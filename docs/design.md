@@ -93,9 +93,9 @@ Hive owns the general workflow contracts once: admission, definitions, task and 
 
 | Boundary | Responsibility |
 | --- | --- |
-| Native mechanisms | Validate typed records; enforce authority, scope, revision and ownership; make transitions durable and replayable; render one accepted record into instructions; expose missing evidence and pending propagation. |
+| Native mechanisms | Validate typed records; enforce authority, scope, revision and ownership; make transitions durable and replayable; render one validated Imperative schema into instructions; expose missing evidence and pending propagation. |
 | Rules and configuration | Model/class/effort preferences, weighted usage comparison, resource floors and their comparison operators, credit authority, lane limits and expiry, review escalation, proof scope, memory budgets, context thresholds, compaction policy, delivery posture, workspace ownership and communication preferences. Values and temporary trials carry scope, provenance and expiry. |
-| External execution | Claude/Codex, Git and worktree providers, the forge and Actions, no-mistakes, native test machines and their provisioning/test suites remain executors. Hive validates their receipts; it does not replace them with a built-in terminal, hypervisor or review engine. |
+| Execution providers | Claude/Codex, Git, the forge and Actions, no-mistakes, native test machines and their provisioning/test suites remain external executors. The proposed Hive-owned worktree provider implements the same isolation boundary; see [Tooling](#tooling). Hive validates executor receipts without building a terminal, hypervisor or review engine. |
 | Project and presentation plugins | Lavish supplies review pages; VibeHub supplies app controls, milestones, exports and its storage compatibility; optional specification adapters can use OpenSpec. Product schemas, credentials, installers and machine administration stay with their owners. |
 
 Lavish, VibeHub, no-mistakes and the forge are named plugin points, not hidden dependencies in core admission. Each adapter registers its version, scoped capabilities, owner and authentication reference privately and implements only the operations it supports. Requests and receipts bind the home, project, task, generation and source revision. Unsupported operations refuse; an unavailable plugin cannot turn a pending obligation into success. Hive's scoped event/export interface supplies projections and invalidation receipts, without expanding an app's permissions or wiring.
@@ -109,9 +109,178 @@ Lavish, VibeHub, no-mistakes and the forge are named plugin points, not hidden d
 
 A plugin that projects workflow state declares the rules/specification revisions it consumes. A source change marks dependent projections stale until refresh and acknowledgment; configured drift checks compare those bindings. A recorded requirement for such a check does not prove that any existing installation already runs it.
 
+## Tooling
+
+This section proposes a tooling ownership strategy for the Hive Mind's ruling through this design revision's merge word.
+It records the 2026-10-10 tooling scout's findings and recommendations; it does not claim that Hive has imported or implemented them.
+The four proposed choices are:
+
+1. **Ownership:** fork and adapt tasks-axi into the Pool and Treehouse into the worktree isolation provider; rebuild the small Fleet-specific workflow mechanisms natively; keep the remaining executors behind plugin points.
+2. **Licence:** adopt MIT for Hive's original code and the two MIT adaptations, preserving upstream copyright/licence notices and a revision-bound import record.
+3. **Starting profile:** use tmux with Claude and Codex, Git and the tools required by the selected delivery route; install browser, review-page, test-machine and network dependencies only when their features are selected.
+4. **Test-machine and app boundary:** Hive owns generic reservation, lifecycle, transport and evidence rules; hypervisors, project test suites, app storage/installer compatibility and machine administration stay external behind the existing plugin boundaries.
+
+Nothing is forked or rebuilt before the Hive Mind rules on this proposal.
+Hive currently has no licence file.
+Licence selection precedes any source import; adding Hive's licence file is a separate subsequent change.
+This revision authorizes no forks, repository creation, installations, upgrades or spend.
+Implementation and migration leave the existing firstmate installation, homes, worktree pools, status displays and shared no-mistakes configuration untouched.
+
+### Inventory and disposition
+
+**F** means fork and adapt selected source into Hive's repository and vocabulary; **R** means independently rebuild the generic workflow contract; **K** means keep an external dependency behind the named component's plugin or platform boundary.
+K is not an installation list: optional and excluded entries have no bootstrap requirement, and platform commands share adapter boundaries rather than each needing a plugin registry entry.
+The inventory includes active dependencies, transitive helpers and explicitly unused candidates so their omission from the starting profile is deliberate.
+Licences describe the scout's inspected package or upstream revision; an unknown origin or uninspected distributed notice set remains unknown until qualification.
+
+| Tool | What it provides | Hive component / boundary | Origin | Licence evidence | Disposition |
+| --- | --- | --- | --- | --- | --- |
+| tasks-axi | Queue, holds, moves and archives | Pool / Mind's word | [kunchenguid/tasks-axi](https://github.com/kunchenguid/tasks-axi) | MIT | **F**; one authoritative Pool |
+| Treehouse | Reusable worktrees, locks and durable leases | Dispatcher / isolation provider | [kunchenguid/treehouse](https://github.com/kunchenguid/treehouse) | MIT | **F**; Hive-owned provider |
+| gh-axi; gh | Complete forge queries, publication and merge transport | Forge / Shadow / Assimilation | [kunchenguid/gh-axi](https://github.com/kunchenguid/gh-axi); [cli/cli](https://github.com/cli/cli) | MIT, both | **K**; GitHub adapter, including gh beneath gh-axi |
+| quota-axi | Attributed provider quota readings | Policy / capacity reader | [kunchenguid/quota-axi](https://github.com/kunchenguid/quota-axi) | MIT | **K**; Hive owns policy |
+| lavish-axi | Review pages, nested rounds and answers | Mind's word / presentation | [kunchenguid/lavish-axi](https://github.com/kunchenguid/lavish-axi) | MIT | **K**; selected review-page feature |
+| chrome-devtools-axi | Browser command interface | Worker proof / browser adapter | [kunchenguid/chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi) | MIT | **K**; selected browser feature |
+| chrome-devtools-mcp; Google Chrome | Browser protocol bridge and browser | Worker proof / browser adapter | [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp); Google | Apache-2.0; proprietary Chrome distribution | **K**; selected browser feature, no bundled browser |
+| no-mistakes | Review, fixes, tests, documentation, lint, publication and CI | Synapse executor | [kunchenguid/no-mistakes](https://github.com/kunchenguid/no-mistakes) | MIT | **K**; native policy and receipts, external gate engine |
+| tmux | Visible sessions and terminal control | Dispatcher / control / Shadow runtime adapter | [tmux/tmux](https://github.com/tmux/tmux) | ISC permission form, with per-file notices | **K**; initial terminal backend |
+| Ghostty | Operator's terminal viewer | Optional presentation | [ghostty-org/ghostty](https://github.com/ghostty-org/ghostty) | MIT upstream; installed app notices not inspected | **K**; viewer choice, no required installation |
+| Herdr | Alternative session runtime | Optional runtime adapter | [herdrdev/herdr](https://github.com/herdrdev/herdr) | Apache-2.0 at inspected revision; verify the selected release | **K**; not installed, not a rollout dependency |
+| Zellij | Alternative terminal runtime | Optional runtime adapter | [zellij-org/zellij](https://github.com/zellij-org/zellij) | MIT upstream | **K**; uninstalled, experimental compatibility |
+| cmux | Alternative desktop terminal runtime | Optional runtime adapter | [manaflow-ai/cmux](https://github.com/manaflow-ai/cmux) | GPL-3.0-or-later root; specified server directories BUSL-1.1; third-party notices | **K**; uninstalled, no source absorption |
+| Orca | Desktop runtime with its own worktrees | Optional runtime/isolation adapter | Exact compatible implementation not established | Not established | **K**; unavailable until identity and capabilities are qualified |
+| Tart | Local macOS virtualization | Test-machine provisioner plugin | [cirruslabs/tart](https://github.com/cirruslabs/tart) | Fair Source 0.9 at 2.32.1 | **K**; external hypervisor, no source/image import |
+| fm-guest-run | Source transfer, bounded execution and result collection | Test-machine transport / Synapse | Local Fleet helper; public source not established | No licence located | **R**; generic runner contract |
+| fm-guest-lock | Shared/exclusive resource reservations | Capacity / test-machine admission | Local Fleet helper | No licence located | **R**; native reservations |
+| fm-guest-stop; fm-guest-slot-retired | Idle/release eligibility and positive retirement proof | Runner lifecycle / continuity | Local Fleet helpers | No licence located | **R**; provisioner still performs shutdown |
+| fm-guest-nightly | Project suite scheduling and stages | Project test-suite plugin | Local project helper | No licence located | **K**; project-owned, no Hive source import |
+| fm-guest-nightly-records | Evidence transfer and project result interpretation | Synapse / project test-suite plugin | Local project helper | No licence located | **R** generic collector; project schemas stay external |
+| Local firstmate launcher | Cold start, restart and capability offers | Session owner / continuity / existing app plugin | Local app-owned launcher, distinct from upstream firstmate | No public grant established | **R** generic lifecycle; app compatibility stays external |
+| fm-dispatch-spend; fm-codex-token-usage | Task/model usage attribution | Native metering / policy | Local Fleet helpers | No licence located | **R**; one metering projection |
+| Local token-usage reader: usage.py, report-tokens.sh, breakdown.py | Claude usage-event normalization | Native metering | Local Python/Bash helpers | No licence located | **R**; same metering contract |
+| claude-ctx-statusline; quota-tmux | Context observations and terminal usage display | Context / Shadow / optional terminal projection | Local Fleet helpers | No licence located | **R**; shared observations, optional formatting adapter |
+| OpenSpec | Optional specification CLI/store | Definition store adapter | [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) | MIT | **K**; selected specification feature |
+| Local external store layer; fm-store-blocks; fm-store-commit | Definition/rule transactions, validation and closure | Definition / rules / knowledge | Local project store layer | No licence located | **R** general workflow; exact app format stays plugin-owned |
+| RTK | Optional command-output filtering | Worker output adapter | [rtk-ai/rtk](https://github.com/rtk-ai/rtk) | Apache-2.0 | **K**; opt-in, complete evidence bypasses filtering |
+| Tailworks | Optional review hosting/transport | Presentation / network adapter | [kesk-git/tailworks](https://github.com/kesk-git/tailworks); source unavailable to scout | Not established | **K**; no vendoring without source/rights qualification |
+| Tailscale | Optional network transport | Network adapter | [tailscale/tailscale](https://github.com/tailscale/tailscale) | BSD-3-Clause upstream; installed app notices not inspected | **K**; selected network feature |
+| ntfy / ntfy-server | Optional notification transport/server | Notification adapter | [binwiederhier/ntfy](https://github.com/binwiederhier/ntfy) | Apache-2.0 at inspected tag | **K**; no demonstrated workflow requirement |
+| Local certificate-renewal helper; Mullvad | Host certificate and VPN administration | External machine administration | Local helper; exact Mullvad package not established | Helper licence not located; Mullvad distribution not audited | **K**; outside Hive provisioning |
+| Local app mockup-server helper | One-off preview hosting | Existing project/presentation plugin | Local project helper | No licence located | **K**; no demonstrated workflow requirement |
+| remote-pi-relay | Other-harness relay | External harness tooling | Not established | Not established | **K**; excluded from Claude/Codex profile |
+| gerrit-axi | Gerrit forge operations | Optional forge adapter | [slnkjthien/gerrit-axi](https://github.com/slnkjthien/gerrit-axi) | Apache-2.0 plus NOTICE | **K**; uninstalled, not required for GitHub |
+| glab | GitLab forge operations | Optional forge adapter | [gitlab-org/cli](https://gitlab.com/gitlab-org/cli) | MIT upstream | **K**; uninstalled, not required for GitHub |
+| tea | Candidate Gitea CLI, no discovered call site | Unselected forge candidate | Exact package not investigated | Not established | **K**; no dependency to introduce |
+| Beads / bd | Conditional legacy queue backend | Optional Pool backend adapter | Compatible distribution not established | Not established | **K**; unused, no second queue installation |
+| Claude Code | Local and qualified Void execution | Claude runtime adapters / Synapse | Anthropic | Proprietary CLI/service | **K**; selected harness |
+| Codex | Local execution and Astra review | Codex runtime adapters / Synapse | [openai/codex](https://github.com/openai/codex) | Apache-2.0 CLI; vendor service remains external | **K**; local selected, both Void routes parked |
+| pi | Other agent harness | External harness tooling | [earendil-works/pi](https://github.com/earendil-works/pi) | MIT in inspected package | **K**; excluded from selected profile |
+| opencode, pi-signed, grok, kimi, cursor / cursor-agent, omp, muse, gemini, rovo, agy, devin | Other named harness candidates | External harness tooling | Exact distributions not established by command names | Not established | **K**; excluded, no mandatory checks/installations |
+| Git | Source identity, worktrees and local landing | Isolation / forge / Assimilation platform boundary | [git/git](https://github.com/git/git); Apple distribution | GPL-2.0 upstream; exact Apple notices not gathered | **K**; external Git engine |
+| jq | JSON processing | Policy / forge / adapter platform boundary | [jqlang/jq](https://github.com/jqlang/jq); Apple distribution | MIT upstream; installed notices not gathered | **K**; only where selected implementation uses it |
+| Bash; zsh; sh | Script execution | Session / runner / platform adapters | GNU; zsh project; system shell distribution | Homebrew Bash GPL-3.0-or-later; exact system-shell notices not gathered | **K**; qualify required shell behavior |
+| Node | AXI and JavaScript execution | Selected tool runtime | [nodejs/node](https://github.com/nodejs/node) | MIT plus bundled third-party notices | **K**; selected Node-based tools require it |
+| npm / npx | Package provisioning | External tool maintenance | [npm/cli](https://github.com/npm/cli) | Artistic-2.0 | **K**; maintenance, no automatic runtime install |
+| Python; Perl | Parsing, metering, locks and bounded helpers | Native helper / runner platform boundary | [python/cpython](https://github.com/python/cpython); Perl project / Apple | Python-2.0 inspected; installed Perl notices not gathered | **K**; only as selected implementations require |
+| SQLite | Read-only gate and usage evidence | Synapse / metering adapter | [sqlite/sqlite](https://github.com/sqlite/sqlite) | Public-domain upstream declaration; installed notices not gathered | **K**; version-bound fallback only |
+| curl; OpenSSL | Network requests and digest/certificate primitives | Forge / network / platform adapters | [curl/curl](https://github.com/curl/curl); [openssl/openssl](https://github.com/openssl/openssl) | curl licence upstream; OpenSSL Apache-2.0 inspected | **K**; selected features only |
+| ssh; scp; rsync | Remote execution and file transport | Runner / optional remote-home adapter | OpenSSH; installed Apple openrsync | BSD-family upstream; exact Apple notices not gathered | **K**; scp has no discovered workflow call site |
+| ShellCheck; actionlint; gitleaks | Shell/workflow lint and optional secret scanning | Synapse / development tools | [koalaman/shellcheck](https://github.com/koalaman/shellcheck); [rhysd/actionlint](https://github.com/rhysd/actionlint); [gitleaks/gitleaks](https://github.com/gitleaks/gitleaks) | GPL-3.0-or-later; MIT; MIT | **K**; project-selected validation, not universal stages |
+| Go; cc; Swift; Xcode / xcodebuild | Build selected helpers or project tests | Build / native-test platform boundary | Go project; Apple compiler/SDK distribution; Swift project | Exact Go/cc notices not audited; Swift Apache-2.0 with runtime exception; Apple SDK terms | **K**; build-time or project-specific only |
+| Homebrew; ripgrep | Package maintenance; worker search | Provisioning / worker tools | [Homebrew/brew](https://github.com/Homebrew/brew); [BurntSushi/ripgrep](https://github.com/BurntSushi/ripgrep) | Installed licences not inspected by scout | **K**; no automatic upgrades or source absorption |
+| macOS; launchctl, osascript, lsappinfo, dscl, open, sw_vers, sysctl, getconf, uuidgen, lsof, ps, pgrep | OS services, notification and process identity | Local runtime / machine administration boundary | Apple and system-component authors | Per-component/system terms | **K**; bounded adapters, no Hive OS layer |
+| awk, base64, basename, cat, chmod, cksum, clear, cmp, comm, cp, cut, date, dd, df, diff, dirname, du, env, file, find, grep, head, id, install, ln, ls, md5, md5sum, mkdir, mkfifo, mktemp, mv, nohup, od, paste, readlink, realpath, rm, rmdir, sed, seq, sha256sum, shasum, sleep, sort, stat, strings, tail, tar, tee, time, touch, tr, uname, uniq, wc, xargs | Files, digests, process detachment and ordinary shell operations | Shared platform boundary | OS/package providers | Exact per-binary notices not audited | **K**; capability-check used operations, no vendoring |
+| pbpaste; timeout / gtimeout | Optional setup input; conditional bounded-execution fallback | Setup / platform adapter | OS/package providers | Exact distributions not audited | **K**; no universal requirement; timeout CLIs absent in scout |
+| setsid, flock, pkill, say | API/builtin/local-function or forbidden-command references, not established CLI dependencies | Platform reference inventory | Implementation-specific | No separate package attribution established | **K** classification only; no installation or lifecycle authority inferred |
+| Python IMAP/SMTP; curl-backed Relay; Python voice client / sounddevice / SSH | Optional mail, notification and voice transport | Communication plugins | Standard/protocol libraries and local adapters; exact optional packages not audited | Distribution-specific; unresolved where uninspected | **K**; unused/unproved, feature-selected only |
+| cloudflared, ffmpeg, sox; mail / fmx command names | No demonstrated executable dependency | Unselected network/communication candidates | Exact packages not investigated | Not established | **K** classification only; do not introduce them |
+
+The in-process firstmate-calm mod is local harness customization, not another external executable to import; backup copies are inactive artifacts.
+Neither is a Hive dependency.
+
+### Fork and adapt: equivalence before replacement
+
+Both adaptations retain upstream attribution, applicable notices and upstream tests in a bounded module, with a recorded upstream base and a maintenance owner.
+Hive vocabulary applies to new interfaces and explicit versioned migrations; historical words, evidence and unknown record fields must survive unchanged.
+Qualify the chosen revision and its dependencies before import rather than treating an upstream root licence as covering every bundled file.
+
+**Pool:** use tasks-axi's parser, transitions, archives and multi-item moves as the implementation base.
+The scout's reproducible source baseline is [tasks-axi 0.2.6](https://github.com/kunchenguid/tasks-axi/tree/9401ff899c0d1d8ae6b4fd8727b9025abda2032c).
+Preserve real-format round trips, prose/evidence/unknown fields, archive lookup, queued versus in-flight transitions, unanswered holds through completion/cleanup, idempotent answer receipts, and recoverable atomic multi-home moves.
+Prove that private-home selection cannot write into a project's code root and that persistent Fleets are never represented as ordinary tasks.
+Keep legacy Markdown import/export and optional backend seams, with an explicit identity migration for legacy follow-up records.
+Admission, Mind's word and task generations share one authoritative store; tasks-axi and Hive must not concurrently write equivalent queues.
+
+**Isolation provider:** adapt Treehouse's pool, lease, locking, preservation and VCS integration; keep Git itself external.
+The scout's reproducible source baseline is [Treehouse v3.1.2](https://github.com/kunchenguid/treehouse/tree/a5ab29f88f9dc57c06b5ffb43b9f25c79a7acf33).
+Expose acquire/observe/release receipts bound to private home, project clone, task generation, branch and physical worktree, replacing terminal-directory discovery only after qualification.
+Retain upstream tests for concurrent acquisition, durable leases after exit, stale-owner ambiguity, interrupted acquire/return, base/branch setup, checkout hooks and trust, spaces in paths, symlink/common-directory verification, and preservation of dirty, untracked or unlanded work.
+Add proof for distinct clones of the same origin, refusal to release a reassigned slot and every supported runtime/provider combination, including runtime-owned isolation.
+New Hive work uses a separate owned namespace; existing firstmate slots are never adopted by resemblance or apparent idleness.
+This adaptation establishes ownership and reliable receipts; it has no measured memory-saving claim.
+
+### Rebuild natively: workflow contracts
+
+Rebuild the local additions with no located licence independently from their behavioral contracts, without transplanting their source.
+Any later proposal to copy such source first needs established provenance and redistribution rights.
+Use the existing [components and private state](#components-and-private-state), not a second orchestration tier or another always-on daemon.
+
+| Native responsibility | Required contract and acceptance evidence |
+| --- | --- |
+| Session launch and restart | Implement `hive-session-start` and continuity through the ordinary policy resolver, home lock and exact process/session generation. Prove cold start, duplicate-launch refusal, verified checkpoint/plan revision, preservation of worker windows/worktrees, partial restoration, and separately reported wake failure. App caller/allowlist translation stays in the existing app plugin. |
+| Context observation and projection | Implement `hive-context` with source, time, home, harness/session generation and measured/estimated/unknown status. Reject stale or mismatched observations, handle long turns, and never derive restart authority from guessed model-window capacity. Optional terminal formatting consumes the same cached observations, with no provider poll per pane. |
+| Policy and usage metering | Keep `hive-policy` as the single resolver for all roles and restart; quota-axi remains its provider reader. Record task generation, actual model and gate ownership at execution time; preserve event deduplication, account/reset discontinuities, cache/input/output distinctions, read-only source access and crash-consistent generations. Mark estimated/unmeasured coverage and freshness explicitly; token counts are not quota percentages or a billing guarantee. Apply [resource admission](#effective-policy-and-resource-admission) before spend. |
+| Test-machine reservation | Reserve before mutation; preserve the observed runner profile's two shared lanes, at most one compile and one flow, with captures/nightly exclusive and inherited locks valid. Express capacities/classes as the runner's configured profile, not universal project rules. Prove concurrent admission, no third lane in that profile, exclusive/shared exclusion and refusal to release another generation's lease. |
+| Test-machine transport and lifecycle | Bind source/base/head and cache identity, confine synchronization to the owned target, enforce disk/capacity checks and finite execution bounds, and refuse host fallback. Cancellation must positively account for guest-side processes before releasing capacity. Unknown guest activity prevents stop; idle release and slot retirement require current positive ownership proof. Only the provisioner performs guest boot/shutdown. |
+| Evidence collection and lifecycle records | Retain full proof on transfer/test failure, separating transport health from the test verdict. Bind environment, task generation, source head, run and artifacts; replay collection without duplicate completion. Project result schemas/stages remain in the test-suite plugin. Preserve independent task, report, decision, specification and cleanup receipts under [requirement closure](#requirement-closure-and-worker-retirement). |
+| Definition, rules and store transactions | Implement the [definition/rule/knowledge contract](#definitions-standing-rules-and-generated-knowledge), including original words, accepted revisions, validation before commit, pending closure after code lands, atomic recovery and replay without double commit. OpenSpec and app-specific section/storage formats remain optional adapters; a failed store update cannot claim completion. |
+
+Historical reports of guest cancellation or shutdown defects are regression scenarios to qualify, not proof that a current release still has those defects.
+Native acceptance exercises state, side effects and crash recovery through executable interfaces; script renaming or matching instruction text cannot establish equivalence.
+
+### Keep dependencies: feature-scoped plugin contracts
+
+Every K entry is provisioned only if its feature is selected, with its required transitive runtime and verified version/capabilities.
+Already available tools may be reused; selection does not authorize an upgrade, account change, service start or network exposure.
+Retained terminal interfaces preserve inherited Claude/Codex capabilities, but an uninstalled or unqualified backend cannot be advertised as ready.
+Unknown licences block source absorption or redistribution, and unknown capability identity blocks enablement; neither requires installing unused tools to resolve it now.
+
+| Plugin boundary | Kept dependencies and integration commitment |
+| --- | --- |
+| Harness and terminal runtime | Claude/Codex and initially tmux implement the [runtime adapter contract](#runtime-adapters-what-the-void-adds). Preserve stable endpoint IDs, verified composer clearing, acknowledgments, semantic activity and exact-target control. Ghostty is an optional viewer; Herdr, Zellij, cmux and Orca remain optional interfaces qualified only when selected. Other harness tools are excluded from the starting profile. |
+| Forge | Keep gh-axi and its gh dependency, with alternative forge CLIs only for a selected forge. Hive owns repository identity, authority and source/head binding under the existing forge contract. Qualify pagination, complete machine-readable responses, REST-only cloud restrictions, stale heads, unknown mergeability and authorized merge read-back; compact display output is not complete evidence. |
+| Resource reader | Keep quota-axi behind the policy evidence interface, reading only the selected Claude/Codex scope by default. Use bounded cached observations with explicit age; unknown windows cannot prove free capacity. Observation must not invoke models, refresh credentials or switch accounts to evade a refusal. |
+| Local Synapse | Keep no-mistakes behind start/observe/respond and its supported custody/synchronization protocol. Prove reattachment, real daemon failure, parked/unknown custody, full findings, changed heads, separate validation/publication and archived evidence. Any read-only SQLite fallback is version-bound and retired when complete supported CLI reads replace it. Hive neither mirrors the engine's state machine nor edits its shared configuration. |
+| Review pages and browser proof | Keep lavish-axi behind the existing complete-round/answer contract; persist every returned round before acknowledgment and do not claim recovery for vendor feedback never returned. Browser proof uses chrome-devtools-axi, MCP and Chrome with verified selected-page identity, navigation, screenshots, attachments and disconnect behavior. Start only for selected work; no idle board/browser service and no browser-based Codex dispatch. |
+| Test machine and project suites | Keep Tart, SSH/file transport, native SDKs and project suites behind reservation/execute/collect/release. Hive owns the generic records above; suite scheduling, stages, result interpretation, installers, VM images and Apple tool permissions remain external. Platform tools are qualified on the actual runner, not inferred from host versions. |
+| Specification and legacy Pool stores | Keep OpenSpec only for a selected store adapter, with identity/revision, transaction recovery and closure receipts. Beads retains a conditional compatibility seam; it never creates a competing default Pool or requires bd installation. Exact app storage compatibility remains at the existing project plugin. |
+| Optional presentation, network and communication | RTK, Tailworks, Tailscale, ntfy and the listed relay/voice/mail dependencies stay opt-in. Preserve unfiltered authority/evidence output; measure RTK before considering a default. Hosting, tunnel, certificate and VPN administration need their own authorized setup. Local mockup/nightly helpers stay project-owned; no new Hive service is implied. |
+| Platform and development | Git, shells, language runtimes, JSON/SQLite/network utilities, OS commands, build tools and linters remain external under the component boundaries in the inventory. Install only what the selected implementation or project's checks require; package managers are provisioning tools, not startup dependencies. Verify flags, versions and bounded subprocess behavior without forking commodity tools. |
+
+Herdr was not installed in the scout's environment; its inspected [Apache-2.0 source](https://github.com/herdrdev/herdr/blob/2563803dca97c040beaf3dc3acdcb5a3221b4238/LICENSE) does not assign that licence to older releases.
+The selected [Tart 2.32.1 licence](https://github.com/cirruslabs/tart/blob/2.32.1/LICENSE) is Fair Source 0.9, so Tart remains external with its usage conditions and no bundled VM images.
+Keep applicable Apache notices/change notices and each dependency's own distribution terms; do not place GPL, BUSL, proprietary or unresolved source under Hive's proposed MIT header.
+The import record must identify each imported portion, upstream repository and exact revision, licence/copyright and third-party notices, retained tests, local changes and maintenance owner.
+No private home state, credentials, decision records or global configuration notes enter a public source import.
+
+### Ordered implementation plan
+
+Each phase is bounded work after the ruling, not permission to begin all phases or alter the operating firstmate fleet.
+
+1. **Licence and contracts first:** record the ruling, add the chosen licence in its separate change, and define import provenance, component ownership, typed identity/receipt schemas, capabilities, configuration precedence and failure states. Establish the minimal profile and baseline elapsed time, process count, peak memory and disk for dispatch, idle polling and validation before claiming resource savings. Ordinary observation uses no model turns.
+2. **Pool:** after licence and identity schemas, adapt tasks-axi, first importing records read-only and proving round-trip/crash recovery, then selecting one writer in a new Hive private home. Integrate Mind's word and native admission; build definition/rule/knowledge transactions against this store, with optional external store adapters.
+3. **Isolation with tmux:** after Pool task generations and home/clone identity, adapt Treehouse and the tmux adapter in isolated qualification environments. Prove leases, provider receipts, distinct same-origin clones and uncertain-launch reconciliation before enabling dispatch; never switch a live firstmate pool to qualify the provider.
+4. **Session, context, policy and metering:** after Pool and runtime identity, implement native lifecycle and attributed observations, use quota-axi as the reader and preserve app translation at its plugin boundary. Prove safe checkpoint/restart, resource parks, fresh resume authority and shared observation caches without another daemon.
+5. **Synapse, forge and test-machine integration:** adapters can be developed alongside the preceding phases, but dispatch waits for their identity and custody gates. Preserve no-mistakes fix ownership, current-head evidence and project-specific policy without changing shared configuration. Qualify generic reservations, cancellation, transfer and proof against external Tart/SSH and project suites; resource-heavy tests remain opt-in and capacity-controlled.
+6. **Review pages and optional features:** after Mind's word and evidence receipts, qualify complete Lavish rounds, browser proof and selected hosting/network/communication features. Retain other terminal/forge interfaces without installing them; do not substitute a new UI or configure networking implicitly.
+7. **End-to-end proof:** after the required selected adapters pass, prove a complete local lifecycle and then the Claude session/GitHub path, including GitHub Synapse with local Astra and Mac Assimilation. Exercise crash/replay at launch, answer, proof, publication, merge and retirement. Retire only Hive migration shims whose replacements prove equivalence; the existing firstmate remains untouched. Parked Codex Void routes do not block this sequence and remain subject to their separate readiness contract.
+
 ## Components and private state
 
-Hive remains a set of instructions, skills, and small local scripts around existing tools. It needs no new hosted control service. The `hive-*` command names below are **proposed script interfaces**, not installed commands or vendor flags. Their upstream owners are named so an implementation can port behavior without reproducing it in several places.
+Hive combines instructions, skills and native workflow helpers with the proposed Pool and isolation adaptations and external executors described in [Tooling](#tooling).
+It needs no new hosted control service.
+The `hive-*` command names below are **proposed interfaces**, not installed commands or vendor flags.
+Their upstream owners are named so an implementation can port behavior without reproducing it in several places.
 
 Each supervisor has an explicitly selected private home outside the public project repository. The following are logical stores within that home, not machine-specific locations. Use atomic record replacement, append-only event journals, and home/task locks. Missing or malformed authoritative records stop the affected mutation; a cached display cannot authorize it.
 
@@ -121,7 +290,7 @@ Each supervisor has an explicitly selected private home outside the public proje
 | Pool: `hive-pool add/read/update` | Private durable work items: task identity, project, scope, dependencies, delivery path, dispatch class, artifact links, holds and dates. Ports the home-scoped `fm-tasks-axi.sh` interface. | Failed dispatch/finish transitions cannot be reported as successful. Capacity deferral leaves the item queued. |
 | Mind's word: `hive-word hold/answer/complete/verify` | Private held task, reason, origin, decision provenance, answer, and release/completion state. Ports `fm-captain-hold.sh`. | An unanswered or unreadable hold prevents dependent dispatch, Assimilation, and closing that question. |
 | Imperative author: `hive-imperative create/revise/render` | Private canonical text, revision and digest, plus exactly what was delivered for each generation. Ports `fm-brief.sh` and its intent/completion helpers. | Empty sections, unresolved placeholders, or incompatible delivery settings refuse dispatch. |
-| Admission: `hive-admit create/check/approve` | Private immutable request and typed Object/Standard/Output/Boundary fields, inherited-record reference, interpretation and approval owner/revision. | Malformed or incomplete admission refuses every launch path; a shell hook cannot bypass it. |
+| Admission: `hive-admit create/check/approve` | Private immutable request and admission receipt bound to the Imperative revision, its embedded Object/Standard/Output/Boundary fields, inherited evidence and authority. `approve` records a required ruling, not a routine extra wait. | Missing fields, a material guess or absent required authority refuses dispatch; a high-confidence authorized reading proceeds under the Imperative contract. |
 | Definition: `hive-spec define/accept/close` | Private specification revision, acceptance receipt, requirement/evidence links and closure receipt; optional adapter points at its canonical external store. | Product gaps hold acceptance; changed requirements invalidate the affected acceptance and proof bindings. |
 | Effective rules: `hive-rule record/amend/resolve` | Private original words, amendments, scope, effective/expiry times, supersession and resolved-rule digest. | Preserve originals; unresolved precedence or expired authority blocks the dependent action. |
 | Policy resolver: `hive-policy resolve` | Private role/profile selection with rule digest, resource evidence, freshness, permissions and permitted fallbacks. | Unsupported model, missing required evidence or exhausted admission allowance refuses launch without changing accounts or model. |
@@ -167,22 +336,25 @@ One owner presents and reconciles each round, through Lavish or another configur
 
 ## Imperatives are given at dispatch
 
-### One admission record before dispatch
+### Admission checks the Imperative
 
-Command admission has four typed fields, distinct from the Imperative's four presentation sections:
+Object, Standard, Output and Boundary are required typed fields inside the Imperative's own sections, in the single schema defined under [render and deliver](#render-and-deliver-the-imperative).
+There is no separate four-part block beside the Imperative and no independently maintained admission copy of its contents.
+`hive-admit` preserves the original request, checks that schema and records a receipt bound to its revision/digest and the authority used.
+Fields may draw on an identified, readable, revision-bound task/specification record.
 
-| Field | Required meaning |
-| --- | --- |
-| Object | The project, task and concrete artifact or behavior being changed or investigated. |
-| Standard | Acceptance conditions, evidence requirements and the authoritative requirements/rules used to judge the result. |
-| Output | The expected deliverable, recipient and validation/publication choices. |
-| Boundary | Scope, exclusions, allowed effects, resources, permissions and stop/escalation conditions. |
-
-`hive-admit` preserves the original request and may inherit fields from an identified, readable, revision-bound task/specification record. It records the proposed interpretation and the authority that accepted it. Missing product intent or material authority stays held with recommended readings until the Hive Mind supplies the word; the Fleet resolves technical detail already inside accepted scope. Malformed input fails closed rather than becoming an exempt dispatch.
+When every part can be filled with high confidence from the command's words and the record, state that reading in the dispatch and proceed within existing authority, without a separate restatement-and-wait turn.
+Stop to ask when a part is a genuine guess that would change what gets built, or when a boundary involving spend, deletion, security or publication needs the Hive Mind's authority.
+Already explicit, applicable authority satisfies that boundary check; inference cannot supply it.
+Record the unresolved part and its consequence as a hold; the Fleet resolves technical detail already inside accepted scope.
+Dispatch without all four fields is refused on every launch path, even when the intended work seems obvious.
+Malformed input likewise fails closed.
 
 Record-only maintenance may use a narrower schema only when a named, configured exemption proves it cannot launch project work or broaden authority. Provisioning a persistent Fleet uses a charter/provisioning record instead of pretending it is a Swarm task. Neither exemption allows build work to bypass admission. Hooks may improve feedback, but `hive-dispatch` and every adapter entry point enforce the same native check for local and Void work.
 
-The accepted record renders the Imperative and launch parameters, with admission/specification revisions and policy digest embedded in the private receipt. Contradictory includes or independently inferred flags refuse dispatch. Steering that changes scope revises the same source record and repeats the affected checks; it cannot smuggle a new permission through a message.
+The validated Imperative schema renders both the dispatch text and launch parameters, with admission/specification revisions and policy digest embedded in the private receipt.
+Contradictory includes or independently inferred flags refuse dispatch.
+Steering that changes scope revises that same schema and repeats the affected checks; it cannot smuggle a new permission through a message.
 
 | Independent dispatch axis | Contract |
 | --- | --- |
@@ -197,12 +369,12 @@ Validated local-only delivery is a first-class combination: the Fleet validates 
 
 The Hive owns the canonical Imperative in its private home, or delegates custody to the dispatching Fleet's private home with a parent reference. Nothing requires committing it to a public repository. The source branch must be pushed for a Void launch; the Imperative is supplied as the session launch prompt or rendered for the selected GitHub integration under the visibility rules below. Provider receipt of that prompt does not authorize publishing it in a Harvest, comment, log, or code file.
 
-Preserve four parts from firstmate's [dispatch scaffold](https://github.com/kunchenguid/firstmate/blob/fb75c1f94170df7e0751147ea61afabcf5d4e104/bin/fm-brief.sh):
+Preserve the four sections from firstmate's [dispatch scaffold](https://github.com/kunchenguid/firstmate/blob/fb75c1f94170df7e0751147ea61afabcf5d4e104/bin/fm-brief.sh), with the command fields embedded as follows:
 
-1. **Task:** the Hive Mind's intent, separately from the Fleet's implementation specification. Include the substance of referenced evidence, scope, exclusions, acceptance criteria, and the assigned dispatch class. Do not turn the Fleet's implementation choices into purported operator intent.
-2. **Setup:** repository, immutable source SHA and base, output branch rule, role, harness/placement, dependencies, available tools, allowed access, and isolation assertions. Local execution verifies physical working directory and repository top level before branching. Void execution verifies repository/base/source identity before editing.
-3. **Rules:** hard boundaries, allowed changes and artifacts, complete validation commands, delivery and decision channels, authorized repair scope, finite retry limits, and stop conditions. Name who can answer a blocker; do not assume private Mac files or local tools exist in the Void.
-4. **Definition of done:** the exact deliverable and evidence. A validated Harvest requires the agreed Synapse results at its current head; a direct Harvest requires publication and its stated checks; validated local-only work requires a clean branch plus passing current-head Synapse evidence; an explicitly authorized direct local route carries its stated checks; a Lictor requires a collected report and decision inventory. Define the worker's stopping point separately from later Assimilation.
+1. **Task:** contains **Object** (project, task and concrete artifact or behavior) and **Standard** (acceptance conditions, required evidence and authoritative requirements/rules). Preserve the Hive Mind's intent separately from the Fleet's implementation specification, include the substance of referenced evidence and assign the dispatch class. Do not turn implementation choices into purported operator intent.
+2. **Setup:** binds that Object to repository, immutable source SHA/base, output branch rule, role, harness/placement, dependencies, available tools, allowed access and isolation assertions. Local execution verifies physical working directory and repository top level before branching; Void execution verifies repository/base/source identity before editing. Setup implements the same schema's Boundary and cannot expand it.
+3. **Rules:** contains **Boundary** (scope, exclusions, allowed effects, resources, permissions and stop/escalation conditions), including authorized repair scope and finite retry limits. Supply complete validation commands that implement the Standard and identify the delivery/decision channels and blocker owner. Do not assume private Mac files or local tools exist in the Void.
+4. **Definition of done:** contains **Output** (exact deliverable, recipient, validation/publication choices and completion evidence against the Standard). A validated Harvest requires agreed Synapse results at its current head; a direct Harvest requires publication and its stated checks; validated local-only work requires a clean branch plus passing current-head Synapse evidence; an explicitly authorized direct local route carries its stated checks; a Lictor requires a collected report and decision inventory. Define the worker's stopping point separately from later Assimilation.
 
 The rendered prompt starts with the worker role boundary, so project instructions cannot turn a Swarm into a supervisor. Before launch, validate that the text fits the selected transport without truncation and that required files, network access, result collection, tool installation, and credentials are already available. Secrets and unrelated private history never belong in the prompt. If those requirements cannot be met, hold dispatch or choose an explicitly permitted local route.
 
@@ -486,7 +658,7 @@ The following are open implementation issues. Keep each in the owning Pool with 
 
 | Issue | Evidence needed to close it |
 | --- | --- |
-| Admission and independent delivery axes | Exercise malformed/missing fields, revision-bound inheritance and narrow exemptions across all launch entry points. Prove define/accept/build ownership and validated local-only delivery without contradictory includes or accidental publication. |
+| Admission and independent delivery axes | Exercise the Imperative's single schema, refusal without all four fields, revision-bound inheritance and narrow exemptions across all launch entry points. Prove high-confidence dispatch without a separate wait, holds for material guesses or missing sensitive-boundary authority, define/accept/build ownership and validated local-only delivery without contradictory includes or accidental publication. |
 | Rules, specification closure and memory | Prove immutable words, scoped supersession/expiry, optional store-adapter recovery, code-landed/store-close-pending separation, single-owner rendering and stale-consumer detection. A pending projection must not authorize stale behavior. |
 | Local-only Fleet custody | Prove native provision/route/recover/retire paths with no forge requirement, distinct isolation for same-origin clones, Fleet-owned validation and Hive-only local landing. |
 | Context, resource policy and restart | Exercise equality at configured resource floors, stale/unknown readings, all applicable roles, safe gate parks, fresh resume authority, context checkpoint acknowledgment and exact-target restart under the same policy resolver. |
@@ -502,4 +674,8 @@ The following are open implementation issues. Keep each in the owning Pool with 
 | Assimilation enforcement | Prove the protected-base permission boundary, required check provenance, exact-head race refusal, current authority checks and verified post-merge result. |
 | Recovery and resource use | Kill and restart the Mac supervisor at launch, collection, review, merge and cleanup boundaries; recover without duplicated work or lost decisions. Show that ordinary polling uses no model turns and respects configured machine capacity. |
 
-Implement the retained local route first. Prioritize native admission/independent delivery axes and the rule/specification/knowledge store, then local-only Fleet custody, context/resource lifecycle, complete decision rounds and proof/closure transactions. Qualify the shared adapter contract and Claude session/GitHub execution, then complete GitHub Synapse with local Astra and Mac Assimilation. Retire private wrappers only after equivalence evidence; do not replace one set of duplicated rules with another. Preserve the Codex backend boundaries and measured evidence, but keep Void dispatch parked until a supported command-line route honors model selection and passes qualification. Neither that future route nor legacy retirement blocks the rest of Hive. Preserve working local routes throughout. This document specifies the target; deployment, vendor-account changes, and changes to the existing firstmate operation remain separate work.
+Follow the dependencies in the proposed [Tooling implementation plan](#ordered-implementation-plan) after the Hive Mind's ruling, using the evidence requirements above to qualify each affected component.
+Preserve the Codex backend boundaries and measured evidence, but keep Void dispatch parked until a supported command-line route honors model selection and passes qualification.
+Neither that future route nor legacy retirement blocks the rest of Hive.
+Preserve working local routes throughout.
+This document specifies the target; deployment, vendor-account changes, and changes to the existing firstmate operation remain separate work.
