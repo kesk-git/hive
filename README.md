@@ -6,6 +6,6 @@ A supervisor for Claude Code and Codex agents, with local execution on the Mac a
 
 Hive is not affiliated with Games Workshop.
 
-Vocabulary: the operator is the Hive Mind; the supervisor is the Hive; each project's persistent supervisor is a Fleet named after its project; workers are Swarms; investigators are Lictors; the review gate is Synapse; a brief is an Imperative; the backlog is the Pool; a pull request is a Harvest; a merge is Assimilation; the cloud is the Void; supervision is the Shadow.
+Vocabulary: the operator is the Hive Mind; the supervisor is the Hive; each workspace has one persistent Fleet, named after the workspace and supervising its registered projects; workers are Swarms; investigators are Lictors; the review gate is Synapse; a brief is an Imperative; the backlog is the Pool; a pull request is a Harvest; a merge is Assimilation; the cloud is the Void; supervision is the Shadow; in the UI the Expanse is the Hive-wide view, a Sector is a workspace and a Subsector is a project.
 
 Research and development of Hive is carried out by a dedicated second mate of the operator's current fleet, which may read the original firstmate at https://github.com/kunchenguid/firstmate.
