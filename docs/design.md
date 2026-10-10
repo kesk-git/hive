@@ -145,7 +145,7 @@ The existing `hive-*` interfaces below map into these packages rather than creat
 | `shadow` | Bounded observations, due polls, durable wakes and acknowledgments; `hive-shadow`, `hive-state`. | `test-shadow`: replay, unknown/stale observations, backoff and wake ownership. |
 | `synapse` | Validation obligations, review/fix custody, evidence and readiness; `hive-synapse`, guarded Assimilation interfaces. | `test-synapse`: head-bound proof, finding gates, one fixer and landing authority. |
 | `word` | The single decision intake, held questions, exact answers and completion receipts over Pool storage; `hive-word`. | `test-word`: complete rounds, authorized answers, deduplication and unresolved holds. |
-| `ui` | Local observability, artifact serving and [Review](#review), with decision cards over scoped projections; `hive-ui`. | `test-ui`: stale/incomplete cards, revision-bound submissions, durable review rounds and receipt display. |
+| `ui` | Local observability, artifact serving and [Review](#review), with decision cards over scoped projections; `hive-ui`. Its **Waiting on you** view lists the decisions the operator owes, each as a decision card. | `test-ui`: stale/incomplete cards, revision-bound submissions, durable review rounds and receipt display. |
 
 These are required future per-package targets, not commands already present in this documentation-only repository.
 Each target runs that package's owned tests independently; integration targets separately exercise the command-line contracts between packages.
@@ -244,7 +244,7 @@ Native does not mean duplicating the same rule in a prompt, hook, UI and script:
 
 #### Review
 
-Mockup and design review live in `ui`, replacing Lavish. A Lictor writes plain HTML into the owning supervisor's private home, one file per revision. The Hive Mind opens that artifact, annotates it and answers decision cards beside it; the owning Fleet (or the Hive for its own task) receives the resulting round through the Shadow. The decision cards beside the mockup and the **Waiting on you** cards are one component, using the same projections, answer binding and `word` intake.
+Mockup and design review live in `ui`, replacing Lavish. A Lictor writes plain HTML into the owning supervisor's private home, one file per revision. The Hive Mind opens that artifact, annotates it and answers decision cards beside it; the owning Fleet (or the Hive for its own task) receives the resulting round through the Shadow. The review's decision cards beside the mockup and the cards in the `ui` **Waiting on you** view are one component, using the same projections, answer binding and `word` intake.
 
 **Files and ownership.** All paths below are relative to the selected private home, outside the project repository. A review lives under `reviews/<task-id>/<generation>/<review-id>/`; IDs bind it to its Pool item, owning supervisor and assigned Lictor. Revision and round numbers increase independently and are never reused.
 
