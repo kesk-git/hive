@@ -1,8 +1,8 @@
 # Hive
 
-A supervisor for Claude Code and Codex agents: an operator's firstmate that keeps every capability of the original on the Mac and adds cloud sessions as an option, never a limit.
+A supervisor for Claude Code and Codex agents, with local execution on the Mac and optional cloud sessions. Hive owns its workflow in one repository, with five core dependencies: Git, gh, tmux, Claude Code and Codex CLI.
 
-[Hive design](docs/design.md) defines the architecture, dispatch classes, and delivery contracts.
+[Hive design](docs/design.md) defines the architecture, dispatch classes, delivery contracts and approved [tooling strategy](docs/design.md#tooling). It specifies the target; the native packages are not implemented yet.
 
 Hive is not affiliated with Games Workshop.
 
