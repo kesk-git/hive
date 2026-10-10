@@ -4,7 +4,7 @@ Design baseline: 2026-10-10. This is an implementation contract, not a claim tha
 
 Product scope follows the Hive Mind's 2026-10-10 brainstorm rulings and later Codex findings and decisions, including the decision to park Codex Void work without model selection. The dated Claude and Codex measurements establish the capability evidence; the original firstmate supplies the inherited operational contracts.
 
-Hive specializes firstmate for Claude Code and Codex. It retains their existing local capabilities and adds execution in the Void. The Hive and its Hive Fleets ordinarily run as Claude Code sessions on the Mac; local Codex supervision remains an inherited capability. Swarms and Lictors can run locally or in the Void. Synapse validates their work, and Assimilation stays on the Mac.
+Hive specializes firstmate for Claude Code and Codex. It retains their existing local capabilities and adds execution in the Void. The Hive and its Fleets ordinarily run as Claude Code sessions on the Mac; local Codex supervision remains an inherited capability. Swarms and Lictors can run locally or in the Void. Synapse validates their work, and Assimilation stays on the Mac.
 
 The latest Mind's word takes precedence over the earlier minimal-Mac sketch. Local Swarms, worktrees, terminal runtimes, the local review pipeline, supervision hooks, and a local test machine remain available. Tooling specific to other agent harnesses is removed; shared tools needed by Claude and Codex remain. This design does not alter the existing firstmate installation.
 
@@ -18,23 +18,25 @@ The later Mind's word parks Codex Void work because the legacy path cannot choos
 | --- | --- |
 | Hive | The product. **The Hive** is its primary supervisor and the Hive Mind's point of contact. |
 | Hive Mind | The operator; supplies intent, scope, decisions, and Assimilation authority. |
-| Hive Fleet | A persistent project supervisor, named after its project, with an isolated private home and a charter. |
+| Fleet | A persistent project supervisor, named after its project, with an isolated private home and a charter. |
 | Swarm | A worker completing an authorized change through its chosen delivery path. |
 | Lictor | An investigator producing evidence, a diagnosis, or a design report; research alone does not authorize implementation. |
 | Imperative | The complete dispatch instructions for one assignment. |
-| Pool | The durable work queue owned by the Hive or a Hive Fleet. |
+| Pool | The durable work queue owned by the Hive or a Fleet. |
 | Mind's word | An operator decision, recorded against a held Pool item. |
-| Shadow in the Warp | Supervision; called **the Shadow** below. |
+| Shadow | Supervision, durable observation and wake ownership. |
 | Synapse | The review and validation gate. |
 | Harvest | A pull request carrying a proposed change. |
 | Assimilation | Authorized merging of a Harvest or landing of a local-only change. |
 | Void | Cloud execution. Model names remain their real names. |
 | Genestealer | The research role developing Hive; it does not create another level of runtime authority. |
 
+Hive uses its own visual identity. Do not use Tyranid, Warhammer or Games Workshop artwork in its interface, documentation or promotional material.
+
 ```mermaid
 flowchart TD
     Mind[Hive Mind] --> Hive[The Hive · Mac]
-    Hive --> Fleet[Hive Fleet · Mac]
+    Hive --> Fleet[Fleet · Mac]
     Hive <--> Private[Private homes · Pool, Imperatives, decisions, journal]
     Fleet <--> Private
     Fleet --> Local[Local Claude or Codex · isolated worktree]
@@ -62,10 +64,10 @@ The inheritance baseline is the original [firstmate operator contract](https://g
 
 ### Operator contract and hard rules
 
-1. The Hive coordinates work; Swarms change projects. Hive Fleets apply the same separation within their charters. Guarded initialization, synchronization, updates, and authorized Assimilation keep their narrow upstream exceptions. A concrete instruction from the Hive Mind can authorize a specific project operation, but cannot be broadened into standing authority.
+1. The Hive coordinates work; Swarms change projects. Fleets apply the same separation within their charters. Guarded initialization, synchronization, updates, and authorized Assimilation keep their narrow upstream exceptions. A concrete instruction from the Hive Mind can authorize a specific project operation, but cannot be broadened into standing authority.
 2. Assimilation requires the Hive Mind's explicit word, or an explicitly granted project posture permitting autonomous Assimilation of green, in-scope work. A worker, reviewer, passing check, or completed Void session cannot grant that authority.
 3. Preserve unlanded work. A dirty worktree, uncertain ownership, an uncollected result, or an unproved remote copy blocks cleanup. A Lictor's scratch copy can be retired only after its report is safely collected and its decision inventory recorded.
-4. Swarms and Lictors report to their dispatching supervisor. Hive Fleets relay outcomes through their registered parent channel. Direct intervention by the Hive Mind remains authoritative and is reconciled into the durable record.
+4. Swarms and Lictors report to their dispatching supervisor. Fleets relay outcomes through their registered parent channel. Direct intervention by the Hive Mind remains authoritative and is reconciled into the durable record.
 5. Report outcomes faithfully: distinguish an accepted launch, observed activity, published change, passing Synapse, and completed Assimilation. Missing evidence is unknown, not success.
 
 The Hive presents concrete outcomes and the decisions needed from the Hive Mind, including a Harvest's full URL when relevant. An idle Fleet does not invent audits or improvement work. Research is dispatched separately only when requested or when uncertainty could change whether or what to build; bounded research can remain within an already authorized implementation task.
@@ -77,13 +79,35 @@ The Hive presents concrete outcomes and the decisions needed from the Hive Mind,
 | Local Claude and Codex | Preserve verified launch, steering, interruption, exit, resume, recovery, model/effort configuration, permission modes, and tool restrictions. Harness choice and runtime placement are separate axes. |
 | Isolated worktrees and terminal runtimes | Preserve pooled or runtime-owned disposable copies and visible sessions, including existing verified terminal backends. Neither a Void addition nor a resource-saving preference removes a local runtime. |
 | Local Synapse | Retain no-mistakes and its ownership of review, fixes, tests, documentation, lint, publication, and CI when selected. A worker drives its gates; it does not edit around an active run. |
-| Delivery choices | Preserve validated delivery, direct Harvest delivery, and local-only delivery. Their upstream command values are `no-mistakes`, `direct-PR`, and `local-only`. Merge authority is an independent choice. |
+| Delivery choices | Model placement, validation, publication and Assimilation authority independently. Preserve the upstream `no-mistakes`, `direct-PR` and `local-only` inputs through explicit translation; local-only publication never disables validation by implication. |
 | Local test machines | Preserve a Fleet's required native machine or guest and its capacity controls. macOS execution requires a macOS runner or local macOS machine; a Linux Void session cannot establish macOS behavior. |
 | Persistent Fleets | Preserve charters, isolated homes, scope routing, correlated parent replies, guarded provisioning and recovery. Existing remote-home capability remains optional; the chosen deployment starts with supervisors on the Mac. |
 | Supervision and continuity | Preserve durable inboxes, status events, wake acknowledgments, current-state reconciliation, turn-end guards, away/quiet operation, stow, and guarded restart/update behavior for Claude and Codex. |
 | Project and operational tooling | Keep project registration, branch/base selection, forge bindings, Pool backends, usage-aware admission, optional operator communication integrations, and guarded synchronization where they support Claude/Codex work. Optional features stay opt-in; this GitHub Void design does not silently remove other local delivery capabilities. |
 
-Local-only work stays under the Hive's local landing authority. A direct Harvest does not acquire an additional independent review pipeline merely because it uses Claude or Codex. The complete GitHub Synapse contract below is the validated Void delivery path; choosing the faster path or local-only path must be explicit in the Imperative. Existing repository-required checks still apply.
+Local-only work stays under the Hive's local landing authority. A direct Harvest does not acquire an additional independent review pipeline merely because it uses Claude or Codex. The complete GitHub Synapse contract below is the validated Void delivery path. The Imperative must separately declare validation and publication; a local-only branch still receives its required Synapse checks. Existing repository-required checks still apply.
+
+### Native workflow, configurable policy and plugins
+
+Hive owns the general workflow contracts once: admission, definitions, task and decision identity, effective policy, evidence linkage, safe lifecycle transitions and knowledge projections. Port those responsibilities from the existing procedures, rather than accumulating copies of their scripts or keeping parallel rules in hooks and prompts. Historical records remain evidence and do not automatically become effective instructions. The existing firstmate operation stays untouched.
+
+| Boundary | Responsibility |
+| --- | --- |
+| Native mechanisms | Validate typed records; enforce authority, scope, revision and ownership; make transitions durable and replayable; render one accepted record into instructions; expose missing evidence and pending propagation. |
+| Rules and configuration | Model/class/effort preferences, weighted usage comparison, resource floors and their comparison operators, credit authority, lane limits and expiry, review escalation, proof scope, memory budgets, context thresholds, compaction policy, delivery posture, workspace ownership and communication preferences. Values and temporary trials carry scope, provenance and expiry. |
+| External execution | Claude/Codex, Git and worktree providers, the forge and Actions, no-mistakes, native test machines and their provisioning/test suites remain executors. Hive validates their receipts; it does not replace them with a built-in terminal, hypervisor or review engine. |
+| Project and presentation plugins | Lavish supplies review pages; VibeHub supplies app controls, milestones, exports and its storage compatibility; optional specification adapters can use OpenSpec. Product schemas, credentials, installers and machine administration stay with their owners. |
+
+Lavish, VibeHub, no-mistakes and the forge are named plugin points, not hidden dependencies in core admission. Each adapter registers its version, scoped capabilities, owner and authentication reference privately and implements only the operations it supports. Requests and receipts bind the home, project, task, generation and source revision. Unsupported operations refuse; an unavailable plugin cannot turn a pending obligation into success. Hive's scoped event/export interface supplies projections and invalidation receipts, without expanding an app's permissions or wiring.
+
+| Plugin point | Operations and durable receipt | Boundary on failure |
+| --- | --- | --- |
+| Lavish | Fetch a complete round and attachment manifest, present an authorized question, collect an exact answer, acknowledge that round. Store page/round revision, content digest and answer receipt in the private decision store. | Incomplete nested content or an unreadable attachment keeps the round open. A native replacement UI needs separate approval. |
+| VibeHub | Export scoped Pool, decision and workflow projections; collect authorized app requests; record source digest, consumer contract version and acknowledgment. | Failed export or contract drift leaves propagation pending. Exact app storage, installation and controls remain plugin-owned. |
+| no-mistakes | Start, observe and respond through its supported CLI; collect run/head evidence and follow its branch-custody and synchronization instructions. | An active run owns its fixes. Missing evidence or unknown custody blocks publication/landing; Hive never edits around the gate. |
+| Forge | Read requirements and current heads, publish a Harvest, collect checks/reviews, submit an authorized expected-head merge and verify its result. | Missing producer, unreadable rules or a changed head blocks readiness/Assimilation. GitHub is this Void design's selected implementation, not a new source of merge authority. |
+
+A plugin that projects workflow state declares the rules/specification revisions it consumes. A source change marks dependent projections stale until refresh and acknowledgment; configured drift checks compare those bindings. A recorded requirement for such a check does not prove that any existing installation already runs it.
 
 ## Components and private state
 
@@ -97,14 +121,21 @@ Each supervisor has an explicitly selected private home outside the public proje
 | Pool: `hive-pool add/read/update` | Private durable work items: task identity, project, scope, dependencies, delivery path, dispatch class, artifact links, holds and dates. Ports the home-scoped `fm-tasks-axi.sh` interface. | Failed dispatch/finish transitions cannot be reported as successful. Capacity deferral leaves the item queued. |
 | Mind's word: `hive-word hold/answer/complete/verify` | Private held task, reason, origin, decision provenance, answer, and release/completion state. Ports `fm-captain-hold.sh`. | An unanswered or unreadable hold prevents dependent dispatch, Assimilation, and closing that question. |
 | Imperative author: `hive-imperative create/revise/render` | Private canonical text, revision and digest, plus exactly what was delivered for each generation. Ports `fm-brief.sh` and its intent/completion helpers. | Empty sections, unresolved placeholders, or incompatible delivery settings refuse dispatch. |
-| Dispatcher: `hive-dispatch` | Private configuration and task execution record, launch intent and receipt, runtime ownership, admission/capacity reservation. Ports `fm-spawn.sh` and verified Claude/Codex adapters. | Preserve uncertain launches for reconciliation; never blindly create a second session after a timeout. |
+| Admission: `hive-admit create/check/approve` | Private immutable request and typed Object/Standard/Output/Boundary fields, inherited-record reference, interpretation and approval owner/revision. | Malformed or incomplete admission refuses every launch path; a shell hook cannot bypass it. |
+| Definition: `hive-spec define/accept/close` | Private specification revision, acceptance receipt, requirement/evidence links and closure receipt; optional adapter points at its canonical external store. | Product gaps hold acceptance; changed requirements invalidate the affected acceptance and proof bindings. |
+| Effective rules: `hive-rule record/amend/resolve` | Private original words, amendments, scope, effective/expiry times, supersession and resolved-rule digest. | Preserve originals; unresolved precedence or expired authority blocks the dependent action. |
+| Policy resolver: `hive-policy resolve` | Private role/profile selection with rule digest, resource evidence, freshness, permissions and permitted fallbacks. | Unsupported model, missing required evidence or exhausted admission allowance refuses launch without changing accounts or model. |
+| Fleet owner: `hive-fleet provision/route/recover` | Private charter, parent channel, project/clone identity, publication/validation defaults and home-bound isolation ownership. | Refuse ambiguous ownership or an unsupported local-only route; do not fall back to hand wiring. |
+| Knowledge: `hive-memory render/check/propagate` | Private source-owner index, generated projections, maintenance queue, version/digest and per-consumer acknowledgment. | Drift and incomplete propagation remain visible; stale projections cannot authorize work. |
+| Context and capacity: `hive-context observe/checkpoint`, `hive-park`, `hive-resume` | Private observation provenance/freshness, checkpoint readiness, parked obligations and restart policy/target receipts. | Unknown observations do not trigger destructive control; no restart without a verified checkpoint and target. |
+| Dispatcher: `hive-dispatch` | Private accepted admission/specification revisions, resolved policy receipt and task execution record, launch intent and receipt, runtime ownership and capacity reservation. Ports `fm-spawn.sh` and verified Claude/Codex adapters. | Preserve uncertain launches for reconciliation; never blindly create a second session after a timeout. |
 | Steering and control: `hive-send`, `hive-control` | Private message outbox/inbox, acknowledgments, revisions, lifecycle operation receipts. Ports `fm-send.sh` and `fm-control.sh`. | Delivery acceptance is distinct from acknowledgment. Unsupported lifecycle actions refuse; a chat message is not an interrupt command. |
 | Shadow: `hive-shadow`, `hive-state` | Private observations, poll cursors, next-due times, wake queue, handled sequences, owner generation and liveness. Ports `fm-watch.sh`, `fm-crew-state.sh`, and wake helpers. | Unknown remote state stays unknown; failures neither erase evidence nor trigger destructive recovery. |
 | Synapse: `hive-synapse start/collect/respond` | Private run ledger, review packets, finding decisions, bound head/base SHAs, fix rounds and executor; public sanitized checks/reviews on GitHub. | Incomplete or stale evidence keeps the gate pending or failed. Only the selected executor owns fixes. |
 | Assimilation: `hive-assimilate`, `hive-assimilate-local` | Private authority receipt, verified Harvest identity/head, required evidence, merge result and completion receipt. Ports `fm-pr-merge.sh` and `fm-merge-local.sh`. | Refuse on missing authority or unmet guards; verify actual forge state after submission. |
 | Continuity: `hive-stow`, `hive-recover`, `hive-sync`, `hive-retire` | Private curated memory, recovery checkpoint, pending transitions and cleanup receipts; recorded worktree ownership. Ports stow, sync, control and teardown contracts. | Preserve records and copies on failed collection, synchronization or cleanup; never reset/discard to make recovery convenient. |
 
-The minimum execution record carries `task_id`, `home_id`, `generation`, `kind` (Swarm or Lictor), project/repository identity, base branch and source SHA, expected output branch, Imperative revision/digest, class, concrete harness/model/effort, placement, delivery mode, Synapse executor, authority reference, and timestamps. Every record also binds the adapter backend, implementation version and capability-evidence revision. A local record adds the owned worktree and runtime endpoint; a Void record adds vendor, environment generation if applicable, session/task or Actions run ID and URL, trigger receipt, observed output branch, and collection receipt. A backend change creates a new execution generation; old results retain their original backend identity. Record requested and observed model separately; absence of observed model evidence cannot be filled from the request.
+The minimum execution record carries `task_id`, `home_id`, `generation`, `kind` (Swarm or Lictor), project/repository identity, base branch and source SHA, expected output branch, Imperative revision/digest, class, concrete harness/model/effort, placement, validation policy, publication mode, Synapse executor, authority reference, admission/specification revisions, effective-rule digest, and timestamps. Every record also binds the adapter backend, implementation version and capability-evidence revision. A local record adds the owned worktree and runtime endpoint; a Void record adds vendor, environment generation if applicable, session/task or Actions run ID and URL, trigger receipt, observed output branch, and collection receipt. A backend change creates a new execution generation; old results retain their original backend identity. Record requested and observed model separately; absence of observed model evidence cannot be filled from the request.
 
 Execution, delivery, and decision state are separate. Execution can be planned, launching, running, stopped, failed, or unknown. Delivery can be unpublished, collected, Harvest-open, in-Synapse, ready, assimilated, or retired. Holds can coexist with any of those. An event saying `done` does not imply Assimilation, and a later `working` event does not close a keyed decision.
 
@@ -112,11 +143,57 @@ Execution, delivery, and decision state are separate. Execution can be planned, 
 
 Pool items describe work, never persistent agents. A Fleet's routed work belongs in its Pool; the parent keeps a handoff receipt rather than a second competing task. Dispatch reserves capacity and transitions a queued item together with recording the launch attempt. If submission becomes uncertain, retain the reservation until reconciliation proves what happened.
 
-A decision is an ordinary Pool item held for the Hive Mind. Prefer holding the work it gates; create a separate question only when it has its own scope. Record the question, consequence, options, recommendation, and any explicit revisit date privately. `hive-word answer` records the actual answer and either releases the work or completes the question. Replays of the same answer are idempotent; conflicting answers require reconciliation. A deferral date is not approval.
+An operator decision is an ordinary Pool item held for the Hive Mind; routine technical acceptance within approved scope belongs to the owning Fleet. Prefer holding the work it gates; create a separate question only when it has its own scope. Record the question, consequence, options, recommendation, and any explicit revisit date privately. `hive-word answer` records the actual answer and either releases the work or completes the question. Replays of the same answer are idempotent; conflicting answers require reconciliation. A deferral date is not approval.
 
 Before completing a Lictor report, the supervisor inventories every remaining operator decision and records the held items, or explicitly records that there are none. Finishing the report and closing those decisions are distinct actions. Cleanup must retain an open question even when its source report or Harvest has been delivered. This ports the [held-task lifecycle](https://github.com/kunchenguid/firstmate/blob/fb75c1f94170df7e0751147ea61afabcf5d4e104/docs/captain-hold-lifecycle.md).
 
+### Definitions, standing rules and generated knowledge
+
+A Pool item can pass through `definition-needed`, `defining`, `accepted`, `building` and `delivered`, with holds kept separately. The Fleet names the main deliverable and subordinate lanes, commissions only the needed definition work, and accepts a revision against the already authorized intent. A sufficiently complete existing specification can be referenced directly; this is not mandatory planning ceremony for every small task. The acceptance receipt identifies the Fleet's supervisor, specification digest, admission revision and open product questions. A product choice returns to the Hive Mind; technical acceptance cannot settle it. Build dispatch refuses an unaccepted required revision, and later edits invalidate only affected acceptance/evidence rather than silently changing the worker's target.
+
+The private rule store separates original words from their operational interpretation. `hive-rule record` appends immutable words and origin; `amend` adds an attributed revision or supersession without rewriting history; `resolve` computes rules effective for the current home, project, role and time. Each rule carries authority, scope, status, effective/expiry times, source references and requirement/evidence links. An unresolved conflict holds the action it affects. Expired waivers, archived narrative and abandoned trials remain readable but are not loaded as current policy. A missing render field is not proof that a rule was retired.
+
+Hive supplies a native specification/decision store interface. OpenSpec is an optional adapter; neither its CLI, the VibeHub-specific store format nor nested Git repositories are prerequisites for all users. An adapter must retain immutable identity, accepted revision, amendment history, proof references, atomic update/recovery and closure receipts. VibeHub owns its exact compatibility format. Failed external updates leave a pending transaction with a replay key, never a fictitious completed archive.
+
+`hive-memory render` derives shared and Fleet-specific instructions from the effective rule set and each fact's single canonical owner. Projections record source revisions, scope, renderer version and digest. `check` reports duplication, budget violations, stale sources and consumer drift using configured budgets; it never repairs authority by copying contradictory prose. `propagate` records what each consumer received and acknowledged. Missing propagation remains visible, and dispatch/restart refuses a stale projection when the changed rule affects its authority or behavior.
+
+Knowledge maintenance has one writer per store and an explicit queue. Stow can enqueue uncovered knowledge under its canonical owner; folding, archiving and propagation run only under an authorized maintenance policy or an explicit instruction. Their cadence is configuration. Deferred research and held work stay in the Pool for the Hive Mind; a maintenance cycle does not authorize picking them up. Source changes produce invalidations and receipts, not competing hand-maintained rule copies.
+
+### Complete review rounds and answers
+
+`hive-word` handles channel-independent rounds as well as simple questions. Before marking a round read, collect its complete nested text, all questions and an attachment manifest with content revisions/digests and fetch outcomes. A missing, truncated or unreadable part keeps the round incomplete and yields a precise fetch blocker. Plugin transport acceptance, content-read acknowledgment, the Hive Mind's answer and decision completion are separate states.
+
+One owner presents and reconciles each round, through Lavish or another configured channel. Store the exact answer privately, bind it to the question/round revision and record a per-question disposition. Replayed events are idempotent; a changed question needs reconciliation, not silent application of an older answer. An unanswered call remains visible until answered or explicitly superseded, regardless of age. Archiving a round must preserve a verifiable answer and its completion receipt; absence from the active queue proves neither. A collected Lictor report, answered page round and completed decision have independent receipts, so none can close the others by inference.
+
 ## Imperatives are given at dispatch
+
+### One admission record before dispatch
+
+Command admission has four typed fields, distinct from the Imperative's four presentation sections:
+
+| Field | Required meaning |
+| --- | --- |
+| Object | The project, task and concrete artifact or behavior being changed or investigated. |
+| Standard | Acceptance conditions, evidence requirements and the authoritative requirements/rules used to judge the result. |
+| Output | The expected deliverable, recipient and validation/publication choices. |
+| Boundary | Scope, exclusions, allowed effects, resources, permissions and stop/escalation conditions. |
+
+`hive-admit` preserves the original request and may inherit fields from an identified, readable, revision-bound task/specification record. It records the proposed interpretation and the authority that accepted it. Missing product intent or material authority stays held with recommended readings until the Hive Mind supplies the word; the Fleet resolves technical detail already inside accepted scope. Malformed input fails closed rather than becoming an exempt dispatch.
+
+Record-only maintenance may use a narrower schema only when a named, configured exemption proves it cannot launch project work or broaden authority. Provisioning a persistent Fleet uses a charter/provisioning record instead of pretending it is a Swarm task. Neither exemption allows build work to bypass admission. Hooks may improve feedback, but `hive-dispatch` and every adapter entry point enforce the same native check for local and Void work.
+
+The accepted record renders the Imperative and launch parameters, with admission/specification revisions and policy digest embedded in the private receipt. Contradictory includes or independently inferred flags refuse dispatch. Steering that changes scope revises the same source record and repeats the affected checks; it cannot smuggle a new permission through a message.
+
+| Independent dispatch axis | Contract |
+| --- | --- |
+| Placement | Local or a qualified Void backend, with exact runtime/isolation ownership. |
+| Validation | Required Synapse executor and proof policy, or an explicitly authorized direct-delivery policy. A change of publication mode cannot remove a required gate. |
+| Publication | Harvest or local-only branch delivery. A local-only route needs no forge binding, remote or fabricated Harvest. |
+| Assimilation authority | Attended explicit word or recorded autonomous posture, checked separately at landing. Neither validation nor publication supplies it. |
+
+Validated local-only delivery is a first-class combination: the Fleet validates and presents the exact local branch; the Hive retains local landing authority. The inherited command-mode inputs are compatibility syntax, not the internal state model.
+
+### Render and deliver the Imperative
 
 The Hive owns the canonical Imperative in its private home, or delegates custody to the dispatching Fleet's private home with a parent reference. Nothing requires committing it to a public repository. The source branch must be pushed for a Void launch; the Imperative is supplied as the session launch prompt or rendered for the selected GitHub integration under the visibility rules below. Provider receipt of that prompt does not authorize publishing it in a Harvest, comment, log, or code file.
 
@@ -125,7 +202,7 @@ Preserve four parts from firstmate's [dispatch scaffold](https://github.com/kunc
 1. **Task:** the Hive Mind's intent, separately from the Fleet's implementation specification. Include the substance of referenced evidence, scope, exclusions, acceptance criteria, and the assigned dispatch class. Do not turn the Fleet's implementation choices into purported operator intent.
 2. **Setup:** repository, immutable source SHA and base, output branch rule, role, harness/placement, dependencies, available tools, allowed access, and isolation assertions. Local execution verifies physical working directory and repository top level before branching. Void execution verifies repository/base/source identity before editing.
 3. **Rules:** hard boundaries, allowed changes and artifacts, complete validation commands, delivery and decision channels, authorized repair scope, finite retry limits, and stop conditions. Name who can answer a blocker; do not assume private Mac files or local tools exist in the Void.
-4. **Definition of done:** the exact deliverable and evidence. A validated Harvest requires the agreed Synapse results at its current head; a direct Harvest requires publication and its stated checks; local-only work requires a clean ready branch; a Lictor requires a collected report and decision inventory. Define the worker's stopping point separately from later Assimilation.
+4. **Definition of done:** the exact deliverable and evidence. A validated Harvest requires the agreed Synapse results at its current head; a direct Harvest requires publication and its stated checks; validated local-only work requires a clean branch plus passing current-head Synapse evidence; an explicitly authorized direct local route carries its stated checks; a Lictor requires a collected report and decision inventory. Define the worker's stopping point separately from later Assimilation.
 
 The rendered prompt starts with the worker role boundary, so project instructions cannot turn a Swarm into a supervisor. Before launch, validate that the text fits the selected transport without truncation and that required files, network access, result collection, tool installation, and credentials are already available. Secrets and unrelated private history never belong in the prompt. If those requirements cannot be met, hold dispatch or choose an explicitly permitted local route.
 
@@ -158,6 +235,14 @@ The private dispatch configuration maps each class to eligible Claude/Codex prof
 
 The Fleet resolves the class and concrete profile at every intake. An explicit task instruction wins, followed by the configured matching rule, configured default, then the supported static default. Inspect actual model support and available usage evidence; record uncertainty rather than inventing precision. A malformed configuration, unsupported required capability, or unusable authentication stops dispatch. Never silently change vendor, model, permission mode, or placement to bypass a refusal. Where local fallback is preauthorized, record the fallback and its reason in the execution record.
 
+### Effective policy and resource admission
+
+`hive-policy resolve` applies the effective scoped rules to every role: the Hive, Fleet supervisors, eight dispatch classes, reviewers, fixers and validation steps. It emits a receipt with requested and resolved model/effort, harness, placement, permissions, validation/publication choices, resource reservation, allowed fallback and the source/rule revisions that selected them. Restart uses this same resolver, not a separate default profile. An explicit request retains its priority within current authority; conflicts or unavailable capabilities return a hold rather than a silent downgrade.
+
+Resource readers provide timestamped, attributed evidence with an accuracy/freshness classification. Configured policy decides which usage/credit/resource readings are required and how to weigh available capacity. Unknown or stale values cannot prove capacity; missing required evidence blocks admission, while optional metering can remain visibly unknown. Threshold values, comparison operators, scope, lane limits, expiry and credit authority are configuration. A floor policy defined as at-or-below must fire at equality; it is not a strictly-below check and cannot retain a superseded single-role exception.
+
+Reserve capacity atomically with launch intent and reconcile uncertain submissions before releasing it. `hive-park` waits for a safe checkpoint or pipeline gate, records custody, outstanding work, the resource blocker and resume authority, and stops admitting dependent work. It does not abort a validation round to save capacity. `hive-resume` rechecks fresh evidence, current policy and authority and continues the owned task/gate once, without changing accounts, funding, credentials or model to escape the hold. A timer or resource recovery is not itself new spend authority.
+
 ## Runtime adapters: what the Void adds
 
 Each adapter implements `probe`, `launch`, `observe`, `collect`, and a capability declaration for `steer`, `interrupt`, `resume`, and `stop`. These are Hive interfaces, not assumed vendor commands. Results distinguish accepted, running, finished, failed, unknown, and unsupported; they carry source evidence and the bound task generation. Completion always requires collection and delivery checks above the adapter.
@@ -173,6 +258,14 @@ The local adapter ports firstmate's runtime/harness separation. `hive-dispatch` 
 `hive-send` writes a durable steering message and rings the recorded endpoint. `hive-control` performs verified lifecycle operations; relaunch preserves the same worktree and work. `hive-state` reconciles the current no-mistakes run, semantic harness activity, inbox acknowledgment and status journal. It does not infer a live run from a stale status tail. The local adapter retains existing native test-machine routing and capacity reservations.
 
 No worker may administer a shared pipeline daemon or another task's worktree. A missing endpoint is not proof that work was lost or that a second endpoint is safe. A pipeline client timeout first prompts inspection and reattachment; a confirmed daemon failure is a supervisor-owned blocker. Preserve Codex compaction and Claude handover/recovery behavior through their respective harness adapters rather than imposing one vendor's lifecycle on the other.
+
+### Fleets with local-only custody
+
+`hive-fleet provision` accepts a local-only project without inventing a forge binding. Its charter records the owning supervisor and parent, project/clone identity, validation policy, local publication mode and the Hive's landing authority. `route` sends the work to that Fleet's Pool and preserves one parent handoff receipt. The Fleet owns definition acceptance, isolated branches, Swarm supervision, validation and evidence collection; the Hive performs authorized local Assimilation.
+
+Isolation ownership binds the private home, project clone, provider, task generation and branch/worktree. Two clones of the same origin must not collide in a shared pool. Recovery reconciles those identities and provider receipts rather than guessing from a branch name or an apparently free slot. Provisioning, routing, restart and cleanup must work through the same native interfaces for local-only and Harvest projects; manual symlink/configuration wiring is not an accepted fallback.
+
+On completion, the Fleet presents the clean exact branch and its validation receipt to the Hive. Failed validation, unknown branch custody, unresolved decisions or unavailable proof keeps the handoff pending. Cleanup remains with the recorded owner and requires safe reachability of the work and retained decisions; a local-only project is not exempt from preservation or validation.
 
 ### Claude in the Void
 
@@ -246,7 +339,7 @@ Record any announced retirement deadline and a dispatch cutoff that leaves time 
 
 Switch to `codex-new` only after model selection and its own command-line readiness replay pass and dispatch is explicitly re-enabled; rollback selects another proved backend for new work without discarding old receipts. If legacy access ends first, Claude carries permitted Void work and Codex runs locally. An Imperative requiring Codex, Astra, a particular model or Void-only placement cannot silently become a different executor: use a preauthorized compatible fallback or return the choice to the Fleet. Retirement changes execution routing; it does not weaken either reviewer, Synapse evidence or Mac Assimilation authority.
 
-## The Shadow in the Warp
+## The Shadow
 
 The Shadow is a lightweight Mac process, one owner per private home. It performs bounded reads without model calls, persists observations, and wakes a supervisor only for actionable changes. Claude's existing Stop-hook supervision ownership and Codex's existing checkpoint protocol remain available. The Hive observes its Fleets' routed summaries; each Fleet observes its own children. No process sweeps another home's endpoint namespace.
 
@@ -270,13 +363,23 @@ Every event is correlated with task generation, source, evidence identity and se
 
 Worker status is evidence, not executable input. Validate schema, size, identity, allowed state transitions and the authenticated publisher; fetch full responses and reject truncation. After a Harvest exists, prefer sanitized status comments or another verified receipt channel over commits to the code branch: the Claude measurement showed status-only commits cancelling and restarting CI. Private reports and Imperatives never use a public comment as a convenient transport.
 
+### Context, capacity and safe checkpoints
+
+The Shadow reads fresh context/resource observations through a capability-checked native interface, or a separately verified terminal observer bound to the owned session. Each observation includes source, timestamp, session generation and whether the value is measured, estimated or unknown. A supervision hook registration, cached footer or matching instruction file is not proof that context monitoring is running. Missing observation capability is explicit; it cannot be replaced by guessed usage or a destructive restart.
+
+Configured thresholds produce a checkpoint request to the owned session, not a kill command. Claude saves through stow and reports readiness at a safe point; Codex retains its supported compaction/checkpoint behavior. The session owner records saved task/rule revisions, pending operations, branch custody and a checkpoint digest. The parent or authorized lifecycle owner verifies the exact runtime target and acknowledgment before restarting it. A stale lock, wrong target, failed save or busy gate blocks the transition and preserves work.
+
+Resolve the effective idle-compaction policy across participating supervisor homes, not only the Hive's session. Role-specific exceptions must be explicit, and desired settings remain distinct from verified runtime behavior. Context thresholds and restart profiles are configuration; a restart reuses the ordinary policy resolver and records any authorized revision change instead of silently falling back to a cheaper or different model.
+
+Resource floors use `hive-park` at a safe checkpoint; the Shadow records the clearing condition and wakes the owner under its policy. It does not terminate an active shared validation round or resume spend on a timer. Optional usage reports carry freshness and coverage, never an unconditional fresh label. Repeated handovers or scope-crossing signals can be recorded against configured fitness thresholds and presented as a decision; they do not autonomously split a Fleet or launch deferred research.
+
 ### Restart is a non-event
 
 `hive-session-start` acquires the home lock, loads the Pool, charter, Imperatives, unresolved decisions, execution records and unacknowledged wakes, then schedules bounded live reconciliation. It does not relaunch everything in the journal. Reconcile only recorded direct reports, known vendor IDs, owned branches and known Harvests.
 
 Persist an operation intent before each external side effect and its receipt after success. If a process dies between them, query the exact existing branch, Harvest, session or task before retrying. If the service cannot prove whether an unacknowledged launch succeeded, keep it unknown and request recovery; do not promise exactly-once submission from an API that lacks that guarantee. Missing local endpoints likewise require the runtime's recovery-grade proof before replacement.
 
-Restore poll deadlines, rate-limit backoff, subscription registrations, review-head bindings and pending cleanup transitions from disk. Re-read current forge state before decisions that depend on it. A completed remote task can be collected after the Mac returns; new dispatch and Assimilation wait while the Mac is unavailable. GitHub Actions and vendor event handling may continue independently.
+Restore poll deadlines, rate-limit backoff, subscription registrations, rule/projection revisions, accepted definitions, checkpoint and policy receipts, review-head bindings and pending cleanup transitions from disk. Re-read current forge state before decisions that depend on it. A completed remote task can be collected after the Mac returns; new dispatch and Assimilation wait while the Mac is unavailable. GitHub Actions and vendor event handling may continue independently.
 
 `hive-stow` saves unrecorded decisions, open work, handover facts and reusable knowledge to their proper private owners, curates stale memory, and checkpoints active operations. It does not substitute a conversation summary for task state or reconcile the whole Pool from memory. A failed save means the session is not reset-safe. Recovery reuses existing work, and guarded self-update never resets a dirty project to make versions align.
 
@@ -295,6 +398,18 @@ The Fleet stores the selected Synapse executor and its policy revision before di
 | Tests and build | GitHub Actions executes the project's agreed checks natively on Linux, Windows and macOS. Linux cross-compilation does not establish the other platforms' behavior. |
 | Documentation and lint | Explicit documentation review plus deterministic formatting/lint commands in Actions; omissions are findings, not a presumed pass. |
 | Publication and CI readiness | Verified Harvest identity, exact head, complete check set and reviewer attestations; an aggregate result suitable for branch protection. |
+
+### Validated local delivery, findings and custody
+
+A local-only publication mode retains required review, tests, documentation and lint. For a no-mistakes local executor, the adapter uses its supported `no-mistakes axi run --skip push,pr,ci --intent "<authorized-intent>"` shape and records that publication/forge CI were intentionally excluded, not that validation was skipped. Qualify this mode in the project's actual initialization configuration before enabling it. A plugin unable to validate the local project is a blocker; it cannot rewrite the Imperative to require only a clean branch.
+
+A proof receipt binds the accepted specification and admission revisions, effective-rule digest, relevant environment/tool versions, tested scope, exact head/base, pipeline run/step, check producer and artifact references. Evidence belongs to that revision and run. A later code or requirement change invalidates affected proof unless the selected gate supplies a verified continuity result within its own contract. A report that tests passed is not a substitute for the current-head receipt.
+
+For a held finding set, `hive-synapse collect` retrieves every finding in full, including ID, severity, location, description, action and authority where supplied. Persist the complete gate snapshot and digest with the run, step and head. The Swarm forwards the entire ask-user set to the Fleet; the Fleet applies its authority rules, escalates product/authority ambiguity to the Hive Mind and returns a disposition for every held finding. Decisions bind that snapshot and preserve the actual ruling. Missing or truncated findings, partial answers or a changed gate stay held; a general completion event cannot resolve them. The worker submits the authorized response and leaves every fix to the gate's selected executor.
+
+The no-mistakes plugin's branch-custody record is authoritative while it owns a run. Hive follows its offered reattach, guarded sync or recovery action and checks the resulting head; it never replaces the branch to discard a fix commit. A timed-out client call is distinct from a dead daemon or terminal failure. After publication or local validation, the Fleet verifies that its presented branch contains the pipeline's exact completed head before handing it to the Hive. Any divergence or uncertainty remains a concrete recovery blocker.
+
+An integration-finalizer workflow remains an opt-in trial under separate scoped authority. Its record names the participating branches, accepted specifications, integration owner and final-head validation policy. Enabling the trial alone does not remove a lane's gate or waive proof; any such change requires an explicit approved policy. The finalizer must establish fresh integrated-head evidence, and landing still uses the ordinary authority guards. No trial or plugin registration broadens VibeHub wiring or replaces Lavish, no-mistakes or the forge.
 
 ### Actions and review contracts
 
@@ -316,7 +431,7 @@ Codex's [GitHub review integration](https://developers.openai.com/codex/integrat
 
 The measured Claude native subscription repaired a failed check and a review comment. Hive records the subscription owner, Harvest, allowed scope, current head, expiry and remaining repair rounds privately. Use the supported native Auto-fix mechanism; the observed internal tool names are evidence, not a promised public CLI contract. An implementation must verify a supported enable/disable route.
 
-Default to at most three repair rounds per Imperative, configurable at intake. Deduplicate vendor events by Harvest/head/finding; changing the head invalidates both reviewer passes and starts checks and reviews for the new head. A routine must not repeatedly review its own status comment, and a fixer must not weaken the checks to produce green. A new product choice, destructive action, ambiguous correction, inaccessible required log or exhausted round limit stops the fix and returns a concrete decision/blocker to the Fleet. A Swarm does not answer an ask-user finding about its own instructions.
+Resolve the repair budget, escalation point and exhausted-budget outcome separately for local and Void Synapse before dispatch. These are versioned configuration, not one hard-coded round count. A genuine required defect stays blocking through every round; reaching a budget or escalation point produces a held decision or safe park, never an automatic waiver or success. Deduplicate vendor events by Harvest/head/finding; changing the head invalidates both reviewer passes and starts checks and reviews for the new head. A routine must not repeatedly review its own status comment, and a fixer must not weaken the checks to produce green. A new product choice, destructive action, ambiguous correction, inaccessible required log or exhausted round limit stops the fix and returns a concrete decision/blocker to the Fleet. A Swarm does not answer an ask-user finding about its own instructions.
 
 Synapse is ready only when the expected three-OS checks, documentation/lint obligations, both current-head reviews, and all required finding resolutions are present. The trusted publisher writes an aggregate attestation; the Shadow independently verifies it and records readiness. Before Assimilation, stop further branch-writing repairs and confirm unsubscribe/repair quiescence so an unnoticed late fix cannot race the reviewed head.
 
@@ -335,20 +450,48 @@ Only the Hive or the owning Fleet, acting through the Mac merge helper and withi
 
 The inherited attended exception for an explicitly named failing or missing check remains narrow: the Hive Mind must identify the concrete merge and check to waive. Record that exception and still enforce every other guard; neither autonomous posture nor away mode supplies a waiver. No worker can use administrative flags to skip Synapse. Repository identity, required-source readability and head binding are not inferred from a waiver.
 
-`hive-assimilate-local <task-id>` ports the [local landing helper](https://github.com/kunchenguid/firstmate/blob/fb75c1f94170df7e0751147ea61afabcf5d4e104/bin/fm-merge-local.sh): verified local-only mode, recorded authority, released holds, clean owned branch and destination, and a fast-forward only. Divergence returns to a Swarm for reconciliation; it does not authorize a reset.
+`hive-assimilate-local <task-id>` ports the [local landing helper](https://github.com/kunchenguid/firstmate/blob/fb75c1f94170df7e0751147ea61afabcf5d4e104/bin/fm-merge-local.sh): verified local-only publication mode, required Synapse policy and passing proof at the exact accepted-specification/head revision, recorded Hive authority, released holds, clean owned branch and destination, and a fast-forward only. Divergence returns to a Swarm for reconciliation; it does not authorize a reset.
 
 Cloud publication in the measurement used credentials that were not proven unable to merge. Production enablement therefore needs a demonstrated permissions/ruleset arrangement that permits Swarms to publish branches and Harvests while reserving protected-base updates and Assimilation to the authorized Mac route. Required check producers must resist author spoofing. This is an implementation prerequisite, not a security property already established by the experiment.
 
 After confirmed Assimilation, guarded synchronization refreshes the project copy. Cleanup verifies that all work is safely reachable or otherwise proven landed, confirms task/slot ownership, preserves unresolved decisions, and records the Pool transition before retiring execution records. A merge does not justify deleting uncommitted files or a sibling's copy.
 
+### Requirement closure and worker retirement
+
+Code Assimilation and requirement closure are separate recorded transitions. After verified landing, the owning Fleet's `hive-spec close` binds the landed head, accepted requirements, resolved findings and proof receipts, updates task completion, and folds or archives the accepted delta into the standing specification through its chosen store adapter. Preserve original rulings, amendments and evidence links. If store closure fails, retain a pending closure item and replay key; do not report the requirements landed merely because the code merged, and do not roll back a verified merge to hide the failed bookkeeping.
+
+A Lictor report, page round, operator decision, specification delta and implementation task each have their own completion condition. The retirement queue checks all applicable receipts and unresolved holds before releasing owned execution resources. It can propose cleanup only from current authenticated state, not a timestamp-free status pattern, an old report or a PID file. Prove equivalence before retiring an existing cleanup mechanism; duplicate-looking scripts are not sufficient evidence that one is redundant.
+
+## Explicit decisions on inherited mismatches
+
+These decisions resolve the workflow inventory's conflicts as part of this design. They describe Hive's target contract, not claims that the existing firstmate installation or external tools already enforce it.
+
+| Mismatch | Decision taken by this design |
+| --- | --- |
+| Local delivery and failing-check preferences | Local-only publication retains required Synapse validation. The Hive retains local landing authority. A general preference for accepting an apparently stale failure grants no merge authority: only an explicit waiver naming the concrete Harvest and check can relax that check, with every other guard intact. |
+| Definition approval | The owning Fleet's supervisor accepts technical definitions within authorized intent. Only unresolved product or authority choices return to the Hive Mind. Old procedures requiring another operator approval for every technical definition are not inherited as mandatory ceremony. |
+| Review rounds | Local and Void repair budgets and escalation points are separate configured policies. Their exhaustion holds work or escalates; it never erases a genuine defect or substitutes for its correction. A bounded Void retry policy is not claimed equivalent to a local escalation rule. |
+| Resource floors and historical scope | Resolve the currently effective rule, including its comparison operator and full role scope. An at-or-below floor includes equality; a superseded single-role exception does not narrow it. Values remain configuration and old paragraphs cannot override the resolved rule. |
+| Inheritance and enforcement | Provision and verify required native capabilities and plugin wiring explicitly. Shared memory bytes, copied scripts or matching model configuration do not establish enforced parity. A missing required admission, lifecycle or proof capability blocks the corresponding route. |
+| Context and compaction | Apply the effective idle-compaction policy across participating supervisor homes, with explicit role exceptions and verified session observations. Do not inherit a main-session-only assumption or infer context monitoring from generic supervision records. Uninspected global runtime settings remain unknown. |
+| External contracts and old defects | Track consumer versions and source-date/digest drift at the plugin boundary, and prove that configured checks actually run. Reproduce archived-answer lookup or other reported defects against the current dependency before adding a workaround. Historical issue age proves neither that a defect remains nor that it was fixed. |
+
+The integration-finalizer trial stays opt-in, app-wiring scope stays unchanged, and a native replacement for an external plugin needs a separate word. Approval of this design does not authorize deployment, account changes, destructive cleanup or Assimilation of this Harvest; that last action still needs the Hive Mind's further merge word after validation.
+
 ## Implementation evidence still required
 
 The later rulings resolve the earlier disagreements about dropping local tooling and committing Imperatives: local capabilities remain, and canonical Imperatives are private dispatch material. The latest ruling parks Codex Void despite proved legacy submit/status/diff/apply and internal final-text retrieval: model selection is unavailable on that path. New-service automation also remains parked pending a supported command-line route with effective model selection. Claude is the primary Void executor; Codex keeps local, legacy and new backend boundaries. Legacy retirement must not become a dependency failure for Hive.
 
-The following are open implementation issues. Keep each in the owning Pool with evidence and a completion condition:
+The following are open implementation issues. Keep each in the owning Pool with evidence and a completion condition. Deferred items wait for authorization; the table is not an automatic research or upgrade schedule:
 
 | Issue | Evidence needed to close it |
 | --- | --- |
+| Admission and independent delivery axes | Exercise malformed/missing fields, revision-bound inheritance and narrow exemptions across all launch entry points. Prove define/accept/build ownership and validated local-only delivery without contradictory includes or accidental publication. |
+| Rules, specification closure and memory | Prove immutable words, scoped supersession/expiry, optional store-adapter recovery, code-landed/store-close-pending separation, single-owner rendering and stale-consumer detection. A pending projection must not authorize stale behavior. |
+| Local-only Fleet custody | Prove native provision/route/recover/retire paths with no forge requirement, distinct isolation for same-origin clones, Fleet-owned validation and Hive-only local landing. |
+| Context, resource policy and restart | Exercise equality at configured resource floors, stale/unknown readings, all applicable roles, safe gate parks, fresh resume authority, context checkpoint acknowledgment and exact-target restart under the same policy resolver. |
+| Complete review rounds | Exercise nested text, missing attachments, replayed/changed rounds, exact answer binding, unanswered-call visibility and verifiable archived answers through the Lavish plugin boundary. |
+| Proof, findings and retirement | Exercise full finding-set rulings, changed-head/spec invalidation, pipeline fix custody, validated local handoff and independent report/page/decision/spec completion before cleanup. Keep the integration-finalizer trial opt-in. |
 | Codex model selection and legacy evidence | Preserve the measured submit/status/diff/apply, internal final-text retrieval and failed model-selection evidence. Keep legacy dispatch parked. Re-enablement requires model selection first, then the complete delivery replay; validate any retained internal reader against missing, malformed, mismatched and incomplete results. |
 | Codex new-service readiness and retirement | Re-test only through explicitly authorized command-line probes. Keep the backend parked until model selection and the full readiness contract pass. Preserve recorded results through legacy retirement while local Codex and Claude remain operational. |
 | Claude session observation and private report collection | A supported native state reader, or an explicitly limited observation contract, plus durable private collection of a Lictor report without public leakage. Keep a Lictor local when its required private output cannot yet be collected from the Void. |
@@ -359,4 +502,4 @@ The following are open implementation issues. Keep each in the owning Pool with 
 | Assimilation enforcement | Prove the protected-base permission boundary, required check provenance, exact-head race refusal, current authority checks and verified post-merge result. |
 | Recovery and resource use | Kill and restart the Mac supervisor at launch, collection, review, merge and cleanup boundaries; recover without duplicated work or lost decisions. Show that ordinary polling uses no model turns and respects configured machine capacity. |
 
-Implement inherited local behavior first, then the shared execution records and adapter contract, then Claude session and GitHub execution, then the complete GitHub Synapse with local Astra and Mac Assimilation. Preserve the Codex backend boundaries and measured evidence, but keep Void dispatch parked until a supported command-line route honors model selection and passes qualification. Neither that future route nor legacy retirement blocks the rest of Hive. Preserve working local routes throughout. This document specifies the target; deployment, vendor-account changes, and changes to the existing firstmate operation remain separate work.
+Implement the retained local route first. Prioritize native admission/independent delivery axes and the rule/specification/knowledge store, then local-only Fleet custody, context/resource lifecycle, complete decision rounds and proof/closure transactions. Qualify the shared adapter contract and Claude session/GitHub execution, then complete GitHub Synapse with local Astra and Mac Assimilation. Retire private wrappers only after equivalence evidence; do not replace one set of duplicated rules with another. Preserve the Codex backend boundaries and measured evidence, but keep Void dispatch parked until a supported command-line route honors model selection and passes qualification. Neither that future route nor legacy retirement blocks the rest of Hive. Preserve working local routes throughout. This document specifies the target; deployment, vendor-account changes, and changes to the existing firstmate operation remain separate work.
