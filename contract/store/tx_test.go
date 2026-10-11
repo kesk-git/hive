@@ -926,9 +926,8 @@ func TestIntentPathsAreRelativeToTheHome(t *testing.T) {
 		t.Errorf("dispatch intent paths = %v, want %v", got, want)
 	}
 	u, _, _ := open(t, home, "ui")
-	review := ReviewPath("task-1/1/review-1/review.json")
-	got = paths(t, u, Tx{RequestID: req9, Records: []RecordWrite{{review, []byte(`{}`), 0}, {task1, []byte(`{}`), 0}}, Outcome: []byte(`{}`)})
-	want = []string{review, "ui/" + task1, "ui/" + OutcomePath(req9)}
+	got = paths(t, u, Tx{RequestID: req9, Records: []RecordWrite{{task1, []byte(`{}`), 0}}, Outcome: []byte(`{}`)})
+	want = []string{"ui/" + task1, "ui/" + OutcomePath(req9)}
 	if !slices.Equal(got, want) {
 		t.Errorf("ui intent paths = %v, want %v", got, want)
 	}

@@ -66,7 +66,7 @@
   },
   "$defs": {
     "path": {
-      "description": "A path to a file of one record, relative to the private home: the store's own directory, or the top-level path of the home that the layout table gives the package.",
+      "description": "A path to a file of one record, relative to the private home: the store's own directory, or home.json, which the layout table gives to dispatch.",
       "allOf": [
         {
           "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"

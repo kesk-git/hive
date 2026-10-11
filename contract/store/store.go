@@ -35,7 +35,7 @@ type Options struct {
 
 // Store is one package's part of one home: <home>/<package>/, and the
 // top-level path of the home the table of spec/records.md gives the package
-// besides it (home.json for dispatch, reviews/ for ui).
+// besides it (home.json for dispatch).
 type Store struct {
 	*Home
 	pkg     string

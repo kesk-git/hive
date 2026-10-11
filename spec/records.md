@@ -67,7 +67,7 @@ A private home is a directory outside every project repository, selected explici
 | `receipts/<receipt_id>.json` | The [receipts](receipts.md) the package wrote. Written once. |
 | `requests/<request_id>.json` | The recorded outcome of each mutating request, for [replay](commands.md#replay). |
 | `tx/<request_id>.json` | The intent of a transaction in progress. |
-| `tmp/<request_id>.tmp` | The temporary file of a write in progress, for a record anywhere under the package's directory and for `home.json` and the files of `reviews/` alike. |
+| `tmp/<request_id>.tmp` | The temporary file of a write in progress, for a record anywhere under the package's directory and for `home.json` alike. |
 
 The identity registry is the one store this specification places beyond that: `dispatch/registry/`, as [identities.md](identities.md) lists.
 

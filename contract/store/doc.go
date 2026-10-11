@@ -11,11 +11,11 @@
 // to agree takes the lock shared, which completes a transaction a crash left
 // before it grants the lock.
 //
-// A package's files are below its own directory, and a path that is its
-// top-level path in the home, home.json for dispatch and reviews/... for ui,
-// names the one top-level path the layout table gives it besides. Nothing
-// else outside its directory is its to write. An intent holds every path
-// relative to the home.
+// A package's files are below its own directory, and dispatch's path
+// home.json names the home's own record, the one top-level path the store
+// writes. Nothing else outside a package's directory is its to write. The
+// files of a review directory under reviews/ are not written through the
+// store. An intent holds every path relative to the home.
 //
 // The store sets record_revision and updated_at on every record it writes,
 // writes every file in canonical form with one final line feed, and sets no

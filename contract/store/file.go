@@ -24,28 +24,18 @@ const (
 	tmpDir      = "tmp"
 )
 
-// topLevel gives each package the one top-level path of the home, besides its
-// own directory, that the table of spec/records.md gives it: home.json for
-// dispatch and everything under reviews/ for ui. A package names such a path
-// by its path in the home, and a path of its own directory never begins with
-// it. No other path outside a package's directory is its to write.
-var topLevel = map[string]string{"dispatch": homeFile, "ui": "reviews"}
-
+// The one top-level path of the home that a package may write besides its own
+// directory in this lane is home.json, which the table of spec/records.md gives
+// to dispatch. A package names it by its path in the home, and a path of its
+// own directory never is that path. No other path outside a package's
+// directory is its to write.
 // HomeFilePath is the path of home.json, as dispatch names it.
 const HomeFilePath = homeFile
-
-// ReviewPath is the path of a file of a review directory, as ui names it:
-// rel is relative to reviews/.
-func ReviewPath(rel string) string { return "reviews/" + rel }
 
 // owned reports whether rel names the top-level path of the home that the
 // package owns, rather than a path of its own directory.
 func (s *Store) owned(rel string) bool {
-	top := topLevel[s.pkg]
-	if top == homeFile {
-		return rel == top
-	}
-	return top != "" && strings.HasPrefix(rel, top+"/")
+	return s.pkg == "dispatch" && rel == homeFile
 }
 
 // abs returns the absolute path of rel, a slash path below the store or the

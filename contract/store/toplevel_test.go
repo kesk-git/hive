@@ -88,34 +88,6 @@ func TestDispatchWritesHomeJSONInATransaction(t *testing.T) {
 	}
 }
 
-// A ui transaction writes under reviews/, at the top of the home.
-func TestUIWritesReviewsInATransaction(t *testing.T) {
-	home := newHome(t)
-	s, _, _ := open(t, home, "ui")
-	w := lock(t, s)
-	defer w.Release()
-	review := ReviewPath("task-1/1/review-1/review.json")
-	if _, err := w.Commit(Tx{
-		RequestID: req9,
-		Records:   []RecordWrite{{review, []byte(`{"n":1}`), 0}, {RecordPath("state", "x"), []byte(`{}`), 0}},
-		Outcome:   []byte(`{"status":"ok"}`),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(home, "reviews", "task-1", "1", "review-1", "review.json")); err != nil {
-		t.Error(err)
-	}
-	if _, err := os.Stat(filepath.Join(home, "ui", "reviews")); err == nil {
-		t.Error("the review was written below ui/")
-	}
-	if _, err := CheckHome(home); err != nil {
-		t.Error(err)
-	}
-	if rec, err := s.ReadRecord(review); err != nil || rec.Revision != 1 {
-		t.Errorf("ReadRecord = %+v, %v", rec, err)
-	}
-}
-
 // A package writes its own directory and the one top-level path the table
 // gives it, and nothing else of the home. A path that is not the package's own
 // top-level path is a path of its own directory, and a path that leaves it is
@@ -133,11 +105,10 @@ func TestTopLevelPathsAreOwned(t *testing.T) {
 	// own directory, and the top of the home is untouched.
 	for _, tc := range []struct{ pkg, path string }{
 		{"pool", HomeFilePath},
-		{"pool", ReviewPath("a/review.json")},
 		{"spawning-pool", HomeFilePath},
-		{"shadow", ReviewPath("a/review.json")},
+		{"shadow", "reviews/a/review.json"},
 		{"synapse", HomeFilePath},
-		{"dispatch", ReviewPath("a/review.json")},
+		{"dispatch", "reviews/a/review.json"},
 		{"ui", "home.json/x.json"},
 	} {
 		t.Run(tc.pkg+" "+tc.path, func(t *testing.T) {
@@ -232,16 +203,6 @@ func TestTopLevelTransactionsRecover(t *testing.T) {
 		paths []string
 	}{
 		{"dispatch", provision, []string{HomeFilePath}},
-		{"ui", func(t *testing.T) Tx {
-			return Tx{
-				RequestID: req9,
-				Records: []RecordWrite{
-					{ReviewPath("task-1/1/review-1/review.json"), []byte(`{"n":1}`), 0},
-					{ReviewPath("task-1/1/review-1/final.json"), []byte(`{"n":2}`), 0},
-				},
-				Outcome: []byte(`{"status":"ok"}`),
-			}
-		}, []string{ReviewPath("task-1/1/review-1/review.json"), ReviewPath("task-1/1/review-1/final.json")}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.pkg, func(t *testing.T) {
@@ -353,7 +314,7 @@ func TestClearingTmpTouchesNothingElse(t *testing.T) {
 	})
 }
 
-// A write that goes to the top of the home or below reviews/ makes its
+// A write that goes to the top of the home makes its
 // temporary file in the package's own tmp/ and moves it into place from there;
 // a crash leaves nothing at the top of the home.
 func TestTopLevelWritesUseThePackageTmp(t *testing.T) {
@@ -362,7 +323,6 @@ func TestTopLevelWritesUseThePackageTmp(t *testing.T) {
 		content  func(t *testing.T) []byte
 	}{
 		{"dispatch", HomeFilePath, homeContent},
-		{"ui", ReviewPath("task-1/1/review-1/review.json"), func(*testing.T) []byte { return []byte(`{"n":1}`) }},
 	} {
 		t.Run(tc.pkg, func(t *testing.T) {
 			home := newHome(t)
