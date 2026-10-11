@@ -966,6 +966,138 @@ func TestIntentPathsAreRelativeToTheHome(t *testing.T) {
 	}
 }
 
+// The lock taken for a request says, on every error, whether that request's
+// own transaction is durable: at every step of the recovery it runs, the
+// enumeration of the intents, the first flush of tx/, each file of the
+// intent, and the cleanup after the intent is complete, the request whose
+// intent was left behind is reported interrupted and a request that wrote
+// nothing is not, whichever intent stopped the recovery.
+func TestLockForReportsTheRequestInHand(t *testing.T) {
+	want, wantEvents := committed(t)
+	interrupted := func(t *testing.T) (*Store, *fakeJournal) {
+		t.Helper()
+		s, j := seeded(t)
+		w := lock(t, s)
+		faultAt(s, "create "+task2, 1) // the intent and task1 are written
+		if _, err := w.Commit(fullTx()); !errors.Is(err, errCrash) {
+			t.Fatal(err)
+		}
+		w.Release()
+		s.fault = nil
+		return s, j
+	}
+	s, _ := interrupted(t)
+	steps := trace(t, s, func() {
+		w, err := s.LockFor(req9)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Release()
+	})
+	for _, step := range []string{"readdir pool/tx/", "syncdir pool/tx/", "create " + task2, "events " + IntentPath("pool", req9), "remove " + IntentPath("pool", req9), "clear pool/tmp/"} {
+		if !slices.Contains(steps, step) {
+			t.Errorf("recovery steps %v lack %s", steps, step)
+		}
+	}
+	// With nothing to complete, the lock for a request is the same lock and
+	// the same recovery.
+	sameTree(t, "after recovery", tree(t, s.Dir), want)
+	for _, step := range steps {
+		t.Run(step, func(t *testing.T) {
+			for _, request := range []string{req9, req2} {
+				s, j := interrupted(t)
+				hit := faultAt(s, step, 1)
+				w, err := s.LockFor(request)
+				if !*hit || !errors.Is(err, errCrash) || w != nil {
+					t.Fatalf("the interruption did not happen for %s: hit %v, %v, %v", request, *hit, w, err)
+				}
+				var ie *InterruptedError
+				reported := errors.As(err, &ie)
+				switch {
+				case request == req9 && (!reported || ie.RequestID != req9):
+					t.Errorf("%s, whose intent is durable, is not reported interrupted: %v", request, err)
+				case request == req2 && reported && ie.RequestID == req2:
+					t.Errorf("%s, which wrote nothing, is reported interrupted: %v", request, err)
+				}
+				s.fault = nil
+				// The failed lock released the lock, and the next completes.
+				w = lock(t, s)
+				w.Release()
+				sameTree(t, "after recovery", tree(t, s.Dir), want)
+				if !slices.Equal(j.order, wantEvents) {
+					t.Errorf("journal = %v", j.order)
+				}
+			}
+		})
+	}
+
+	t.Run("a lock held elsewhere", func(t *testing.T) {
+		s, _ := interrupted(t)
+		held, err := Acquire(s.Dir, "pool", false, Waiting{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer held.Release()
+		w, err := s.LockFor(req9)
+		var ie *InterruptedError
+		if !errors.Is(err, ErrLockHeld) || !errors.As(err, &ie) || ie.RequestID != req9 || w != nil {
+			t.Errorf("LockFor(%s) against a held lock = %v, %v", req9, w, err)
+		}
+		w, err = s.LockFor(req2)
+		if !errors.Is(err, ErrLockHeld) || errors.As(err, &ie) || w != nil {
+			t.Errorf("LockFor(%s) against a held lock = %v, %v", req2, w, err)
+		}
+	})
+
+	t.Run("another intent stops the recovery first", func(t *testing.T) {
+		// req2 comes before req9 in name order, and its intent cannot be
+		// completed: the record it creates is present with other content.
+		s, j := interrupted(t)
+		w := lock(t, s) // completes req9
+		w.Release()
+		second := Tx{RequestID: req2, Records: []RecordWrite{{RecordPath("pool", "item", id("task", 5)), []byte(`{"n":5}`), 0}}, Outcome: []byte(`{"status":"ok"}`)}
+		secondData, _ := s.encodeIntent(plan(t, s, second))
+		write(t, s, IntentPath("pool", req2), secondData)
+		write(t, s, RecordPath("pool", "item", id("task", 5)), record(t, map[string]any{"n": int64(7)}, 1, "2026-10-11T08:00:00.000Z"))
+		// req9 is complete, its outcome recorded: still the store's.
+		tenthData, _ := s.encodeIntent(plan(t, s, Tx{RequestID: id("req", 10), Records: []RecordWrite{{RecordPath("pool", "item", id("task", 6)), []byte(`{"n":6}`), 0}}, Outcome: []byte(`{"status":"ok"}`)}))
+		write(t, s, IntentPath("pool", id("req", 10)), tenthData)
+		before := tree(t, s.Dir)
+		for _, tc := range []struct {
+			request string
+			named   string
+		}{
+			{req2, req2},                   // the request whose intent stopped recovery
+			{req9, req9},                   // a request completed before, its outcome recorded
+			{id("req", 10), id("req", 10)}, // a request whose intent waits behind the stopped one
+			{req1, req2},                   // a request that wrote nothing: the stopped intent is named
+		} {
+			w, err := s.LockFor(tc.request)
+			var ie *InterruptedError
+			if !errors.Is(err, ErrRecordMalformed) || !errors.As(err, &ie) || ie.RequestID != tc.named || w != nil {
+				t.Errorf("LockFor(%s) = %v, %v; want an InterruptedError naming %s", tc.request, w, err, tc.named)
+			}
+			if !strings.Contains(err.Error(), IntentPath("pool", req2)) {
+				t.Errorf("error %q does not name the intent that stopped recovery", err)
+			}
+			sameTree(t, "after a stopped recovery", tree(t, s.Dir), before)
+		}
+		if j.appends != 1 {
+			t.Errorf("journal appends = %d", j.appends)
+		}
+	})
+
+	t.Run("a request that is not one", func(t *testing.T) {
+		s, _ := seeded(t)
+		if w, err := s.LockFor("req_x"); err == nil || w != nil {
+			t.Errorf("LockFor = %v, %v", w, err)
+		}
+		if _, err := s.Lock(); err != nil {
+			t.Errorf("the refused lock was left held: %v", err)
+		}
+	})
+}
+
 // A crash after an intent is unlinked and before tx/ is flushed leaves no
 // intent to find. The next exclusive lock still flushes tx/, so that a write
 // admitted after it cannot be followed by the old intent coming back.

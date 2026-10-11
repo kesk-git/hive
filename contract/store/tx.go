@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -92,8 +93,9 @@ type intentFile struct {
 // intent, writes the records, the receipts, the events and the outcome, and
 // removes the intent. Nothing is written when a check fails. An
 // interruption after the intent is written is completed by the next Lock, and
-// its error is an *InterruptedError; an error of any other kind left nothing
-// of the transaction behind.
+// its error is an *InterruptedError naming the request, from whichever step
+// stopped it; an error of any other kind left nothing of the transaction
+// behind.
 func (w *Writer) Commit(tx Tx) (*Committed, error) {
 	if w.lock == nil {
 		return nil, errReleased
@@ -110,10 +112,7 @@ func (w *Writer) Commit(tx Tx) (*Committed, error) {
 		return nil, err
 	}
 	if err := w.s.writeFile(IntentPath(w.s.pkg, in.request), in.request, data); err != nil {
-		if _, serr := os.Lstat(w.s.abs(IntentPath(w.s.pkg, in.request))); serr == nil {
-			return nil, &InterruptedError{in.request, err}
-		}
-		return nil, err
+		return nil, w.s.report(in.request, err)
 	}
 	if err := w.s.complete(in, false); err != nil {
 		return nil, &InterruptedError{in.request, err}
@@ -256,25 +255,101 @@ func (s *Store) put(request string, f *intentFile) error {
 	return s.writeFile(f.rel, request, f.data)
 }
 
-// recover brings the store to a consistent state under the exclusive lock:
-// it flushes tx/, rolls every intent forward and empties tmp/. Intents are
-// completed in name order, each in full before the next; an intent that
-// cannot be completed stops it with an *InterruptedError naming its request.
-func (s *Store) recover() error {
+// LockFor takes the store's transaction lock for the mutating request
+// requestID, as Lock does, and brings the store to a consistent state the
+// same way. It differs from Lock in what its error says: every error, from
+// taking the lock, from listing the intents, from the first flush of tx/,
+// from an intent that cannot be completed, this request's or another's, and
+// from the cleanup after recovery, is an *InterruptedError naming requestID
+// when the request's own transaction had become durable, and nothing of the
+// kind otherwise. The command that holds the request answers from that alone:
+// a transaction that is the store's to complete is never answered as if
+// nothing of it were written.
+func (s *Store) LockFor(requestID string) (*Writer, error) {
+	if err := ids.Check(requestID, ids.Request); err != nil {
+		return nil, err
+	}
+	l, err := Acquire(s.Dir, s.pkg, false, s.waiting)
+	if err != nil {
+		return nil, s.report(requestID, err)
+	}
+	if err := s.recoverFor(requestID); err != nil {
+		l.Release()
+		return nil, err
+	}
+	return &Writer{s, l}, nil
+}
+
+// Fault installs fn, which the store calls before each step of a write or of
+// a recovery with the step's name; an error it returns stops the store there,
+// as a crash would. It is for a test that interrupts the store by control,
+// and a delivered executable installs none.
+func (s *Store) Fault(fn func(step string) error) { s.fault = fn }
+
+// recover brings the store to a consistent state under the exclusive lock,
+// for no request in particular: an intent that cannot be completed stops it
+// with an *InterruptedError naming that intent's request.
+func (s *Store) recover() error { return s.recoverFor("") }
+
+// recoverFor is recover for the request in hand: it flushes tx/, rolls every
+// intent forward and empties tmp/. Intents are completed in name order, each
+// in full before the next. Every error leaves the store as recovery found it
+// or further along, and says, through report, whether the request's own
+// transaction had become durable.
+func (s *Store) recoverFor(request string) error {
+	if err := s.step("readdir " + s.relDir(filepath.Join(s.dir, txDir))); err != nil {
+		return s.report(request, err)
+	}
 	names, err := s.intents()
 	if err != nil {
-		return err
+		return s.report(request, err)
 	}
 	if err := s.syncTx(); err != nil {
-		return err
+		return s.report(request, err)
 	}
 	for _, name := range names {
 		rel := s.pkg + "/" + txDir + "/" + name
 		if err := s.rollForward(rel); err != nil {
-			return &InterruptedError{strings.TrimSuffix(name, ".json"), err}
+			return s.report(request, &InterruptedError{strings.TrimSuffix(name, ".json"), err})
 		}
 	}
-	return s.clearTmp()
+	if err := s.step("clear " + s.relDir(filepath.Join(s.dir, tmpDir))); err != nil {
+		return s.report(request, err)
+	}
+	if err := s.clearTmp(); err != nil {
+		return s.report(request, err)
+	}
+	return nil
+}
+
+// report classifies an error of a write or a recovery for the request in
+// hand: when the request's transaction is durable, the error is an
+// *InterruptedError naming the request, wrapping err where err is not that
+// already; otherwise err is returned as it is. With no request in hand,
+// nothing is classified.
+func (s *Store) report(request string, err error) error {
+	if request == "" || !s.durable(request) {
+		return err
+	}
+	var interrupted *InterruptedError
+	if errors.As(err, &interrupted) && interrupted.RequestID == request {
+		return err
+	}
+	return &InterruptedError{request, err}
+}
+
+// durable reports whether the transaction of the request is the store's:
+// its intent is on disk, so the next lock completes it, or its outcome is,
+// which only a transaction that completed writes. A file whose presence
+// cannot be told counts as present: the request's outcome cannot be
+// established, and that is what the caller is told.
+func (s *Store) durable(request string) bool {
+	for _, rel := range []string{IntentPath(s.pkg, request), OutcomePath(s.pkg, request)} {
+		if _, err := os.Lstat(s.abs(rel)); !errNotExist(err) {
+			return true
+		}
+	}
+	return false
 }
 
 // rollForward completes the intent at rel.

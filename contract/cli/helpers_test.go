@@ -366,6 +366,73 @@ func newHarness(t testing.TB) *harness {
 	return h
 }
 
+// faultAt makes every store the executable opens fail, as a crash would, at
+// the first occurrence of step, and reports whether it did. The executable
+// faults until Fault is cleared.
+func (h *harness) faultAt(step string) *bool {
+	hit := new(bool)
+	h.exe.Fault = func(name string) error {
+		if name != step || *hit {
+			return nil
+		}
+		*hit = true
+		return errors.New("test: the process crashed here")
+	}
+	return hit
+}
+
+// expectUnknown asserts the answer of a durable transaction whose response
+// cannot be given: unknown with outcome_unknown, not retryable, with no
+// receipts and not a replay.
+func expectUnknown(t testing.TB, resp *envelope.Response) {
+	t.Helper()
+	expect(t, resp, envelope.Unknown, "outcome_unknown")
+	if len(resp.Receipts) != 0 || resp.Error.Retryable || resp.Replayed {
+		t.Fatalf("%+v", resp)
+	}
+}
+
+// floorOf is the smallest response limit the command's floor admits: the
+// size of the largest outcome_unknown answer of a durable transaction of any
+// of its supported mutating operations. The floor admits it for every such
+// operation, and refuses one byte less for at least one.
+func floorOf(t testing.TB, e *Executable, c *Command) int64 {
+	t.Helper()
+	var floor int64
+	var mutating []*Operation
+	for _, op := range c.Operations {
+		if op.State != envelope.Supported || !op.Mutates {
+			continue
+		}
+		mutating = append(mutating, op)
+		for _, message := range []string{interruptedMessage, oversizeReplayMessage} {
+			resp := e.unknownAnswer(c, op.Name, sampleRequestID, message)
+			resp.CompletedAt = sampleTimestamp
+			data, err := resp.Encode()
+			if err != nil {
+				t.Fatal(err)
+			}
+			floor = max(floor, int64(len(data)))
+		}
+	}
+	narrow := *c
+	narrow.Limits.MaxResponseBytes = floor
+	for _, op := range mutating {
+		if err := e.floor(&narrow, op); err != nil {
+			t.Fatalf("the floor refuses its own size: %v", err)
+		}
+	}
+	narrow.Limits.MaxResponseBytes = floor - 1
+	refused := false
+	for _, op := range mutating {
+		refused = refused || e.floor(&narrow, op) != nil
+	}
+	if !refused {
+		t.Fatal("the floor admits one byte less than the largest unknown answer")
+	}
+	return floor
+}
+
 // ticking is a clock that moves a millisecond each time it is read.
 type ticking struct{ at time.Time }
 
