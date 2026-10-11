@@ -198,7 +198,7 @@ func TestFailureRules(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%d characters: %v", c.chars, err)
 			}
-			if _, err := Accept(out, 1, "req_01arz3ndektsv4rrffq69g5fav"); err != nil {
+			if _, err := AcceptResponse(out, 1, "req_01arz3ndektsv4rrffq69g5fav"); err != nil {
 				t.Errorf("%d characters: %v", c.chars, err)
 			}
 		} else if err == nil {
@@ -399,7 +399,11 @@ func TestResponseRoundTrip(t *testing.T) {
 			if !bytes.Equal(out, want) {
 				t.Errorf("Encode is not the canonical form:\n%s\n%s", out, want)
 			}
-			if _, err := Accept(out, r.ExitCode(), r.RequestID); err != nil {
+			caller := r.RequestID
+			if caller == "" {
+				caller = "req_01arz3ndektsv4rrffq69g5fav"
+			}
+			if _, err := AcceptResponse(out, r.ExitCode(), caller); err != nil {
 				t.Errorf("the command's own response is not accepted: %v", err)
 			}
 		})
@@ -501,10 +505,10 @@ func TestResponseRules(t *testing.T) {
 // The caller's rule: a response is accepted only if the whole document
 // parses, follows the schema, echoes the request_id and agrees with the exit
 // code. Anything else is unknown.
-func TestAccept(t *testing.T) {
+func TestAcceptResponse(t *testing.T) {
 	data := fixture(t, "response-ok.json")
 	good, _ := canon.Line(data)
-	if r, err := Accept(good, 0, "req_01arz3ndektsv4rrffq69g5fav"); err != nil || r.Status != Ok {
+	if r, err := AcceptResponse(good, 0, "req_01arz3ndektsv4rrffq69g5fav"); err != nil || r.Status != Ok {
 		t.Fatalf("not accepted: %v", err)
 	}
 	cases := []struct {
@@ -530,11 +534,12 @@ func TestAccept(t *testing.T) {
 		{"too_large about the response", tooLarge(t, func(e map[string]any) { e["detail"] = map[string]any{"record": "response"} }), 7, "req_01arz3ndektsv4rrffq69g5fav"},
 		{"too_large without the detail", tooLarge(t, func(e map[string]any) { delete(e, "detail") }), 7, "req_01arz3ndektsv4rrffq69g5fav"},
 		{"too_large within the limit", tooLarge(t, func(e map[string]any) { e["actual_bytes"] = e["limit_bytes"] }), 7, "req_01arz3ndektsv4rrffq69g5fav"},
-		{"not a response", []byte("ok\n"), 0, ""},
+		{"a capabilities response for a request", capabilitiesResponse(t), 0, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"not a response", []byte("ok\n"), 0, "req_01arz3ndektsv4rrffq69g5fav"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			r, err := Accept(c.out, c.exit, c.id)
+			r, err := AcceptResponse(c.out, c.exit, c.id)
 			if r != nil {
 				t.Fatal("a response was returned")
 			}
@@ -557,19 +562,60 @@ func TestAccept(t *testing.T) {
 		{"usage", nullID(t, "usage", 2, "usage"), 2, Usage},
 		{"a request that is no record", nullID(t, "invalid", 3, "malformed_request"), 3, Invalid},
 	} {
-		for _, caller := range []string{id, ""} {
-			r, err := Accept(c.out, c.exit, caller)
-			if err != nil || r.Status != c.status || r.RequestID != "" {
-				t.Errorf("%s for %q: %v %+v", c.name, caller, err, r)
-			}
+		r, err := AcceptResponse(c.out, c.exit, id)
+		if err != nil || r.Status != c.status || r.RequestID != "" {
+			t.Errorf("%s: %v %+v", c.name, err, r)
 		}
 	}
-	// The capabilities invocation takes no request and answers with none.
-	caps := tree(t, fixture(t, "response-ok.json"))
-	caps["request_id"], caps["operation"] = nil, CapabilitiesOperation
-	if r, err := Accept(encode(t, caps), 0, ""); err != nil || r.Status != Ok {
-		t.Errorf("capabilities: %v", err)
+}
+
+// The capabilities invocation takes no request: its response is accepted by
+// its own rule, only with a null request_id and the capabilities operation.
+func TestAcceptCapabilities(t *testing.T) {
+	good := capabilitiesResponse(t)
+	if r, err := AcceptCapabilities(good, 0); err != nil || r.Status != Ok {
+		t.Fatalf("not accepted: %v", err)
 	}
+	other := tree(t, fixture(t, "response-ok.json"))
+	other["request_id"] = nil
+	withID := tree(t, fixture(t, "response-ok.json"))
+	withID["operation"] = CapabilitiesOperation
+	for name, c := range map[string]struct {
+		out  []byte
+		exit int
+	}{
+		"empty":                    {nil, 0},
+		"exit code disagrees":      {good, 1},
+		"another operation":        {encode(t, other), 0},
+		"an identity":              {encode(t, withID), 0},
+		"a response to a request":  {fixture(t, "response-ok.json"), 0},
+		"usage that names no call": {nullID(t, "usage", 2, "usage"), 2},
+	} {
+		r, err := AcceptCapabilities(c.out, c.exit)
+		if r != nil {
+			t.Errorf("%s: a response was returned", name)
+		}
+		failure(t, err, Unknown, CodeOutcomeUnknown)
+	}
+}
+
+// An identity-less call is not a request: AcceptResponse is for requests that
+// have one, and never accepts for none.
+func TestAcceptResponseNeedsAnIdentity(t *testing.T) {
+	for _, out := range [][]byte{capabilitiesResponse(t), nullID(t, "usage", 2, "usage")} {
+		if r, err := AcceptResponse(out, 0, ""); r != nil || AsFailure(err) == nil {
+			t.Errorf("accepted for no identity: %v", err)
+		}
+	}
+}
+
+// capabilitiesResponse is a response with a null request_id to the
+// capabilities operation.
+func capabilitiesResponse(t *testing.T) []byte {
+	t.Helper()
+	m := tree(t, fixture(t, "response-ok.json"))
+	m["request_id"], m["operation"] = nil, CapabilitiesOperation
+	return encode(t, m)
 }
 
 // tooLarge is the too_large response of a request over the limit, edited.

@@ -217,6 +217,10 @@ func TestCommitChecksBeforeWriting(t *testing.T) {
 			if tc.want != nil && !errors.Is(err, tc.want) {
 				t.Fatalf("error = %v; want %v", err, tc.want)
 			}
+			var ie *InterruptedError
+			if errors.As(err, &ie) {
+				t.Errorf("a transaction that wrote nothing reported as interrupted: %v", err)
+			}
 			sameTree(t, "after a refused transaction", tree(t, s.Dir), before)
 			if j.appends != 0 {
 				t.Error("the journal was touched")
@@ -279,6 +283,11 @@ func TestCommitInterruptedAtEachStep(t *testing.T) {
 			w.Release()
 			if !*hit || !errors.Is(err, errCrash) {
 				t.Fatalf("the interruption did not happen: hit %v, err %v", *hit, err)
+			}
+			// The error says whether the intent was durable when it failed.
+			var ie *InterruptedError
+			if got := errors.As(err, &ie); got != (i >= durable) || got && ie.RequestID != req9 {
+				t.Errorf("InterruptedError %v (%+v) after step %d %s", got, ie, i, step)
 			}
 			s.fault = nil
 
@@ -358,8 +367,14 @@ func TestRecoveryInterruptedAtEachStep(t *testing.T) {
 		t.Run(step, func(t *testing.T) {
 			s, j := interrupted(t)
 			hit := faultAt(s, step, 1)
-			if _, err := s.Lock(); !*hit || !errors.Is(err, errCrash) {
+			_, err := s.Lock()
+			if !*hit || !errors.Is(err, errCrash) {
 				t.Fatalf("the interruption did not happen: hit %v, err %v", *hit, err)
+			}
+			// Recovery that stops on a transaction names its request.
+			var ie *InterruptedError
+			if errors.As(err, &ie) && ie.RequestID != req9 {
+				t.Errorf("InterruptedError names %s", ie.RequestID)
 			}
 			s.fault = nil
 			// The failed Lock released the lock: the next one is taken at once.
@@ -469,6 +484,10 @@ func TestRecoveryDecidesByWhatItFinds(t *testing.T) {
 				}
 				if Code(err) != "record_malformed" {
 					t.Errorf("Code = %q", Code(err))
+				}
+				var ie *InterruptedError
+				if !errors.As(err, &ie) || ie.RequestID != req9 {
+					t.Errorf("a transaction recovery cannot complete is not reported as interrupted: %v", err)
 				}
 				sameTree(t, "after a stopped recovery", tree(t, s.Dir), before)
 				if j.appends != 0 {

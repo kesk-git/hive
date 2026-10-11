@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
-	"path/filepath"
 	"runtime/debug"
 	"slices"
 	"time"
@@ -262,11 +260,22 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		return ok(res.Body, nil), res.After
 	}
 
+	// stored is the answer to an error of the store: every path of a
+	// mutating operation that can fail after a transaction became durable
+	// answers through it.
+	stored := func(err error) *envelope.Response {
+		f := storeFailure(err, req.RequestID)
+		if f.Status == envelope.Unknown {
+			fmt.Fprintln(inv.Stderr, err)
+		}
+		return fail(req.RequestID, f)
+	}
+
 	// A mutating operation: the store's lock, then the replay check.
 	at := &recordClock{}
 	st, w, err := e.open(home, at)
 	if err != nil {
-		return fail(req.RequestID, envelope.AsFailure(err)), nil
+		return stored(err), nil
 	}
 	defer w.Release()
 	digest, err := envelope.Digest(inv.Request)
@@ -299,8 +308,8 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		if !whole || len(f.Receipts) == 0 {
 			return resp, nil
 		}
-		if err := e.commit(st, w, req.RequestID, digest, resp, nil, f.Receipts, nil); err != nil {
-			return fail(req.RequestID, envelope.AsFailure(err)), nil
+		if err := e.commit(w, req.RequestID, digest, resp, nil, f.Receipts, nil); err != nil {
+			return stored(err), nil
 		}
 		return resp, nil
 	}
@@ -318,8 +327,8 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	if bad := e.preflight(c, resp); bad != nil {
 		return bad, nil
 	}
-	if err := e.commit(st, w, req.RequestID, digest, resp, res.Records, res.Receipts, res.Events); err != nil {
-		return fail(req.RequestID, envelope.AsFailure(err)), nil
+	if err := e.commit(w, req.RequestID, digest, resp, res.Records, res.Receipts, res.Events); err != nil {
+		return stored(err), nil
 	}
 	return resp, res.After
 }
@@ -457,14 +466,29 @@ func (e *Executable) open(home *store.Home, clk clock.Clock) (*store.Store, *sto
 	}
 	w, err := st.Lock()
 	if err != nil {
-		return nil, nil, storeFailure(err)
+		return nil, nil, err
 	}
 	return st, w, nil
 }
 
-// storeFailure maps an error of the store to its status: the common code
-// the error carries, or failed for one that carries none.
-func storeFailure(err error) error {
+// interruptedMessage is the whole of what an interrupted transaction says.
+const interruptedMessage = "the transaction was recorded and is not known to be complete; sending the same request again completes it"
+
+// storeFailure maps an error of the store, of opening it, of recovering it or
+// of committing to it, to its failure, for the request requestID. A
+// transaction of this request whose intent is durable is outcome_unknown
+// whatever stopped it, since the next lock completes it; one of an earlier
+// request stops the store before this request writes anything, and is
+// record_malformed. Any other error left nothing behind, and is the common
+// code it carries, or failed for one that carries none.
+func storeFailure(err error, requestID string) *envelope.Failure {
+	var interrupted *store.InterruptedError
+	if errors.As(err, &interrupted) {
+		if interrupted.RequestID == requestID {
+			return envelope.Common(envelope.CodeOutcomeUnknown, interruptedMessage)
+		}
+		return envelope.Common(envelope.CodeRecordMalformed, "an earlier transaction of this store, "+interrupted.RequestID+", cannot be completed, and nothing of this request was written")
+	}
 	if f := envelope.AsFailure(err); f != nil {
 		return f
 	}
@@ -483,7 +507,7 @@ func storeFailure(err error) error {
 
 // commit writes the records, the receipts and the events of an invocation
 // with its recorded outcome, in one transaction.
-func (e *Executable) commit(st *store.Store, w *store.Writer, requestID, digest string, resp *envelope.Response, records []store.RecordWrite, receipts []envelope.Receipt, events []store.Event) error {
+func (e *Executable) commit(w *store.Writer, requestID, digest string, resp *envelope.Response, records []store.RecordWrite, receipts []envelope.Receipt, events []store.Event) error {
 	tx := store.Tx{RequestID: requestID, Records: records, Events: events}
 	for i := range receipts {
 		data, err := receipts[i].Encode()
@@ -497,18 +521,6 @@ func (e *Executable) commit(st *store.Store, w *store.Writer, requestID, digest 
 		return envelope.Common(envelope.CodeInternal, err.Error())
 	}
 	tx.Outcome = outcome
-	if _, err := w.Commit(tx); err != nil {
-		// Once the intent is durable the transaction is the store's to
-		// complete, and the next lock does; and once the outcome is written
-		// only the intent's removal is left. The response that promises
-		// nothing changed is false from the intent on, and the outcome is
-		// unknown until the same request is sent again.
-		for _, rel := range []string{store.IntentPath(st.Package(), requestID), store.OutcomePath(st.Package(), requestID)} {
-			if _, serr := os.Lstat(filepath.Join(st.Dir, filepath.FromSlash(rel))); serr == nil || !errors.Is(serr, fs.ErrNotExist) {
-				return envelope.Common(envelope.CodeOutcomeUnknown, "the transaction was interrupted after it was recorded; sending the same request again completes it: "+err.Error())
-			}
-		}
-		return storeFailure(err)
-	}
-	return nil
+	_, err = w.Commit(tx)
+	return err
 }

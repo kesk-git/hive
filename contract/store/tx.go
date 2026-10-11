@@ -91,7 +91,9 @@ type intentFile struct {
 // Commit runs the transaction: it checks every expected state, writes the
 // intent, writes the records, the receipts, the events and the outcome, and
 // removes the intent. Nothing is written when a check fails. An
-// interruption after the intent is written is completed by the next Lock.
+// interruption after the intent is written is completed by the next Lock, and
+// its error is an *InterruptedError; an error of any other kind left nothing
+// of the transaction behind.
 func (w *Writer) Commit(tx Tx) (*Committed, error) {
 	if w.lock == nil {
 		return nil, errReleased
@@ -108,10 +110,13 @@ func (w *Writer) Commit(tx Tx) (*Committed, error) {
 		return nil, err
 	}
 	if err := w.s.writeFile(IntentPath(w.s.pkg, in.request), in.request, data); err != nil {
+		if _, serr := os.Lstat(w.s.abs(IntentPath(w.s.pkg, in.request))); serr == nil {
+			return nil, &InterruptedError{in.request, err}
+		}
 		return nil, err
 	}
 	if err := w.s.complete(in, false); err != nil {
-		return nil, err
+		return nil, &InterruptedError{in.request, err}
 	}
 	out := &Committed{}
 	for _, r := range in.records {
@@ -253,7 +258,8 @@ func (s *Store) put(request string, f *intentFile) error {
 
 // recover brings the store to a consistent state under the exclusive lock:
 // it flushes tx/, rolls every intent forward and empties tmp/. Intents are
-// completed in name order, each in full before the next.
+// completed in name order, each in full before the next; an intent that
+// cannot be completed stops it with an *InterruptedError naming its request.
 func (s *Store) recover() error {
 	names, err := s.intents()
 	if err != nil {
@@ -264,21 +270,26 @@ func (s *Store) recover() error {
 	}
 	for _, name := range names {
 		rel := s.pkg + "/" + txDir + "/" + name
-		in, err := s.readIntent(rel)
-		if err != nil {
-			return err
-		}
-		if err := s.syncChain(rel); err != nil {
-			return err
-		}
-		if err := s.classify(rel, in); err != nil {
-			return err
-		}
-		if err := s.complete(in, true); err != nil {
-			return err
+		if err := s.rollForward(rel); err != nil {
+			return &InterruptedError{strings.TrimSuffix(name, ".json"), err}
 		}
 	}
 	return s.clearTmp()
+}
+
+// rollForward completes the intent at rel.
+func (s *Store) rollForward(rel string) error {
+	in, err := s.readIntent(rel)
+	if err != nil {
+		return err
+	}
+	if err := s.syncChain(rel); err != nil {
+		return err
+	}
+	if err := s.classify(rel, in); err != nil {
+		return err
+	}
+	return s.complete(in, true)
 }
 
 // syncTx flushes the store's tx/ directory, when it is there, so that an

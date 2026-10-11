@@ -34,6 +34,22 @@ var (
 	ErrNoJournal = errors.New("store: the transaction names events but the store has no journal")
 )
 
+// InterruptedError reports a transaction whose intent is durable and that
+// stopped before it completed, from Commit or from the recovery a Lock runs.
+// The intent is the store's to complete, and the next Lock does; whatever the
+// cause, the transaction is no longer one that wrote nothing. A failure
+// before the intent is durable is never an InterruptedError. Err is the
+// cause, which errors.Is and Code see through.
+type InterruptedError struct {
+	// RequestID is the request whose transaction was interrupted.
+	RequestID string
+	Err       error
+}
+
+func (e *InterruptedError) Error() string { return e.Err.Error() }
+
+func (e *InterruptedError) Unwrap() error { return e.Err }
+
 // Code returns the common error code of spec/commands.md that err carries,
 // or "" for an error that has none.
 func Code(err error) string {

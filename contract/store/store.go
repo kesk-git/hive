@@ -148,7 +148,8 @@ type Writer struct {
 // a consistent state before returning: it completes the transaction a crash
 // left behind, if any, and removes the temporary files a crash left. An
 // intent it cannot complete stops the store with ErrRecordMalformed naming
-// the intent; nothing discards the intent.
+// the intent; nothing discards the intent. An intent that stops it is
+// reported as an *InterruptedError naming its request.
 func (s *Store) Lock() (*Writer, error) {
 	l, err := Acquire(s.Dir, s.pkg, false, s.waiting)
 	if err != nil {

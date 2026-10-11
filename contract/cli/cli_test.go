@@ -62,6 +62,7 @@ func TestCheck(t *testing.T) {
 	})
 	bad("package not a package", func(e *Executable) { e.Package = "contract" })
 	bad("version over a hundred characters", func(e *Executable) { e.Version = strings.Repeat("é", 101) })
+	bad("response limit under the answer of an interrupted transaction", func(e *Executable) { e.Commands[1].Limits.MaxResponseBytes = 100 })
 	bad("storeless with a mutating operation", func(e *Executable) { e.Storeless = true })
 	// The limits are characters: a hundred two-byte ones are not too many.
 	e := *h.exe
@@ -82,7 +83,7 @@ func TestVersionAndCapabilities(t *testing.T) {
 	}
 	for _, command := range []string{"hive-fleet", "hive-park", "hive-dispatch"} {
 		code, out, errs := h.run(command, nil, "capabilities")
-		resp, err := envelope.Accept(out, code, "")
+		resp, err := envelope.AcceptCapabilities(out, code)
 		if err != nil || errs != "" {
 			t.Fatalf("%s capabilities: %v %q", command, err, errs)
 		}
@@ -149,7 +150,7 @@ func TestUsage(t *testing.T) {
 			stdin := &failingReader{}
 			var stdout, stderr bytes.Buffer
 			code := h.exe.Main(append([]string{c.command}, c.args...), stdin, &stdout, &stderr)
-			resp, err := envelope.Accept(stdout.Bytes(), code, "")
+			resp, err := envelope.AcceptResponse(stdout.Bytes(), code, id(ids.Request, 1))
 			if err != nil {
 				t.Fatalf("not accepted: %v\n%s", err, stdout.String())
 			}
@@ -645,7 +646,7 @@ func TestTooLarge(t *testing.T) {
 	// Nothing of the request was parsed, so the response echoes no
 	// request_id.
 	code, out, _ := h.run("hive-fleet", over, "echo", "--home", home)
-	resp, err := envelope.Accept(out, code, id(ids.Request, 1))
+	resp, err := envelope.AcceptResponse(out, code, id(ids.Request, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -662,7 +663,7 @@ func TestTooLarge(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, out, _ = h.run("hive-fleet", nil, "echo", "--home", home, "--request-file", file)
-	resp, err = envelope.Accept(out, code, id(ids.Request, 1))
+	resp, err = envelope.AcceptResponse(out, code, id(ids.Request, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -694,10 +695,10 @@ func TestTooLarge(t *testing.T) {
 	// The too_large response is itself under the limit, whatever the
 	// limit; a command with a tiny limit still answers.
 	tiny := *h.exe
-	tiny.Commands = []*Command{{Name: "hive-dispatch"}, {Name: "hive-fleet", Limits: envelope.Limits{MaxResponseBytes: 1}, Operations: h.exe.command("hive-fleet").Operations}}
+	tiny.Commands = []*Command{{Name: "hive-dispatch"}, {Name: "hive-fleet", Limits: envelope.Limits{MaxResponseBytes: 1}, Operations: []*Operation{h.exe.command("hive-fleet").operation("echo")}}}
 	var stdout, stderr bytes.Buffer
 	code = tiny.Main([]string{"hive-fleet", "echo", "--home", home}, bytes.NewReader(req), &stdout, &stderr)
-	resp, err = envelope.Accept(stdout.Bytes(), code, id(ids.Request, 1))
+	resp, err = envelope.AcceptResponse(stdout.Bytes(), code, id(ids.Request, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -792,7 +793,7 @@ func TestUnavailable(t *testing.T) {
 		t.Fatalf("exit %d: %v", code, err)
 	}
 	expect(t, resp, envelope.Unavailable, "source_unreadable")
-	if _, err := envelope.Accept(out, code, id(ids.Request, 1)); envelope.AsFailure(err) == nil {
+	if _, err := envelope.AcceptResponse(out, code, id(ids.Request, 1)); envelope.AsFailure(err) == nil {
 		t.Error("a response that answers no request was accepted for one")
 	}
 }
@@ -830,7 +831,7 @@ func TestTransport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := envelope.Accept(written, code, id(ids.Request, 1))
+	resp, err := envelope.AcceptResponse(written, code, id(ids.Request, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -847,7 +848,7 @@ func TestTransport(t *testing.T) {
 		t.Errorf("exit %d", code)
 	}
 	written2, _ := os.ReadFile(respFile)
-	resp, err = envelope.Accept(written2, code, id(ids.Request, 1))
+	resp, err = envelope.AcceptResponse(written2, code, id(ids.Request, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -907,7 +908,7 @@ func TestRecordedOutcomeIsTheResponse(t *testing.T) {
 	home := newHome(t)
 	req := request(t, "put", 1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "thing" })
 	code, out, _ := h.run("hive-fleet", req, "put", "--home", home)
-	resp, err := envelope.Accept(out, code, id(ids.Request, 1))
+	resp, err := envelope.AcceptResponse(out, code, id(ids.Request, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -961,40 +962,91 @@ func TestResponseIsWholeBeforeAnythingIsWritten(t *testing.T) {
 	}
 }
 
-// A transaction interrupted after its intent is durable is the store's to
-// complete: the answer is not one that promises nothing changed, and the same
-// request, sent again, completes it and replays what it would have answered.
+// A transaction whose intent is durable is the store's to complete, and from
+// then on the only answers are ok and outcome_unknown: never one that promises
+// nothing changed, whatever stopped it, however long the diagnostic, and
+// whether it was this commit or the recovery a retry runs that stopped. The
+// same request, sent again once the store works, completes it and replays.
 func TestInterruptedCommitIsUnknownUntilCompleted(t *testing.T) {
-	h := newHarness(t)
-	home := newHome(t)
-	req := request(t, "put", 1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "first" })
-	h.journal.fail = errors.New("the journal is full")
-	resp := h.invoke(t, home, "put", req)
-	expect(t, resp, envelope.Unknown, "outcome_unknown")
-	if len(resp.Receipts) != 0 || resp.Error.Retryable {
-		t.Errorf("%+v", resp)
+	intentOf := func(home string, n int) string {
+		return filepath.Join(home, filepath.FromSlash(store.IntentPath("dispatch", id(ids.Request, n))))
 	}
-	intent := filepath.Join(home, filepath.FromSlash(store.IntentPath("dispatch", id(ids.Request, 1))))
-	if _, err := os.Stat(intent); err != nil {
-		t.Fatalf("the intent is not there: %v", err)
+	put := func(n int, name string) []byte {
+		return request(t, "put", n, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = name })
 	}
-	h.journal.fail = nil
-	again := h.invoke(t, home, "put", req)
-	expect(t, again, envelope.Ok, "")
-	if !again.Replayed || len(again.Receipts) != 1 || again.Body["wrote"] != "first" || h.calls["put"] != 1 {
-		t.Errorf("%+v, calls %d", again, h.calls["put"])
-	}
-	if _, err := os.Stat(intent); err == nil {
-		t.Error("the intent was left behind")
-	}
-	for _, p := range []string{store.RecordPath("dispatch", "thing", "first"), store.ReceiptPath("dispatch", again.Receipts[0].ReceiptID), store.OutcomePath("dispatch", id(ids.Request, 1))} {
-		if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(p))); err != nil {
-			t.Errorf("%s: %v", p, err)
+	unknown := func(t *testing.T, resp *envelope.Response) {
+		t.Helper()
+		expect(t, resp, envelope.Unknown, "outcome_unknown")
+		if len(resp.Receipts) != 0 || resp.Error.Retryable || resp.Replayed {
+			t.Errorf("%+v", resp)
 		}
 	}
-	if len(h.journal.order) != 1 {
-		t.Errorf("events appended: %v", h.journal.order)
+	for _, c := range []struct {
+		name  string
+		limit int64
+		cause string
+	}{
+		{"a diagnostic", 0, "the journal is full"},
+		{"a diagnostic longer than the response limit", 2048, strings.Repeat("x", 2000)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := newHarness(t)
+			if c.limit != 0 {
+				h.exe.command("hive-fleet").Limits.MaxResponseBytes = c.limit
+			}
+			home := newHome(t)
+			req := put(1, "first")
+			h.journal.fail = errors.New(c.cause)
+			unknown(t, h.invoke(t, home, "put", req))
+			if _, err := os.Stat(intentOf(home, 1)); err != nil {
+				t.Fatalf("the intent is not there: %v", err)
+			}
+
+			// Recovery that fails again is the same answer, and nothing of the
+			// handler runs a second time.
+			unknown(t, h.invoke(t, home, "put", req))
+			if h.calls["put"] != 1 {
+				t.Errorf("put ran %d times", h.calls["put"])
+			}
+
+			h.journal.fail = nil
+			again := h.invoke(t, home, "put", req)
+			expect(t, again, envelope.Ok, "")
+			if !again.Replayed || len(again.Receipts) != 1 || again.Body["wrote"] != "first" || h.calls["put"] != 1 {
+				t.Errorf("%+v, calls %d", again, h.calls["put"])
+			}
+			if _, err := os.Stat(intentOf(home, 1)); err == nil {
+				t.Error("the intent was left behind")
+			}
+			for _, p := range []string{store.RecordPath("dispatch", "thing", "first"), store.ReceiptPath("dispatch", again.Receipts[0].ReceiptID), store.OutcomePath("dispatch", id(ids.Request, 1))} {
+				if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(p))); err != nil {
+					t.Errorf("%s: %v", p, err)
+				}
+			}
+			if len(h.journal.order) != 1 {
+				t.Errorf("events appended: %v", h.journal.order)
+			}
+		})
 	}
+
+	// A recovery that stops on the transaction of an earlier request answers
+	// the present request unavailable: the present request wrote nothing.
+	t.Run("an earlier request's recovery", func(t *testing.T) {
+		h := newHarness(t)
+		home := newHome(t)
+		h.journal.fail = errors.New("the journal is full")
+		unknown(t, h.invoke(t, home, "put", put(1, "first")))
+		before := tree(t, home)
+		resp := h.invoke(t, home, "put", put(2, "second"))
+		expect(t, resp, envelope.Unavailable, "record_malformed")
+		if h.calls["put"] != 1 || len(resp.Receipts) != 0 {
+			t.Errorf("%+v, calls %d", resp, h.calls["put"])
+		}
+		after := tree(t, home)
+		same(t, before, after)
+		h.journal.fail = nil
+		expect(t, h.invoke(t, home, "put", put(2, "second")), envelope.Ok, "")
+	})
 }
 
 // A record is final before anything is sealed: the digest the response and
@@ -1062,7 +1114,7 @@ func TestStorelessExecutable(t *testing.T) {
 		req := request(t, operation, 1, func(m map[string]any) { m["command"] = "hive-word" })
 		var stdout, stderr bytes.Buffer
 		code := word.Main([]string{"hive-word", operation, HomeOption, home}, bytes.NewReader(req), &stdout, &stderr)
-		resp, err := envelope.Accept(stdout.Bytes(), code, id(ids.Request, 1))
+		resp, err := envelope.AcceptResponse(stdout.Bytes(), code, id(ids.Request, 1))
 		if err != nil {
 			t.Fatalf("%v\n%s", err, stdout.String())
 		}

@@ -156,7 +156,8 @@ func request(t testing.TB, operation string, n int, edit func(m map[string]any))
 type fakeJournal struct {
 	order []string
 	lines map[string][]byte
-	// fail, when set, is the error Append returns without appending.
+	// fail, when set, is the error Append and Recover return without
+	// appending.
 	fail error
 }
 
@@ -173,6 +174,9 @@ func (j *fakeJournal) Append(events []store.Event) error {
 	}
 	return nil
 }
+
+// Recover is Append: the fake never repeats an event it holds.
+func (j *fakeJournal) Recover(events []store.Event) error { return j.Append(events) }
 
 // harness is a test executable with its fake clock and journal.
 type harness struct {
@@ -398,7 +402,10 @@ func (h *harness) invoke(t testing.TB, home, operation string, req []byte) *enve
 	t.Helper()
 	code, out, _ := h.run("hive-fleet", req, operation, HomeOption, home)
 	want, _ := envelope.LooseRequestID(req)
-	resp, err := envelope.Accept(out, code, want)
+	if want == "" {
+		want = id(ids.Request, 1)
+	}
+	resp, err := envelope.AcceptResponse(out, code, want)
 	if err != nil {
 		t.Fatalf("the response is not accepted: %v\nexit %d\n%s", err, code, out)
 	}

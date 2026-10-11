@@ -307,6 +307,37 @@ func (e *Executable) Check() error {
 		if err := e.Capabilities(c).Check(); err != nil {
 			return fmt.Errorf("cli: %s: %w", c.Name, err)
 		}
+		if err := e.holdsInterruptedAnswer(c); err != nil {
+			return err
+		}
 	}
 	return nil
 }
+
+// holdsInterruptedAnswer checks that the command's response limit admits the
+// answer of an interrupted transaction, which is never replaced by another
+// status, for every supported mutating operation of the command.
+func (e *Executable) holdsInterruptedAnswer(c *Command) error {
+	limit := c.Limits.Resolved().MaxResponseBytes
+	for _, op := range c.Operations {
+		if op.State != envelope.Supported || !op.Mutates {
+			continue
+		}
+		resp := e.failure(sampleRequestID, c.Name, op.Name, envelope.Common(envelope.CodeOutcomeUnknown, interruptedMessage))
+		resp.CompletedAt = sampleTimestamp
+		data, err := resp.Encode()
+		if err != nil {
+			return fmt.Errorf("cli: %s %s: %w", c.Name, op.Name, err)
+		}
+		if int64(len(data)) > limit {
+			return fmt.Errorf("cli: %s: max_response_bytes %d cannot hold the %d-byte answer of an interrupted transaction of %s", c.Name, limit, len(data), op.Name)
+		}
+	}
+	return nil
+}
+
+// The request identity and the time a response is sized with.
+const (
+	sampleRequestID = "req_00000000000000000000000000"
+	sampleTimestamp = "2026-10-11T08:00:00.000Z"
+)

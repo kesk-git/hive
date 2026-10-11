@@ -241,17 +241,51 @@ func readError(f fields) (*Error, error) {
 	return e, nil
 }
 
-// Accept is the caller's rule for a response (spec/commands.md, The
-// response): the whole output parses, follows the schema, echoes the
-// caller's request_id and agrees with the process's exit code. A request_id
-// that is not null is the caller's in every case. A null one is accepted only
-// where the callee answers before it can read the request's identity or the
-// invocation carries no request: usage, invalid with code malformed_request,
-// too_large because the request exceeded the limit, and the capabilities
-// invocation. Anything else is a *Failure of status unknown, never success
-// and never an empty result; a process that ended by a signal or a timeout
-// gave no output and is unknown the same way.
-func Accept(output []byte, exit int, requestID string) (*Response, error) {
+// AcceptResponse is the caller's rule for the response to a request it sent
+// (spec/commands.md, The response): the whole output parses, follows the
+// schema, echoes the caller's request_id and agrees with the process's exit
+// code. requestID is the request's identity and is never empty. A request_id
+// that is not null is the caller's in every case; a null one is accepted only
+// with one of three early refusals, given before the request's identity could
+// be read: usage, invalid with code malformed_request, and too_large because
+// the request exceeded the limit. Anything else is a *Failure of status
+// unknown, never success and never an empty result; a process that ended by a
+// signal or a timeout gave no output and is unknown the same way.
+func AcceptResponse(output []byte, exit int, requestID string) (*Response, error) {
+	if requestID == "" {
+		return nil, Common(CodeOutcomeUnknown, "a response is accepted for a request that has an identity")
+	}
+	r, err := acceptDocument(output, exit)
+	if err != nil {
+		return nil, err
+	}
+	if r.RequestID == "" {
+		if !r.earlyRefusal() {
+			return nil, Common(CodeOutcomeUnknown, "the response answers no request")
+		}
+	} else if r.RequestID != requestID {
+		return nil, Common(CodeOutcomeUnknown, "the response answers another request")
+	}
+	return r, nil
+}
+
+// AcceptCapabilities is the caller's rule for the response to the capabilities
+// invocation, which takes no request: the response follows the schema, agrees
+// with the process's exit code, answers the capabilities operation and has a
+// null request_id.
+func AcceptCapabilities(output []byte, exit int) (*Response, error) {
+	r, err := acceptDocument(output, exit)
+	if err != nil {
+		return nil, err
+	}
+	if r.Operation != CapabilitiesOperation || r.RequestID != "" {
+		return nil, Common(CodeOutcomeUnknown, "the response does not answer the capabilities invocation")
+	}
+	return r, nil
+}
+
+// acceptDocument reads a response whole and checks it against the exit code.
+func acceptDocument(output []byte, exit int) (*Response, error) {
 	unknown := func(format string, args ...any) error {
 		return Common(CodeOutcomeUnknown, fmt.Sprintf(format, args...))
 	}
@@ -265,33 +299,22 @@ func Accept(output []byte, exit int, requestID string) (*Response, error) {
 	if err != nil {
 		return nil, unknown("the response is not a response: %v", err)
 	}
-	if r.RequestID == "" {
-		if !r.mayCarryNoRequestID() {
-			return nil, unknown("the response answers no request")
-		}
-	} else if r.RequestID != requestID {
-		return nil, unknown("the response answers another request")
-	}
 	if r.ExitCode() != exit {
 		return nil, unknown("the response says %s but the process exited with %d", r.Status, exit)
 	}
 	return r, nil
 }
 
-// mayCarryNoRequestID reports whether a response with a null request_id is
-// one the contract allows: the capabilities invocation, which takes no
-// request, or an answer given before the request's identity could be read.
-func (r *Response) mayCarryNoRequestID() bool {
-	if r.Operation == CapabilitiesOperation {
-		return true
-	}
+// earlyRefusal reports whether the response is one a callee gives before it
+// can read the request's identity.
+func (r *Response) earlyRefusal() bool {
+	e := r.Error
 	switch r.Status {
 	case Usage:
 		return true
 	case Invalid:
-		return r.Error != nil && r.Error.Code == CodeMalformedRequest
+		return e != nil && e.Code == CodeMalformedRequest
 	case TooLarge:
-		e := r.Error
 		return e != nil && e.Code == CodeRecordTooLarge && e.Detail["record"] == "request" &&
 			e.LimitBytes != nil && e.ActualBytes != nil && *e.ActualBytes > *e.LimitBytes
 	}
