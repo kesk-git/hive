@@ -112,6 +112,7 @@ func Load(fsys fs.FS, root string) (*Registry, error) {
 	}
 
 	probs = append(probs, r.resolve(refs)...)
+	probs = append(probs, openUses(refs)...)
 	probs = append(probs, r.cycles()...)
 	if len(probs) > 0 {
 		slices.SortStableFunc(probs, func(a, b Problem) int {
@@ -194,6 +195,24 @@ func (r *Registry) resolve(refs []pendingRef) []Problem {
 			continue
 		}
 		pr.from.ref = target
+	}
+	return probs
+}
+
+// openUses finds a reference that reaches an open object from anywhere but a
+// designated open member, however the reference is written or chained.
+func openUses(refs []pendingRef) []Problem {
+	var probs []Problem
+	for _, pr := range refs {
+		seen := map[*node]bool{}
+		t := pr.from.ref
+		for t != nil && !t.open && t.ref != nil && !seen[t] {
+			seen[t] = true
+			t = t.ref
+		}
+		if t != nil && t.open && !pr.from.designated {
+			probs = append(probs, Problem{pr.from.loc, fmt.Sprintf("$ref %s reaches an open object; only %s may be open", pr.text, strings.Join(openMembers, ", "))})
+		}
 	}
 	return probs
 }
@@ -295,60 +314,10 @@ func (r *Registry) Validate(ref string, data []byte) error {
 	return run(n, v)
 }
 
-// ValidateValue checks a value already decoded: nil, bool, string, whole
-// numbers (int, int64 or a whole float64 within ±MaxWhole), []any and
-// map[string]any. A value that is anything else, or whose text is not valid
-// UTF-8, is a violation of the encoding.
-func (r *Registry) ValidateValue(ref string, v any) error {
-	n, err := r.lookup(ref)
-	if err != nil {
-		return err
-	}
-	var out sink
-	wellFormed(v, "", 0, &out)
-	if len(out.list) > 0 {
-		return &ValidationError{out.list, out.omitted}
-	}
-	return run(n, v)
-}
-
 func run(n *node, v any) error {
 	var out sink
 	if n.check(v, "", &out) {
 		return nil
 	}
 	return &ValidationError{out.list, out.omitted}
-}
-
-// wellFormed finds what a Hive record cannot hold in a value that did not come
-// from Decode.
-func wellFormed(v any, at string, depth int, out *sink) {
-	if depth > MaxDepth {
-		out.add(at, "encoding", "nested too deeply")
-		return
-	}
-	switch t := v.(type) {
-	case nil, bool:
-	case string:
-		if !utf8.ValidString(t) {
-			out.add(at, "encoding", "is not valid UTF-8")
-		}
-	case int, int64, float64:
-		if _, ok := asInt(t); !ok {
-			out.add(at, "encoding", "is not a whole number within ±%d", int64(MaxWhole))
-		}
-	case []any:
-		for i, e := range t {
-			wellFormed(e, fmt.Sprintf("%s/%d", at, i), depth+1, out)
-		}
-	case map[string]any:
-		for _, k := range slices.Sorted(maps.Keys(t)) {
-			if !utf8.ValidString(k) {
-				out.add(at, "encoding", "has a member name that is not valid UTF-8")
-			}
-			wellFormed(t[k], at+"/"+escape(k), depth+1, out)
-		}
-	default:
-		out.add(at, "encoding", "is a %T, which is not a JSON value", v)
-	}
 }

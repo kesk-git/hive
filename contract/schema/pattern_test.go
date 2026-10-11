@@ -1,13 +1,15 @@
 package schema
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestPatternCommonSyntax(t *testing.T) {
 	for _, p := range []string{
 		`^[a-z]{1,3}$`, `(?:ab)+`, `\x41`, `[\w-]+`, `a{2,}`, `a{3}`, `\.`, `^$`,
-		`(^|/)\.\.?(/|$)`, `[^/\x00]+`, `a|b`, `a*?`, `\d\D\w\W\s\S`, `\bword\b`,
-		`[a-f0-9]`, `\/`, `\-`, `[\]]`, `[\[]`, `a{0,1000}`, `(a)(b)`,
-		`^https://[^\s]+$`,
+		`(^|/)\.\.?(/|$)`, `[^/\x00]+`, `a|b`, `a*?`, `\d\D\w\W`, `\bword\b`,
+		`[a-f0-9]`, `\/`, `\-`, `[\]]`, `[\[]`, `a{0,1000}`, `(a)(b)`, `[.]`, `[^\n\t ]+`,
 	} {
 		if _, err := compilePattern(p); err != nil {
 			t.Errorf("pattern %q: %v", p, err)
@@ -69,6 +71,14 @@ func TestPatternRefusals(t *testing.T) {
 		`\C`:          "Go-only byte class",
 		`[\p{L}]`:     "property class in a class",
 		`[a-\d]`:      "range ending in a class",
+		`\s`:          "white space differs between RE2 and ECMAScript",
+		`\S`:          "white space differs between RE2 and ECMAScript",
+		`[^\s]+`:      "white space differs between RE2 and ECMAScript",
+		`[\s]`:        "white space differs between RE2 and ECMAScript",
+		`.`:           "dot differs on line terminators",
+		`a.b`:         "dot differs on line terminators",
+		`^.*$`:        "dot differs on line terminators",
+		`(?:a.)+`:     "dot differs on line terminators",
 	} {
 		if _, err := compilePattern(p); err == nil {
 			t.Errorf("pattern %q (%s) was accepted", p, why)
@@ -76,5 +86,32 @@ func TestPatternRefusals(t *testing.T) {
 	}
 	if _, err := compilePattern(j(`@u0041`)); err == nil {
 		t.Error(`the ECMAScript-only escape \u0041 was accepted`)
+	}
+}
+
+// The committed repository pattern refuses exactly the characters a browser
+// reads as white space, as the answer in Go must match the answer in one.
+func TestImportRecordRepositoryPatternMatchesBrowserWhiteSpace(t *testing.T) {
+	r, err := Embedded()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const ref = "urn:hive:schema:import-record:v1#/properties/upstream/properties/repository"
+	doc := func(s string) []byte {
+		b, err := json.Marshal(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b
+	}
+	for _, ok := range []string{"https://github.com/a/b", "https://x/\u00e9", "https://x/\u200b", "https://x/\u0085", "https://x/\u180e"} {
+		if err := r.Validate(ref, doc(ok)); err != nil {
+			t.Errorf("%q was refused: %v", ok, err)
+		}
+	}
+	for _, space := range []string{"\t", "\n", "\u000b", "\f", "\r", " ", "\u00a0", "\u1680", "\u2000", "\u2005", "\u200a", "\u2028", "\u2029", "\u202f", "\u205f", "\u3000", "\ufeff"} {
+		if err := r.Validate(ref, doc("https://x/a"+space+"b")); err == nil {
+			t.Errorf("a repository holding %q was accepted", space)
+		}
 	}
 }

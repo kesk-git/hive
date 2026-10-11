@@ -3,7 +3,6 @@ package schema
 import (
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -314,63 +313,6 @@ func TestUnknownReferenceToValidateAgainst(t *testing.T) {
 		if err := r.Validate(ref, []byte(`1`)); !errors.Is(err, ErrUnknownSchema) {
 			t.Errorf("Validate(%q) = %v, want ErrUnknownSchema", ref, err)
 		}
-		if err := r.ValidateValue(ref, int64(1)); !errors.Is(err, ErrUnknownSchema) {
-			t.Errorf("ValidateValue(%q) = %v, want ErrUnknownSchema", ref, err)
-		}
-	}
-}
-
-func TestValidateValue(t *testing.T) {
-	r := mustOne(t, `"$defs":{"anything":true,"int":{"type":"integer","minimum":1}}`)
-	free := testID + "#/$defs/anything"
-	whole := testID + "#/$defs/int"
-	for _, v := range []any{nil, true, "s", 1, int64(2), float64(3), []any{1, "a", nil}, map[string]any{"a": []any{int64(1)}}, float64(-9007199254740991)} {
-		if err := r.ValidateValue(free, v); err != nil {
-			t.Errorf("%#v: %v", v, err)
-		}
-	}
-	if err := r.ValidateValue(whole, float64(3)); err != nil {
-		t.Errorf("a whole float64: %v", err)
-	}
-	if err := r.ValidateValue(whole, 0); err == nil {
-		t.Error("0 passed minimum 1")
-	}
-	for name, v := range map[string]any{
-		"fraction":       1.5,
-		"nan":            math.NaN(),
-		"infinity":       math.Inf(1),
-		"too large":      float64(9007199254740992),
-		"too small":      float64(-9007199254740992),
-		"nested":         map[string]any{"a": []any{1, 0.1}},
-		"invalid UTF-8":  "\xff",
-		"bad member":     map[string]any{"\xff": 1},
-		"struct":         struct{}{},
-		"string slice":   []string{"a"},
-		"typed map":      map[string]int{"a": 1},
-		"unsigned":       uint(1),
-		"pointer":        new(int),
-		"float32":        float32(1),
-		"complex number": complex(1, 1),
-	} {
-		var ve *ValidationError
-		if err := r.ValidateValue(free, v); !errors.As(err, &ve) {
-			t.Errorf("%s: %v, want a *ValidationError", name, err)
-		} else if ve.Violations[0].Schema != "encoding" {
-			t.Errorf("%s: %+v", name, ve.Violations[0])
-		}
-	}
-	// A cyclic value ends in a refusal and not in a crash.
-	cyc := map[string]any{}
-	cyc["self"] = cyc
-	if err := r.ValidateValue(free, cyc); err == nil || !strings.Contains(err.Error(), "nested too deeply") {
-		t.Errorf("cycle: %v", err)
-	}
-	var deep any
-	for range MaxDepth + 1 {
-		deep = []any{deep}
-	}
-	if err := r.ValidateValue(free, deep); err == nil {
-		t.Error("a value nested beyond MaxDepth was accepted")
 	}
 }
 

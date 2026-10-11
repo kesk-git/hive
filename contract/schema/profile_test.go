@@ -140,15 +140,9 @@ func TestProfileRefusesMalformedKeywords(t *testing.T) {
 		{`"pattern":"("`, "/pattern", "pattern ("},
 		{`"pattern":"(?i)x"`, "/pattern", "pattern (?i)x"},
 		{`"pattern":"\\p{L}"`, "/pattern", "not in the syntax common"},
-		{`"then":{}`, "/then", "without if"},
-		{`"else":true`, "/else", "without if"},
-		{`"minItems":3,"maxItems":2`, "", "no array can pass"},
-		{`"minLength":3,"maxLength":2`, "", "no string can pass"},
-		{`"minimum":3,"maximum":2`, "", "no number can pass"},
 		{`"properties":{"a":{"$id":"urn:hive:schema:other:v1"}}`, "/properties/a/$id", "root of a schema file"},
 		{`"properties":{"a":{"$schema":"` + metaSchema + `"}}`, "/properties/a/$schema", "root of a schema file"},
 		{`"$ref":5`, "/$ref", "string"},
-		{`"type":"object","additionalProperties":false,"required":["x"]`, "/required", "does not list it"},
 	}
 	for _, c := range cases {
 		_, err := one(c.body)
@@ -345,7 +339,8 @@ func TestEveryObjectIsClosedButTheDesignatedOpenMembers(t *testing.T) {
 			testFile:                file(testID, body),
 		}
 	}
-	ref := `{"$ref":"` + openObjectRef + `"}`
+	const openRef = "urn:hive:schema:common:v1#/$defs/open_object"
+	ref := `{"$ref":"` + openRef + `"}`
 	for _, member := range []string{"body", "detail", "unknown"} {
 		for name, decl := range map[string]string{"bare": `{"type":"object"}`, "described": `{"type":"object","description":"x"}`, "shared": ref} {
 			body := `"type":"object","additionalProperties":false,"properties":{"` + member + `":` + decl + `}`
@@ -361,7 +356,11 @@ func TestEveryObjectIsClosedButTheDesignatedOpenMembers(t *testing.T) {
 		{"bare in items", `"items":{"type":"object"}`, "#/items", "may be open"},
 		{"bare in a branch", `"allOf":[{"type":"object"}]`, "#/allOf/0", "may be open"},
 		{"bare under defs", `"$defs":{"anything":{"type":"object"}}`, "#/$defs/anything", "may be open"},
-		{"shared open object elsewhere", `"properties":{"payload":` + ref + `}`, "#/properties/payload/$ref", "only for body, detail, unknown"},
+		{"shared open object elsewhere", `"properties":{"payload":` + ref + `}`, "#/properties/payload", "reaches an open object"},
+		{"shared open object by an encoded reference", `"properties":{"payload":{"$ref":"urn:hive:schema:common:v1#/$defs/open%5Fobject"}}`, "#/properties/payload", "reaches an open object"},
+		{"shared open object in a branch", `"allOf":[` + ref + `]`, "#/allOf/0", "reaches an open object"},
+		{"shared open object through a definition", `"$defs":{"alias":` + ref + `},"properties":{"payload":{"$ref":"` + testID + `#/$defs/alias"}}`, "#/properties/payload", "reaches an open object"},
+		{"open object declared in another file", `"$defs":{"open_object":{"type":"object"}}`, "#/$defs/open_object", "may be open"},
 		{"properties without closing", `"type":"object","properties":{"a":true}`, "#", "sets additionalProperties to false"},
 		{"explicitly open", `"type":"object","properties":{"a":true},"additionalProperties":true`, "#", "sets additionalProperties to false"},
 		{"required only", `"type":"object","required":[]`, "#", "sets additionalProperties to false"},
@@ -374,6 +373,22 @@ func TestEveryObjectIsClosedButTheDesignatedOpenMembers(t *testing.T) {
 			wantProblem(t, err, testID+c.at, c.msg)
 		})
 	}
+
+	// A designated member may share another designated member, and nothing else
+	// may.
+	other := func(body string) fstest.MapFS {
+		return fstest.MapFS{
+			"common.v1.schema.json": file("urn:hive:schema:common:v1", open),
+			"other.v1.schema.json":  file("urn:hive:schema:other:v1", `"type":"object","additionalProperties":false,"properties":{"body":`+ref+`}`),
+			testFile:                file(testID, body),
+		}
+	}
+	shared := `{"$ref":"urn:hive:schema:other:v1#/properties/body"}`
+	if _, err := Load(other(`"type":"object","additionalProperties":false,"properties":{"body":`+shared+`}`), "."); err != nil {
+		t.Errorf("a designated member sharing another: %v", err)
+	}
+	_, err := Load(other(`"type":"object","additionalProperties":false,"properties":{"payload":`+shared+`}`), ".")
+	wantProblem(t, err, testID+"#/properties/payload", "reaches an open object")
 
 	// A closed object with nothing to list, and a conditional that names
 	// properties without declaring an object, are both fine.

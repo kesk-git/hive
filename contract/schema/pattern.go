@@ -13,7 +13,9 @@ import (
 // flag groups, POSIX classes, \p, \z, \Q...\E, \x{...}) and a browser accepts
 // more than Go does (lookaround, back-references, \u escapes); every one of
 // those is refused here, and so is a bare brace or bracket whose meaning the
-// two engines settle differently.
+// two engines settle differently. \s, \S and an unescaped dot are refused as
+// well, for they match different characters in the two engines (Unicode
+// white space and line terminators); a pattern writes the class out.
 func compilePattern(src string) (*regexp.Regexp, error) {
 	if err := commonSyntax(src); err != nil {
 		return nil, err
@@ -41,7 +43,9 @@ func commonSyntax(p string) error {
 			e := p[i]
 			switch {
 			case strings.IndexByte(`\^$.*+?()[]{}|/-`, e) >= 0:
-			case strings.IndexByte("dDwWsSnrtfv", e) >= 0:
+			case strings.IndexByte("dDwWnrtfv", e) >= 0:
+			case e == 's' || e == 'S':
+				return fmt.Errorf("\\%c matches different characters in RE2 and ECMAScript; write the class out", e)
 			case (e == 'b' || e == 'B') && !inClass:
 			case e == 'x':
 				if i+2 >= len(p) || !isHex(p[i+1]) || !isHex(p[i+2]) {
@@ -61,6 +65,8 @@ func commonSyntax(p string) error {
 				}
 				inClass = false
 			}
+		case c == '.':
+			return fmt.Errorf("an unescaped . matches different characters in RE2 and ECMAScript; write the class out")
 		case c == '[':
 			inClass = true
 			classStart = i + 1

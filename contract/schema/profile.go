@@ -10,8 +10,9 @@ import (
 // metaSchema is the dialect every schema file names.
 const metaSchema = "https://json-schema.org/draft/2020-12/schema"
 
-// openObjectRef is the shared declaration of a designated open member.
-const openObjectRef = "urn:hive:schema:common:v1#/$defs/open_object"
+// openObjectID is the schema file that holds the shared declaration of a
+// designated open member, at /$defs/open_object.
+const openObjectID = "urn:hive:schema:common:v1"
 
 // openMembers are the only members of a record that may be left open, as
 // spec/records.md fixes them: body in an envelope, detail in an error and
@@ -83,7 +84,7 @@ func (c *compiler) compileFile(doc any) *node {
 // schema compiles the schema at ptr. member is the name of the property it
 // sits under, "" otherwise.
 func (c *compiler) schema(raw any, ptr, member string, root bool) *node {
-	n := &node{loc: c.id + "#" + ptr}
+	n := &node{loc: c.id + "#" + ptr, designated: slices.Contains(openMembers, member)}
 	c.nodes[ptr] = n
 	switch t := raw.(type) {
 	case bool:
@@ -115,7 +116,7 @@ func (c *compiler) keywords(n *node, obj map[string]any, ptr, member string, roo
 				c.problem(at, "%s is a string", kw)
 			}
 		case "$ref":
-			c.reference(n, v, at, member)
+			c.reference(n, v, at)
 		case "$defs":
 			c.schemaMap(v, at, false, func(string, *node) {})
 		case "type":
@@ -182,31 +183,8 @@ func (c *compiler) keywords(n *node, obj map[string]any, ptr, member string, roo
 	c.relations(n, obj, ptr, member)
 }
 
-// relations holds the rules that span several keywords of one schema.
+// relations holds the rule on which objects are open.
 func (c *compiler) relations(n *node, obj map[string]any, ptr, member string) {
-	if _, has := obj["if"]; !has {
-		for _, kw := range []string{"then", "else"} {
-			if _, has := obj[kw]; has {
-				c.problem(ptr+"/"+kw, "%s without if is never applied", kw)
-			}
-		}
-	}
-	if n.minItems != nil && n.maxItems != nil && *n.minItems > *n.maxItems {
-		c.problem(ptr, "minItems exceeds maxItems: no array can pass")
-	}
-	if n.minLength != nil && n.maxLength != nil && *n.minLength > *n.maxLength {
-		c.problem(ptr, "minLength exceeds maxLength: no string can pass")
-	}
-	if n.minimum != nil && n.maximum != nil && *n.minimum > *n.maximum {
-		c.problem(ptr, "minimum exceeds maximum: no number can pass")
-	}
-	if n.closed {
-		for _, name := range n.required {
-			if !n.hasProp(name) {
-				c.problem(ptr+"/required", "%q is required but the closed object does not list it", name)
-			}
-		}
-	}
 	if !slices.Contains(n.types, "object") {
 		return
 	}
@@ -219,17 +197,19 @@ func (c *compiler) relations(n *node, obj map[string]any, ptr, member string) {
 		}
 	}
 	switch {
-	case bare && !isOpenSite(member, ptr):
+	case bare && !c.isOpenSite(member, ptr):
 		c.problem(ptr, "an object that lists no properties is open; only %s may be open", strings.Join(openMembers, ", "))
+	case bare:
+		n.open = true
 	case !bare && !n.closed:
 		c.problem(ptr, "an object schema lists its properties and sets additionalProperties to false")
 	}
 }
 
 // isOpenSite says whether a bare object may sit here: under a designated open
-// member, or as the shared definition of one.
-func isOpenSite(member, ptr string) bool {
-	return slices.Contains(openMembers, member) || ptr == "/$defs/open_object"
+// member, or as the one shared definition of it in the common schema file.
+func (c *compiler) isOpenSite(member, ptr string) bool {
+	return slices.Contains(openMembers, member) || (c.id == openObjectID && ptr == "/$defs/open_object")
 }
 
 // schemaMap compiles an object whose values are schemas ($defs, properties).
@@ -356,7 +336,7 @@ func (c *compiler) whole(v any, at string) *int64 {
 
 // reference records a $ref for resolution once every file is read, after the
 // checks that need only the text.
-func (c *compiler) reference(n *node, v any, at, member string) {
+func (c *compiler) reference(n *node, v any, at string) {
 	text, ok := v.(string)
 	if !ok {
 		c.problem(at, "$ref is a string")
@@ -365,9 +345,6 @@ func (c *compiler) reference(n *node, v any, at, member string) {
 	if _, err := splitRef(text); err != nil {
 		c.problem(at, "$ref %s: %v", text, err)
 		return
-	}
-	if text == openObjectRef && !slices.Contains(openMembers, member) {
-		c.problem(at, "the open object is declared only for %s", strings.Join(openMembers, ", "))
 	}
 	c.refs = append(c.refs, pendingRef{n, text})
 }

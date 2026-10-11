@@ -3,7 +3,6 @@ package schema
 import (
 	"fmt"
 	"maps"
-	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -15,6 +14,9 @@ import (
 // Nodes are immutable once Load returns.
 type node struct {
 	loc string // "<$id>#<JSON pointer>", where this schema sits
+
+	designated bool // sits under a designated open member
+	open       bool // a bare object, which admits any member
 
 	boolean   bool // a boolean schema; verdict holds its value
 	verdict   bool
@@ -199,7 +201,7 @@ func (n *node) check(v any, at string, out *sink) bool {
 			}
 		}
 	}
-	if i, isInt := asInt(v); isInt {
+	if i, isInt := v.(int64); isInt {
 		if n.minimum != nil && i < *n.minimum {
 			if !fail("minimum", "is below the minimum %d", *n.minimum) {
 				return false
@@ -297,26 +299,10 @@ func escape(s string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(s, "~", "~0"), "/", "~1")
 }
 
-// asInt reads a whole number in any of the forms a caller may hold it in. A
-// float that is not whole, or lies outside ±MaxWhole, is not an integer here.
-func asInt(v any) (int64, bool) {
-	switch t := v.(type) {
-	case int64:
-		return t, true
-	case int:
-		return int64(t), true
-	case float64:
-		if t == math.Trunc(t) && math.Abs(t) <= MaxWhole {
-			return int64(t), true
-		}
-	}
-	return 0, false
-}
-
-// kindOf names the JSON type of v: "integer" for a whole number. A value that
-// is none of them is "invalid"; wellFormed has refused such a value already.
+// kindOf names the JSON type of v, which Decode produced: "integer" for a
+// whole number.
 func kindOf(v any) string {
-	switch t := v.(type) {
+	switch v.(type) {
 	case nil:
 		return "null"
 	case bool:
@@ -327,10 +313,8 @@ func kindOf(v any) string {
 		return "object"
 	case []any:
 		return "array"
-	case int64, int, float64:
-		if _, ok := asInt(t); ok {
-			return "integer"
-		}
+	case int64:
+		return "integer"
 	}
 	return "invalid"
 }
@@ -342,8 +326,8 @@ func typeMatches(want, kind string) bool {
 // equal is JSON equality: strings byte for byte, objects by member, arrays by
 // position, whole numbers by value.
 func equal(a, b any) bool {
-	if x, ok := asInt(a); ok {
-		y, ok := asInt(b)
+	if x, ok := a.(int64); ok {
+		y, ok := b.(int64)
 		return ok && x == y
 	}
 	switch x := a.(type) {

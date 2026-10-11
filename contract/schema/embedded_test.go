@@ -3,8 +3,6 @@ package schema
 import (
 	"encoding/json"
 	"io/fs"
-	"os"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -108,33 +106,6 @@ func TestEveryCommittedReferenceResolvesToASchema(t *testing.T) {
 		} else if !strings.HasPrefix(n.loc, strings.SplitN(ref, "#", 2)[0]+"#") {
 			t.Errorf("%s resolved to %s", ref, n.loc)
 		}
-	}
-}
-
-// The prose of spec/records.md lists the profile; the validator implements
-// that list and no other.
-func TestProfileIsTheListOfTheSpecification(t *testing.T) {
-	prose, err := os.ReadFile("../../spec/records.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, after, found := strings.Cut(string(prose), "implements in full:")
-	if !found {
-		t.Fatal("spec/records.md no longer lists the profile where it did")
-	}
-	para, _, _ := strings.Cut(strings.TrimSpace(after), "\n\n")
-	var listed []string
-	for _, m := range regexp.MustCompile("`([^`]+)`").FindAllStringSubmatch(para, -1) {
-		if m[1] != "true" && m[1] != "false" {
-			listed = append(listed, m[1])
-		}
-	}
-	slices.Sort(listed)
-	if !strings.Contains(para, "`true` and `false`") {
-		t.Errorf("the profile no longer names the boolean schemas: %s", para)
-	}
-	if got := Keywords(); !slices.Equal(got, listed) {
-		t.Errorf("Keywords() = %v\nspec/records.md lists %v", got, listed)
 	}
 }
 

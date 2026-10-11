@@ -226,9 +226,6 @@ func (p *parser) number() (any, error) {
 		}
 	}
 	text := string(p.data[start:p.pos])
-	if text == "-0" {
-		return nil, &SyntaxError{start, "negative zero"}
-	}
 	n, err := strconv.ParseInt(text, 10, 64)
 	if err != nil || n > MaxWhole || n < -MaxWhole {
 		return nil, &SyntaxError{start, "number outside ±9007199254740991"}
