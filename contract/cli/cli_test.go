@@ -1049,6 +1049,213 @@ func TestInterruptedCommitIsUnknownUntilCompleted(t *testing.T) {
 	})
 }
 
+// A retry of a request whose transaction is durable that fails in the
+// recovery before it reaches the intent, at the enumeration of the intents or
+// at the first flush of the transaction directory, or after it completed the
+// intent, at the cleanup, answers unknown and never failed: the store reports
+// the request's transaction as durable, and the harness answers nothing else
+// for it. The handler runs once, and the request sent again once the store
+// works is the response as recorded.
+func TestRetryThatFailsRecoveryIsUnknown(t *testing.T) {
+	for _, step := range []string{"readdir dispatch/tx/", "syncdir dispatch/tx/", "clear dispatch/tmp/"} {
+		t.Run(step, func(t *testing.T) {
+			h := newHarness(t)
+			home := newHome(t)
+			req := request(t, "put", 1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "first" })
+			h.journal.fail = errors.New("the journal is full")
+			expectUnknown(t, h.invoke(t, home, "put", req))
+			intent := filepath.Join(home, filepath.FromSlash(store.IntentPath("dispatch", id(ids.Request, 1))))
+			if _, err := os.Stat(intent); err != nil {
+				t.Fatalf("the intent is not there: %v", err)
+			}
+
+			h.journal.fail = nil
+			hit := h.faultAt(step)
+			resp := h.invoke(t, home, "put", req)
+			if !*hit {
+				t.Fatal("the interruption did not happen")
+			}
+			expectUnknown(t, resp)
+			if h.calls["put"] != 1 {
+				t.Errorf("put ran %d times", h.calls["put"])
+			}
+			if !strings.Contains(h.stderr.String(), "crashed here") {
+				t.Error("the cause was not reported on standard error")
+			}
+
+			h.exe.Fault = nil
+			again := h.invoke(t, home, "put", req)
+			expect(t, again, envelope.Ok, "")
+			if !again.Replayed || len(again.Receipts) != 1 || again.Body["wrote"] != "first" || h.calls["put"] != 1 {
+				t.Errorf("%+v, calls %d", again, h.calls["put"])
+			}
+			if _, err := os.Stat(intent); err == nil {
+				t.Error("the intent was left behind")
+			}
+			if len(h.journal.order) != 1 {
+				t.Errorf("events appended: %v", h.journal.order)
+			}
+		})
+	}
+}
+
+// Handle, which a convenience form calls without Check, holds the floor
+// itself: a command whose response limit admits a small success response but
+// not the outcome_unknown answer is refused before anything is written, and
+// an interrupted commit under it is never answered too_large. At the floor
+// exactly, an interrupted commit is answered unknown.
+func TestHandleHoldsTheFloor(t *testing.T) {
+	h := newHarness(t)
+	fleet := h.exe.command("hive-fleet")
+	home := newHome(t)
+	out, err := h.exe.Handle(Invocation{Command: fleet, Operation: "raw", Home: home, Request: request(t, "raw", 1, nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, out.Response, envelope.Ok, "")
+	success := int64(len(out.Encoded))
+	floor := floorOf(t, h.exe, fleet)
+	if success >= floor {
+		t.Fatalf("the success response is %d bytes and the floor %d: the control needs a success below the floor", success, floor)
+	}
+	narrow := func(limit int64) *Command {
+		return &Command{Name: fleet.Name, Limits: envelope.Limits{MaxRequestBytes: 4096, MaxResponseBytes: limit}, Operations: fleet.Operations}
+	}
+
+	// Main refuses the whole executable.
+	below := *h.exe
+	below.Commands = []*Command{{Name: "hive-dispatch"}, narrow(success)}
+	if err := below.Check(); err == nil || !strings.Contains(err.Error(), "interrupted transaction") {
+		t.Errorf("Check = %v", err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := below.Main([]string{"hive-fleet", "raw", HomeOption, home}, bytes.NewReader(request(t, "raw", 2, nil)), &stdout, &stderr); code != 1 || stdout.Len() != 0 {
+		t.Errorf("Main: exit %d, stdout %q", code, stdout.String())
+	}
+
+	// Handle refuses the operation at the floor, before anything is written,
+	// with no response, as Main refuses the executable: the store is not
+	// opened, the handler does not run, and the commit the test would
+	// interrupt is never reached, so no response, too_large least of all,
+	// can say anything about it.
+	home = newHome(t)
+	before := tree(t, home)
+	hit := h.faultAt("create " + store.OutcomePath("dispatch", id(ids.Request, 2)))
+	out, err = h.exe.Handle(Invocation{Command: narrow(success), Operation: "raw", Home: home, Request: request(t, "raw", 2, nil)})
+	if err == nil || out != nil || !strings.Contains(err.Error(), "interrupted transaction") || !strings.Contains(err.Error(), "before anything is written") {
+		t.Fatalf("Handle under a limit below the floor = %+v, %v", out, err)
+	}
+	if *hit || h.calls["raw"] != 1 {
+		t.Errorf("hit %v, calls %d", *hit, h.calls["raw"])
+	}
+	same(t, before, tree(t, home))
+	// A read-only operation of the same command is not held to the floor,
+	// and an invalid request to the mutating one is still answered invalid:
+	// the floor refuses only what would reach the store.
+	out, err = h.exe.Handle(Invocation{Command: narrow(success), Operation: "echo", Home: home, Request: request(t, "echo", 3, nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Response.Status != envelope.Ok && out.Response.Status != envelope.TooLarge {
+		t.Errorf("echo under the narrow limit: %+v", out.Response)
+	}
+	out, err = h.exe.Handle(Invocation{Command: narrow(success), Operation: "raw", Home: home, Request: []byte("{\n")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Response.Status != envelope.Invalid && out.Response.Status != envelope.TooLarge {
+		t.Errorf("a malformed request under the narrow limit: %+v", out.Response)
+	}
+	same(t, before, tree(t, home))
+
+	// At the floor, the interrupted commit is answered unknown, and the
+	// request sent again completes it and replays the success, which fits.
+	hit = h.faultAt("create " + store.OutcomePath("dispatch", id(ids.Request, 4)))
+	out, err = h.exe.Handle(Invocation{Command: narrow(floor), Operation: "raw", Home: home, Request: request(t, "raw", 4, nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !*hit {
+		t.Fatal("the interruption did not happen")
+	}
+	expectUnknown(t, out.Response)
+	if int64(len(out.Encoded)) > floor {
+		t.Errorf("the unknown answer is %d bytes over its floor %d", len(out.Encoded), floor)
+	}
+	h.exe.Fault = nil
+	out, err = h.exe.Handle(Invocation{Command: narrow(floor), Operation: "raw", Home: home, Request: request(t, "raw", 4, nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, out.Response, envelope.Ok, "")
+	if !out.Response.Replayed || h.calls["raw"] != 2 {
+		t.Errorf("%+v, calls %d", out.Response, h.calls["raw"])
+	}
+}
+
+// A put interrupted at the journal append, then recovered by its retry while
+// the response limit is lowered below the recorded response but not below
+// the floor, is answered unknown and never too_large: the transaction is
+// complete, and only the response as recorded or unknown can say so. With the
+// limit restored, the replay is the response as recorded.
+func TestReplayThatNoLongerFitsIsUnknown(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	fleet := h.exe.command("hive-fleet")
+	req := request(t, "put", 1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "first" })
+	h.journal.fail = errors.New("the journal is full")
+	expectUnknown(t, h.invoke(t, home, "put", req))
+	intent := filepath.Join(home, filepath.FromSlash(store.IntentPath("dispatch", id(ids.Request, 1))))
+	if _, err := os.Stat(intent); err != nil {
+		t.Fatalf("the intent is not there: %v", err)
+	}
+
+	h.journal.fail = nil
+	floor := floorOf(t, h.exe, fleet)
+	fleet.Limits.MaxResponseBytes = floor
+	resp := h.invoke(t, home, "put", req)
+	if resp.Status == envelope.TooLarge {
+		t.Fatalf("a completed transaction was answered too_large: %+v", resp)
+	}
+	expectUnknown(t, resp)
+	if h.calls["put"] != 1 {
+		t.Errorf("put ran %d times", h.calls["put"])
+	}
+	// The retry completed the transaction: the intent is gone, the outcome
+	// is recorded, the event is in the journal once, and the recorded
+	// response is indeed over the limit.
+	if _, err := os.Stat(intent); err == nil {
+		t.Error("the intent was left behind")
+	}
+	if len(h.journal.order) != 1 {
+		t.Errorf("events appended: %v", h.journal.order)
+	}
+	data, err := os.ReadFile(filepath.Join(home, filepath.FromSlash(store.OutcomePath("dispatch", id(ids.Request, 1)))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := canon.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded, _ := canon.Encode(v.(map[string]any)["response"])
+	if int64(len(recorded)+1) <= floor {
+		t.Fatalf("the recorded response is %d bytes, within the limit %d: the control needs one over it", len(recorded)+1, floor)
+	}
+	// Lowered again, the same answer; nothing of the handler runs.
+	expectUnknown(t, h.invoke(t, home, "put", req))
+	if !strings.Contains(h.stderr.String(), "recorded response") {
+		t.Error("the cause was not reported on standard error")
+	}
+
+	fleet.Limits.MaxResponseBytes = 4096
+	again := h.invoke(t, home, "put", req)
+	expect(t, again, envelope.Ok, "")
+	if !again.Replayed || len(again.Receipts) != 1 || again.Body["wrote"] != "first" || h.calls["put"] != 1 {
+		t.Errorf("%+v, calls %d", again, h.calls["put"])
+	}
+}
+
 // A record is final before anything is sealed: the digest the response and
 // the receipt carry, taken from Finalize, is the digest of the record on disk
 // though the clock moves between every reading, and a record returned without

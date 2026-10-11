@@ -62,6 +62,11 @@ type Executable struct {
 	// that appends events. Nil means the executable appends none; a
 	// transaction that names events then fails.
 	Journal func(dir string) (store.Journal, error)
+	// Fault, when set by a test, is installed on every store the executable
+	// opens, which calls it before each step of a write or of a recovery with
+	// the step's name; an error it returns stops the store there, as a crash
+	// would. A delivered executable sets none.
+	Fault func(step string) error
 }
 
 // Command is one command name of an executable, with its limits and its
@@ -307,23 +312,28 @@ func (e *Executable) Check() error {
 		if err := e.Capabilities(c).Check(); err != nil {
 			return fmt.Errorf("cli: %s: %w", c.Name, err)
 		}
-		if err := e.holdsInterruptedAnswer(c); err != nil {
-			return err
+		for _, op := range c.Operations {
+			if op.State == envelope.Supported && op.Mutates {
+				if err := e.floor(c, op); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
 }
 
-// holdsInterruptedAnswer checks that the command's response limit admits the
-// answer of an interrupted transaction, which is never replaced by another
-// status, for every supported mutating operation of the command.
-func (e *Executable) holdsInterruptedAnswer(c *Command) error {
+// floor checks that the command's response limit holds every answer of a
+// durable transaction of the operation that is not the response as recorded:
+// the outcome_unknown answers of spec/commands.md, Size, which are never
+// replaced by too_large. Check runs it for every supported mutating
+// operation, and the harness runs it again for the operation in hand before
+// its store is touched, so that no entry can reach a transaction it could
+// not answer for.
+func (e *Executable) floor(c *Command, op *Operation) error {
 	limit := c.Limits.Resolved().MaxResponseBytes
-	for _, op := range c.Operations {
-		if op.State != envelope.Supported || !op.Mutates {
-			continue
-		}
-		resp := e.failure(sampleRequestID, c.Name, op.Name, envelope.Common(envelope.CodeOutcomeUnknown, interruptedMessage))
+	for _, message := range []string{interruptedMessage, oversizeReplayMessage} {
+		resp := e.unknownAnswer(c, op.Name, sampleRequestID, message)
 		resp.CompletedAt = sampleTimestamp
 		data, err := resp.Encode()
 		if err != nil {

@@ -49,7 +49,10 @@ func (e *Executable) Handle(inv Invocation) (*Outcome, error) {
 	if inv.Stderr == nil {
 		inv.Stderr = io.Discard
 	}
-	resp, after := e.handle(inv)
+	resp, after, err := e.handle(inv)
+	if err != nil {
+		return nil, err
+	}
 	if err := e.stamp(resp); err != nil {
 		return nil, err
 	}
@@ -159,21 +162,22 @@ func (e *Executable) capabilities(c *Command) *envelope.Response {
 
 // handle runs the harness for an operation invocation and returns the
 // response, with completed_at unset, and the continuation of a resident
-// operation.
-func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func() error) {
+// operation. Its error is the one refusal that has no response: a mutating
+// operation whose command's response limit is below the floor.
+func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func() error, err error) {
 	c := inv.Command
 	fail := func(requestID string, f *envelope.Failure) *envelope.Response {
 		return e.failure(requestID, c.Name, inv.Operation, f)
 	}
 	op := c.operation(inv.Operation)
 	if op == nil {
-		return fail("", envelope.Common(envelope.CodeUnknownOperation, fmt.Sprintf("%s has no operation %q", c.Name, inv.Operation))), nil
+		return fail("", envelope.Common(envelope.CodeUnknownOperation, fmt.Sprintf("%s has no operation %q", c.Name, inv.Operation))), nil, nil
 	}
 
 	// Size, before the request is parsed.
 	limits := c.Limits.Resolved()
 	if int64(len(inv.Request)) > limits.MaxRequestBytes {
-		return fail("", envelope.Oversize("request", limits.MaxRequestBytes, int64(len(inv.Request)))), nil
+		return fail("", envelope.Oversize("request", limits.MaxRequestBytes, int64(len(inv.Request)))), nil, nil
 	}
 
 	// The whole request, before anything else is read or written.
@@ -184,34 +188,34 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		if id == "" && f.Err.Code != envelope.CodeMalformedRequest {
 			f = envelope.Common(envelope.CodeMalformedRequest, "the request names no request_id that can be read: "+f.Err.Message)
 		}
-		return fail(id, f), nil
+		return fail(id, f), nil, nil
 	}
 	if err := req.Addressed(c.Name, op.Name); err != nil {
-		return fail(req.RequestID, envelope.AsFailure(err)), nil
+		return fail(req.RequestID, envelope.AsFailure(err)), nil, nil
 	}
 	switch op.State {
 	case envelope.Unsupported:
-		return fail(req.RequestID, envelope.Common(envelope.CodeUnsupportedOperation, reason(op, "the operation is declared and not built"))), nil
+		return fail(req.RequestID, envelope.Common(envelope.CodeUnsupportedOperation, reason(op, "the operation is declared and not built"))), nil, nil
 	case envelope.Parked:
-		return fail(req.RequestID, envelope.Common(envelope.CodeOperationParked, reason(op, "the operation is held closed by a recorded decision"))), nil
+		return fail(req.RequestID, envelope.Common(envelope.CodeOperationParked, reason(op, "the operation is held closed by a recorded decision"))), nil, nil
 	}
 	if !slices.Contains(op.Versions, req.OperationVersion) {
-		return fail(req.RequestID, envelope.Common(envelope.CodeUnsupportedVersion, fmt.Sprintf("%s %s accepts body versions %v, not %s", c.Name, op.Name, op.Versions, req.OperationVersion))), nil
+		return fail(req.RequestID, envelope.Common(envelope.CodeUnsupportedVersion, fmt.Sprintf("%s %s accepts body versions %v, not %s", c.Name, op.Name, op.Versions, req.OperationVersion))), nil, nil
 	}
 	if op.RequestSchema == "" {
-		return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the operation declares no request schema")), nil
+		return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the operation declares no request schema")), nil, nil
 	}
 	if err := envelope.ValidateBody(req.Body, op.RequestSchema); err != nil {
-		return fail(req.RequestID, envelope.AsFailure(err)), nil
+		return fail(req.RequestID, envelope.AsFailure(err)), nil, nil
 	}
 
 	// The home and the scope, before anything changes.
 	home, err := e.checkHome(inv.Home, req, op)
 	if err != nil {
-		return fail(req.RequestID, envelope.AsFailure(err)), nil
+		return fail(req.RequestID, envelope.AsFailure(err)), nil, nil
 	}
 	if err := checkScope(home, req.Scope); err != nil {
-		return fail(req.RequestID, envelope.AsFailure(err)), nil
+		return fail(req.RequestID, envelope.AsFailure(err)), nil, nil
 	}
 
 	call := &Call{
@@ -252,47 +256,52 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		res, err := e.run(call)
 		if err != nil {
 			resp, _ := failed(envelope.AsFailure(err))
-			return resp, nil
+			return resp, nil, nil
 		}
 		if len(res.Records)+len(res.Receipts)+len(res.Events) > 0 {
-			return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "a read-only operation records nothing, and it returned records")), nil
+			return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "a read-only operation records nothing, and it returned records")), nil, nil
 		}
-		return ok(res.Body, nil), res.After
+		return ok(res.Body, nil), res.After, nil
 	}
 
-	// stored is the answer to an error of the store: every path of a
-	// mutating operation that can fail after a transaction became durable
-	// answers through it.
-	stored := func(err error) *envelope.Response {
-		f := storeFailure(err, req.RequestID)
-		if f.Status == envelope.Unknown {
-			fmt.Fprintln(inv.Stderr, err)
-		}
-		return fail(req.RequestID, f)
+	// settle is the one answer to what the store reports of this request:
+	// every path of a mutating operation that runs after the store is
+	// touched answers through it.
+	settle := func(resp *envelope.Response, err error) *envelope.Response {
+		return e.settle(c, op, req.RequestID, resp, err, inv.Stderr)
 	}
 
-	// A mutating operation: the store's lock, then the replay check.
+	// A mutating operation. The floor first: the limit holds every answer a
+	// durable transaction can need, or the store is never touched, whichever
+	// entry the invocation came through. Main refused the executable for
+	// this at its start; Handle refuses the operation here, the same way,
+	// with no response: no status it could give would fit a limit below the
+	// floor without promising that nothing changed.
+	if err := e.floor(c, op); err != nil {
+		return nil, nil, fmt.Errorf("%w: the operation is refused before anything is written", err)
+	}
+	// Then the store's lock, for this request, and the replay check.
 	at := &recordClock{}
-	st, w, err := e.open(home, at)
+	st, w, err := e.open(home, req.RequestID, at)
 	if err != nil {
-		return stored(err), nil
+		return settle(nil, err), nil, nil
 	}
 	defer w.Release()
 	digest, err := envelope.Digest(inv.Request)
 	if err != nil {
-		return fail(req.RequestID, envelope.Common(envelope.CodeInternal, err.Error())), nil
+		return fail(req.RequestID, envelope.Common(envelope.CodeInternal, err.Error())), nil, nil
 	}
 	recorded, err := readOutcome(st, req.RequestID)
 	if err != nil {
-		return fail(req.RequestID, envelope.AsFailure(err)), nil
+		return fail(req.RequestID, envelope.AsFailure(err)), nil, nil
 	}
 	if recorded != nil {
 		if recorded.digest != digest {
-			return fail(req.RequestID, envelope.Common(envelope.CodeReplayMismatch, "the request_id was used before with another request")), nil
+			return fail(req.RequestID, envelope.Common(envelope.CodeReplayMismatch, "the request_id was used before with another request")), nil, nil
 		}
 		resp := recorded.response
 		resp.Replayed = true
-		return resp, nil
+		return settle(resp, nil), nil, nil
 	}
 	at.at = e.clock().Now()
 	call.Store, call.recordedAt = st, at.at
@@ -306,18 +315,15 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		// whole. A failure that leaves nothing, and an unknown outcome,
 		// which is never recorded as complete, write nothing.
 		if !whole || len(f.Receipts) == 0 {
-			return resp, nil
+			return resp, nil, nil
 		}
-		if err := e.commit(w, req.RequestID, digest, resp, nil, f.Receipts, nil); err != nil {
-			return stored(err), nil
-		}
-		return resp, nil
+		return settle(resp, e.commit(w, req.RequestID, digest, resp, nil, f.Receipts, nil)), nil, nil
 	}
 	// The records are final before anything is sealed.
 	for i := range res.Records {
 		rec, _, err := call.Finalize(res.Records[i])
 		if err != nil {
-			return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the operation returned a record that cannot be written: "+err.Error())), nil
+			return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the operation returned a record that cannot be written: "+err.Error())), nil, nil
 		}
 		res.Records[i] = rec
 	}
@@ -325,12 +331,12 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	// The response is checked and sized before anything is written, so that a
 	// response too large to return leaves nothing behind.
 	if bad := e.preflight(c, resp); bad != nil {
-		return bad, nil
+		return bad, nil, nil
 	}
 	if err := e.commit(w, req.RequestID, digest, resp, res.Records, res.Receipts, res.Events); err != nil {
-		return stored(err), nil
+		return settle(resp, err), nil, nil
 	}
-	return resp, res.After
+	return settle(resp, nil), res.After, nil
 }
 
 // recordClock is the clock of the store: the one time at which the records of
@@ -450,8 +456,10 @@ func homeFailure(err error) error {
 	return envelope.Common(envelope.CodeIOFailure, err.Error())
 }
 
-// open opens the package's store in the home and takes its lock.
-func (e *Executable) open(home *store.Home, clk clock.Clock) (*store.Store, *store.Writer, error) {
+// open opens the package's store in the home and takes its lock for the
+// request, so that the store's report of a failure says whether the
+// request's own transaction is durable.
+func (e *Executable) open(home *store.Home, requestID string, clk clock.Clock) (*store.Store, *store.Writer, error) {
 	var journal store.Journal
 	if e.Journal != nil {
 		j, err := e.Journal(home.Dir)
@@ -464,29 +472,75 @@ func (e *Executable) open(home *store.Home, clk clock.Clock) (*store.Store, *sto
 	if err != nil {
 		return nil, nil, homeFailure(err)
 	}
-	w, err := st.Lock()
+	if e.Fault != nil {
+		st.Fault(e.Fault)
+	}
+	w, err := st.LockFor(requestID)
 	if err != nil {
 		return nil, nil, err
 	}
 	return st, w, nil
 }
 
-// interruptedMessage is the whole of what an interrupted transaction says.
-const interruptedMessage = "the transaction was recorded and is not known to be complete; sending the same request again completes it"
+// The whole of what a durable transaction says when its response cannot be
+// given: one that is not known to be complete, and one that is complete and
+// whose recorded response is larger than the limit now declared.
+const (
+	interruptedMessage    = "the transaction was recorded and is not known to be complete; sending the same request again completes it"
+	oversizeReplayMessage = "the transaction is complete and its recorded response is larger than the response limit now declared; it stands as recorded"
+)
+
+// unknownAnswer is the answer of a durable transaction whose response cannot
+// be given: outcome_unknown, not retryable, with no receipts and the message
+// given. The floor holds it for every message a durable transaction can need.
+func (e *Executable) unknownAnswer(c *Command, operation, requestID, message string) *envelope.Response {
+	return e.failure(requestID, c.Name, operation, envelope.Common(envelope.CodeOutcomeUnknown, message))
+}
+
+// settle is the one function that turns what the store reports of a mutating
+// request into its response, and every entry answers through it: err is what
+// taking the lock with recovery, or committing, reported, and resp is, with
+// err nil, the response as recorded for a replay or as just committed. The
+// store reports a durable transaction of the request as an *InterruptedError
+// naming it, and a recorded response is durable by being recorded. Once the
+// transaction is durable the answer is only the response as recorded, when it
+// fits the limit, or outcome_unknown, which fits by the floor checked before
+// the store was touched; never too_large, which would promise that nothing
+// changed. An error that left nothing of the request behind is answered by
+// the code it carries, and too_large replaces that answer where it does not
+// fit. Sizing is done here, so that no entry can replace a durable answer.
+func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *envelope.Response, err error, stderr io.Writer) *envelope.Response {
+	durable := true
+	if err != nil {
+		var interrupted *store.InterruptedError
+		durable = errors.As(err, &interrupted) && interrupted.RequestID == requestID
+		if durable {
+			fmt.Fprintln(stderr, err)
+			resp = e.unknownAnswer(c, op.Name, requestID, interruptedMessage)
+		} else {
+			resp = e.failure(requestID, c.Name, op.Name, storeFailure(err))
+		}
+	}
+	if bad := e.preflight(c, resp); bad != nil {
+		if !durable {
+			return bad
+		}
+		fmt.Fprintf(stderr, "%s %s: the recorded response of %s is %s\n", c.Name, op.Name, requestID, bad.Error.Message)
+		return e.unknownAnswer(c, op.Name, requestID, oversizeReplayMessage)
+	}
+	return resp
+}
 
 // storeFailure maps an error of the store, of opening it, of recovering it or
-// of committing to it, to its failure, for the request requestID. A
-// transaction of this request whose intent is durable is outcome_unknown
-// whatever stopped it, since the next lock completes it; one of an earlier
-// request stops the store before this request writes anything, and is
-// record_malformed. Any other error left nothing behind, and is the common
-// code it carries, or failed for one that carries none.
-func storeFailure(err error, requestID string) *envelope.Failure {
+// of committing to it, that left nothing of the request in hand behind, to
+// its failure: the transaction of an earlier request that stops the store
+// before this request writes anything is record_malformed, and any other
+// error is the common code it carries, or failed for one that carries none.
+// A transaction of the request in hand that is durable never reaches it;
+// settle answers that.
+func storeFailure(err error) *envelope.Failure {
 	var interrupted *store.InterruptedError
 	if errors.As(err, &interrupted) {
-		if interrupted.RequestID == requestID {
-			return envelope.Common(envelope.CodeOutcomeUnknown, interruptedMessage)
-		}
 		return envelope.Common(envelope.CodeRecordMalformed, "an earlier transaction of this store, "+interrupted.RequestID+", cannot be completed, and nothing of this request was written")
 	}
 	if f := envelope.AsFailure(err); f != nil {

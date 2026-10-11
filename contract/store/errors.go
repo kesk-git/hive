@@ -34,14 +34,23 @@ var (
 	ErrNoJournal = errors.New("store: the transaction names events but the store has no journal")
 )
 
-// InterruptedError reports a transaction whose intent is durable and that
-// stopped before it completed, from Commit or from the recovery a Lock runs.
-// The intent is the store's to complete, and the next Lock does; whatever the
-// cause, the transaction is no longer one that wrote nothing. A failure
-// before the intent is durable is never an InterruptedError. Err is the
-// cause, which errors.Is and Code see through.
+// InterruptedError reports a transaction that is durable and is not known to
+// be complete: its intent is on disk, or its outcome is, and something
+// stopped the store before it could say which. Whatever the cause, the
+// transaction is no longer one that wrote nothing, and the next lock
+// completes what is left of it. A failure before the intent is durable is
+// never an InterruptedError. Err is the cause, which errors.Is and Code see
+// through.
+//
+// Commit returns one naming its own request. The recovery Lock runs returns
+// one naming the request whose intent stopped it. LockFor returns one naming
+// the request in hand from every error it can fail with, whichever step
+// failed and whichever intent stopped it, whenever that request's own
+// transaction is durable; the error it wraps may be an InterruptedError
+// naming another request's intent.
 type InterruptedError struct {
-	// RequestID is the request whose transaction was interrupted.
+	// RequestID is the request whose transaction is durable and was
+	// interrupted.
 	RequestID string
 	Err       error
 }
