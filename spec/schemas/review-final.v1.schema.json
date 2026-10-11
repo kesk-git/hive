@@ -111,6 +111,7 @@
                 "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
               },
               "digest": {
+                "description": "The events digest: the digest of the canonical form of the file's events array from sequence 1 through last_sequence. It stays true when later events are appended. See spec/review.md.",
                 "$ref": "urn:hive:schema:common:v1#/$defs/digest"
               },
               "last_sequence": {

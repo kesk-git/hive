@@ -70,8 +70,8 @@
       }
     },
     "operations": {
+      "description": "Every operation of the command other than capabilities. Empty for a command whose only operation is capabilities.",
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,

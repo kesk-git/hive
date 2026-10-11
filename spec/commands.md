@@ -141,7 +141,7 @@ It declares the command's package and executable, the contract and implementatio
 
 An operation the design names and the build has not reached is declared `unsupported`; calling it is `refused` with `unsupported_operation`. An operation that is built and held closed by a recorded decision is `parked`; calling it is `refused` with `operation_parked`. Neither ever falls back to another route.
 
-What a command declares must agree with its package's declaration: `test-contract` compares them.
+A command whose only operation is `capabilities` declares an empty list of operations: no operation is invented to fill it, and its package's declaration lists none either. What a command declares must agree with its package's declaration: `test-contract` compares them.
 
 ## What a command guarantees
 

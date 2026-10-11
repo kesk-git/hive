@@ -4,7 +4,7 @@
   "name": "dispatch",
   "kind": "package",
   "title": "Dispatch",
-  "owns": "Session launch and control; Fleet provisioning and the workspace, project and clone registry, including each home's identity record; effective policy; the native quota, context and usage readers; reservations; scheduled-job records; steering and lifecycle control; continuity.",
+  "owns": "Session launch and control; Fleet provisioning and the workspace, project and clone registry, including each home's identity record, which every package of the same home reads through the contract library; effective policy; the native quota, context and usage readers; reservations; scheduled-job records; steering and lifecycle control; continuity.",
   "plan_stage": 4,
   "executable": "hive-dispatch",
   "commands": [

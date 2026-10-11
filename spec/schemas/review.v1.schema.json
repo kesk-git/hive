@@ -280,6 +280,7 @@
         "question_id",
         "question_revision",
         "held_task_id",
+        "held_task_revision",
         "decision_round_id",
         "decision_round_revision",
         "owner_home_id",
@@ -301,6 +302,10 @@
         "held_task_id": {
           "description": "The held Pool item the decision gates.",
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "held_task_revision": {
+          "description": "The revision of the held Pool item at the time the card was captured, so a submission or a later inspection sees what the card was shown against.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
         },
         "decision_round_id": {
           "$ref": "urn:hive:schema:common:v1#/$defs/decision_round_id"

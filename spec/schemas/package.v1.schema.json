@@ -102,7 +102,7 @@
       }
     },
     "home_paths": {
-      "description": "The paths of a private home that only this package writes, relative to the home.",
+      "description": "The paths of a private home that only this package writes, relative to the home. Other packages read the identity records and the files of a review directory through the contract library without declaring them.",
       "type": "array",
       "items": {
         "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
@@ -153,7 +153,7 @@
       "minLength": 1
     },
     "calls": {
-      "description": "The packages whose commands this package may call. The declared graph has no cycle.",
+      "description": "The packages whose commands this package may call. The declared graph has no cycle. A shared read through the contract library is not a call and is not listed.",
       "type": "array",
       "items": {
         "$ref": "urn:hive:schema:common:v1#/$defs/package_name"
@@ -280,7 +280,7 @@
       }
     },
     "imports": {
-      "description": "The import records the package is the maintenance owner of.",
+      "description": "The import records the package is the maintenance owner of. Each names an existing record: the list is empty until the import is made.",
       "type": "array",
       "items": {
         "$ref": "urn:hive:schema:common:v1#/$defs/slug"

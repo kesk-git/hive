@@ -38,7 +38,7 @@ Every file is written by `ui`, through `hive-ui`. The party that supplies the co
 | `round-NNNN.reply.json` | The assigned Lictor | Once |
 | `final.json` | The Hive Mind pressing Done | Once |
 
-A Lictor and a supervisor never write these files directly. They call `hive-ui`, whose operations for registering, publishing and replying stage 6 defines. The feedback writer is the one narrowly scoped writer the page reaches, and it writes only the registered round's file.
+Any package of the same home may read these files through the contract library's validated reader, without a lock, as the Shadow does to read the registered review files; none but `ui` writes them. A Lictor and a supervisor never write these files directly. They call `hive-ui`, whose operations for registering, publishing and replying stage 6 defines. The feedback writer is the one narrowly scoped writer the page reaches, and it writes only the registered round's file.
 
 ## `review.json`
 
@@ -87,7 +87,7 @@ and exactly one of the following, by kind. A field that does not apply is absent
 
 A note has a `note_kind`. An `annotation` has a target, and keeps the original target even when a later revision moves or removes the element. An `instruction` is a free-standing instruction for the round and has none. It is its own entry and is never recast as an answer to a card.
 
-**The card binding** ties a card to the decision it presents: card, question, held item and decision round, each with its revision, and the home and task that own the decision. It keeps the review round distinct from the decision round.
+**The card binding** ties a card to the decision it presents: card, question, held item and decision round, each with its revision (`held_task_revision` is the held item's), and the home and task that own the decision. It is the same binding in the card draft, the submission's card answer, the reply and the final record. It keeps the review round distinct from the decision round.
 
 **A submission** is the commitment boundary. It holds a stable `request_id`, the round revision it expects, the last draft sequence it includes, and an immutable snapshot of:
 
@@ -103,7 +103,7 @@ A submission is a receipt, not a ruling. Nothing in the file is an accepted answ
 
 The Lictor's reply to one round, written once.
 
-- **Bindings:** the review, the round, the scope, task and generation, the Lictor, and the feedback file it answers with that file's digest and the last sequence the Lictor read.
+- **Bindings:** the review, the round, the scope, task and generation, the Lictor, and the feedback file it answers with its path, the last sequence the Lictor read and the digest of the events through that sequence (the [events digest](#the-events-digest)).
 - **`responses`:** each with its own `response_id`, the `event_id` of the submission it answers, and the `note_id`, `question_id` or `card_id` it answers where it answers one of them; its text; a picture of the element it concerns where one helps, as a declared asset; and the binding of a decision card where the response puts a decision to the Hive Mind.
 - **`next_revision`:** the revision written in answer to this round, with its path and digest, where one was asked for.
 
@@ -115,11 +115,15 @@ Written once, by Done, after the Done event is durable in the current feedback f
 
 - **Identity:** the review, scope, task and generation; the Done event by round, `event_id` and sequence; the operator; the time.
 - **`final_revision`:** the revision displayed at Done, with its digest.
-- **`rounds`:** every round, with its feedback file, that file's digest and the last sequence Done included, and its reply where one was written.
+- **`rounds`:** every round, with its feedback file, the last sequence Done included and the events digest through that sequence, and its reply where one was written.
 - **`decisions`:** every card the review presented, with what was known of its decision at that moment: `pending`, `accepted`, `released`, `completed` or `superseded`, and the `word` receipt that establishes any state but `pending`.
 - **`unsubmitted_drafts`:** every draft saved and never submitted, by round and sequence.
 
 A crash between the Done event and this file is recovered from the Done event. `final.json` records that the review ended and what Done included. It supplies no missing answer, closes no hold, accepts no implementation, completes no task and authorizes no Assimilation.
+
+## The events digest
+
+A feedback file is replaced as events are added, and a late submission may append to it after a reply or the final record was written, so the digest of its bytes does not stay true. A reply and the final record bind the file to what they read by its **events digest**: the digest of the [canonical form](records.md#encoding) of the JSON array of the file's events with `sequence` 1 through the stated `last_sequence`, in order. Those events are never changed or dropped, so the digest keeps verifying after later events are appended, and a verifier recomputes it from the file as it stands. The file's bindings are fixed attributes and need no digest. The reply file and each revision file are written once, so their digests are the digests of their bytes.
 
 ## Rules that hold across the files
 

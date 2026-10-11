@@ -4,7 +4,7 @@
   "name": "ui",
   "kind": "package",
   "title": "UI",
-  "owns": "The Hive UI: the Fleet overview, Pool and The Swarm; the session dock and the optional reader; the on-demand task, Harvest, Shadow, History and Scheduled views and the Review artifact surface; artifact serving; decision cards over scoped projections; every file of a review directory.",
+  "owns": "The Hive UI: the Fleet overview, Pool and The Swarm; the session dock and the optional reader; the on-demand task, Harvest, Shadow, History and Scheduled views and the Review artifact surface; artifact serving; decision cards over scoped projections; every file of a review directory, which every package of the same home reads through the contract library.",
   "plan_stage": 6,
   "executable": "hive-ui",
   "commands": [

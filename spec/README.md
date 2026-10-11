@@ -1,10 +1,10 @@
 # Hive specification
 
-This directory holds the contracts of the first stage of the [ordered implementation plan](../docs/design.md#ordered-implementation-plan). They are a definition, held for acceptance before any build starts. Nothing here is implemented: the repository contains no executable, no test and no imported source.
+This directory holds the contracts of the first stage of the [ordered implementation plan](../docs/design.md#ordered-implementation-plan). They are a definition, accepted on 2026-10-11 with all twenty of its decisions; the build follows as separate work. Nothing here is implemented: the repository contains no executable, no test and no imported source.
 
 [The design](../docs/design.md) says what Hive is and why. This specification says where each thing lives, who owns it and what proves it. Where the two differ, the design governs and the difference is a defect in this specification.
 
-Contract version: **1.0, proposed**. It becomes 1.0 on acceptance.
+Contract version: **1.0**, accepted on 2026-10-11.
 
 ## What is defined
 

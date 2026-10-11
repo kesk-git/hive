@@ -80,7 +80,7 @@ Every request, receipt and event says where it belongs with the same flat fields
 
 - Scope is declared, never inferred. A missing `scope_level` is a schema violation, and project work never inherits a project from a default, a current directory or the last one used.
 - `home_id` in a request must equal the `home_id` of the home the command was pointed at. A difference is refused with `home_mismatch` before anything is read.
-- The callee checks that the workspace, project and clone named exist in that home's registry, are `active` and belong to each other. A failure is refused with `scope_mismatch`.
+- The callee checks that the workspace, project and clone named exist in that home's registry, are `active` and belong to each other. It reads the home record and the registry records through the contract library's validated reader, takes no lock and does not call `dispatch`. A failure is refused with `scope_mismatch`.
 
 ## Creating identities
 
@@ -99,7 +99,7 @@ Stage 1's build delivers one operation of `dispatch` ahead of the rest of the pa
 - A directory that already holds a `home.json` with a different `home_id` is refused with `home_mismatch`. A caller adding a project to an existing home reads the home's identity first and sends it.
 - The response returns every record the request named, each marked `created` true or false, so a repeated request reads exactly as the first did apart from those marks.
 - A request that would change a fixed attribute of an existing identity (a home's role, a workspace's `slug`, a clone's common directory under a different project) is a `conflict` with code `already_exists`, and nothing is written.
-- All records of one request are written in one transaction with one receipt per record created: `dispatch.home.created`, `dispatch.workspace.registered`, `dispatch.project.registered`, `dispatch.clone.registered`. Their bodies are empty; the receipt's `subject` names the record.
+- All records of one request are written in one transaction, and each record created is an entry of its intent that states the record is expected to be absent, so a crash before any of them reached disk rolls forward like any other. There is one receipt per record created, so a request that creates two projects writes two `dispatch.project.registered` receipts, each with its own `subject`: `dispatch.home.created`, `dispatch.workspace.registered`, `dispatch.project.registered`, `dispatch.clone.registered`. Their bodies are empty; the receipt's `subject` names the record.
 - The operation runs Git, to read a clone. It writes nothing into a clone or its Git directory.
 
 Provisioning in full, including the registration of a Fleet in the Hive's own home, the charter, routing, recovery and the guarded move of a project between workspaces, is stage 4's and is not defined here.

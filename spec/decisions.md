@@ -1,6 +1,6 @@
 # Decisions taken in this definition
 
-The design leaves a number of choices to contract work. Each one made here is listed with its reason, what it costs, and what was rejected. They are proposed together and are accepted or sent back as a whole. A decision that a later stage could change cheaply says so; the others are the ones to read closely.
+The design leaves a number of choices to contract work. Each one made here is listed with its reason, what it costs, and what was rejected. They were accepted together, as a whole, on 2026-10-11. A decision that a later stage could change cheaply says so; the others are the ones to read closely.
 
 Nothing here widens the design. Where a decision reads the design one way of two, it says which.
 
@@ -108,7 +108,7 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 **Rejected.** *A journal per package with a shared counter* leaves a gap or a duplicate when a process dies between the counter and the append, unless each writer reads the others' journals to recover. *A journal owned by the Shadow* would make every package call a later stage's command to record anything.
 
-**Reading the design.** The design says no package opens another's private store. The journal is the home's, not a package's, and holds only notices of what owners have already recorded. This is the one place two packages touch the same files, and it is always through one implementation.
+**Reading the design.** The design says no package opens another's private store. The journal is the home's, not a package's, and holds only notices of what owners have already recorded; the journal is the one place two packages write the same files, and it is always through one implementation. Two other sets of records are read by every package through the same validated reader: the identity records, so a callee can check its scope without calling `dispatch`, and the files of a review directory, so the Shadow can read them without calling `ui`. Each is written only by its owner and read without a lock. The call graph, the one writer of each record and the lock order are unchanged.
 
 **To undo.** Moderate before stage 4, expensive after.
 

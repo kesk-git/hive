@@ -39,7 +39,7 @@ A declaration lists, for each command, the operations the design names. Every co
 ## What ownership means
 
 1. **One writer.** Only the owning package writes its home paths, its records and its receipts. Another package that needs a change asks for it through the owner's command.
-2. **One reader of private state.** Only the owning package reads its home paths. Another package that needs a value asks for it through the owner's command and receives a complete response. The two shared paths of a home, `journal/` and `locks/`, are the exception and are written and read only through the contract library; see [records.md](records.md#the-home).
+2. **One reader of private state.** Only the owning package reads its home paths. Another package that needs a value asks for it through the owner's command and receives a complete response. Three sets of records are the exception, and are read by any package of the same home through the contract library's validated reader, never by opening the files directly: (a) the `journal/` and `locks/` paths, which are also written only through the contract library; (b) the identity records, meaning the home record and the workspace, project and clone records, so a callee can check that the scope it was given exists, is active and belongs together without calling `dispatch`; (c) the files of a review directory, so the Shadow can read registered review files without calling `ui`. The identity records and the review files are still written only by their owner, or by the writers [review.md](review.md#who-writes-what) names. These reads take no lock: each record is replaced atomically, and the parent links the check relies on are fixed attributes. They add no call and no lock, so the graph below and the lock order are unchanged. See [records.md](records.md#the-home).
 3. **Names carry the owner.** Every record kind, receipt kind, event kind and package error code begins with the owning package's name. A package never writes a name that begins with another package's.
 4. **One test target.** A package's target runs that package's tests and nothing else's, and passes or fails without any other package being built. See [test-targets.md](test-targets.md).
 5. **Declared calls only.** A package calls the commands of the packages its declaration lists under `calls`, and no others.
@@ -72,6 +72,7 @@ Two rules hold for every amendment.
 - typed identifiers, timestamps and digests ([identities.md](identities.md));
 - canonical JSON and the schema validator ([records.md](records.md));
 - atomic record files, the home event journal and transaction locks ([records.md](records.md));
+- the validated reader through which any package reads the journal, the identity records and the files of a review directory ([what ownership means](#what-ownership-means));
 - the request and response envelopes, the command-line harness and the exit states ([commands.md](commands.md));
 - the one process-execution path ([distribution.md](distribution.md)).
 

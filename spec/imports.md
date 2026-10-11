@@ -65,7 +65,7 @@ It cannot prove that an unrecorded copy was never made. That is a matter for rev
 
 ## The two planned imports
 
-Neither is made by this definition. Each is made by its stage, record first.
+Neither is made by this definition. Each is made by its stage, record first. The owner's declaration keeps its `imports` list empty until the record exists, and the stage that makes the import adds the `import_id` to the list in the same change.
 
 | Import | Owner | Kind | Upstream baseline named by the design |
 | --- | --- | --- | --- |

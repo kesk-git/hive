@@ -11,7 +11,7 @@ Owner: the contract library. Proved by `test-contract`.
 - **Text is kept exactly as written.** Nothing normalizes Unicode, trims, reflows or re-escapes a string that came from the Hive Mind, a worker, a vendor or a forge. A writer that cannot keep a string whole refuses the write.
 - **Numbers are whole.** A record holds no fractional or exponent number and no number outside ±9,007,199,254,740,991. A value that is not whole is written as a string in a form its schema states.
 - **Times** are RFC 3339 in UTC with millisecond precision and a literal `Z`: `2026-10-11T08:00:00.000Z`. A wall-clock time in a declared zone is two fields, the UTC instant and the zone's name.
-- **Digests** are SHA-256, written `sha256:` and 64 lowercase hexadecimal digits. The digest of a file is the digest of its bytes. The digest of a record is the digest of its canonical form.
+- **Digests** are SHA-256, written `sha256:` and 64 lowercase hexadecimal digits. The digest of a file is the digest of its bytes. The digest of a record is the digest of its canonical form. A digest that binds a part of a file, which a later write may extend, says which part and is defined where it is used, as the [events digest](review.md#the-events-digest) of a review round is.
 - **Canonical form** is RFC 8785. Because numbers are whole, its number rule reduces to writing integers in decimal.
 - **Git revisions** are full object names, 40 or 64 hexadecimal digits, never abbreviated.
 - **Paths inside a record** are relative to a base the schema names, use forward slashes and contain no empty, `.` or `..` segment. An absolute path appears only where a schema asks for a physical location, and such a record never leaves the home that holds it.
@@ -58,7 +58,7 @@ A private home is a directory outside every project repository, selected explici
 | `reviews/` | `ui` | [Review directories](review.md), at the path the design fixes. |
 
 - A home directory is created with access for its owner only, and so is every file and directory in it.
-- A package writes and reads only its own paths. Nothing else at the top level of a home is created by Hive, and a command that finds an entry it does not know leaves it alone and says so in its response.
+- A package writes only its own paths and reads only its own paths, with the three exceptions of [packages.md](packages.md#what-ownership-means): the journal and the locks, the identity records and the files of a review directory, each read through the contract library's validated reader and written only by its owner. Nothing else at the top level of a home is created by Hive, and a command that finds an entry it does not know leaves it alone and says so in its response.
 - Inside its own directory every package uses the same four places, and defines the rest itself:
 
 | Path under `<package>/` | Holds |
@@ -90,13 +90,13 @@ A record that fails its schema, or cannot be read, is never repaired by guessing
 A mutation that changes more than one record of a store is one transaction.
 
 1. Take the store's lock.
-2. Check every expected revision.
-3. Write the **intent** to `tx/<request_id>.json`: every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. Flush it.
+2. Check every expected revision, and that every record to be created is absent.
+3. Write the **intent** to `tx/<request_id>.json`: every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. The entry of a record being created has no revision to expect and instead states that the record is expected to be absent. Flush it.
 4. Write the records, then the receipts, then append the events.
 5. Write the outcome to `requests/<request_id>.json`.
 6. Remove the intent and release the lock.
 
-Recovery **rolls forward**. The next command to take the store's lock that finds an intent completes it: a record already at the intended digest is left, a record at the expected revision is written, and anything else stops the store with `record_malformed` for that transaction, naming the intent. An intent is never discarded to make recovery convenient. A receipt or event the intent names is written at most once, because each is keyed by an identifier the intent already holds.
+Recovery **rolls forward**. The next command to take the store's lock that finds an intent completes it: a record already at the intended digest is left, a record at the expected revision is written, a record expected to be absent and still absent is written, and anything else stops the store with `record_malformed` for that transaction, naming the intent. An intent is never discarded to make recovery convenient. A receipt or event the intent names is written at most once, because each is keyed by an identifier the intent already holds.
 
 A transaction lives in one store of one home. Work that spans two packages or two homes is a sequence of transactions joined by receipts, each replayable, with the order and the recovery stated by the operation that needs it.
 
@@ -104,7 +104,7 @@ A transaction lives in one store of one home. Work that spans two packages or tw
 
 There are two kinds, and they are not the same thing.
 
-**A transaction lock** serializes writers of one store for the length of one command. It is an advisory lock taken on `locks/<package>.lock`, or on `locks/journal.lock` for the journal. The operating system releases it when the process ends, so a crash leaves nothing to clean. A command waits a bounded time for it and then stops with `conflict` and code `lock_held`. A reader of a single record takes no lock; a reader that needs several records to agree takes the lock shared.
+**A transaction lock** serializes writers of one store for the length of one command. It is an advisory lock taken on `locks/<package>.lock`, or on `locks/journal.lock` for the journal. The operating system releases it when the process ends, so a crash leaves nothing to clean. A command waits a bounded time for it and then stops with `conflict` and code `lock_held`. A reader of a single record takes no lock; a reader that needs several records to agree takes the lock shared. The scope check of [identities.md](identities.md#scope) is the exception: it takes no lock, because each record it reads is replaced atomically and the parent links it relies on never change.
 
 Lock order is fixed: a store's lock first, then the journal's. A command may hold its own store's lock while it calls a package it [declares](packages.md#calls-between-packages); since the declared graph has no cycle, neither do the locks.
 
