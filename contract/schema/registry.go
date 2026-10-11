@@ -107,9 +107,6 @@ func Load(fsys fs.FS, root string) (*Registry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("schema: reading %s: %w", root, err)
 	}
-	if len(r.docs) == 0 && len(probs) == 0 {
-		probs = append(probs, Problem{root, "holds no schema file"})
-	}
 
 	probs = append(probs, r.resolve(refs)...)
 	probs = append(probs, openUses(refs)...)
@@ -217,8 +214,10 @@ func openUses(refs []pendingRef) []Problem {
 	return probs
 }
 
-// edges lists the schemas that apply to the same value as n does. A cycle
-// among them never reads any more of a document and so never ends.
+// edges lists the schemas that apply to the same value as n does; then and
+// else apply only beside an if. A cycle among them never reads any more of a
+// document and so never ends, so Load refuses it: the guard that validation
+// terminates.
 func (n *node) edges() []*node {
 	var out []*node
 	add := func(m ...*node) {
@@ -228,7 +227,10 @@ func (n *node) edges() []*node {
 			}
 		}
 	}
-	add(n.ref, n.not, n.ifNode, n.thenNode, n.elseNode)
+	add(n.ref, n.not, n.ifNode)
+	if n.ifNode != nil {
+		add(n.thenNode, n.elseNode)
+	}
 	add(n.allOf...)
 	add(n.anyOf...)
 	add(n.oneOf...)

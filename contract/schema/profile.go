@@ -278,17 +278,9 @@ func (c *compiler) typeKeyword(v any, at string) []string {
 
 func (c *compiler) enumKeyword(n *node, v any, at string) {
 	list, ok := v.([]any)
-	if !ok || len(list) == 0 {
-		c.problem(at, "enum is a non-empty array")
+	if !ok {
+		c.problem(at, "enum is an array")
 		return
-	}
-	for i := range list {
-		for j := range i {
-			if equal(list[i], list[j]) {
-				c.problem(at, "enum lists the same value twice")
-				return
-			}
-		}
 	}
 	n.enum, n.hasEnum = list, true
 }

@@ -108,10 +108,7 @@ func TestProfileRefusesMalformedKeywords(t *testing.T) {
 		{`"type":["string","string"]`, "/type", "twice"},
 		{`"type":5`, "/type", "type name"},
 		{`"type":[1]`, "/type", "strings"},
-		{`"enum":[]`, "/enum", "non-empty"},
-		{`"enum":"a"`, "/enum", "non-empty"},
-		{`"enum":[1,1]`, "/enum", "twice"},
-		{`"enum":[{"a":1,"b":2},{"b":2,"a":1}]`, "/enum", "twice"},
+		{`"enum":"a"`, "/enum", "an array"},
 		{`"required":"a"`, "/required", "array"},
 		{`"required":[1]`, "/required", "strings"},
 		{`"required":["a","a"]`, "/required", "twice"},
@@ -150,6 +147,43 @@ func TestProfileRefusesMalformedKeywords(t *testing.T) {
 	}
 }
 
+// The profile refuses a schema for a reason spec/records.md gives; a schema
+// that is odd but within it loads, and means what JSON Schema says.
+func TestProfileLoadsWhatIsWithinIt(t *testing.T) {
+	for _, body := range []string{
+		`"enum":[]`,
+		`"enum":[1,1]`,
+		`"enum":[{"a":1,"b":2},{"b":2,"a":1}]`,
+		`"then":false`,
+		`"else":false`,
+		`"minItems":3,"maxItems":2`,
+		`"type":["string","null"],"minLength":3,"maxLength":2`,
+		`"minimum":3,"maximum":2`,
+		`"type":"object","additionalProperties":false,"required":["x"]`,
+	} {
+		mustOne(t, body)
+	}
+	if _, err := Load(fstest.MapFS{}, "."); err != nil {
+		t.Errorf("a tree without a schema file: %v", err)
+	}
+	r := mustOne(t, `"enum":[]`)
+	if err := r.Validate(testID, []byte(`1`)); err == nil {
+		t.Error("an empty enum admitted a value")
+	}
+	r = mustOne(t, `"enum":[1,1]`)
+	if err := r.Validate(testID, []byte(`1`)); err != nil {
+		t.Error(err)
+	}
+	r = mustOne(t, `"then":false`)
+	if err := r.Validate(testID, []byte(`1`)); err != nil {
+		t.Errorf("a then without an if was applied: %v", err)
+	}
+	r = mustOne(t, `"type":"object","additionalProperties":false,"required":["x"]`)
+	if err := r.Validate(testID, []byte(`{}`)); err == nil {
+		t.Error("a missing required member was accepted")
+	}
+}
+
 func TestProfileRefusesNonWholeNumbersInASchema(t *testing.T) {
 	_, err := one(`"minimum":1.5`)
 	wantProblem(t, err, testFile, "not whole")
@@ -180,7 +214,6 @@ func TestProfileRefusesBadFiles(t *testing.T) {
 		{"not a schema", fstest.MapFS{"README.md": {Data: []byte("x")}}, "README.md", "<name>.v<major>"},
 		{"bad directory", fstest.MapFS{"Dir/t.v1.schema.json": file("urn:hive:schema:Dir:t:v1", "")}, "Dir/t.v1.schema.json", "lowercase name"},
 		{"wrong directory id", fstest.MapFS{"ops/t.v1.schema.json": file(testID, "")}, "urn:hive:schema:ops:t:v1#", `"urn:hive:schema:ops:t:v1"`},
-		{"empty tree", fstest.MapFS{}, ".", "no schema file"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -321,6 +354,14 @@ func TestReferenceCyclesAreRefused(t *testing.T) {
 				t.Errorf("%v, want a reference cycle", err)
 			}
 		})
+	}
+	// then and else apply only beside an if; without one they end no chain.
+	for _, body := range []string{
+		`"then":{"$ref":"` + testID + `"}`,
+		`"else":{"$ref":"` + testID + `"}`,
+		`"$defs":{"a":{"then":{"$ref":"` + testID + `#/$defs/a"},"else":{"$ref":"` + testID + `#/$defs/a"}}}`,
+	} {
+		mustOne(t, body)
 	}
 	files := fstest.MapFS{
 		"a.v1.schema.json": file("urn:hive:schema:a:v1", `"$ref":"urn:hive:schema:b:v1"`),
