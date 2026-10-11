@@ -98,6 +98,20 @@ type Journal struct {
 	segmentSize int64
 	waiting     store.Waiting
 	reg         *schema.Registry
+
+	// fault, when set by a test, is called at each named point of a read or
+	// a write with the point's name; an error it returns stops the journal
+	// there, as a crash would, and whatever else it does runs there too.
+	fault func(step string) error
+}
+
+// step is the point at which a test interrupts the journal. In a delivered
+// executable fault is nil and nothing happens.
+func (j *Journal) step(name string) error {
+	if j.fault == nil {
+		return nil
+	}
+	return j.fault(name)
 }
 
 // Open checks the home at dir and returns its journal, creating journal/ if
@@ -246,7 +260,7 @@ type tail struct {
 
 // readTail reads the end of the segment file at path, from the end back to
 // the start of its last complete line.
-func readTail(path string) (*tail, error) {
+func (j *Journal) readTail(path string) (*tail, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
@@ -257,6 +271,9 @@ func readTail(path string) (*tail, error) {
 		return nil, fmt.Errorf("journal: %w", err)
 	}
 	size := info.Size()
+	if err := j.step("tail " + filepath.Base(path)); err != nil {
+		return nil, err
+	}
 	const chunk = 64 << 10
 	var buf []byte // a suffix of the file
 	pos := size    // where buf starts in the file
@@ -318,7 +335,7 @@ func (j *Journal) state() (*state, error) {
 		return st, nil
 	}
 	st.cur = &segs[len(segs)-1]
-	st.tail, err = readTail(filepath.Join(j.dir, st.cur.name))
+	st.tail, err = j.readTail(filepath.Join(j.dir, st.cur.name))
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +353,7 @@ func (j *Journal) state() (*state, error) {
 	st.next = st.cur.first
 	if len(segs) >= 2 {
 		prev := segs[len(segs)-2]
-		t, err := readTail(filepath.Join(j.dir, prev.name))
+		t, err := j.readTail(filepath.Join(j.dir, prev.name))
 		if err != nil {
 			return nil, err
 		}
@@ -378,15 +395,19 @@ func (j *Journal) syncDirs() error {
 	return syncDir(j.Home.Dir)
 }
 
-// syncFile flushes a file as it is, so that lines read from it are durable.
-func syncFile(path string) error {
-	f, err := os.Open(path)
+// syncSegment flushes a segment as it is, so that the lines in it, whoever
+// wrote them, are durable.
+func (j *Journal) syncSegment(name string) error {
+	if err := j.step("sync " + name); err != nil {
+		return err
+	}
+	f, err := os.Open(filepath.Join(j.dir, name))
 	if err != nil {
 		return fmt.Errorf("journal: %w", err)
 	}
 	defer f.Close()
 	if err := f.Sync(); err != nil {
-		return fmt.Errorf("journal: flushing %s: %w", filepath.Base(path), err)
+		return fmt.Errorf("journal: flushing %s: %w", name, err)
 	}
 	return nil
 }

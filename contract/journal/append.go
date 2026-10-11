@@ -126,6 +126,11 @@ func (j *Journal) append(events []store.Event, recovering bool) error {
 	}
 	for _, ln := range lines {
 		if st.cur == nil || st.tail.intact > 0 && st.tail.intact+int64(len(ln.data)) > j.segmentSize {
+			if st.cur != nil {
+				if err := j.syncSegment(st.cur.name); err != nil {
+					return err
+				}
+			}
 			st.segs = append(st.segs, segment{SegmentName(ln.seq), ln.seq})
 			st.cur = &st.segs[len(st.segs)-1]
 			st.tail = &tail{}
@@ -251,7 +256,7 @@ func (j *Journal) present(st *state, events []store.Event) (map[string]bool, err
 			}
 		}
 		if hit {
-			if err := syncFile(path); err != nil {
+			if err := j.syncSegment(st.segs[i].name); err != nil {
 				return nil, err
 			}
 		}
@@ -313,6 +318,10 @@ func (j *Journal) writeLine(name string, off int64, data []byte, cut bool) error
 			f.Close()
 			return fmt.Errorf("journal: cutting %s: %w", name, err)
 		}
+	}
+	if err := j.step("sync " + name); err != nil {
+		f.Close()
+		return err
 	}
 	if err := f.Sync(); err != nil {
 		f.Close()

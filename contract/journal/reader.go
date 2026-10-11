@@ -11,6 +11,9 @@ import (
 	"github.com/kesk-git/hive/contract/store"
 )
 
+// readChunk is how much of a segment a Reader takes in at one read.
+const readChunk = 4 << 10
+
 // Entry is one line of the journal as read.
 type Entry struct {
 	// HomeSequence is the line's position in the journal.
@@ -33,11 +36,13 @@ type Entry struct {
 }
 
 // mark is the latest a source has been seen to be: its greatest
-// source_sequence, when it has carried one, and its greatest occurred_at.
+// source_sequence, when it has carried one, the greatest occurred_at of the
+// events that carried none, and the greatest occurred_at of all its events.
 type mark struct {
-	seq      int64
-	hasSeq   bool
-	occurred string
+	seq        int64
+	hasSeq     bool
+	unsequence string
+	occurred   string
 }
 
 // Reader reads the journal after a cursor, in order. It takes no lock: a
@@ -195,9 +200,20 @@ func (r *Reader) read() ([]byte, bool, error) {
 	if _, err := f.Seek(r.off, io.SeekStart); err != nil {
 		return nil, false, fmt.Errorf("journal: %w", err)
 	}
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return nil, false, fmt.Errorf("journal: reading %s: %w", r.seg.name, err)
+	var data []byte
+	chunk := make([]byte, readChunk)
+	for {
+		n, err := f.Read(chunk)
+		data = append(data, chunk[:n]...)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, false, fmt.Errorf("journal: reading %s: %w", r.seg.name, err)
+		}
+		if err := r.j.step("read " + r.seg.name); err != nil {
+			return nil, false, err
+		}
 	}
 	end := bytes.LastIndexByte(data, '\n') + 1
 	return data[:end], end < len(data), nil
@@ -235,9 +251,12 @@ func (r *Reader) entry(line []byte, expect int64) (*Entry, error) {
 }
 
 // late reports whether an event is late and takes it into the marks of its
-// source. It is late when the source was already seen further on: by
-// source_sequence where both the event and the marks carry one, otherwise by
-// occurred_at. Timestamps are of one fixed width, so they compare as text.
+// source. Two events of a source are compared by source_sequence where both
+// carry one, and by occurred_at otherwise: an event with a source_sequence is
+// late when the source was seen at a greater one, or when an event without one
+// occurred after it; an event without one is late when any event of the source
+// occurred after it. Timestamps are of one fixed width, so they compare as
+// text.
 func (r *Reader) late(event map[string]any) bool {
 	source, _ := event["source"].(map[string]any)
 	sourceID, _ := source["source_id"].(string)
@@ -248,12 +267,15 @@ func (r *Reader) late(event map[string]any) bool {
 		m = &mark{}
 		r.marks[sourceID] = m
 	}
-	late := m.occurred > occurred
-	if hasSeq && m.hasSeq {
-		late = m.seq > seq
-	}
-	if hasSeq && (!m.hasSeq || seq > m.seq) {
-		m.seq, m.hasSeq = seq, true
+	var late bool
+	if hasSeq {
+		late = m.hasSeq && m.seq > seq || m.unsequence > occurred
+		if !m.hasSeq || seq > m.seq {
+			m.seq, m.hasSeq = seq, true
+		}
+	} else {
+		late = m.occurred > occurred
+		m.unsequence = max(m.unsequence, occurred)
 	}
 	m.occurred = max(m.occurred, occurred)
 	return late

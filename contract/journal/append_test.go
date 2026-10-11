@@ -545,3 +545,73 @@ func TestAppendNeedsTheHomeRecord(t *testing.T) {
 		t.Fatalf("read %d entries", len(got))
 	}
 }
+
+// A line another writer left visible and not flushed is flushed before a
+// successor segment is made durable, so that a loss of what was never flushed
+// leaves no gap in home_sequence: the first writer stops between its write and
+// its flush, the second rotates, and what the file system would not have kept
+// is cut from every segment.
+func TestRolloverFlushesTheInheritedTail(t *testing.T) {
+	errCrash := errors.New("stopped")
+	for _, recovering := range []bool{false, true} {
+		name := map[bool]string{false: "append", true: "recover"}[recovering]
+		t.Run(name, func(t *testing.T) {
+			home := newHome(t, false)
+			durable := map[string]int64{}
+			flushed := func(step string) error {
+				if seg, ok := strings.CutPrefix(step, "sync "); ok {
+					info, err := os.Stat(filepath.Join(home, journalDir, seg))
+					if err != nil {
+						t.Fatal(err)
+					}
+					durable[seg] = info.Size()
+				}
+				return nil
+			}
+			a, _ := open(t, home, "pool", 0)
+			a.fault = flushed
+			append_(t, a, event(t, "pool", 1))
+			a.fault = func(step string) error {
+				if strings.HasPrefix(step, "sync ") {
+					return errCrash
+				}
+				return nil
+			}
+			wantErr(t, "the first writer", a.Append(events(t, "pool", 2, 2)), errCrash)
+			if seqs := sequences(t, segmentBytes(t, home, SegmentName(1))); !slices.Equal(seqs, []int64{1, 2}) {
+				t.Fatalf("the first writer left %v", seqs)
+			}
+
+			b, _ := open(t, home, "pool", 1) // every line closes its segment
+			b.fault = flushed
+			write := b.Append
+			if recovering {
+				write = b.Recover
+			}
+			if err := write(events(t, "pool", 3, 3)); err != nil {
+				t.Fatal(err)
+			}
+			if got := segmentFiles(t, home); !slices.Equal(got, []string{SegmentName(1), SegmentName(3)}) {
+				t.Fatalf("segments %v", got)
+			}
+
+			// Whatever was not flushed is lost.
+			for _, seg := range segmentFiles(t, home) {
+				if err := os.Truncate(filepath.Join(home, journalDir, seg), durable[seg]); err != nil {
+					t.Fatal(err)
+				}
+			}
+			after, _ := open(t, home, "pool", 1)
+			if head, err := after.Head(); err != nil || head != 3 {
+				t.Fatalf("Head after the loss = %d, %v", head, err)
+			}
+			var got []int64
+			for _, e := range readAll(t, after, 0) {
+				got = append(got, e.HomeSequence)
+			}
+			if !slices.Equal(got, []int64{1, 2, 3}) {
+				t.Errorf("read %v after the loss", got)
+			}
+		})
+	}
+}

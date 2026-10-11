@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/canon"
@@ -228,6 +229,21 @@ func TestReaderMarksLateEvents(t *testing.T) {
 			sourced(t, 2, gh, 0, "2026-10-11T07:58:01.000Z"),
 			sourced(t, 3, gh, 0, "2026-10-11T07:58:03.000Z"),
 		}, []int64{2}},
+		{"a sequenced event after an unsequenced one that occurred later", []store.Event{
+			sourced(t, 1, gh, 1, "2026-10-11T08:00:00.000Z"),
+			sourced(t, 2, gh, 0, "2026-10-11T08:10:00.000Z"),
+			sourced(t, 3, gh, 2, "2026-10-11T08:05:00.000Z"),
+		}, []int64{3}},
+		{"an unsequenced event after a sequenced one that occurred later", []store.Event{
+			sourced(t, 1, gh, 1, "2026-10-11T08:00:00.000Z"),
+			sourced(t, 2, gh, 2, "2026-10-11T08:10:00.000Z"),
+			sourced(t, 3, gh, 0, "2026-10-11T08:05:00.000Z"),
+		}, []int64{3}},
+		{"sequenced events are not late by the time of unsequenced ones that preceded them", []store.Event{
+			sourced(t, 1, gh, 0, "2026-10-11T08:00:00.000Z"),
+			sourced(t, 2, gh, 1, "2026-10-11T08:20:00.000Z"),
+			sourced(t, 3, gh, 2, "2026-10-11T08:10:00.000Z"),
+		}, nil},
 		{"two sources interleaved", []store.Event{
 			sourced(t, 1, gh, 2, "2026-10-11T07:58:02.000Z"),
 			sourced(t, 2, other, 1, "2026-10-11T07:58:00.000Z"),
@@ -311,6 +327,19 @@ func TestReaderLatenessAcrossResume(t *testing.T) {
 				t.Errorf("Cursor = %d beyond the head", r.Cursor())
 			}
 		}
+		// The marks of both kinds of event are rebuilt on resuming.
+		mixed, _ := open(t, newHome(t, false), "shadow", size)
+		append_(t, mixed,
+			sourced(t, 1, gh, 1, "2026-10-11T08:00:00.000Z"),
+			sourced(t, 2, gh, 0, "2026-10-11T08:10:00.000Z"),
+			sourced(t, 3, gh, 2, "2026-10-11T08:05:00.000Z"),
+			sourced(t, 4, gh, 0, "2026-10-11T08:07:00.000Z"),
+		)
+		for cursor, want := range map[int64][]int64{0: {3, 4}, 1: {3, 4}, 2: {3, 4}, 3: {4}} {
+			if l := late(readAll(t, mixed, cursor)); !slices.Equal(l, want) {
+				t.Errorf("size %d, mixed events, cursor %d: late = %v, want %v", size, cursor, l, want)
+			}
+		}
 		// A reader that goes on as lines are appended keeps its marks.
 		r, _ := j.Reader(5)
 		if e, err := r.Next(); e != nil || err != nil {
@@ -325,62 +354,107 @@ func TestReaderLatenessAcrossResume(t *testing.T) {
 	}
 }
 
-// A reader never takes a torn tail for a line, nor a writer repairing it for a
-// fault: while writers tear and repair the tail of the segment, a reader and
-// Head see whole lines and no error.
-func TestReaderWhileTheTailIsRepaired(t *testing.T) {
-	home := newHome(t, false)
-	j, _ := open(t, home, "pool", 0)
-	writer, _ := open(t, home, "pool", 0)
-	append_(t, j, event(t, "pool", 1))
-	path := filepath.Join(home, journalDir, SegmentName(1))
-
-	done := make(chan struct{})
-	errs := make(chan error, 2)
-	go func() {
-		defer close(done)
-		for n := 2; n < 60; n++ {
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, fileMode)
-			if err != nil {
-				errs <- err
-				return
-			}
-			_, err = f.Write(bytes.Repeat([]byte("x"), 40+n))
-			f.Close()
-			if err != nil {
-				errs <- err
-				return
-			}
-			if err := writer.Append([]store.Event{event(t, "pool", n)}); err != nil {
-				errs <- err
-				return
-			}
-		}
-	}()
-	r, _ := j.Reader(0)
-	for stop := false; !stop; {
-		select {
-		case <-done:
-			stop = true
-		default:
-		}
-		for {
-			e, err := r.Next()
-			if err != nil {
-				t.Fatalf("Next: %v", err)
-			}
-			if e == nil {
-				break
-			}
-		}
-		if _, err := j.Head(); err != nil {
-			t.Fatalf("Head: %v", err)
-		}
+// paddedEvent is the n-th test event of pool whose line, once the journal has
+// set home_sequence 1 and recorded_at on it, is size bytes with its line feed.
+func paddedEvent(t testing.TB, n, size int) store.Event {
+	t.Helper()
+	pad := func(k int) store.Event {
+		m := envelope("pool", n)
+		m["kind"] = "pool." + strings.Repeat("x", k) + ".happened"
+		return encoded(t, m)
 	}
-	select {
-	case err := <-errs:
+	probe := newHome(t, false)
+	j, _ := open(t, probe, "pool", 0)
+	append_(t, j, pad(1))
+	k := size - len(segmentBytes(t, probe, SegmentName(1))) + 1
+	if k < 1 {
+		t.Fatalf("a line of %d bytes is too short", size)
+	}
+	return pad(k)
+}
+
+// A reader that holds the front of a torn tail when a writer repairs it takes
+// in the rest of the repaired file at its next read: the line it assembles is
+// neither, and is not a fault of the journal. The reader stops after its first
+// read of the segment, the writer repairs and appends, and the reader goes on.
+func TestReaderHoldingATornPrefixWhenItIsRepaired(t *testing.T) {
+	home := newHome(t, false)
+	writer, _ := open(t, home, "pool", 0)
+	append_(t, writer, paddedEvent(t, 1, readChunk-100), event(t, "pool", 2))
+	name := SegmentName(1)
+	torn := tear(t, home, name, 5)
+	if len(torn) <= 100 {
+		t.Fatalf("a torn tail of %d bytes", len(torn))
+	}
+
+	reader, _ := open(t, home, "pool", 0)
+	stopped := 0
+	reader.fault = func(step string) error {
+		if step != "read "+name || stopped > 0 {
+			return nil
+		}
+		stopped++
+		if _, tail := lines(segmentBytes(t, home, name)); !bytes.Equal(tail, torn) {
+			t.Error("the reader was stopped after the repair")
+		}
+		return writer.Append([]store.Event{event(t, "pool", 3)})
+	}
+	var got []*Entry
+	r, err := reader.Reader(0)
+	if err != nil {
 		t.Fatal(err)
-	default:
+	}
+	for {
+		e, err := r.Next()
+		if err != nil {
+			t.Fatalf("Next after a repair: %v", err)
+		}
+		if e == nil {
+			break
+		}
+		got = append(got, e)
+	}
+	if stopped != 1 {
+		t.Fatalf("the reader was stopped %d times", stopped)
+	}
+	if len(got) != 3 || got[0].EventID != id(ids.Event, 1) || got[1].Kind != RepairKind || got[2].EventID != id(ids.Event, 3) {
+		t.Errorf("read %d entries: %+v", len(got), got)
+	}
+}
+
+// Head, which takes the size of the segment before it reads the end of it,
+// meets a file the repair has since cut: it reads again and reports the head
+// of the repaired journal.
+func TestHeadReadingWithASizeTakenBeforeTheRepair(t *testing.T) {
+	home := newHome(t, false)
+	writer, _ := open(t, home, "pool", 0)
+	append_(t, writer, event(t, "pool", 1))
+	name := SegmentName(1)
+	data := segmentBytes(t, home, name)
+	writeSegment(t, home, name, append(slices.Clone(data), bytes.Repeat([]byte("{"), 5000)...))
+
+	reader, _ := open(t, home, "pool", 0)
+	stopped := 0
+	reader.fault = func(step string) error {
+		if step != "tail "+name || stopped > 0 {
+			return nil
+		}
+		stopped++
+		before := len(segmentBytes(t, home, name))
+		if err := writer.Append([]store.Event{event(t, "pool", 2)}); err != nil {
+			return err
+		}
+		if after := len(segmentBytes(t, home, name)); after >= before {
+			t.Errorf("the repair left %d bytes of %d: nothing was cut", after, before)
+		}
+		return nil
+	}
+	head, err := reader.Head()
+	if err != nil || head != 3 {
+		t.Fatalf("Head = %d, %v; want 3, the event after the repair", head, err)
+	}
+	if stopped != 1 {
+		t.Errorf("Head was stopped %d times", stopped)
 	}
 }
 
