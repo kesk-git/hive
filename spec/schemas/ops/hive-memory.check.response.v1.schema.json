@@ -43,7 +43,7 @@
               "fresh",
               "stale"
             ],
-            "description": "Computed at the check from the rules in force at checked_at: fresh when they resolve to the rendering's digest and have no conflict, stale otherwise."
+            "description": "Computed at the check from the rules in force at checked_at: fresh when they resolve to the rendering's rules_digest, the resolved-rule digest, and have no conflict, stale otherwise. The comparison names the rules digest and never the digest of the rendered text, so an unchanged rendering of changed rules is stale."
           },
           "bytes": {
             "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"

@@ -15,7 +15,16 @@
     "body": {
       "type": "string"
     },
+    "level": {
+      "description": "Required for a new item whose deliverable is not a decision; a decision item carries none.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/level"
+    },
+    "wave": {
+      "description": "On a Target only.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/wave"
+    },
     "deliverable": {
+      "description": "Absent on a Target, which carries no deliverable.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/deliverable"
     },
     "class": {
@@ -39,7 +48,7 @@
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/definition_state"
     },
     "deps": {
-      "description": "Each blocked-by edge must name an item of this Pool that exists; a dangling blocker is refused.",
+      "description": "Each blocked-by edge must name an item of this Pool that exists; a dangling blocker is refused. A parent edge must point from a Hunt to a Prey or from a Prey to a Target; any other pair is refused with pool.hierarchy.",
       "type": "array",
       "items": {
         "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"
@@ -54,5 +63,53 @@
     "schedule": {
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/schedule"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "deliverable"
+        ],
+        "properties": {
+          "deliverable": {
+            "const": "decision"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "level": false
+        }
+      },
+      "else": {
+        "required": [
+          "level"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "level"
+        ],
+        "properties": {
+          "level": {
+            "const": "target"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "deliverable": false,
+          "placement_requested": false,
+          "delivery": false
+        }
+      },
+      "else": {
+        "properties": {
+          "wave": false
+        }
+      }
+    }
+  ]
 }

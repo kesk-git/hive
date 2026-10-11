@@ -31,6 +31,14 @@
             "type": "string"
           }
         },
+        "level": {
+          "description": "The item's level, as its owner sets it on an imported legacy item that lacks one. A Target carries no deliverable, requested placement or delivery axes.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/level"
+        },
+        "wave": {
+          "description": "On a Target only; refused where the item's level is not target.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/wave"
+        },
         "deliverable": {
           "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/deliverable"
         },
@@ -65,6 +73,7 @@
           }
         },
         "add_deps": {
+          "description": "A parent edge must point from a Hunt to a Prey or from a Prey to a Target; any other pair is refused with pool.hierarchy.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"

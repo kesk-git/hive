@@ -8,7 +8,7 @@ Each package states what it owns in its declaration, `packages/<name>/hive-packa
 
 | Package | Owns | Executable | Home paths | Test target | Built in plan stage |
 | --- | --- | --- | --- | --- | --- |
-| `pool` | The Pool: work items, admission, Imperatives, specifications, rules and generated knowledge | `hive-pool` | `pool/` | `test-pool` | 2 |
+| `pool` | The Pool: items at the level of a Target, a Prey or a Hunt, admission, Imperatives, specifications, rules and generated knowledge | `hive-pool` | `pool/` | `test-pool` | 2 |
 | `spawning-pool` | The Spawning Pool: Hive-owned worktrees, leases and their receipts | `hive-spawning-pool` | `spawning-pool/` | `test-spawning-pool` | 3 |
 | `dispatch` | Sessions, Fleet provisioning and the identity registry, policy, metering, reservations, scheduled jobs, steering, continuity | `hive-dispatch` | `home.json`, `dispatch/` | `test-dispatch` | 4 |
 | `shadow` | Observations, due polls, wakes and acknowledgments | `hive-shadow` | `shadow/` | `test-shadow` | 4 |
