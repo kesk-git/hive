@@ -9,6 +9,7 @@ The definition of the job for stage 2 of the ordered implementation plan, the Po
 - `packages/pool/hive-package.json` and `packages/word/hive-package.json` amended; both validate against `package.v1`.
 - `spec/README.md` (index and version 1.2), `spec/test-targets.md`, `spec/receipts.md`, `spec/events.md` and `spec/decisions.md` edited by a sentence or a row each.
 - `DEFINITION-SUMMARY.md` at the root, with the eight points.
+- After the supervisor's review, four corrections in commit `8c098d9`: `spec/pool.md` states that stage 2 refuses `codex-void` unconditionally in the check itself and names the later change that un-parks it; `spec/word.md` states the secrets rule for the intake and what happens to free text kept exactly; `spec/import-plan-tasks-axi.md` names `src/backends/lock.ts` by its real path; the summary's point 5 records how the build plan reads the plan's order inside the stage, and the unconditional refusal, each with its alternative.
 
 Nothing under `contract/`, `packages/` other than the two declarations, `Makefile`, `go.mod`, `spec/embed.go`, `integration/` or any `.go` file was touched. No source was imported, nothing was installed, no pull request was opened, and `main` was not touched.
 
@@ -20,7 +21,7 @@ The work is on `claude/hive-stage2-pool-129teu`, the branch this session was ope
 
 ## Checks
 
-Run on the final tree, with Go 1.27.0 as `go.mod` requires:
+Run on the final tree, after the corrections, with Go 1.27.0 as `go.mod` requires:
 
 ```
 $ make check
@@ -28,13 +29,15 @@ go vet ./...
 exit=0
 $ make test-contract
 go test ./contract/... ./spec/...
-ok  	github.com/kesk-git/hive/contract/canon	0.040s
-ok  	github.com/kesk-git/hive/contract/clock	0.005s
-ok  	github.com/kesk-git/hive/contract/ids	0.010s
-ok  	github.com/kesk-git/hive/contract/schema	15.065s
+ok  	github.com/kesk-git/hive/contract/canon	(cached)
+ok  	github.com/kesk-git/hive/contract/clock	(cached)
+ok  	github.com/kesk-git/hive/contract/ids	(cached)
+ok  	github.com/kesk-git/hive/contract/schema	(cached)
 ?   	github.com/kesk-git/hive/spec	[no test files]
 exit=0
 ```
+
+The cached results are those of the uncached run on the same schema tree, which the corrections did not touch: canon 0.040s, clock 0.005s, ids 0.010s, schema 15.065s, all ok.
 
 Every JSON file under `spec/schemas/` and every package declaration parses. The amended declarations were validated against `package.v1` with a throwaway test that was not committed.
 
