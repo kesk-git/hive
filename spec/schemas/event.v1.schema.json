@@ -50,7 +50,7 @@
       ],
       "properties": {
         "package": {
-          "description": "The package that wrote the line. It equals the first segment of kind.",
+          "description": "The package that wrote the line. It equals the first segment of kind, except for the journal's own repair event.",
           "$ref": "urn:hive:schema:common:v1#/$defs/package_name"
         },
         "source_id": {
