@@ -109,6 +109,7 @@ func TestReplaceRefusesAndWritesNothing(t *testing.T) {
 		{"a path with upper case", "records/item/Task.json", `{}`, 0, nil},
 		{"a path without .json", "records/item/x", `{}`, 0, nil},
 		{"a temporary file", "records/item/x.json.req.tmp", `{}`, 0, nil},
+		{"a path in tmp", "tmp/x.json", `{}`, 0, nil},
 		{"a receipt as a record", ReceiptPath(id("rcpt", 1)), `{}`, 0, nil},
 		{"an outcome as a record", OutcomePath(req1), `{}`, 0, nil},
 		{"an intent as a record", IntentPath(req1), `{}`, 0, nil},
@@ -149,16 +150,16 @@ func TestReplaceInterruptedAtEachStep(t *testing.T) {
 		return s, old
 	}
 	s, _ := setup(t)
+	w := lock(t, s)
 	steps := trace(t, s, func() {
-		w := lock(t, s)
-		defer w.Release()
 		if _, err := w.Replace(req2, task1, []byte(`{"n":2}`), 1); err != nil {
 			t.Fatal(err)
 		}
 	})
+	w.Release()
 	want := []string{
 		"create " + task1, "fill " + task1, "sync " + task1, "rename " + task1,
-		"syncdir " + task1, "syncdir pool/records/", "syncdir pool/", "syncdir ./",
+		"syncdir " + task1, "syncdir pool/records/", "syncdir pool/", "syncdir ./", "syncdir pool/tmp/",
 	}
 	if !slices.Equal(steps, want) {
 		t.Fatalf("steps = %v, want %v", steps, want)
@@ -181,7 +182,7 @@ func TestReplaceInterruptedAtEachStep(t *testing.T) {
 			if err != nil {
 				t.Fatalf("a reader after the interruption: %v", err)
 			}
-			tmp := s.abs(task1) + "." + req2 + tempSuffix
+			tmp := filepath.Join(s.dir, tmpDir, req2+tempSuffix)
 			_, tmpErr := os.Stat(tmp)
 			// Between its creation and its rename the temporary file is there
 			// and the record is still the old one.
@@ -206,14 +207,14 @@ func TestReplaceInterruptedAtEachStep(t *testing.T) {
 				t.Error("the next lock changed the record")
 			}
 			if _, err := os.Stat(filepath.Join(s.Dir, locksDir, "pool.lock")); err != nil {
-				t.Error("the lock file was swept")
+				t.Error("the lock file was removed")
 			}
 		})
 	}
 }
 
 // A temporary file, whole or partial, is never read as a record, and a
-// writer sweeps it. A write that fails under pressure leaves the record as
+// writer empties tmp/ of it. A write that fails under pressure leaves the record as
 // it was and no temporary file.
 func TestTemporaryFilesAreNeverRecords(t *testing.T) {
 	home := newHome(t)
@@ -224,15 +225,15 @@ func TestTemporaryFilesAreNeverRecords(t *testing.T) {
 	}
 	w.Release()
 	whole := record(t, map[string]any{"n": int64(2)}, 2, "2026-10-11T08:00:00.000Z")
-	write(t, s, task1+"."+req2+tempSuffix, whole)
-	write(t, s, task1+"."+id("req", 3)+tempSuffix, whole[:len(whole)/2])
-	write(t, s, "records/item/"+id("task", 9)+".json."+id("req", 4)+tempSuffix, nil)
-	write(t, s, "tx/"+id("req", 5)+".json."+id("req", 5)+tempSuffix, []byte(`{"schema":"hive.tx-in`))
+	write(t, s, "tmp/"+req2+tempSuffix, whole)
+	write(t, s, "tmp/"+id("req", 3)+tempSuffix, whole[:len(whole)/2])
+	write(t, s, "tmp/"+id("req", 4)+tempSuffix, nil)
+	write(t, s, "tmp/"+id("req", 5)+tempSuffix, []byte(`{"schema":"hive.tx-in`))
 	rec, err := s.ReadRecord(task1)
 	if err != nil || rec.Revision != 1 {
 		t.Fatalf("ReadRecord with temporary files beside = %+v, %v", rec, err)
 	}
-	for _, rel := range []string{task1 + "." + req2 + tempSuffix, "records/item/" + id("task", 9) + ".json." + id("req", 4) + tempSuffix} {
+	for _, rel := range []string{"tmp/" + req2 + tempSuffix, "tmp/" + req2 + ".json"} {
 		if _, err := s.ReadRecord(rel); err == nil {
 			t.Errorf("a temporary file %s was read as a record", rel)
 		}
@@ -246,7 +247,7 @@ func TestTemporaryFilesAreNeverRecords(t *testing.T) {
 		t.Errorf("temporary files after the lock: %v", temps)
 	}
 	if rec, err := s.ReadRecord(task1); err != nil || rec.Revision != 1 {
-		t.Errorf("the record after the sweep: %+v, %v", rec, err)
+		t.Errorf("the record after the lock: %+v, %v", rec, err)
 	}
 
 	// Pressure: the temporary file cannot be created. The write is refused

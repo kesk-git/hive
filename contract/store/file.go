@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/kesk-git/hive/contract/canon"
-	"github.com/kesk-git/hive/contract/ids"
 )
 
-// tempSuffix ends every temporary file. A record ends in .json, so a
-// temporary file is never read as one.
+// tempSuffix ends the name of every temporary file, which sits in the store's
+// tmp/ directory and nowhere else. A record ends in .json, so a temporary file
+// is never read as one.
 const tempSuffix = ".tmp"
 
 // The directories of a store that hold something other than replaceable
@@ -21,6 +21,7 @@ const (
 	receiptsDir = "receipts"
 	requestsDir = "requests"
 	txDir       = "tx"
+	tmpDir      = "tmp"
 )
 
 // topLevel gives each package the one top-level path of the home, besides its
@@ -78,8 +79,8 @@ func (s *Store) fromHomePath(p string) (string, error) {
 }
 
 // checkPath checks a path below the store, or the top-level path the package
-// owns: slash-separated, every segment a lowercase file name, ending in .json
-// and never a temporary file.
+// owns: slash-separated, every segment a lowercase file name, ending in
+// .json.
 func (s *Store) checkPath(rel string) error {
 	if rel == "" {
 		return fmt.Errorf("store: empty path")
@@ -94,9 +95,6 @@ func (s *Store) checkPath(rel string) error {
 				return fmt.Errorf("store: path %q is not a lowercase file name", rel)
 			}
 		}
-		if strings.HasSuffix(seg, tempSuffix) {
-			return fmt.Errorf("store: path %q names a temporary file", rel)
-		}
 	}
 	if !strings.HasSuffix(rel, ".json") {
 		return fmt.Errorf("store: path %q does not end in .json", rel)
@@ -105,13 +103,14 @@ func (s *Store) checkPath(rel string) error {
 }
 
 // checkRecordPath is checkPath for a replaceable record, which never sits
-// among the receipts, the recorded outcomes or the intents.
+// among the receipts, the recorded outcomes, the intents or the temporary
+// files.
 func (s *Store) checkRecordPath(rel string) error {
 	if err := s.checkPath(rel); err != nil {
 		return err
 	}
 	switch first, _, _ := strings.Cut(rel, "/"); first {
-	case receiptsDir, requestsDir, txDir:
+	case receiptsDir, requestsDir, txDir, tmpDir:
 		return fmt.Errorf("store: path %q is not a record path: %s/ holds no replaceable record", rel, first)
 	}
 	return nil
@@ -141,19 +140,22 @@ func (s *Store) step(name string) error {
 
 // writeFile replaces the file at rel with data by the four steps of
 // spec/records.md, Writing one record: the content goes to a temporary file
-// in the same directory named for the request, the file is flushed, renamed
-// over the record's name, and the directory is flushed. A reader sees the
-// whole old file or the whole new one. A write that fails leaves the record
-// as it was and removes its temporary file; an interruption leaves the
-// temporary file for the next writer to remove. When it returns, the file and
-// every directory on its way down from the home are durable.
+// named for the request in the store's tmp/ directory, the file is flushed,
+// renamed over the record's name, and both directories the rename touched are
+// flushed. A reader sees the whole old file or the whole new one. A write that
+// fails leaves the record as it was and removes its temporary file; an
+// interruption leaves the temporary file for the next writer to empty tmp/ of.
+// When it returns, the file and every directory on its way down from the home
+// are durable.
 func (s *Store) writeFile(rel, requestID string, data []byte) error {
 	full := s.abs(rel)
-	dir := filepath.Dir(full)
-	if err := os.MkdirAll(dir, dirMode); err != nil {
-		return fmt.Errorf("store: %w", err)
+	tmpDirPath := filepath.Join(s.dir, tmpDir)
+	for _, d := range []string{tmpDirPath, filepath.Dir(full)} {
+		if err := os.MkdirAll(d, dirMode); err != nil {
+			return fmt.Errorf("store: %w", err)
+		}
 	}
-	tmp := full + "." + requestID + tempSuffix
+	tmp := filepath.Join(tmpDirPath, requestID+tempSuffix)
 	if err := s.step("create " + rel); err != nil {
 		return err
 	}
@@ -190,7 +192,13 @@ func (s *Store) writeFile(rel, requestID string, data []byte) error {
 		os.Remove(tmp)
 		return fmt.Errorf("store: %w", err)
 	}
-	return s.syncChain(rel)
+	if err := s.syncChain(rel); err != nil {
+		return err
+	}
+	if err := s.step("syncdir " + s.relDir(tmpDirPath)); err != nil {
+		return err
+	}
+	return syncDir(tmpDirPath)
 }
 
 // syncChain flushes the directory of the file at rel and every directory
@@ -251,70 +259,24 @@ func syncDir(dir string) error {
 	return nil
 }
 
-// tempOf recognises the name writeFile gives a temporary file: the name of
-// the file it writes, then the request that writes it, then .tmp. It returns
-// the file's name. Nothing else is a temporary file, whatever its suffix.
-func tempOf(name string) (string, bool) {
-	base, ok := strings.CutSuffix(name, tempSuffix)
-	if !ok {
-		return "", false
-	}
-	i := strings.LastIndex(base, ".")
-	if i < 0 || ids.Check(base[i+1:], ids.Request) != nil || !strings.HasSuffix(base[:i], ".json") {
-		return "", false
-	}
-	return base[:i], true
-}
-
-// sweepTemps removes the temporary files a crash left under the store, and
-// under the top-level path of the home it owns: at the top of the home only
-// those of home.json, below reviews/ and the store's directory any. A writer
-// holding the lock calls it, so none it finds is still being written.
-func (s *Store) sweepTemps() error {
-	dirty := map[string]bool{}
-	sweep := func(root string) error {
-		return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if _, ok := tempOf(d.Name()); ok && d.Type().IsRegular() {
-				if err := os.Remove(p); err != nil {
-					return err
-				}
-				dirty[filepath.Dir(p)] = true
-			}
-			return nil
-		})
-	}
-	err := sweep(s.dir)
-	switch top := topLevel[s.pkg]; {
-	case err != nil:
-	case top == homeFile:
-		var entries []fs.DirEntry
-		if entries, err = os.ReadDir(s.Dir); err == nil {
-			for _, e := range entries {
-				if file, ok := tempOf(e.Name()); ok && file == homeFile && e.Type().IsRegular() {
-					if err = os.Remove(filepath.Join(s.Dir, e.Name())); err != nil {
-						break
-					}
-					dirty[s.Dir] = true
-				}
-			}
-		}
-	case top != "":
-		if err = sweep(filepath.Join(s.Dir, top)); errNotExist(err) {
-			err = nil
-		}
+// clearTmp empties the store's tmp/ directory of what a crash left in it. A
+// writer holding the lock calls it, so nothing in it is still being written.
+// Nothing outside tmp/ is ever removed for being a temporary file.
+func (s *Store) clearTmp() error {
+	dir := filepath.Join(s.dir, tmpDir)
+	entries, err := os.ReadDir(dir)
+	if errNotExist(err) || err == nil && len(entries) == 0 {
+		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("store: removing temporary files: %w", err)
+		return fmt.Errorf("store: emptying %s: %w", tmpDir, err)
 	}
-	for dir := range dirty {
-		if err := syncDir(dir); err != nil {
-			return err
+	for _, e := range entries {
+		if err := os.RemoveAll(filepath.Join(dir, e.Name())); err != nil {
+			return fmt.Errorf("store: emptying %s: %w", tmpDir, err)
 		}
 	}
-	return nil
+	return syncDir(dir)
 }
 
 // readFile reads the file at rel and checks its form: one JSON document in

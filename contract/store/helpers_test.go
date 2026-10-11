@@ -158,12 +158,12 @@ func files(t testing.TB, dir string) []string {
 	return out
 }
 
-// temps lists the temporary files below dir.
+// temps lists the files of every tmp/ directory below dir.
 func temps(t testing.TB, dir string) []string {
 	t.Helper()
 	var out []string
 	for _, f := range files(t, dir) {
-		if strings.HasSuffix(f, tempSuffix) {
+		if strings.Contains("/"+f, "/"+tmpDir+"/") {
 			out = append(out, f)
 		}
 	}

@@ -247,11 +247,14 @@ func (s *Store) put(request string, f *intentFile) error {
 }
 
 // recover brings the store to a consistent state under the exclusive lock:
-// it rolls every intent forward and removes every temporary file. Intents
-// are completed in name order, each in full before the next.
+// it flushes tx/, rolls every intent forward and empties tmp/. Intents are
+// completed in name order, each in full before the next.
 func (s *Store) recover() error {
 	names, err := s.intents()
 	if err != nil {
+		return err
+	}
+	if err := s.syncTx(); err != nil {
 		return err
 	}
 	for _, name := range names {
@@ -270,7 +273,20 @@ func (s *Store) recover() error {
 			return err
 		}
 	}
-	return s.sweepTemps()
+	return s.clearTmp()
+}
+
+// syncTx flushes the store's tx/ directory, when it is there, so that an
+// intent a crash removed stays removed before any later write is admitted.
+func (s *Store) syncTx() error {
+	dir := filepath.Join(s.dir, txDir)
+	if err := s.step("syncdir " + s.relDir(dir)); err != nil {
+		return err
+	}
+	if err := syncDir(dir); err != nil && !errNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // intents lists the names of the intents in the store, in name order.

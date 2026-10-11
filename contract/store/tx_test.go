@@ -617,12 +617,12 @@ func TestTornIntent(t *testing.T) {
 	})
 	t.Run("a torn temporary file of an intent is removed", func(t *testing.T) {
 		s, j := seeded(t)
-		write(t, s, rel+"."+req9+tempSuffix, whole[:len(whole)/2])
+		write(t, s, "tmp/"+req9+tempSuffix, whole[:len(whole)/2])
 		write(t, s, "tx/notes.txt", []byte("not an intent"))
 		before := tree(t, s.Dir)
 		lock(t, s).Release()
-		delete(before, "pool/tx/"+req9+".json."+req9+tempSuffix)
-		sameTree(t, "after the sweep", tree(t, s.Dir), before)
+		delete(before, "pool/tmp/"+req9+tempSuffix)
+		sameTree(t, "after emptying tmp/", tree(t, s.Dir), before)
 		if j.appends != 0 {
 			t.Error("events were appended")
 		}
@@ -811,7 +811,7 @@ func TestWritesFlushEveryDirectoryOnTheWay(t *testing.T) {
 		for k := len(dirs) - 2; k >= 0; k-- {
 			want = append(want, "syncdir "+path.Join(append([]string{"pool"}, dirs[:k]...)...)+"/")
 		}
-		want = append(want, "syncdir ./")
+		want = append(want, "syncdir ./", "syncdir pool/tmp/")
 		if !slices.Equal(chain, want) {
 			t.Errorf("after %s the flushed directories are %v, want %v", rel, chain, want)
 		}
@@ -936,5 +936,24 @@ func TestIntentPathsAreRelativeToTheHome(t *testing.T) {
 		if strings.Contains(p, "..") {
 			t.Errorf("path %q has a dot-dot segment", p)
 		}
+	}
+}
+
+// A crash after an intent is unlinked and before tx/ is flushed leaves no
+// intent to find. The next exclusive lock still flushes tx/, so that a write
+// admitted after it cannot be followed by the old intent coming back.
+func TestRecoveryFlushesTxWhenNoIntentRemains(t *testing.T) {
+	s, _ := seeded(t)
+	w := lock(t, s)
+	if _, err := w.Commit(fullTx()); err != nil {
+		t.Fatal(err)
+	}
+	w.Release()
+	if _, err := os.Stat(s.abs(IntentPath(req9))); !errNotExist(err) {
+		t.Fatal("the intent remains")
+	}
+	steps := trace(t, s, func() { lock(t, s).Release() })
+	if !slices.Contains(steps, "syncdir pool/tx/") {
+		t.Errorf("tx/ was not flushed: %v", steps)
 	}
 }

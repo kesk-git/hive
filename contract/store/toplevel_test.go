@@ -253,13 +253,13 @@ func TestTopLevelTransactionsRecover(t *testing.T) {
 			}
 			s, home := fresh()
 			untouched := tree(t, home)
+			w := lock(t, s)
 			steps := trace(t, s, func() {
-				w := lock(t, s)
-				defer w.Release()
 				if _, err := w.Commit(tc.tx(t)); err != nil {
 					t.Fatal(err)
 				}
 			})
+			w.Release()
 			done := tree(t, home)
 			durable := slices.Index(steps, "syncdir "+IntentPath(req9))
 			for i, step := range steps {
@@ -297,65 +297,97 @@ func TestTopLevelTransactionsRecover(t *testing.T) {
 	}
 }
 
-// A writer removes the temporary files it gave a request, recognised by their
-// exact form, and nothing else: an entry it does not know at the top of the
-// home and a file below a review directory, whatever its suffix, are left
-// alone.
-func TestSweepRemovesOnlyTheTemporaryFilesTheStoreMade(t *testing.T) {
-	tmp := func(file, req string) string { return file + "." + req + tempSuffix }
-	t.Run("dispatch", func(t *testing.T) {
-		home := newHome(t)
-		s, _, _ := open(t, home, "dispatch")
-		made := []string{tmp(homeFile, req1), "dispatch/" + tmp(task1, req2), "dispatch/" + tmp("registry/x.json", req2)}
-		kept := []string{
-			"home.json.backup.tmp", "home.json.tmp", tmp("notes.json", req1), tmp("home.json.old", req1),
-			"home.json." + req1 + ".bak", "reviews/a/" + tmp("review.json", req1), "reviews/capture.tmp",
-			"dispatch/records/item/capture.tmp", "dispatch/" + task1 + ".backup.tmp", "pool/" + tmp(task1, req1),
-		}
-		for _, name := range append(slices.Clone(made), kept...) {
-			full := filepath.Join(home, filepath.FromSlash(name))
+// A writer empties tmp/, the one directory the store makes temporary files
+// in, and removes nothing else: whatever its name, no file at the top of the
+// home, in the package's own directory or below a review directory is taken
+// for a temporary file.
+func TestClearingTmpTouchesNothingElse(t *testing.T) {
+	name := func(file, req string) string { return file + "." + req + tempSuffix }
+	populate := func(t *testing.T, home string, left, kept []string) {
+		t.Helper()
+		for _, rel := range append(slices.Clone(left), kept...) {
+			full := filepath.Join(home, filepath.FromSlash(rel))
 			os.MkdirAll(filepath.Dir(full), dirMode)
 			if err := os.WriteFile(full, []byte("x"), fileMode); err != nil {
 				t.Fatal(err)
 			}
 		}
+	}
+	check := func(t *testing.T, home string, left, kept []string) {
+		t.Helper()
+		for _, rel := range left {
+			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(rel))); err == nil {
+				t.Errorf("%s was left", rel)
+			}
+		}
+		for _, rel := range kept {
+			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(rel))); err != nil {
+				t.Errorf("%s was removed: %v", rel, err)
+			}
+		}
+	}
+	t.Run("dispatch", func(t *testing.T) {
+		home := newHome(t)
+		s, _, _ := open(t, home, "dispatch")
+		left := []string{"dispatch/tmp/" + req1 + tempSuffix, "dispatch/tmp/" + req2 + tempSuffix, "dispatch/tmp/sub/x"}
+		kept := []string{
+			"home.json.backup.tmp", "home.json.tmp", name(homeFile, req1), "reviews/a/" + name("review.json", req1),
+			"dispatch/" + name(task1, req2), "dispatch/records/item/capture.tmp", "pool/tmp/" + req1 + tempSuffix,
+		}
+		populate(t, home, left, kept)
 		lock(t, s).Release()
-		for _, name := range made {
-			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(name))); err == nil {
-				t.Errorf("%s was left", name)
-			}
-		}
-		for _, name := range kept {
-			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(name))); err != nil {
-				t.Errorf("%s was removed: %v", name, err)
-			}
-		}
+		check(t, home, left, kept)
 	})
 	t.Run("ui", func(t *testing.T) {
 		home := newHome(t)
 		s, _, _ := open(t, home, "ui")
-		made := []string{"reviews/a/1/b/" + tmp("review.json", req1), "reviews/" + tmp("x.json", req2), "ui/" + tmp(task1, req2)}
+		left := []string{"ui/tmp/" + req1 + tempSuffix}
 		kept := []string{
-			"reviews/a/1/b/attachments/0001/capture.tmp", "reviews/a/1/b/round-0001.feedback.json.tmp",
-			"reviews/a/1/b/revision-0001.html", "reviews/a/1/b/assets/0001/x.json.backup.tmp", "home.json." + req1 + ".tmp",
+			"reviews/a/1/b/attachments/0001/capture.json." + req1 + tempSuffix, "reviews/a/1/b/" + name("review.json", req1),
+			"reviews/a/1/b/round-0001.feedback.json.tmp", "reviews/a/1/b/revision-0001.html",
+			"reviews/a/1/b/assets/0001/x.json.backup.tmp", "home.json." + req1 + ".tmp", "ui/" + name(task1, req2),
 		}
-		for _, name := range append(slices.Clone(made), kept...) {
-			full := filepath.Join(home, filepath.FromSlash(name))
-			os.MkdirAll(filepath.Dir(full), dirMode)
-			if err := os.WriteFile(full, []byte("x"), fileMode); err != nil {
-				t.Fatal(err)
-			}
-		}
+		populate(t, home, left, kept)
 		lock(t, s).Release()
-		for _, name := range made {
-			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(name))); err == nil {
-				t.Errorf("%s was left", name)
-			}
-		}
-		for _, name := range kept {
-			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(name))); err != nil {
-				t.Errorf("%s was removed: %v", name, err)
-			}
-		}
+		check(t, home, left, kept)
 	})
+}
+
+// A write that goes to the top of the home or below reviews/ makes its
+// temporary file in the package's own tmp/ and moves it into place from there;
+// a crash leaves nothing at the top of the home.
+func TestTopLevelWritesUseThePackageTmp(t *testing.T) {
+	for _, tc := range []struct {
+		pkg, rel string
+		content  func(t *testing.T) []byte
+	}{
+		{"dispatch", HomeFilePath, homeContent},
+		{"ui", ReviewPath("task-1/1/review-1/review.json"), func(*testing.T) []byte { return []byte(`{"n":1}`) }},
+	} {
+		t.Run(tc.pkg, func(t *testing.T) {
+			home := newHome(t)
+			s, _, _ := open(t, home, tc.pkg)
+			before := tree(t, home)
+			w := lock(t, s)
+			hit := faultAt(s, "rename "+tc.rel, 1)
+			if _, err := w.Replace(req1, tc.rel, tc.content(t), 0); !errors.Is(err, errCrash) || !*hit {
+				t.Fatalf("Replace = %v", err)
+			}
+			w.Release()
+			s.fault = nil
+			left := temps(t, home)
+			if want := []string{tc.pkg + "/tmp/" + req1 + tempSuffix}; !slices.Equal(left, want) {
+				t.Fatalf("temporary files = %v, want %v", left, want)
+			}
+			delete(before, "locks/"+tc.pkg+".lock")
+			lock(t, s).Release()
+			if left := temps(t, home); len(left) != 0 {
+				t.Errorf("temporary files after the lock: %v", left)
+			}
+			h, err := CheckHome(home)
+			if err != nil || len(h.Unknown) != 0 {
+				t.Errorf("CheckHome = %+v, %v", h, err)
+			}
+		})
+	}
 }
