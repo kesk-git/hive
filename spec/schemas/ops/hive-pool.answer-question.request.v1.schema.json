@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.answer-question.request:v1",
+  "title": "hive-pool answer-question: request body",
+  "description": "Records one answer exactly as given against a question, its card and its round at their revisions, and applies it in the same transaction: releases the hold, completes the question, defers it, or records it unreconciled when the question has moved on. Two answers with the same source are one answer: the second returns the first's receipt and writes nothing. The operation word persists answers through.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "card",
+    "text",
+    "source",
+    "answered_at"
+  ],
+  "properties": {
+    "card": {
+      "description": "The card the answer was given on, with every revision the Hive Mind saw.",
+      "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
+    },
+    "option_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+    },
+    "option_label": {
+      "type": "string"
+    },
+    "text": {
+      "description": "The free text exactly as given. Empty only when an option was chosen with no text.",
+      "type": "string"
+    },
+    "later": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revisit_at"
+      ],
+      "properties": {
+        "revisit_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        }
+      }
+    },
+    "source": {
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer_source"
+    },
+    "answered_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "supersedes": {
+      "description": "The sequence of an earlier applied answer this one replaces. Requires the envelope's authority to be the Hive Mind's word.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "reconciles": {
+      "description": "The sequence of an unreconciled answer this one settles at the current revision.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "option_id"
+        ]
+      },
+      "then": {
+        "required": [
+          "option_label"
+        ]
+      },
+      "else": {
+        "properties": {
+          "option_label": false
+        }
+      }
+    }
+  ]
+}

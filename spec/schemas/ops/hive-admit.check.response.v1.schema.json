@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-admit.check.response:v1",
+  "title": "hive-admit check: response body",
+  "description": "Present only when the check admitted. A refused or held check has no body: its findings are in the admission record, its receipt is in the envelope's receipts, and a hold is named by error.hold.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admission",
+    "check"
+  ],
+  "properties": {
+    "admission": {
+      "$ref": "urn:hive:schema:records:pool.admission:v1"
+    },
+    "check": {
+      "$ref": "urn:hive:schema:records:pool.admission:v1#/$defs/check"
+    }
+  }
+}

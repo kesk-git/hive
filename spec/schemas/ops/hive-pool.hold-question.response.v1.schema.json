@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.hold-question.response:v1",
+  "title": "hive-pool hold-question: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question",
+    "round",
+    "hold",
+    "item"
+  ],
+  "properties": {
+    "question": {
+      "$ref": "urn:hive:schema:records:pool.question:v1"
+    },
+    "round": {
+      "$ref": "urn:hive:schema:records:pool.decision-round:v1"
+    },
+    "hold": {
+      "$ref": "urn:hive:schema:records:pool.hold:v1"
+    },
+    "item": {
+      "$ref": "urn:hive:schema:records:pool.item:v1"
+    }
+  }
+}

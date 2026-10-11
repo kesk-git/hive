@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.hold.request:v1",
+  "title": "hive-word hold: request body",
+  "description": "Raises a question for the Hive Mind and holds the item it gates, or a new decision item made for a question with its own scope. word mints the question, round and card identities and persists them through hive-pool hold-question. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "origin",
+    "text",
+    "consequence",
+    "options",
+    "round"
+  ],
+  "properties": {
+    "held_task_id": {
+      "description": "The item to hold. Either this or new_item, never both.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "new_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/label"
+        },
+        "body": {
+          "type": "string"
+        }
+      }
+    },
+    "origin": {
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/origin"
+    },
+    "text": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "consequence": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "recommendation": {
+      "description": "The option to present first. Required when options is not empty.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/option"
+      }
+    },
+    "amount": {
+      "description": "For a spend ask: the amount and its reason are stated; an ordinary card otherwise.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "round": {
+      "description": "Join an existing open round of this home by identity, or open a new one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "complete"
+      ],
+      "properties": {
+        "decision_round_id": {
+          "description": "An existing open round to join. Absent opens a new round.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/decision_round_id"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "file",
+              "fetched"
+            ],
+            "properties": {
+              "file": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+              },
+              "fetched": {
+                "enum": [
+                  "complete",
+                  "missing",
+                  "truncated",
+                  "unreadable"
+                ]
+              }
+            }
+          }
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "incomplete_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      }
+    },
+    "hold_reason": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    }
+  }
+}

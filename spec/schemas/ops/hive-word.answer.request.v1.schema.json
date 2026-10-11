@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.answer.request:v1",
+  "title": "hive-word answer: request body",
+  "description": "The one intake for the Hive Mind's answer: the exact words, with or without an option, or Later with a revisit date, against the card, question, held item and round at the revisions the Hive Mind saw. word checks the card against the current records, then persists the answer through hive-pool answer-question. A replay of the same answer is idempotent; an answer to a changed question is recorded and held for reconciliation. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "card",
+    "text",
+    "source",
+    "answered_at"
+  ],
+  "properties": {
+    "card": {
+      "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
+    },
+    "option_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+    },
+    "option_label": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    },
+    "later": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revisit_at"
+      ],
+      "properties": {
+        "revisit_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        }
+      }
+    },
+    "source": {
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer_source"
+    },
+    "answered_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "supersedes": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "reconciles": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "option_id"
+        ]
+      },
+      "then": {
+        "required": [
+          "option_label"
+        ]
+      },
+      "else": {
+        "properties": {
+          "option_label": false
+        }
+      }
+    }
+  ]
+}

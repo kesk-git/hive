@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-admit.create.response:v1",
+  "title": "hive-admit create: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admission"
+  ],
+  "properties": {
+    "admission": {
+      "$ref": "urn:hive:schema:records:pool.admission:v1"
+    }
+  }
+}

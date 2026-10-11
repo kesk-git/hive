@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-rule.expire.request:v1",
+  "title": "hive-rule expire: request body",
+  "description": "Records that a rule's expiry time was noticed and honoured, with the receipt that says so. The resolver excluded the rule from its expiry time on, before this; the receipt records that the expiry was noticed, not that it took effect. Refused before the expiry time, and idempotent after a first record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rule_id",
+    "noticed_at"
+  ],
+  "properties": {
+    "rule_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+    },
+    "noticed_at": {
+      "description": "When the owning supervisor noticed it, from the wake it drained.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "wake": {
+      "description": "The wake record drained, where the Shadow wrote one.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    }
+  }
+}

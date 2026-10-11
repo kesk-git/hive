@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-imperative.render.response:v1",
+  "title": "hive-imperative render: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "revision",
+    "revision_digest",
+    "renderer_version",
+    "text",
+    "text_digest",
+    "text_bytes",
+    "launch_parameters"
+  ],
+  "properties": {
+    "revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "revision_digest": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    },
+    "renderer_version": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
+    },
+    "text": {
+      "description": "The four sections in order, Task, Setup, Rules, Definition of done, opened by the worker role boundary, with the Standard's criteria rendered from the specification revision the Imperative names.",
+      "type": "string",
+      "minLength": 1
+    },
+    "text_digest": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    },
+    "text_bytes": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+    },
+    "criteria": {
+      "description": "The specification revision the Standard was rendered from, where the item carries one.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
+    },
+    "launch_parameters": {
+      "description": "What the Imperative itself fixes for a launch. Model, effort and the resolved place are the policy resolver's, at a later stage, and are not here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "harness",
+        "placement_requested",
+        "class",
+        "validation",
+        "publication"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "swarm",
+            "lictor"
+          ]
+        },
+        "harness": {
+          "enum": [
+            "claude",
+            "codex",
+            "policy"
+          ]
+        },
+        "placement_requested": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/placement"
+        },
+        "class": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dispatch_class"
+        },
+        "validation": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/validation_axis"
+        },
+        "publication": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/publication_axis"
+        }
+      }
+    }
+  }
+}

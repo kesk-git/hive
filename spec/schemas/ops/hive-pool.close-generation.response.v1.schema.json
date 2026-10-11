@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.close-generation.response:v1",
+  "title": "hive-pool close-generation: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "item",
+    "generation"
+  ],
+  "properties": {
+    "item": {
+      "$ref": "urn:hive:schema:records:pool.item:v1"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/generation_entry"
+    }
+  }
+}

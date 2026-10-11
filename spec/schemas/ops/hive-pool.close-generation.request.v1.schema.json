@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.close-generation.request:v1",
+  "title": "hive-pool close-generation: request body",
+  "description": "Closes an open generation with the outcome the caller established and the receipt that establishes it. The item's state does not change: delivery is reported by transition, with its own evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "generation",
+    "outcome",
+    "closed_by"
+  ],
+  "properties": {
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "outcome": {
+      "enum": [
+        "delivered",
+        "failed",
+        "stopped",
+        "superseded",
+        "unknown"
+      ]
+    },
+    "closed_by": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    }
+  }
+}

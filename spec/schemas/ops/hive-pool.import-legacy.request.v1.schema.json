@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.import-legacy.request:v1",
+  "title": "hive-pool import-legacy: request body",
+  "description": "Reads one legacy Markdown backlog and either reports what it holds (dry_run true, nothing written) or imports it into this Pool with an explicit identity migration. The file is read and never written. The Pool refuses a home inside a repository before it reads anything, so an import can never write into a project's code root. See spec/pool.md, Legacy import and export.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "path",
+    "zone",
+    "dry_run"
+  ],
+  "properties": {
+    "path": {
+      "description": "The legacy backlog's physical path. It is recorded in the migration and never leaves the home.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/absolute_path"
+    },
+    "zone": {
+      "description": "The zone the file's calendar dates are read in.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/zone"
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "expected_digest": {
+      "description": "Refuse with conflict if the file's digest differs: the caller imports what it inspected.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    }
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-rule.resolve.response:v1",
+  "title": "hive-rule resolve: response body",
+  "description": "The effective rules with their rendered lines, the conflicts found, what was excluded and why, and the resolved-rule digest, present only when there is no conflict. A caller whose action depends on a conflicted subject holds that action.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "at",
+    "role",
+    "rules",
+    "conflicts",
+    "excluded"
+  ],
+  "properties": {
+    "at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "role": {
+      "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/role"
+    },
+    "rules": {
+      "description": "In the order they apply: by scope from widest to narrowest, then by effective time.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/resolved_rule"
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/conflict"
+      }
+    },
+    "excluded": {
+      "description": "Rules in scope that were not applied, each with the reason.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule_id",
+          "reason"
+        ],
+        "properties": {
+          "rule_id": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+          },
+          "reason": {
+            "description": "expired-by-clock: past its expiry time, receipt or not. not-yet-effective, lifted, superseded, ended, overridden: a narrower scope governs the subject. role: the rule does not apply to the role asked.",
+            "enum": [
+              "expired-by-clock",
+              "not-yet-effective",
+              "lifted",
+              "superseded",
+              "ended",
+              "overridden",
+              "role"
+            ]
+          }
+        }
+      }
+    },
+    "digest": {
+      "description": "The resolved-rule digest: the digest of the canonical form of the rules array. Absent when conflicts is not empty.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    }
+  }
+}

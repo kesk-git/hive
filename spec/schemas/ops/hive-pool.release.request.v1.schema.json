@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.release.request:v1",
+  "title": "hive-pool release: request body",
+  "description": "Releases a parked, external, resource or future hold. A word hold is released only by an accepted answer through hive-word, an admission hold only by a later admission check that admits, and a definition hold only by hive-spec accept. Releasing a hold already released returns it unchanged and writes nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "hold_id"
+  ],
+  "properties": {
+    "hold_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
+    },
+    "evidence": {
+      "description": "What lifted the hold, where there is a record of it.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    },
+    "reason": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    }
+  }
+}

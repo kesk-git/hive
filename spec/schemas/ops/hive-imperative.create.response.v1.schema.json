@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-imperative.create.response:v1",
+  "title": "hive-imperative create: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "imperative"
+  ],
+  "properties": {
+    "imperative": {
+      "$ref": "urn:hive:schema:records:pool.imperative:v1"
+    }
+  }
+}

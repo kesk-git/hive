@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-spec.close.response:v1",
+  "title": "hive-spec close: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specification",
+    "closure"
+  ],
+  "properties": {
+    "specification": {
+      "$ref": "urn:hive:schema:records:pool.specification:v1"
+    },
+    "closure": {
+      "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/closure"
+    }
+  }
+}

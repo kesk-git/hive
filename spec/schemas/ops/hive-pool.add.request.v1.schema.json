@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.add.request:v1",
+  "title": "hive-pool add: request body",
+  "description": "Adds one item to the Pool in the request's scope. The Pool mints the task_id. See spec/pool.md, Items.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title"
+  ],
+  "properties": {
+    "title": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/label"
+    },
+    "body": {
+      "type": "string"
+    },
+    "deliverable": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/deliverable"
+    },
+    "class": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dispatch_class"
+    },
+    "priority": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/priority"
+    },
+    "placement_requested": {
+      "description": "Absent means policy.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/placement"
+    },
+    "delivery": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/delivery"
+    },
+    "specification_required": {
+      "type": "boolean"
+    },
+    "definition": {
+      "description": "Absent means not-required, or needed when specification_required is true.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/definition_state"
+    },
+    "deps": {
+      "description": "Each blocked-by edge must name an item of this Pool that exists; a dangling blocker is refused.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/link"
+      }
+    },
+    "schedule": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/schedule"
+    }
+  }
+}

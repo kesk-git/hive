@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-spec.define.response:v1",
+  "title": "hive-spec define: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specification",
+    "invalidated"
+  ],
+  "properties": {
+    "specification": {
+      "$ref": "urn:hive:schema:records:pool.specification:v1"
+    },
+    "invalidated": {
+      "description": "The items whose accepted criteria this revision invalidated.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+      }
+    }
+  }
+}
