@@ -122,14 +122,14 @@ type options struct {
 }
 
 // parseOptions reads the options after the operation name. Each is given at
-// most once, as --name value or --name=value; anything else is a usage
-// error. The options read before the error are returned with it, so that
-// the response can still go where the caller asked.
+// most once, as --name value; anything else is a usage error. The options
+// read before the error are returned with it, so that the response can still
+// go where the caller asked.
 func parseOptions(args []string) (options, error) {
 	var o options
 	seen := map[string]bool{}
 	for i := 0; i < len(args); i++ {
-		name, value, inline := strings.Cut(args[i], "=")
+		name := args[i]
 		if !strings.HasPrefix(name, "--") {
 			return o, fmt.Errorf("unexpected argument %q: the request is never an argument; it is read from %s or standard input", args[i], RequestFileOption)
 		}
@@ -148,13 +148,11 @@ func parseOptions(args []string) (options, error) {
 			return o, fmt.Errorf("%s is given twice", name)
 		}
 		seen[name] = true
-		if !inline {
-			if i+1 >= len(args) {
-				return o, fmt.Errorf("%s needs a value", name)
-			}
-			i++
-			value = args[i]
+		if i+1 >= len(args) {
+			return o, fmt.Errorf("%s needs a value", name)
 		}
+		i++
+		value := args[i]
 		if value == "" {
 			return o, fmt.Errorf("%s needs a value", name)
 		}
@@ -234,9 +232,14 @@ func (e *Executable) write(c *Command, resp *envelope.Response, data []byte, res
 // writeFile writes the response file whole, for its owner only, and flushes
 // it: a caller that reads it after the process ends sees all of it.
 func writeFile(path string, data []byte) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
+	}
+	// The mode applies only to a file this call creates; a file that was
+	// there keeps its own until it is set, and nothing is written before.
+	if err := errors.Join(f.Chmod(0o600), f.Truncate(0)); err != nil {
+		return errors.Join(err, f.Close())
 	}
 	_, werr := f.Write(data)
 	serr := f.Sync()

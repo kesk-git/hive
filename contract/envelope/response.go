@@ -244,9 +244,12 @@ func readError(f fields) (*Error, error) {
 // Accept is the caller's rule for a response (spec/commands.md, The
 // response): the whole output parses, follows the schema, echoes the
 // caller's request_id ("" for an invocation that carries none) and agrees
-// with the process's exit code. Anything else is a *Failure of status
-// unknown, never success and never an empty result; a process that ended by
-// a signal or a timeout gave no output and is unknown the same way.
+// with the process's exit code. A request_id that is not null is the
+// caller's in every case; a null one is accepted only with a status the
+// callee reaches before it can read the request's identity. Anything else is
+// a *Failure of status unknown, never success and never an empty result; a
+// process that ended by a signal or a timeout gave no output and is unknown
+// the same way.
 func Accept(output []byte, exit int, requestID string) (*Response, error) {
 	unknown := func(format string, args ...any) error {
 		return Common(CodeOutcomeUnknown, fmt.Sprintf(format, args...))
@@ -261,11 +264,24 @@ func Accept(output []byte, exit int, requestID string) (*Response, error) {
 	if err != nil {
 		return nil, unknown("the response is not a response: %v", err)
 	}
-	if r.RequestID != requestID {
+	if r.RequestID != requestID && (r.RequestID != "" || !r.unreadIdentity()) {
 		return nil, unknown("the response answers another request")
 	}
 	if r.ExitCode() != exit {
 		return nil, unknown("the response says %s but the process exited with %d", r.Status, exit)
 	}
 	return r, nil
+}
+
+// unreadIdentity reports whether the response is one a callee gives before it
+// can read the request's identity: usage, too_large for a request over the
+// limit, and invalid with code malformed_request.
+func (r *Response) unreadIdentity() bool {
+	switch r.Status {
+	case Usage, TooLarge:
+		return true
+	case Invalid:
+		return r.Error != nil && r.Error.Code == CodeMalformedRequest
+	}
+	return false
 }

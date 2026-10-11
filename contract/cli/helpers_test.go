@@ -156,9 +156,14 @@ func request(t testing.TB, operation string, n int, edit func(m map[string]any))
 type fakeJournal struct {
 	order []string
 	lines map[string][]byte
+	// fail, when set, is the error Append returns without appending.
+	fail error
 }
 
 func (j *fakeJournal) Append(events []store.Event) error {
+	if j.fail != nil {
+		return j.fail
+	}
 	for _, e := range events {
 		if _, ok := j.lines[e.ID]; ok {
 			continue
@@ -238,13 +243,19 @@ func newHarness(t testing.TB) *harness {
 		{OperationDecl: decl("refuse", true), Handle: count("refuse", func(c *Call) (*Result, error) {
 			f := envelope.Common(envelope.CodeAuthorityMissing, "no word was given")
 			name, _ := c.Request.Body["home"].(map[string]any)["name"].(string)
-			if name == "unknown" {
-				f = envelope.Common(envelope.CodeOutcomeUnknown, strings.Repeat("é", 1500))
-			}
-			if name == "long" {
+			switch name {
+			case "unknown":
+				f = envelope.Common(envelope.CodeOutcomeUnknown, "the adapter did not answer")
+			case "unknown bare":
+				f = envelope.Common(envelope.CodeOutcomeUnknown, "the adapter did not answer")
+			case "wide":
 				f = envelope.Common(envelope.CodeAuthorityMissing, strings.Repeat("é", 1500))
+			case "record big":
+				f = envelope.Common(envelope.CodeAuthorityMissing, strings.Repeat("é", 2000))
+			case "conflict":
+				f = envelope.Common(envelope.CodeAlreadyExists, "it exists")
 			}
-			if name == "record it" || name == "unknown" {
+			if name == "record it" || name == "unknown" || name == "record big" || name == "conflict" {
 				rc, err := c.NewReceipt("dispatch.thing.refused", "1.0", nil, nil, nil)
 				if err != nil {
 					return nil, err
@@ -260,8 +271,38 @@ func newHarness(t testing.TB) *harness {
 				return nil, err
 			}
 			f := envelope.Hold(envelope.RecordRef{Schema: "word.question", ID: id(ids.Question, 1)}, "waiting on a decision")
+			switch c.Request.Body["home"].(map[string]any)["name"] {
+			case "oversize":
+				f.Err.Message = strings.Repeat("é", 2000)
+			case "bad hold":
+				f.Err.Hold.Digest = "nope"
+			}
 			f.Receipts = []envelope.Receipt{rc}
 			return nil, f
+		})},
+		// stamp writes one record stamped with the call's own time, and
+		// answers with the digest of the record as it made it, which is the
+		// digest of the record as stored when the time holds still.
+		{OperationDecl: decl("stamp", true), Handle: count("stamp", func(c *Call) (*Result, error) {
+			at, err := c.Stamp()
+			if err != nil {
+				return nil, err
+			}
+			content := mustEncode(map[string]any{"schema": "dispatch.thing", "schema_version": "1.0", "name": "stamped", "record_revision": int64(1), "updated_at": at})
+			digest, err := canon.RecordDigest(content)
+			if err != nil {
+				return nil, err
+			}
+			subject := &envelope.RecordRef{Schema: "dispatch.thing", ID: "stamped", HomeID: homeID, RecordRevision: 1, Digest: digest}
+			rc, err := c.NewReceipt("dispatch.thing.stamped", "1.0", subject, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+			return &Result{
+				Body:     map[string]any{"digest": digest, "updated_at": at},
+				Records:  []store.RecordWrite{{Path: store.RecordPath("dispatch", "thing", "stamped"), Content: content}},
+				Receipts: []envelope.Receipt{rc},
+			}, nil
 		})},
 		// fail ends as the body's name says: a plain error, a panic, an
 		// unknown outcome, a failure that breaks the contract, a body that
@@ -315,6 +356,15 @@ func newHarness(t testing.TB) *harness {
 		Journal:  func(string) (store.Journal, error) { return h.journal, nil },
 	}
 	return h
+}
+
+// ticking is a clock that moves a millisecond each time it is read.
+type ticking struct{ at time.Time }
+
+func (c *ticking) Now() time.Time {
+	t := c.at
+	c.at = c.at.Add(time.Millisecond)
+	return t
 }
 
 func mustEncode(tree map[string]any) []byte {

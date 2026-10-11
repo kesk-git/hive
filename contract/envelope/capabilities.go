@@ -26,13 +26,13 @@ func DefaultLimits() Limits {
 // Resolved fills each zero limit with its default.
 func (l Limits) Resolved() Limits {
 	d := DefaultLimits()
-	if l.MaxArgumentBytes <= 0 {
+	if l.MaxArgumentBytes == 0 {
 		l.MaxArgumentBytes = d.MaxArgumentBytes
 	}
-	if l.MaxRequestBytes <= 0 {
+	if l.MaxRequestBytes == 0 {
 		l.MaxRequestBytes = d.MaxRequestBytes
 	}
-	if l.MaxResponseBytes <= 0 {
+	if l.MaxResponseBytes == 0 {
 		l.MaxResponseBytes = d.MaxResponseBytes
 	}
 	return l

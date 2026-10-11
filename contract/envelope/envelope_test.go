@@ -182,6 +182,29 @@ func TestFailureRules(t *testing.T) {
 	if err := (&Failure{Status: Failed, Err: Error{Code: "internal"}}).Check(); err == nil {
 		t.Error("an empty message passed")
 	}
+	// The message limit counts characters, as the schema validator does.
+	for _, c := range []struct {
+		chars int
+		ok    bool
+	}{{MaxMessageChars, true}, {MaxMessageChars + 1, false}} {
+		f := &Failure{Status: Failed, Err: Error{Code: CodeInternal, Message: strings.Repeat("é", c.chars)}}
+		if err := f.Check(); (err == nil) != c.ok {
+			t.Errorf("%d characters: Check %v", c.chars, err)
+		}
+		r := &Response{Command: "hive-pool", Status: Failed, Responder: Responder{Package: "pool", Command: "hive-pool", ImplementationVersion: "0.1.0", ContractVersion: ContractVersion},
+			CompletedAt: "2026-10-11T08:00:00.000Z", Error: &f.Err}
+		out, err := r.Encode()
+		if c.ok {
+			if err != nil {
+				t.Fatalf("%d characters: %v", c.chars, err)
+			}
+			if _, err := Accept(out, 1, ""); err != nil {
+				t.Errorf("%d characters: %v", c.chars, err)
+			}
+		} else if err == nil {
+			t.Errorf("%d characters encoded", c.chars)
+		}
+	}
 	for _, bad := range []func(){
 		func() { Fail(Ok, "internal", "x") },
 		func() { Fail("done", "internal", "x") },
@@ -498,7 +521,10 @@ func TestAccept(t *testing.T) {
 		{"exit code disagrees", good, 1, "req_01arz3ndektsv4rrffq69g5fav"},
 		{"signal exit", good, 137, "req_01arz3ndektsv4rrffq69g5fav"},
 		{"another request", good, 0, "req_01arz3ndektsv4rrffq69g5fa0"},
-		{"null where one was expected", fixture(t, "response-too-large.json"), 7, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"null with a status that needs the identity", nullID(t, "failed", 1, "internal"), 1, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"null with a refusal", nullID(t, "refused", 4, "home_mismatch"), 4, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"null with another invalid code", nullID(t, "invalid", 3, "schema_violation"), 3, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"an identity where the caller has none", good, 0, ""},
 		{"not a response", []byte("ok\n"), 0, ""},
 	}
 	for _, c := range cases {
@@ -513,12 +539,41 @@ func TestAccept(t *testing.T) {
 			}
 		})
 	}
-	// A null request_id is echoed as "" and is accepted for a capabilities
-	// answer.
-	large := fixture(t, "response-too-large.json")
-	if _, err := Accept(large, 7, ""); err != nil {
+	// A null request_id is accepted, against the caller's real identity, only
+	// with a status the callee reaches before it can read the identity.
+	id := "req_01arz3ndektsv4rrffq69g5fav"
+	for _, c := range []struct {
+		name   string
+		out    []byte
+		exit   int
+		status Status
+	}{
+		{"a request over the limit", fixture(t, "response-too-large.json"), 7, TooLarge},
+		{"usage", nullID(t, "usage", 2, "usage"), 2, Usage},
+		{"a request that is no record", nullID(t, "invalid", 3, "malformed_request"), 3, Invalid},
+	} {
+		r, err := Accept(c.out, c.exit, id)
+		if err != nil || r.Status != c.status || r.RequestID != "" {
+			t.Errorf("%s: %v %+v", c.name, err, r)
+		}
+	}
+	// A caller that carries no identity accepts a null one with any status.
+	if _, err := Accept(nullID(t, "failed", 1, "internal"), 1, ""); err != nil {
 		t.Error(err)
 	}
+}
+
+// nullID is a failure response of the status, code and exit code whose
+// request_id is null.
+func nullID(t *testing.T, status string, exit int64, code string) []byte {
+	t.Helper()
+	m := tree(t, fixture(t, "response-ok.json"))
+	m["request_id"] = nil
+	m["status"] = status
+	m["exit_code"] = exit
+	delete(m, "body")
+	m["error"] = map[string]any{"code": code, "message": "the request could not be read", "retryable": false}
+	return encode(t, m)
 }
 
 func TestReceiptRoundTrip(t *testing.T) {
@@ -632,7 +687,12 @@ func TestLimits(t *testing.T) {
 	if got := (Limits{MaxRequestBytes: 10}).Resolved(); got != (Limits{4096, 10, 67108864}) {
 		t.Errorf("Resolved: %+v", got)
 	}
-	if got := (Limits{-1, -1, -1}).Resolved(); got != DefaultLimits() {
+	if got := (Limits{-1, -1, -1}).Resolved(); got != (Limits{-1, -1, -1}) {
 		t.Errorf("Resolved negative: %+v", got)
+	}
+	caps := (&Capabilities{Command: "hive-pool", Package: "pool", Executable: "hive-pool", ContractVersion: ContractVersion,
+		ImplementationVersion: "0.1.0", Limits: Limits{-1, 0, 0}.Resolved(), Operations: []OperationDecl{}})
+	if err := caps.Check(); err == nil {
+		t.Error("a negative limit reached no validation")
 	}
 }

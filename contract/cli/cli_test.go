@@ -61,6 +61,14 @@ func TestCheck(t *testing.T) {
 		e.Commands[1].Operations = append(e.Commands[1].Operations, &Operation{OperationDecl: envelope.OperationDecl{Name: "x", State: envelope.Unsupported, Mode: envelope.Unary}})
 	})
 	bad("package not a package", func(e *Executable) { e.Package = "contract" })
+	bad("version over a hundred characters", func(e *Executable) { e.Version = strings.Repeat("é", 101) })
+	bad("storeless with a journal", func(e *Executable) { e.Storeless = true })
+	// The limits are characters: a hundred two-byte ones are not too many.
+	e := *h.exe
+	e.Version = strings.Repeat("é", 100)
+	if err := e.Check(); err != nil {
+		t.Error(err)
+	}
 }
 
 // --version prints one line and exits 0; capabilities answers with a valid
@@ -339,18 +347,36 @@ func TestRefused(t *testing.T) {
 	}
 	same(t, recorded, tree(t, home))
 
-	// An unknown outcome is never recorded as complete, receipts or not,
-	// and a long message is cut on a character boundary.
-	unknown := h.invoke(t, home, "refuse", request(t, "refuse", 3, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "unknown" }))
-	expect(t, unknown, envelope.Unknown, "outcome_unknown")
-	if unknown.Replayed || len(unknown.Receipts) != 1 || len(unknown.Error.Message) > 2000 || !strings.HasSuffix(unknown.Error.Message, "é") {
-		t.Errorf("%+v", unknown)
+	// An unknown outcome returns no receipt and writes nothing: this build
+	// makes none durable before an outside effect, so a handler that names one
+	// is at fault, and the caller is never handed a receipt that is not on disk.
+	bare := h.invoke(t, home, "refuse", request(t, "refuse", 3, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "unknown bare" }))
+	expect(t, bare, envelope.Unknown, "outcome_unknown")
+	if bare.Replayed || len(bare.Receipts) != 0 {
+		t.Errorf("%+v", bare)
 	}
 	same(t, recorded, tree(t, home))
-	long := h.invoke(t, home, "refuse", request(t, "refuse", 4, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "long" }))
-	expect(t, long, envelope.Refused, "authority_missing")
-	if len(long.Error.Message) != 2000 {
-		t.Errorf("message of %d bytes", len(long.Error.Message))
+	for _, name := range []string{"unknown", "conflict"} {
+		fault := h.invoke(t, home, "refuse", request(t, "refuse", 3, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = name }))
+		expect(t, fault, envelope.Failed, "internal")
+		if len(fault.Receipts) != 0 {
+			t.Errorf("%s: %+v", name, fault)
+		}
+		same(t, recorded, tree(t, home))
+	}
+	// A message is counted in characters, as the schema counts them: one of
+	// 1,500 two-byte characters is whole, and a longer one is cut on a
+	// character boundary at 2,000.
+	if got := clip(strings.Repeat("é", 2500), "x"); got != strings.Repeat("é", 2000) {
+		t.Errorf("clip: %d bytes", len(got))
+	}
+	if got := clip("", "refused"); got != "refused" {
+		t.Errorf("clip: %q", got)
+	}
+	wide := h.invoke(t, home, "refuse", request(t, "refuse", 4, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "wide" }))
+	expect(t, wide, envelope.Refused, "authority_missing")
+	if wide.Error.Message != strings.Repeat("é", 1500) {
+		t.Errorf("a message of %d bytes", len(wide.Error.Message))
 	}
 	if _, err := h.exe.Handle(Invocation{}); err == nil {
 		t.Error("Handle without a command passed")
@@ -619,7 +645,7 @@ func TestTooLarge(t *testing.T) {
 	// Nothing of the request was parsed, so the response echoes no
 	// request_id.
 	code, out, _ := h.run("hive-fleet", over, "echo", "--home", home)
-	resp, err := envelope.Accept(out, code, "")
+	resp, err := envelope.Accept(out, code, id(ids.Request, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -636,7 +662,7 @@ func TestTooLarge(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, out, _ = h.run("hive-fleet", nil, "echo", "--home", home, "--request-file", file)
-	resp, err = envelope.Accept(out, code, "")
+	resp, err = envelope.Accept(out, code, id(ids.Request, 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -716,6 +742,48 @@ func TestUnavailable(t *testing.T) {
 	record(t, home, store.OutcomePath("dispatch", id(ids.Request, 8)), map[string]any{"schema": "hive.request-outcome", "schema_version": "2.0", "request_id": id(ids.Request, 8)})
 	expect(t, h.invoke(t, home, "put", request(t, "put", 8, nil)), envelope.Invalid, "unsupported_version")
 
+	// An outcome that does not follow its schema is never replayed, whatever
+	// else it holds: it is malformed, and the request runs nothing.
+	good := newHarness(t)
+	source := newHome(t)
+	put := request(t, "put", 9, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "thing" })
+	expect(t, good.invoke(t, source, "put", put), envelope.Ok, "")
+	data, err := os.ReadFile(filepath.Join(source, filepath.FromSlash(store.OutcomePath("dispatch", id(ids.Request, 9)))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := canon.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, edit := range map[string]func(m map[string]any){
+		"no schema version":      func(m map[string]any) { delete(m, "schema_version") },
+		"null schema version":    func(m map[string]any) { m["schema_version"] = nil },
+		"malformed version":      func(m map[string]any) { m["schema_version"] = "one" },
+		"an unknown member":      func(m map[string]any) { m["extra"] = true },
+		"no digest":              func(m map[string]any) { delete(m, "request_digest") },
+		"a response that is not": func(m map[string]any) { m["response"].(map[string]any)["exit_code"] = int64(4) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			copied, _ := canon.Parse(data)
+			m := copied.(map[string]any)
+			edit(m)
+			target := newHome(t)
+			record(t, target, store.OutcomePath("dispatch", id(ids.Request, 9)), m)
+			again := newHarness(t)
+			expect(t, again.invoke(t, target, "put", put), envelope.Unavailable, "record_malformed")
+			if again.calls["put"] != 0 {
+				t.Error("the request ran")
+			}
+		})
+	}
+	// The outcome as written is replayed.
+	replay := newHome(t)
+	record(t, replay, store.OutcomePath("dispatch", id(ids.Request, 9)), v.(map[string]any))
+	if r := good.invoke(t, replay, "put", put); !r.Replayed {
+		t.Errorf("%+v", r)
+	}
+
 	// A request file that cannot be read.
 	code, out, _ := h.run("hive-fleet", nil, "echo", "--home", home, "--request-file", filepath.Join(home, "nothing.json"))
 	resp, err := envelope.Accept(out, code, "")
@@ -738,7 +806,19 @@ func TestTransport(t *testing.T) {
 	if err := os.WriteFile(reqFile, req, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	code, out, errs := h.run("hive-fleet", nil, "echo", "--home="+home, "--request-file="+reqFile, "--response-file", respFile)
+	// A response file that was there before is private once it is written.
+	if err := os.WriteFile(respFile, []byte("stale"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(respFile, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// An option is followed by its value; the name=value spelling is not one.
+	code, out, errs := h.run("hive-fleet", nil, "echo", "--home="+home, "--request-file", reqFile, "--response-file", respFile)
+	if code != 2 || !strings.Contains(errs, "unknown option") {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errs)
+	}
+	code, out, errs = h.run("hive-fleet", nil, "echo", "--home", home, "--request-file", reqFile, "--response-file", respFile)
 	if code != 0 || len(out) != 0 || errs != "" {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errs)
 	}
@@ -842,5 +922,193 @@ func TestRecordedOutcomeIsTheResponse(t *testing.T) {
 	}
 	if err := canon.CheckFile(data); err != nil {
 		t.Error(err)
+	}
+}
+
+// Nothing is written for a response that cannot be returned whole: a hold or
+// a refusal too large for the limit, or one the response schema refuses, is
+// answered as that and leaves no receipt and no outcome behind.
+func TestResponseIsWholeBeforeAnythingIsWritten(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	before := tree(t, home)
+	named := func(operation string, n int, name string) []byte {
+		return request(t, operation, n, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = name })
+	}
+	for n, c := range []struct {
+		operation, name string
+		status          envelope.Status
+		code            string
+	}{
+		{"hold", "oversize", envelope.TooLarge, "record_too_large"},
+		{"hold", "bad hold", envelope.Failed, "internal"},
+		{"refuse", "record big", envelope.TooLarge, "record_too_large"},
+	} {
+		t.Run(c.operation+" "+c.name, func(t *testing.T) {
+			resp := h.invoke(t, home, c.operation, named(c.operation, n+1, c.name))
+			expect(t, resp, c.status, c.code)
+			if len(resp.Receipts) != 0 || resp.Replayed {
+				t.Errorf("%+v", resp)
+			}
+			after := tree(t, home)
+			delete(after, "locks/dispatch.lock")
+			same(t, before, after)
+		})
+	}
+}
+
+// A transaction interrupted after its intent is durable is the store's to
+// complete: the answer is not one that promises nothing changed, and the same
+// request, sent again, completes it and replays what it would have answered.
+func TestInterruptedCommitIsUnknownUntilCompleted(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	req := request(t, "put", 1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "first" })
+	h.journal.fail = errors.New("the journal is full")
+	resp := h.invoke(t, home, "put", req)
+	expect(t, resp, envelope.Unknown, "outcome_unknown")
+	if len(resp.Receipts) != 0 || resp.Error.Retryable {
+		t.Errorf("%+v", resp)
+	}
+	intent := filepath.Join(home, filepath.FromSlash(store.IntentPath("dispatch", id(ids.Request, 1))))
+	if _, err := os.Stat(intent); err != nil {
+		t.Fatalf("the intent is not there: %v", err)
+	}
+	h.journal.fail = nil
+	again := h.invoke(t, home, "put", req)
+	expect(t, again, envelope.Ok, "")
+	if !again.Replayed || len(again.Receipts) != 1 || again.Body["wrote"] != "first" || h.calls["put"] != 1 {
+		t.Errorf("%+v, calls %d", again, h.calls["put"])
+	}
+	if _, err := os.Stat(intent); err == nil {
+		t.Error("the intent was left behind")
+	}
+	for _, p := range []string{store.RecordPath("dispatch", "thing", "first"), store.ReceiptPath("dispatch", again.Receipts[0].ReceiptID), store.OutcomePath("dispatch", id(ids.Request, 1))} {
+		if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(p))); err != nil {
+			t.Errorf("%s: %v", p, err)
+		}
+	}
+	if len(h.journal.order) != 1 {
+		t.Errorf("events appended: %v", h.journal.order)
+	}
+}
+
+// A record the handler stamps with the call's time is the record the store
+// writes, so the digest the response and the receipt carry is the digest of
+// the record on disk, though the clock moves between every reading.
+func TestRecordIsFinalBeforeItIsSealed(t *testing.T) {
+	h := newHarness(t)
+	h.exe.Clock = &ticking{at: epoch}
+	home := newHome(t)
+	resp := h.invoke(t, home, "stamp", request(t, "stamp", 1, nil))
+	expect(t, resp, envelope.Ok, "")
+	st, err := store.Open(home, "dispatch", store.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, err := st.ReadRecord(store.RecordPath("dispatch", "thing", "stamped"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Body["digest"] != rec.Digest || resp.Receipts[0].Subject.Digest != rec.Digest {
+		t.Errorf("the response says %v, the receipt %s, the record on disk %s", resp.Body["digest"], resp.Receipts[0].Subject.Digest, rec.Digest)
+	}
+	v, err := canon.Parse(rec.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.(map[string]any)["updated_at"] != resp.Body["updated_at"] {
+		t.Errorf("updated_at %v on disk, %v answered", v.(map[string]any)["updated_at"], resp.Body["updated_at"])
+	}
+	// What the outcome recorded is what was returned and what was stored.
+	again := h.invoke(t, home, "stamp", request(t, "stamp", 1, nil))
+	if !again.Replayed || again.Body["digest"] != rec.Digest {
+		t.Errorf("%+v", again)
+	}
+}
+
+// An executable that owns no part of the home keeps no store: a mutating
+// operation of it opens none, takes no lock, records no outcome and writes
+// no record, and returns the receipts of the callee it persisted through,
+// which replays by the same request_id.
+func TestStorelessExecutable(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	say := &Operation{
+		OperationDecl: envelope.OperationDecl{Name: "say", State: envelope.Supported, Mode: envelope.Unary, Mutates: true, Versions: []string{"1.0"},
+			RequestSchema: testRequestSchema, ResponseSchema: testResponseSchema, ReceiptKinds: []string{}, Executes: []string{}, Calls: []string{}},
+		Handle: func(c *Call) (*Result, error) {
+			name := c.Request.Body["home"].(map[string]any)["name"].(string)
+			switch name {
+			case "record":
+				return &Result{Body: map[string]any{}, Records: []store.RecordWrite{{Path: store.RecordPath("dispatch", "thing", "x"), Content: []byte(`{}`)}}}, nil
+			case "event":
+				return &Result{Body: map[string]any{}, Events: []store.Event{{ID: id(ids.Event, 1), Content: []byte(`{}`)}}}, nil
+			}
+			// Persist through the callee with the same request_id, and return
+			// the receipts of the response accepted from it.
+			callee := request(t, "put", 1, func(m map[string]any) {
+				m["request_id"] = c.Request.RequestID
+				m["body"].(map[string]any)["home"].(map[string]any)["name"] = name
+			})
+			code, out, _ := h.run("hive-fleet", callee, "put", HomeOption, c.Home.Dir)
+			resp, err := envelope.Accept(out, code, c.Request.RequestID)
+			if err != nil {
+				return nil, err
+			}
+			if resp.Status != envelope.Ok {
+				return nil, errors.New("the callee did not complete")
+			}
+			return &Result{Body: map[string]any{"said": name}, Receipts: resp.Receipts}, nil
+		},
+	}
+	word := &Executable{Package: "word", Name: "hive-word", Version: "0.1.0-test", Storeless: true,
+		Commands: []*Command{{Name: "hive-word", Operations: []*Operation{say}}}, Clock: h.clk}
+	if err := word.Check(); err != nil {
+		t.Fatal(err)
+	}
+	send := func(n int, name string) *envelope.Response {
+		t.Helper()
+		req := request(t, "say", n, func(m map[string]any) {
+			m["command"] = "hive-word"
+			m["body"].(map[string]any)["home"].(map[string]any)["name"] = name
+		})
+		var stdout, stderr bytes.Buffer
+		code := word.Main([]string{"hive-word", "say", HomeOption, home}, bytes.NewReader(req), &stdout, &stderr)
+		resp, err := envelope.Accept(stdout.Bytes(), code, id(ids.Request, n))
+		if err != nil {
+			t.Fatalf("%v\n%s", err, stdout.String())
+		}
+		return resp
+	}
+
+	resp := send(1, "first")
+	expect(t, resp, envelope.Ok, "")
+	if resp.Body["said"] != "first" || len(resp.Receipts) != 1 || resp.Receipts[0].Writer.Package != "dispatch" {
+		t.Fatalf("%+v", resp)
+	}
+	for _, p := range []string{"word", "locks/word.lock", "word/requests"} {
+		if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(p))); err == nil {
+			t.Errorf("%s was created", p)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(store.ReceiptPath("dispatch", resp.Receipts[0].ReceiptID)))); err != nil {
+		t.Errorf("the callee's receipt is not on disk: %v", err)
+	}
+	// The same request again: the callee replays, and the receipts passed
+	// through are the same; the executable itself records and replays nothing.
+	files := tree(t, home)
+	again := send(1, "first")
+	expect(t, again, envelope.Ok, "")
+	if again.Replayed || len(again.Receipts) != 1 || again.Receipts[0].ReceiptID != resp.Receipts[0].ReceiptID || h.calls["put"] != 1 {
+		t.Errorf("%+v, calls %d", again, h.calls["put"])
+	}
+	same(t, files, tree(t, home))
+
+	// A storeless handler that returns what only a store writes is at fault.
+	for _, name := range []string{"record", "event"} {
+		fault := send(2, name)
+		expect(t, fault, envelope.Failed, "internal")
+		same(t, files, tree(t, home))
 	}
 }

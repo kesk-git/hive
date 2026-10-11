@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:request-outcome:v1",
+  "title": "Recorded outcome of a mutating request",
+  "description": "The file requests/<request_id>.json of a store: the digest of the request's canonical form and the response as it was returned. See spec/commands.md, Replay.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "request_id",
+    "request_digest",
+    "response"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.request-outcome"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "request_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+    },
+    "request_digest": {
+      "description": "The digest of the canonical form of the request that was answered.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    },
+    "response": {
+      "description": "The response as it was returned.",
+      "$ref": "urn:hive:schema:response:v1"
+    }
+  }
+}

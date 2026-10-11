@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"unicode/utf8"
 )
 
 // Status is one of the eleven exit states of spec/commands.md. Each has one
@@ -173,6 +174,10 @@ func StatusOfCode(code string) (Status, bool) {
 	return "", false
 }
 
+// MaxMessageChars is the longest error message the response schema admits,
+// counted in characters as the schema validator counts them.
+const MaxMessageChars = 2000
+
 var codeForm = regexp.MustCompile(`^([a-z][a-z0-9-]*\.)?[a-z][a-z0-9_]*$`)
 
 // ValidCode reports whether code has the form of an error code: a common code
@@ -290,8 +295,8 @@ func (f *Failure) Check() error {
 		return errors.New("envelope: a failure has a status other than ok")
 	case !ValidCode(f.Err.Code):
 		return errors.New("envelope: the error code has no error-code form")
-	case f.Err.Message == "" || len(f.Err.Message) > 2000:
-		return errors.New("envelope: the error message is empty or longer than 2000 bytes")
+	case f.Err.Message == "" || utf8.RuneCountInString(f.Err.Message) > MaxMessageChars:
+		return errors.New("envelope: the error message is empty or longer than 2000 characters")
 	case f.Status == TooLarge && (f.Err.LimitBytes == nil || f.Err.ActualBytes == nil):
 		return errors.New("envelope: too_large carries limit_bytes and actual_bytes")
 	case f.Status == Held && f.Err.Hold == nil:

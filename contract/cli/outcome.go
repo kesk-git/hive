@@ -11,13 +11,14 @@ import (
 )
 
 // The recorded outcome of a mutating request (spec/commands.md, Replay): the
-// file requests/<request_id>.json of the store, holding the digest of the
-// request's canonical form and the response as it was returned. No schema
-// file under spec/schemas names it yet; the record carries the name and
-// version a later file would fix, and this build reads version 1.0.
+// file requests/<request_id>.json of the store, a record of the schema
+// urn:hive:schema:request-outcome:v1 holding the digest of the request's
+// canonical form and the response as it was returned. This build reads
+// version 1.0.
 const (
-	outcomeSchema  = "hive.request-outcome"
-	outcomeVersion = "1.0"
+	outcomeSchema   = "hive.request-outcome"
+	outcomeSchemaID = "urn:hive:schema:request-outcome:v1"
+	outcomeVersion  = "1.0"
 )
 
 // recorded is a recorded outcome as read back.
@@ -39,6 +40,9 @@ func encodeOutcome(requestID, digest string, resp *envelope.Response) ([]byte, e
 	if err != nil {
 		return nil, fmt.Errorf("cli: the outcome cannot be written: %w", err)
 	}
+	if err := envelope.Validate(outcomeSchemaID, out); err != nil {
+		return nil, fmt.Errorf("cli: the outcome cannot be written: %w", err)
+	}
 	return out, nil
 }
 
@@ -57,29 +61,22 @@ func readOutcome(st *store.Store, requestID string) (*recorded, error) {
 	malformed := func(what string) error {
 		return envelope.Common(envelope.CodeRecordMalformed, fmt.Sprintf("the recorded outcome %s is malformed: %s", rel, what))
 	}
-	v, err := canon.Parse(data)
-	if err != nil {
+	v, perr := canon.Parse(data)
+	obj, _ := v.(map[string]any)
+	// A version this build does not read is not malformed; it is newer.
+	if perr == nil && obj["schema"] == outcomeSchema {
+		if version, _ := obj["schema_version"].(string); envelope.Newer(version, outcomeVersion) {
+			return nil, envelope.Common(envelope.CodeUnsupportedVersion, fmt.Sprintf("the recorded outcome %s is at version %s; this build reads up to %s", rel, version, outcomeVersion))
+		}
+	}
+	if err := envelope.Validate(outcomeSchemaID, data); err != nil {
 		return nil, malformed(err.Error())
-	}
-	obj, ok := v.(map[string]any)
-	if !ok || obj["schema"] != outcomeSchema {
-		return nil, malformed("it is not a recorded outcome")
-	}
-	version, _ := obj["schema_version"].(string)
-	if envelope.Newer(version, outcomeVersion) {
-		return nil, envelope.Common(envelope.CodeUnsupportedVersion, fmt.Sprintf("the recorded outcome %s is at version %s; this build reads up to %s", rel, version, outcomeVersion))
 	}
 	if obj["request_id"] != requestID {
 		return nil, malformed("it records another request")
 	}
-	digest, ok := obj["request_digest"].(string)
-	if !ok || !canon.ValidDigest(digest) {
-		return nil, malformed("it holds no request digest")
-	}
-	tree, ok := obj["response"].(map[string]any)
-	if !ok {
-		return nil, malformed("it holds no response")
-	}
+	digest := obj["request_digest"].(string)
+	tree := obj["response"].(map[string]any)
 	encoded, err := canon.Encode(tree)
 	if err != nil {
 		return nil, malformed(err.Error())

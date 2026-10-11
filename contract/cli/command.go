@@ -5,6 +5,7 @@ import (
 	"io"
 	"regexp"
 	"slices"
+	"unicode/utf8"
 
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
@@ -50,6 +51,14 @@ type Executable struct {
 	Clock clock.Clock
 	// Waiting says how a mutating operation waits for its store's lock.
 	Waiting store.Waiting
+	// Storeless declares that the package owns no part of the home and keeps
+	// no store, as word persists through the Pool. A mutating operation of a
+	// storeless executable opens no store, takes no lock, makes no replay
+	// check and records no outcome. Its handler persists through the commands
+	// of the package it calls, sending the same request_id, so that replay is
+	// the callee's, and the receipts it returns are those of a response it
+	// accepted from that callee. It returns no records and no events.
+	Storeless bool
 	// Journal opens the home journal of the home at dir for a transaction
 	// that appends events. Nil means the executable appends none; a
 	// transaction that names events then fails.
@@ -90,7 +99,7 @@ type Call struct {
 	// Home is the home the command was pointed at, checked.
 	Home *store.Home
 	// Store is the package's store in the home, opened for a mutating
-	// operation and nil for a read-only one.
+	// operation and nil for a read-only one and for a storeless executable.
 	Store *store.Store
 	// Lock holds the store's transaction lock for a mutating operation. The
 	// handler may replace single records through it; the records, receipts
@@ -111,8 +120,12 @@ type Result struct {
 	// Body is the operation's own response. It is required.
 	Body map[string]any
 	// Records, Receipts and Events are what the operation writes, committed
-	// in one transaction with the recorded outcome. A read-only operation
-	// returns none.
+	// in one transaction with the recorded outcome. A record is written with
+	// its record_revision at Expected+1 and its updated_at at the call's
+	// Clock, which holds still for the invocation, so that a digest or a
+	// reference the handler makes of the record is of the record as stored.
+	// A read-only operation returns none, and a storeless executable returns
+	// receipts only.
 	Records  []store.RecordWrite
 	Receipts []envelope.Receipt
 	Events   []store.Event
@@ -227,8 +240,11 @@ func (e *Executable) Check() error {
 	if !commandForm.MatchString(e.Name) {
 		return fmt.Errorf("cli: %q is not a command name", e.Name)
 	}
-	if e.Version == "" || len(e.Version) > 100 {
-		return fmt.Errorf("cli: the implementation version is one to one hundred bytes")
+	if n := utf8.RuneCountInString(e.Version); n == 0 || n > 100 {
+		return fmt.Errorf("cli: the implementation version is one to one hundred characters")
+	}
+	if e.Storeless && e.Journal != nil {
+		return fmt.Errorf("cli: the executable %s is storeless and appends no events", e.Name)
 	}
 	if e.command(e.Name) == nil {
 		return fmt.Errorf("cli: the executable %s does not list the command of its own name", e.Name)

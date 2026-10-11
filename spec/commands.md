@@ -66,7 +66,7 @@ One JSON document, following `response.v1`, for every invocation that gets as fa
 | `body` | The operation's own response. Present only with `ok`. |
 | `error` | Present with every other status: a `code`, a `message` for a person, `retryable`, and the fields the status requires. |
 
-**A response is complete or it is not a response.** It is one document followed by a line feed. A caller accepts it only if the whole document parses, follows the schema, echoes the caller's `request_id` and agrees with the process's exit code. Empty output, output that does not parse, or a status that disagrees with the exit code is treated as `unknown`, never as success and never as an empty result. With any status but `ok` there is no `body`: no partial result is ever returned.
+**A response is complete or it is not a response.** It is one document followed by a line feed. A caller accepts it only if the whole document parses, follows the schema, echoes the caller's `request_id` and agrees with the process's exit code. A `request_id` that is not null is the caller's in every case. A null `request_id` is accepted only with a status the callee reaches before it can read the request's identity: `usage`, `too_large` for a request over the limit, and `invalid` with code `malformed_request`; with any other status a null `request_id` is `unknown`. Empty output, output that does not parse, or a status that disagrees with the exit code is treated as `unknown`, never as success and never as an empty result. With any status but `ok` there is no `body`: no partial result is ever returned.
 
 ## Exit and error states
 
@@ -121,7 +121,7 @@ Adding a code is a minor change. A code is never reused for another meaning.
 
 `request_id` makes a mutating operation safe to send again.
 
-- A mutating command records the outcome of each request it completes, with the digest of the request's canonical form, under its store's `requests/`.
+- A mutating command records the outcome of each request it completes, with the digest of the request's canonical form, under its store's `requests/`, as a record of schema [`hive.request-outcome`](schemas/request-outcome.v1.schema.json). A recorded outcome that fails its schema is `unavailable` with code `record_malformed` and is never replayed.
 - The same `request_id` with the same digest returns the recorded response with `replayed` true, and writes nothing.
 - The same `request_id` with a different digest is a `conflict` with code `replay_mismatch`.
 - A request that ended `unknown` is not recorded as complete. Sending it again makes the command reconcile first: it establishes what happened from its intent and from the outside system, and only then completes, refuses or reports `unknown` again. It never repeats an outside effect it cannot rule out.
