@@ -448,12 +448,12 @@
       }
     },
     "placement": {
-      "description": "mac: on the Mac. claude-cloud-session: in a Claude cloud session. policy: left to the policy resolver. codex-void: Codex in the Void, a named value that admission refuses while the backend is parked.",
+      "description": "mac: on the Mac. claude-cloud-session: in a Claude cloud session. policy: left to the policy resolver. codex-cloud: Codex in the Void, a named value that admission refuses while the backend is parked.",
       "enum": [
         "mac",
         "claude-cloud-session",
         "policy",
-        "codex-void"
+        "codex-cloud"
       ]
     },
     "item_state": {
