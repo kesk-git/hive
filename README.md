@@ -1,6 +1,6 @@
 # Hive
 
-A supervisor for Claude Code and Codex agents, with local execution on the Mac and optional cloud sessions. Hive owns its workflow in one repository, with five core dependencies: Git, gh, tmux, Claude Code and Codex CLI.
+A supervisor for Claude Code and Codex agents, with local execution on the Mac and optional cloud sessions. Hive owns its workflow in one repository, with six core dependencies: Git, gh, tmux, Claude Code, Codex CLI and no-mistakes, the long-lived plugin point behind its gate.
 
 [Hive design](docs/design.md) defines the architecture, dispatch classes, delivery contracts and approved [tooling strategy](docs/design.md#tooling). It specifies the target; the native packages are not implemented yet. [The specification](spec/README.md) holds the contracts of the plan's first stage: the package owners, identities, schemas, test targets and the distribution and import contracts.
 

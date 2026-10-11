@@ -4,7 +4,7 @@ This directory holds the contracts of the first stage of the [ordered implementa
 
 [The design](../docs/design.md) says what Hive is and why. This specification says where each thing lives, who owns it and what proves it. Where the two differ, the design governs and the difference is a defect in this specification.
 
-Contract version: **1.0**, accepted on 2026-10-11.
+Contract version: **1.1**. Version 1.0 was accepted on 2026-10-11; 1.1, later the same day, corrects the distribution contract to six dependencies, with no-mistakes as the long-lived plugin point behind Synapse, by the Hive Mind's ruling on the shape of the gate's stage. It is a minor change: no schema, record or package declaration changed.
 
 ## What is defined
 
@@ -22,7 +22,7 @@ Contract version: **1.0**, accepted on 2026-10-11.
 | [session-messages.md](session-messages.md) | The session message and the input receipt of the one supervisor conversation. |
 | [review.md](review.md) | The four files of a review directory. |
 | [test-targets.md](test-targets.md) | The test targets, what each runs and what each must prove. |
-| [distribution.md](distribution.md) | The five-dependency distribution contract. |
+| [distribution.md](distribution.md) | The six-dependency distribution contract. |
 | [imports.md](imports.md) | The import record that precedes any upstream source. |
 | [schemas/](schemas/) | The schemas themselves, one file per record. They are normative. |
 

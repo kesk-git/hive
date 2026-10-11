@@ -8,11 +8,11 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 **Decision.** Hive is written in Go, pinned to release line 1.27. The standard library is the only library at stage 1.
 
-**Reason.** The design forbids a sixth runtime prerequisite. Go builds each executable as one self-contained file that needs nothing installed, on the Mac and on Linux alike, and its standard library covers what stage 1 needs: JSON, files and locks, processes, an HTTP server and embedded files. Treehouse, the larger of the two adaptations, is written in Go and can be adapted directly.
+**Reason.** The design forbids a seventh runtime prerequisite. Go builds each executable as one self-contained file that needs nothing installed, on the Mac and on Linux alike, and its standard library covers what stage 1 needs: JSON, files and locks, processes, an HTTP server and embedded files. Treehouse, the larger of the two adaptations, is written in Go and can be adapted directly.
 
 **Cost.** tasks-axi is written in TypeScript. The Pool's adaptation therefore becomes a translation, and its tests are carried over by re-expression rather than kept as files. The import record says so file by file; see [imports.md](imports.md#the-two-planned-imports).
 
-**Rejected.** *TypeScript*, which would keep tasks-axi's source and tests as they are, needs Node at run time or a bundled runtime of tens of megabytes inside each executable, and would turn the Treehouse adaptation into the translation instead. *Shell*, as the inherited implementation uses, has no structured data or schema validation without tools outside the five, and its concurrency and atomicity are the source of defects this design exists to remove. *Rust* meets the delivery rule and makes both adaptations translations. *Swift* does not run the package tests in a Linux session.
+**Rejected.** *TypeScript*, which would keep tasks-axi's source and tests as they are, needs Node at run time or a bundled runtime of tens of megabytes inside each executable, and would turn the Treehouse adaptation into the translation instead. *Shell*, as the inherited implementation uses, has no structured data or schema validation without tools outside the six, and its concurrency and atomicity are the source of defects this design exists to remove. *Rust* meets the delivery rule and makes both adaptations translations. *Swift* does not run the package tests in a Linux session.
 
 **To undo.** Expensive after stage 2. This is the first decision to settle.
 
@@ -166,7 +166,7 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 **Decision.** Delivered for macOS on Apple silicon and on Intel. Built and tested on Linux. Not supported on Windows.
 
-**Reason.** The design places every supervisor on the Mac. Linux is where a Void session and a hosted check run Hive's own tests. tmux, one of the five, does not exist on Windows.
+**Reason.** The design places every supervisor on the Mac. Linux is where a Void session and a hosted check run Hive's own tests. tmux, one of the six, does not exist on Windows.
 
 **To undo.** Cheap to add a platform.
 
@@ -212,7 +212,7 @@ These are not decided here, deliberately. Each is cheap to add later and would b
 | Where the Spawning Pool keeps its worktrees on disk, and its lease record | Stage 3 |
 | A streamed form of response | Stage 4 |
 | Pending approvals in the session, and how a reader is told of a new message | Stage 4 |
-| The minimum version of each of the five, by probe | The stage that first runs each |
+| The minimum version of each of the six, by probe | The stage that first runs each |
 | Where instructions and skills sit in the artefact | The stage that first delivers one |
 | Retention periods and segment sizes | The stage that owns each store, as configuration |
 | Which package declares the optional browser stack | The stage that first selects a browser task |
