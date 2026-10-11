@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.specification:v1",
+  "title": "Specification",
+  "description": "One native specification with its revisions, acceptance and closures, at pool/records/specification/<specification_id>.json. Its accepted criteria are carried into an item and rendered into the Imperative's Standard by revision; there is no second editable copy. See spec/pool.md, Specifications.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "specification_id",
+    "scope_level",
+    "home_id",
+    "title",
+    "current_revision",
+    "revisions",
+    "closures",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.specification"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "specification_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/specification_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "title": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/label"
+    },
+    "current_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "revisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/revision"
+      }
+    },
+    "acceptance": {
+      "description": "The current acceptance. Absent until a revision is accepted; replaced by a later acceptance; marked invalidated by a revision that changes an accepted criterion.",
+      "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/acceptance"
+    },
+    "closures": {
+      "description": "Every closure recorded, each binding accepted requirements to a landed head and its proof.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/closure"
+      }
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ],
+  "$defs": {
+    "criterion_id": {
+      "description": "Stable within the specification across revisions.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+    },
+    "criterion": {
+      "description": "One acceptance criterion: what must hold and what evidence shows it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterion_id",
+        "text",
+        "evidence"
+      ],
+      "properties": {
+        "criterion_id": {
+          "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/criterion_id"
+        },
+        "text": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "evidence": {
+          "description": "The evidence that proves it, in words.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "requirements": {
+          "description": "The requirements this criterion answers: Hive records by reference, or documents by URL.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/link"
+          }
+        }
+      }
+    },
+    "revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "text",
+        "criteria",
+        "digest",
+        "defined_at",
+        "defined_by",
+        "authority",
+        "request_id"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "text": {
+          "description": "The specification's prose, kept exactly.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/criterion"
+          }
+        },
+        "changed_criteria": {
+          "description": "For a revision after the first: the criteria whose text or evidence differs from the revision before, by identity. An acceptance of that earlier revision is invalidated when this list is not empty.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/criterion_id"
+          }
+        },
+        "digest": {
+          "description": "The digest of the canonical form of the text and criteria.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "defined_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "defined_by": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "authority": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/authority"
+        },
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "digest",
+        "state",
+        "accepted_at",
+        "accepted_by",
+        "open_questions",
+        "receipt_id"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "state": {
+          "enum": [
+            "accepted",
+            "invalidated"
+          ]
+        },
+        "accepted_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "accepted_by": {
+          "description": "The Fleet's supervisor, or the Hive for its own item.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "task_id": {
+          "description": "The item the acceptance was recorded for, where it was recorded for one.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "admission": {
+          "description": "The admission revision the acceptance relates to, where there is one.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "open_questions": {
+          "description": "Product questions still open at acceptance, each a question the Hive Mind owes. Technical acceptance settles none of them.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+          }
+        },
+        "receipt_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        },
+        "invalidated_by": {
+          "description": "The revision whose changed criteria invalidated this acceptance.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "invalidated_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "invalidated"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "invalidated_by",
+              "invalidated_at"
+            ]
+          },
+          "else": {
+            "properties": {
+              "invalidated_by": false,
+              "invalidated_at": false
+            }
+          }
+        }
+      ]
+    },
+    "closure": {
+      "description": "Accepted requirements closed against a landed head. Recorded after a verified landing, separately from the landing itself.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "task_id",
+        "generation",
+        "landed_revision",
+        "landing",
+        "proof",
+        "resolved_findings",
+        "closed_at",
+        "closed_by",
+        "receipt_id"
+      ],
+      "properties": {
+        "revision": {
+          "description": "The accepted specification revision closed.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "generation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+        },
+        "landed_revision": {
+          "description": "The landed head.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/git_revision"
+        },
+        "landing": {
+          "description": "The receipt of the verified landing, as the caller named it.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "proof": {
+          "description": "The proof receipts bound to that head, as the caller named them.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          }
+        },
+        "resolved_findings": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          }
+        },
+        "closed_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "closed_by": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "receipt_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        }
+      }
+    }
+  }
+}

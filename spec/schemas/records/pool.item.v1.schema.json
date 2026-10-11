@@ -1,0 +1,715 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.item:v1",
+  "title": "Pool item",
+  "description": "One durable work item of the Pool, at pool/records/item/<task_id>.json. It describes work, never a persistent agent, and never assumes that its work has a worktree. This file also holds the definitions shared by every Pool record. See spec/pool.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "task_id",
+    "scope_level",
+    "home_id",
+    "title",
+    "state",
+    "definition",
+    "placement_requested",
+    "deps",
+    "links",
+    "generations",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.item"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "clone_id": {
+      "description": "Given only where the work is bound to one registered clone. The Pool never requires it and never assumes a worktree from it.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/clone_id"
+    },
+    "title": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/label"
+    },
+    "body": {
+      "description": "The item's notes, kept exactly as written.",
+      "type": "string"
+    },
+    "state": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/item_state"
+    },
+    "definition": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/definition_state"
+    },
+    "deliverable": {
+      "description": "What a generation of this item produces. Absent until intake assigns it. decision never dispatches.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/deliverable"
+    },
+    "class": {
+      "description": "The dispatch class, 0 to 7, as the design numbers them. Absent until intake assigns it.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dispatch_class"
+    },
+    "priority": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/priority"
+    },
+    "placement_requested": {
+      "description": "The place requested for this item's work. Recorded here, rendered into the Imperative's Setup, resolved by policy at a later stage.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/placement"
+    },
+    "delivery": {
+      "description": "The item's delivery axes, declared separately: validation, publication and Assimilation authority. Absent until intake declares them.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/delivery"
+    },
+    "specification_required": {
+      "description": "True when build dispatch needs an accepted specification revision. Absent means false.",
+      "type": "boolean"
+    },
+    "specification": {
+      "description": "The accepted specification revision whose criteria this item carries. Set by hive-spec accept and cleared by an invalidation.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
+    },
+    "deps": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/link"
+      }
+    },
+    "schedule": {
+      "description": "A not-before gate or a recurrence as declared on the item. The item owns the work; the dispatcher's scheduled-job record, a later stage's, carries the schedule's runs. A date here dispatches nothing by itself.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/schedule"
+    },
+    "generations": {
+      "description": "Every execution generation opened on this item, in order, numbered from 1. At most one is open at a time.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/generation_entry"
+      }
+    },
+    "handoff": {
+      "description": "Where a parent routed this item's work to a child Fleet: the one handoff, kept here instead of a second competing task.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "child_home_id",
+        "child_task_id",
+        "evidence"
+      ],
+      "properties": {
+        "child_home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        },
+        "child_task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "evidence": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      }
+    },
+    "moved_from": {
+      "description": "Set on an item that arrived by a multi-home move: the home it came from and the move record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "home_id",
+        "move_id"
+      ],
+      "properties": {
+        "home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        },
+        "move_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/move_id"
+        }
+      }
+    },
+    "moved_to": {
+      "description": "Set on an item that left by a multi-home move. The item stays, in state moved, so its identity and history resolve.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "home_id",
+        "move_id"
+      ],
+      "properties": {
+        "home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        },
+        "move_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/move_id"
+        }
+      }
+    },
+    "legacy": {
+      "description": "For an item imported from a legacy backlog: its legacy identity and the migration that created it. Legacy words are kept here verbatim and never interpreted as authority.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "legacy_id",
+        "migration_id"
+      ],
+      "properties": {
+        "legacy_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/legacy_id"
+        },
+        "migration_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/migration_id"
+        },
+        "kind": {
+          "description": "The legacy kind word as written, such as SHIP or SCOUT.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "repo": {
+          "description": "The legacy repo tag as written.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "meta": {
+          "description": "The legacy free-form fields, kept exactly.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "value"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "closed_at": {
+      "description": "When the item reached done. Cleared on reopen.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ],
+  "$defs": {
+    "admission_id": {
+      "type": "string",
+      "pattern": "^adm_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "specification_id": {
+      "type": "string",
+      "pattern": "^spec_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "rule_id": {
+      "type": "string",
+      "pattern": "^rule_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "hold_id": {
+      "type": "string",
+      "pattern": "^hold_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "projection_id": {
+      "type": "string",
+      "pattern": "^mem_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "migration_id": {
+      "type": "string",
+      "pattern": "^migr_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "move_id": {
+      "type": "string",
+      "pattern": "^move_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "legacy_id": {
+      "description": "A legacy backlog identifier, as the upstream grammar accepts it.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "maxLength": 200
+    },
+    "text": {
+      "description": "Text kept exactly as written, never empty.",
+      "type": "string",
+      "minLength": 1
+    },
+    "zone": {
+      "description": "An IANA time zone name.",
+      "type": "string",
+      "pattern": "^[A-Za-z_]+(/[A-Za-z0-9_+-]+){0,3}$",
+      "maxLength": 100
+    },
+    "zoned_time": {
+      "description": "A wall-clock time in a declared zone: the UTC instant and the zone's name, as spec/records.md requires.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "at",
+        "zone"
+      ],
+      "properties": {
+        "at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "zone": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/zone"
+        },
+        "date": {
+          "description": "The calendar date as it was written where the source gave only a date, as a legacy hold does.",
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        }
+      }
+    },
+    "placement": {
+      "description": "mac: on the Mac. claude-cloud-session: in a Claude cloud session. policy: left to the policy resolver. codex-void: Codex in the Void, a named value that admission refuses while the backend is parked.",
+      "enum": [
+        "mac",
+        "claude-cloud-session",
+        "policy",
+        "codex-void"
+      ]
+    },
+    "item_state": {
+      "description": "queued, in-flight and done are the three legacy sections. archived is a retired item, never deleted. moved is an item that left by a multi-home move.",
+      "enum": [
+        "queued",
+        "in-flight",
+        "done",
+        "archived",
+        "moved"
+      ]
+    },
+    "definition_state": {
+      "description": "not-required: no specification is needed. needed, defining, accepted: the design's definition passage. With state, the design's five-step passage reads: definition-needed and defining are queued items in those definition states, accepted is a queued item with an accepted specification, building is in-flight and delivered is done.",
+      "enum": [
+        "not-required",
+        "needed",
+        "defining",
+        "accepted"
+      ]
+    },
+    "deliverable": {
+      "enum": [
+        "swarm",
+        "lictor",
+        "decision"
+      ]
+    },
+    "dispatch_class": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 7
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "validation_axis": {
+      "description": "synapse: Synapse on the Mac validates the result. direct: an explicitly authorized direct delivery with its stated checks.",
+      "enum": [
+        "synapse",
+        "direct"
+      ]
+    },
+    "publication_axis": {
+      "description": "harvest: a Harvest is published. local-only: a local branch, with no forge binding and no invented Harvest.",
+      "enum": [
+        "harvest",
+        "local-only"
+      ]
+    },
+    "assimilation_axis": {
+      "description": "word: the Hive Mind's explicit word at landing. posture: a recorded autonomous posture for the project, checked at landing by a later stage.",
+      "enum": [
+        "word",
+        "posture"
+      ]
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validation",
+        "publication",
+        "assimilation"
+      ],
+      "properties": {
+        "validation": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/validation_axis"
+        },
+        "publication": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/publication_axis"
+        },
+        "assimilation": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/assimilation_axis"
+        }
+      }
+    },
+    "dependency_type": {
+      "enum": [
+        "blocked-by",
+        "parent",
+        "discovered-from"
+      ]
+    },
+    "dependency": {
+      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready while its blocker is not done. reason is free text carried across a round trip and never read for state.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "task_id"
+      ],
+      "properties": {
+        "type": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency_type"
+        },
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "link_kind": {
+      "enum": [
+        "harvest",
+        "report",
+        "doc",
+        "record"
+      ]
+    },
+    "link": {
+      "description": "A typed link: a Harvest by full URL, a report or document by URL or home-relative path, or a Hive record by reference.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/link_kind"
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "path": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
+        },
+        "ref": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "record"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "ref"
+            ],
+            "properties": {
+              "url": false,
+              "path": false
+            }
+          },
+          "else": {
+            "properties": {
+              "ref": false
+            }
+          }
+        }
+      ]
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "description": "gate: a one-time not-before time. recurrence: a period and its anchor.",
+          "enum": [
+            "gate",
+            "recurrence"
+          ]
+        },
+        "not_before": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/zoned_time"
+        },
+        "recurrence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "interval",
+            "anchor"
+          ],
+          "properties": {
+            "interval": {
+              "description": "An ISO 8601 duration of whole units, such as P1D or PT6H.",
+              "type": "string",
+              "pattern": "^P(([0-9]+D)|([0-9]+W)|(T[0-9]+H)|([0-9]+DT[0-9]+H))$"
+            },
+            "anchor": {
+              "description": "The wall-clock time the recurrence keeps across a daylight-saving change.",
+              "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/zoned_time"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "gate"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "not_before"
+            ],
+            "properties": {
+              "recurrence": false
+            }
+          },
+          "else": {
+            "required": [
+              "recurrence"
+            ],
+            "properties": {
+              "not_before": false
+            }
+          }
+        }
+      ]
+    },
+    "criteria_ref": {
+      "description": "A specification revision bound by identity, revision and digest. The Imperative's Standard renders criteria from the revision named here and holds no editable copy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "specification_id",
+        "revision",
+        "digest"
+      ],
+      "properties": {
+        "specification_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/specification_id"
+        },
+        "revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        }
+      }
+    },
+    "secret_ref": {
+      "description": "A reference to a secret in the platform's secret store. No Pool record ever holds a secret value; where one must name a secret it holds this and nothing else. store is the store's name, keychain on the Mac; item is the entry's name within it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "store",
+        "item"
+      ],
+      "properties": {
+        "store": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        },
+        "item": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      }
+    },
+    "generation_entry": {
+      "description": "One execution generation as the Pool knows it: opened before launch with the place requested and the Imperative and admission it runs under, closed with the evidence named. Execution state belongs to the dispatcher's record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "state",
+        "opened_at",
+        "placement_requested",
+        "imperative_revision",
+        "admission_id"
+      ],
+      "properties": {
+        "generation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "closed"
+          ]
+        },
+        "opened_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "opened_by": {
+          "description": "The request, receipt or record that opened it, where the caller gave one.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "placement_requested": {
+          "description": "The item's requested place at the moment the generation opened.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/placement"
+        },
+        "imperative_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "admission_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/admission_id"
+        },
+        "closed_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "closed_by": {
+          "description": "The receipt or record that establishes the generation's end, as the caller named it.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "outcome": {
+          "description": "As the closing caller reported it from its own receipts. unknown is an outcome, never a success.",
+          "enum": [
+            "delivered",
+            "failed",
+            "stopped",
+            "superseded",
+            "unknown"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "closed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "closed_at",
+              "closed_by",
+              "outcome"
+            ]
+          },
+          "else": {
+            "properties": {
+              "closed_at": false,
+              "closed_by": false,
+              "outcome": false
+            }
+          }
+        }
+      ]
+    },
+    "hold_kind": {
+      "description": "word: held for the Hive Mind's decision. admission: held by an admission check. definition: held until a required specification is accepted. parked, external, resource, future: as the legacy kinds parked, external, load and a dated hold.",
+      "enum": [
+        "word",
+        "admission",
+        "definition",
+        "parked",
+        "external",
+        "resource",
+        "future"
+      ]
+    },
+    "item_selector": {
+      "description": "One item by identity, or a query. A query that matches nothing returns an empty list; an identity that does not exist is not_found.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/item_state"
+          }
+        },
+        "project_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+        },
+        "ready": {
+          "description": "True: only items that are queued, not blocked and not actively held.",
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

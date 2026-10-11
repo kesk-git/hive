@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.hold:v1",
+  "title": "Pool hold",
+  "description": "One hold on one Pool item, at pool/records/hold/<hold_id>.json. A hold is its own record so that a response, a wake and a receipt can name it, and so that an unanswered hold outlives the item's completion and cleanup. Holds are kept apart from the item's state. See spec/pool.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "hold_id",
+    "task_id",
+    "scope_level",
+    "home_id",
+    "kind",
+    "reason",
+    "state",
+    "placed_at",
+    "placed_by",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.hold"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "hold_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "kind": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_kind"
+    },
+    "reason": {
+      "description": "Why the item is held, for a person.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "reason_code": {
+      "description": "A fixed code where the hold was placed by a check: source_branch_not_pushed, field_guess, authority_required, specification_unaccepted.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "until": {
+      "description": "A dated hold: inactive on and after this time. A revisit date recorded by Later is kept on the question; the hold stays until the answer.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/zoned_time"
+    },
+    "question_id": {
+      "description": "For a word hold: the question the Hive Mind owes. Absent for a legacy word hold imported without a question.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "admission_id": {
+      "description": "For an admission hold: the admission whose check placed it.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/admission_id"
+    },
+    "state": {
+      "enum": [
+        "active",
+        "released"
+      ]
+    },
+    "placed_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "placed_by": {
+      "description": "The request that placed the hold and who issued it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "caller"
+      ],
+      "properties": {
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        "caller": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        }
+      }
+    },
+    "released_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "released_by": {
+      "description": "The receipt that establishes the release: an accepted answer, an admission that passed, an accepted specification, or the request that lifted a parked, external, resource or future hold.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "released"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "released_at",
+          "released_by"
+        ]
+      },
+      "else": {
+        "properties": {
+          "released_at": false,
+          "released_by": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "admission"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "admission_id",
+          "reason_code"
+        ]
+      },
+      "else": {
+        "properties": {
+          "admission_id": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "future"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "until"
+        ]
+      }
+    }
+  ]
+}
