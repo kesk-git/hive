@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:records:pool.item:v1",
   "title": "Pool item",
-  "description": "One durable work item of the Pool, at pool/records/item/<task_id>.json. It describes work, never a persistent agent, and never assumes that its work has a worktree. This file also holds the definitions shared by every Pool record. See spec/pool.md.",
+  "description": "One durable item of the Pool, a Target, a Prey, a Hunt or a decision with no level, at pool/records/item/<task_id>.json. It describes work, never a persistent agent, and never assumes that its work has a worktree. This file also holds the definitions shared by every Pool record. See spec/pool.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [

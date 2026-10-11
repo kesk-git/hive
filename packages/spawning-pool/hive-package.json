@@ -4,7 +4,7 @@
   "name": "spawning-pool",
   "kind": "package",
   "title": "Spawning Pool",
-  "owns": "The Spawning Pool: the Hive-owned worktrees, their leases, and the acquire, observe and release receipts that bind a physical worktree to one home, workspace, project, clone, task generation and branch. It holds working copies and never work items.",
+  "owns": "The Spawning Pool: the Hive-owned worktrees, their leases, and the acquire, observe and release receipts that bind a physical worktree to one home, workspace, project, clone, task generation and branch. It holds working copies and never Pool items.",
   "plan_stage": 3,
   "executable": "hive-spawning-pool",
   "commands": [

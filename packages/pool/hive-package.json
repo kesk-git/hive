@@ -10,7 +10,7 @@
   "commands": [
     {
       "name": "hive-pool",
-      "purpose": "Durable work items: identity, scope, dependencies, delivery path, dispatch class, requested place, holds, dates and generations; legacy import and export.",
+      "purpose": "Durable Pool items: identity, level, scope, dependencies, delivery path, dispatch class, requested place, holds, dates and generations; legacy import and export.",
       "operations": [
         "add",
         "read",
