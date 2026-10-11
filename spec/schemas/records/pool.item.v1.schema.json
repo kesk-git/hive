@@ -620,38 +620,15 @@
       }
     },
     "secret_ref": {
-      "description": "A durable reference to a secret: the store it lives in, the host it is for, the account identity and the purpose, and nothing else. It is neither the value nor a transferable authorization: holding one grants nothing, and the value is retrieved from the store at run time by whoever is entitled to it. No Pool record ever holds a secret value; where one must name a secret it holds this.",
+      "description": "A durable reference to a secret: the identifier of its Spoor, and nothing else. The Spoor record, which the dispatcher owns, holds the store, the host, the account identity and the purpose. The reference is neither the value nor a transferable authorization: holding one grants nothing, and the value is retrieved from the store at run time by whoever is entitled to it. No Pool record ever holds a secret value; where one must name a secret it holds this.",
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "store",
-        "host",
-        "account",
-        "purpose"
+        "spoor_id"
       ],
       "properties": {
-        "store": {
-          "description": "The platform's secret store, keychain on the Mac.",
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9-]{0,62}$"
-        },
-        "host": {
-          "description": "The host the secret is for.",
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 253
-        },
-        "account": {
-          "description": "The account identity the secret belongs to.",
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
-        },
-        "purpose": {
-          "description": "What the secret is used for, in words.",
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
+        "spoor_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/spoor_id"
         }
       }
     },
