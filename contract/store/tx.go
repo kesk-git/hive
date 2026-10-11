@@ -110,7 +110,7 @@ func (w *Writer) Commit(tx Tx) (*Committed, error) {
 	if err := w.s.writeFile(IntentPath(w.s.pkg, in.request), in.request, data); err != nil {
 		return nil, err
 	}
-	if err := w.s.complete(in); err != nil {
+	if err := w.s.complete(in, false); err != nil {
 		return nil, err
 	}
 	out := &Committed{}
@@ -206,8 +206,9 @@ func (s *Store) plan(tx Tx) (*intent, error) {
 
 // complete writes what an intent says, in the order spec/records.md fixes,
 // and removes the intent. A file recovery marked as already written is not
-// written again.
-func (s *Store) complete(in *intent) error {
+// written again. Recovery hands its events to the journal's Recover, which
+// skips those already there; the first attempt hands them to Append.
+func (s *Store) complete(in *intent, recovering bool) error {
 	for _, r := range in.records {
 		if err := s.put(in.request, r); err != nil {
 			return err
@@ -225,7 +226,11 @@ func (s *Store) complete(in *intent) error {
 		if err := s.step("events " + IntentPath(s.pkg, in.request)); err != nil {
 			return err
 		}
-		if err := s.journal.Append(slices.Clone(in.events)); err != nil {
+		appendEvents := s.journal.Append
+		if recovering {
+			appendEvents = s.journal.Recover
+		}
+		if err := appendEvents(slices.Clone(in.events)); err != nil {
 			return fmt.Errorf("store: appending the events of %s: %w", in.request, err)
 		}
 	}
@@ -269,7 +274,7 @@ func (s *Store) recover() error {
 		if err := s.classify(rel, in); err != nil {
 			return err
 		}
-		if err := s.complete(in); err != nil {
+		if err := s.complete(in, true); err != nil {
 			return err
 		}
 	}

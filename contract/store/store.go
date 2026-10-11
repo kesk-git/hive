@@ -14,11 +14,15 @@ import (
 
 // Journal is where a transaction's events go. The home journal of
 // spec/events.md implements it; the store opens nothing under journal/
-// itself. Append appends the events in order, taking locks/journal.lock
-// after the store's lock, and skips an event whose event_id is already in
-// the journal, so recovery may call it again for the same events.
+// itself. Both methods append the events in order, taking
+// locks/journal.lock after the store's lock. Append is the first attempt of a
+// transaction: it looks for no earlier line and writes every event. Recover
+// is recovery rolling an intent forward: it appends an event only if no line
+// with its event_id is already present, and makes what it found present
+// durable, so recovery may call it again for the same events.
 type Journal interface {
 	Append(events []Event) error
+	Recover(events []Event) error
 }
 
 // Options configure a Store.
