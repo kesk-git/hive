@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:home:v1",
+  "title": "Home identity record",
+  "description": "The file home.json at the root of a private home. See spec/identities.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "home_id",
+    "role",
+    "name",
+    "parent",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.home"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "role": {
+      "description": "hive: the Hive's own home. fleet: the home of one workspace's Fleet.",
+      "enum": [
+        "hive",
+        "fleet"
+      ]
+    },
+    "name": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/label"
+    },
+    "workspace_id": {
+      "description": "The one workspace a Fleet home belongs to. Absent from the Hive's home.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "parent": {
+      "description": "The home this home reports to. The Hive's home has none.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "none",
+            "home"
+          ]
+        },
+        "home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "home"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "home_id"
+            ]
+          },
+          "else": {
+            "properties": {
+              "home_id": false
+            }
+          }
+        }
+      ]
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "fleet"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "workspace_id"
+        ],
+        "properties": {
+          "parent": {
+            "properties": {
+              "kind": {
+                "const": "home"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "workspace_id": false,
+          "parent": {
+            "properties": {
+              "kind": {
+                "const": "none"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

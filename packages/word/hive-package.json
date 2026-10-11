@@ -1,0 +1,45 @@
+{
+  "schema": "hive.package",
+  "schema_version": "1.0",
+  "name": "word",
+  "kind": "package",
+  "title": "Mind's word",
+  "owns": "The single decision intake: held questions, exact answers and completion receipts. It keeps no store of its own and persists through the Pool.",
+  "plan_stage": 2,
+  "executable": "hive-word",
+  "commands": [
+    {
+      "name": "hive-word",
+      "purpose": "Holds, exact answers, completion and verification of the Mind's word.",
+      "operations": [
+        "hold",
+        "answer",
+        "complete",
+        "verify"
+      ]
+    }
+  ],
+  "home_paths": [],
+  "kind_prefixes": [
+    "word"
+  ],
+  "receipt_kinds": [],
+  "test_target": "test-word",
+  "test_scope": "Complete rounds, authorized answers, deduplication and unresolved holds.",
+  "calls": [
+    "pool"
+  ],
+  "executes": {
+    "core": [],
+    "transitional": [],
+    "optional": [],
+    "project": false
+  },
+  "platform": [],
+  "toolchain": {
+    "language": "go",
+    "version": "1.27"
+  },
+  "libraries": [],
+  "imports": []
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:request:v1",
+  "title": "Command request envelope",
+  "description": "The one document a caller sends to a hive-* command. See spec/commands.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "command",
+    "operation",
+    "operation_version",
+    "request_id",
+    "correlation_id",
+    "issued_at",
+    "caller",
+    "scope_level",
+    "home_id",
+    "authority",
+    "body"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.request"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "command": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+    },
+    "operation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/operation_name"
+    },
+    "operation_version": {
+      "description": "The version of the operation's own body schema that this request was written against.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/schema_version"
+    },
+    "request_id": {
+      "description": "The replay and idempotency identity. A retry of the same request reuses it.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+    },
+    "correlation_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/correlation_id"
+    },
+    "causation": {
+      "description": "The request, receipt or event that directly caused this request, where there is one.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    },
+    "issued_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "caller": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "clone_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/clone_id"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "source_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/git_revision"
+    },
+    "expected_revisions": {
+      "description": "Every record the mutation depends on, with the revision the caller read. A mismatch is a conflict and nothing is written.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema",
+          "id",
+          "record_revision"
+        ],
+        "properties": {
+          "schema": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/kind_name"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "record_revision": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+          }
+        }
+      }
+    },
+    "authority": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/authority"
+    },
+    "body": {
+      "description": "The operation's own request body, validated against the schema the command's capability declaration names.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ]
+}

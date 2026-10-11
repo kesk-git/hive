@@ -1,0 +1,511 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:review:v1",
+  "title": "Review record",
+  "description": "The file review.json of one review directory. Every path in it is relative to that directory. See spec/review.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "review_id",
+    "scope_level",
+    "home_id",
+    "task_id",
+    "generation",
+    "owner",
+    "lictor",
+    "parent_route",
+    "revisions",
+    "current_revision",
+    "current_round",
+    "completion",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.review"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "review_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/review_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "owner": {
+      "$ref": "urn:hive:schema:review:v1#/$defs/owner"
+    },
+    "lictor": {
+      "$ref": "urn:hive:schema:review:v1#/$defs/lictor"
+    },
+    "parent_route": {
+      "description": "The registered route by which the owning supervisor reports to its parent. The Hive's own review has none.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "none",
+            "parent"
+          ]
+        },
+        "parent_home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        },
+        "route": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "parent"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "parent_home_id",
+              "route"
+            ]
+          },
+          "else": {
+            "properties": {
+              "parent_home_id": false,
+              "route": false
+            }
+          }
+        }
+      ]
+    },
+    "revisions": {
+      "description": "The manifest: every published revision, in order. An entry is never changed or removed once written.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision",
+          "html",
+          "assets",
+          "published_at"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "html": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+          },
+          "assets": {
+            "description": "Every file the revision may load. Each lives under that revision's own asset directory.",
+            "type": "array",
+            "items": {
+              "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+            }
+          },
+          "answers_round": {
+            "description": "The round whose reply this revision was written for, where there is one.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "published_at": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+          }
+        }
+      }
+    },
+    "current_revision": {
+      "description": "0 before the first revision is published.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "current_round": {
+      "description": "The round that receives new feedback.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "completion": {
+      "description": "Null until Done. Then a reference to final.json.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+        }
+      ]
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ],
+  "$defs": {
+    "owner": {
+      "description": "The supervisor that owns the review and handles its rounds: the Hive, or the Fleet of one workspace.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "home_id"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "hive",
+            "fleet"
+          ]
+        },
+        "home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        },
+        "workspace_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "fleet"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "workspace_id"
+            ]
+          },
+          "else": {
+            "properties": {
+              "workspace_id": false
+            }
+          }
+        }
+      ]
+    },
+    "lictor": {
+      "description": "The assigned Lictor, as the execution that writes the revisions and replies.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "generation"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "generation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+        }
+      }
+    },
+    "revision_ref": {
+      "description": "One published revision, by number, HTML path and digest.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "path",
+        "digest"
+      ],
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "path": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
+        },
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        }
+      }
+    },
+    "card_binding": {
+      "description": "What ties a card shown in a review to the decision it presents. It keeps the review round distinct from the decision round.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "card_id",
+        "card_revision",
+        "question_id",
+        "question_revision",
+        "held_task_id",
+        "decision_round_id",
+        "decision_round_revision",
+        "owner_home_id",
+        "owner_task_id"
+      ],
+      "properties": {
+        "card_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/card_id"
+        },
+        "card_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "question_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+        },
+        "question_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "held_task_id": {
+          "description": "The held Pool item the decision gates.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "decision_round_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/decision_round_id"
+        },
+        "decision_round_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "owner_home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        },
+        "owner_task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        }
+      }
+    },
+    "card_answer": {
+      "description": "One card's answer as the Hive Mind left it: the option, if one was chosen, together with the exact text typed with it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "card"
+      ],
+      "properties": {
+        "card": {
+          "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
+        },
+        "option_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+        },
+        "option_label": {
+          "description": "The option's label exactly as displayed.",
+          "type": "string"
+        },
+        "answer_text": {
+          "description": "Verbatim, whitespace included.",
+          "type": "string"
+        },
+        "later": {
+          "description": "Later was chosen: the revisit date. A deferral, never an approval.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "revisit_at"
+          ],
+          "properties": {
+            "revisit_at": {
+              "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "option_id"
+            ]
+          },
+          "then": {
+            "required": [
+              "option_label"
+            ]
+          },
+          "else": {
+            "properties": {
+              "option_label": false
+            }
+          }
+        }
+      ]
+    },
+    "target": {
+      "description": "What an annotation points at, captured against the revision that was on screen. It is kept even when a later revision moves or removes the element.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "locator",
+        "element_text"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "urn:hive:schema:review:v1#/$defs/revision_ref"
+        },
+        "locator": {
+          "description": "The element's path in the revision's document.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "element_text": {
+          "type": "string"
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "quote",
+            "start",
+            "end"
+          ],
+          "properties": {
+            "quote": {
+              "description": "The selected text, exactly.",
+              "type": "string"
+            },
+            "start": {
+              "$ref": "urn:hive:schema:review:v1#/$defs/dom_point"
+            },
+            "end": {
+              "$ref": "urn:hive:schema:review:v1#/$defs/dom_point"
+            }
+          }
+        }
+      }
+    },
+    "dom_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "offset"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "note": {
+      "description": "A note as it stands: an annotation with its target, or a free-standing instruction for the round with none.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "note_id",
+        "note_kind",
+        "text"
+      ],
+      "properties": {
+        "note_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/note_id"
+        },
+        "note_kind": {
+          "enum": [
+            "annotation",
+            "instruction"
+          ]
+        },
+        "text": {
+          "description": "Verbatim, whitespace included.",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "urn:hive:schema:review:v1#/$defs/target"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "note_kind": {
+                "const": "annotation"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "target"
+            ]
+          },
+          "else": {
+            "properties": {
+              "target": false
+            }
+          }
+        }
+      ]
+    },
+    "operator": {
+      "description": "The authenticated operator, as the serving login established it. Never a value the browser supplied.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "login",
+        "ref"
+      ],
+      "properties": {
+        "login": {
+          "enum": [
+            "local-session",
+            "private-network"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      }
+    }
+  }
+}

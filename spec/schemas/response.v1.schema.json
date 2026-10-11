@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:response:v1",
+  "title": "Command response envelope",
+  "description": "The one document a hive-* command writes for each invocation. See spec/commands.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "request_id",
+    "command",
+    "operation",
+    "status",
+    "exit_code",
+    "responder",
+    "completed_at",
+    "replayed",
+    "receipts"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.response"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "request_id": {
+      "description": "Echoes the request. Null only when no request identity could be read.",
+      "anyOf": [
+        {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "command": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+    },
+    "operation": {
+      "anyOf": [
+        {
+          "$ref": "urn:hive:schema:common:v1#/$defs/operation_name"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "failed",
+        "usage",
+        "invalid",
+        "refused",
+        "conflict",
+        "not_found",
+        "too_large",
+        "unavailable",
+        "unknown",
+        "held"
+      ]
+    },
+    "exit_code": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "responder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package",
+        "command",
+        "implementation_version",
+        "contract_version"
+      ],
+      "properties": {
+        "package": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/package_name"
+        },
+        "command": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+        },
+        "implementation_version": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
+        },
+        "contract_version": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/schema_version"
+        }
+      }
+    },
+    "completed_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "replayed": {
+      "description": "True when this response repeats the recorded outcome of an earlier invocation with the same request identity.",
+      "type": "boolean"
+    },
+    "receipts": {
+      "description": "Every receipt this invocation wrote, or wrote originally when replayed, in full.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:receipt:v1"
+      }
+    },
+    "body": {
+      "description": "The operation's own response body. Present only with status ok, and always whole.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/error_code"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "retryable": {
+          "description": "True only when repeating the same request unchanged can succeed without anyone acting first.",
+          "type": "boolean"
+        },
+        "hold": {
+          "description": "With status held: the hold that must be released before the operation can proceed.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "limit_bytes": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+        },
+        "actual_bytes": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+        },
+        "detail": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "ok"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "body"
+        ],
+        "properties": {
+          "exit_code": {
+            "const": 0
+          },
+          "error": false
+        }
+      },
+      "else": {
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "body": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "usage"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 2
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "refused"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 4
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "conflict"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 5
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "not_found"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 6
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "too_large"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 7
+          },
+          "error": {
+            "required": [
+              "limit_bytes",
+              "actual_bytes"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "unavailable"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 8
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "unknown"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 9
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "held"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 10
+          },
+          "error": {
+            "required": [
+              "hold"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

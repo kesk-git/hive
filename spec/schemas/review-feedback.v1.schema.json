@@ -1,0 +1,333 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:review-feedback:v1",
+  "title": "Review feedback file",
+  "description": "The one feedback file of one round, round-NNNN.feedback.json. See spec/review.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "review_id",
+    "round_id",
+    "scope_level",
+    "home_id",
+    "task_id",
+    "generation",
+    "owner",
+    "lictor",
+    "reviewed_revision",
+    "events",
+    "updated_at"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.review-feedback"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "description": "The round revision a submission names as expected.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "review_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/review_id"
+    },
+    "round_id": {
+      "description": "The round number. It appears zero-padded in the file name.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "owner": {
+      "$ref": "urn:hive:schema:review:v1#/$defs/owner"
+    },
+    "lictor": {
+      "$ref": "urn:hive:schema:review:v1#/$defs/lictor"
+    },
+    "reviewed_revision": {
+      "$ref": "urn:hive:schema:review:v1#/$defs/revision_ref"
+    },
+    "events": {
+      "description": "The round's operator events in sequence order. Earlier events are never changed or dropped.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:review-feedback:v1#/$defs/event"
+      }
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ],
+  "$defs": {
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "sequence",
+        "captured_at",
+        "received_at",
+        "operator",
+        "kind"
+      ],
+      "properties": {
+        "event_id": {
+          "description": "Chosen by the page and reused on retry.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/feedback_event_id"
+        },
+        "sequence": {
+          "description": "Assigned by the feedback writer: consecutive from 1 within the file.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "captured_at": {
+          "description": "When the page captured the input.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "received_at": {
+          "description": "When the writer made the event durable.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "operator": {
+          "$ref": "urn:hive:schema:review:v1#/$defs/operator"
+        },
+        "kind": {
+          "enum": [
+            "target",
+            "note",
+            "card-draft",
+            "submit",
+            "done"
+          ]
+        },
+        "control_label": {
+          "description": "The exact label of the control pressed, where one was.",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "urn:hive:schema:review:v1#/$defs/target"
+        },
+        "note": {
+          "$ref": "urn:hive:schema:review:v1#/$defs/note"
+        },
+        "card_draft": {
+          "$ref": "urn:hive:schema:review:v1#/$defs/card_answer"
+        },
+        "submission": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "request_id",
+            "expected_round_revision",
+            "last_draft_sequence",
+            "answers",
+            "notes",
+            "attachments"
+          ],
+          "properties": {
+            "request_id": {
+              "description": "Stable for the submission, so a retry commits once.",
+              "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+            },
+            "expected_round_revision": {
+              "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+            },
+            "last_draft_sequence": {
+              "description": "The last draft event the snapshot includes. 0 when there was none.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "answers": {
+              "description": "The immutable snapshot of each answered card. A card left unanswered has no entry and stays open.",
+              "type": "array",
+              "items": {
+                "$ref": "urn:hive:schema:review:v1#/$defs/card_answer"
+              }
+            },
+            "notes": {
+              "description": "The round's notes and free-standing instructions as they stood at submission.",
+              "type": "array",
+              "items": {
+                "$ref": "urn:hive:schema:review:v1#/$defs/note"
+              }
+            },
+            "attachments": {
+              "description": "The attachment manifest. Paths are relative to the review directory.",
+              "type": "array",
+              "items": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+              }
+            }
+          }
+        },
+        "completion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "displayed_revision",
+            "last_feedback_sequence",
+            "submitted_sequences",
+            "unsubmitted_draft_sequences"
+          ],
+          "properties": {
+            "displayed_revision": {
+              "$ref": "urn:hive:schema:review:v1#/$defs/revision_ref"
+            },
+            "last_feedback_sequence": {
+              "description": "The last event of this file the final record includes.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "submitted_sequences": {
+              "description": "The submit events included.",
+              "type": "array",
+              "items": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+              }
+            },
+            "unsubmitted_draft_sequences": {
+              "description": "Draft events saved after the last submission, or with none. They are listed and never applied.",
+              "type": "array",
+              "items": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "target"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "target"
+            ],
+            "properties": {
+              "note": false,
+              "card_draft": false,
+              "submission": false,
+              "completion": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "note"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "note"
+            ],
+            "properties": {
+              "target": false,
+              "card_draft": false,
+              "submission": false,
+              "completion": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "card-draft"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "card_draft"
+            ],
+            "properties": {
+              "target": false,
+              "note": false,
+              "submission": false,
+              "completion": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "submit"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "submission",
+              "control_label"
+            ],
+            "properties": {
+              "target": false,
+              "note": false,
+              "card_draft": false,
+              "completion": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "done"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "completion",
+              "control_label"
+            ],
+            "properties": {
+              "target": false,
+              "note": false,
+              "card_draft": false,
+              "submission": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}

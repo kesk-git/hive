@@ -1,0 +1,486 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:common:v1",
+  "title": "Shared definitions for every Hive contract schema",
+  "description": "Holds no record of its own. Other schemas reference these definitions by this $id and a JSON pointer.",
+  "$defs": {
+    "schema_version": {
+      "description": "MAJOR.MINOR. See spec/records.md, Versioning.",
+      "type": "string",
+      "pattern": "^[1-9][0-9]*\\.(0|[1-9][0-9]*)$"
+    },
+    "home_id": {
+      "type": "string",
+      "pattern": "^home_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "workspace_id": {
+      "type": "string",
+      "pattern": "^ws_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^proj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "clone_id": {
+      "type": "string",
+      "pattern": "^clone_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^task_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^req_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "correlation_id": {
+      "type": "string",
+      "pattern": "^corr_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^rcpt_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^evt_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^sess_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "message_id": {
+      "type": "string",
+      "pattern": "^msg_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "input_id": {
+      "type": "string",
+      "pattern": "^inp_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "review_id": {
+      "type": "string",
+      "pattern": "^rev_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "feedback_event_id": {
+      "type": "string",
+      "pattern": "^fev_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "note_id": {
+      "type": "string",
+      "pattern": "^note_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "response_id": {
+      "type": "string",
+      "pattern": "^resp_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "card_id": {
+      "type": "string",
+      "pattern": "^card_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "question_id": {
+      "type": "string",
+      "pattern": "^q_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "decision_round_id": {
+      "type": "string",
+      "pattern": "^dr_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "any_id": {
+      "description": "Any typed identifier: a registered prefix, an underscore and a lowercase ULID. See spec/identities.md.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]{0,7}_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "option_id": {
+      "description": "Local to its question; unique within one question revision.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "timestamp": {
+      "description": "RFC 3339, UTC, millisecond precision, literal Z.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "git_revision": {
+      "description": "A full Git object name, never abbreviated.",
+      "type": "string",
+      "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "record_revision": {
+      "description": "Counts committed replacements of one record, starting at 1.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "generation": {
+      "description": "An execution generation of a task, or a session generation of a session. Starts at 1 and is never reused.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "byte_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "package_name": {
+      "enum": [
+        "pool",
+        "spawning-pool",
+        "dispatch",
+        "shadow",
+        "synapse",
+        "word",
+        "ui"
+      ]
+    },
+    "command_name": {
+      "type": "string",
+      "pattern": "^hive-[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+    },
+    "operation_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+    },
+    "kind_name": {
+      "description": "A receipt, event or record kind: the owning package, then one to three further lowercase segments.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*){1,3}$"
+    },
+    "error_code": {
+      "description": "A common code from spec/commands.md, or a package code written <package>.<code>.",
+      "type": "string",
+      "pattern": "^([a-z][a-z0-9-]*\\.)?[a-z][a-z0-9_]*$"
+    },
+    "implementation_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "home_relative_path": {
+      "description": "A path relative to its declared base, with forward slashes, no empty, '.' or '..' segment and no leading slash.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[^/\\x00]+(/[^/\\x00]+)*$",
+      "not": {
+        "pattern": "(^|/)\\.\\.?(/|$)"
+      }
+    },
+    "absolute_path": {
+      "description": "An absolute physical path with symbolic links resolved. Private: it never leaves the home that records it.",
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 4096,
+      "pattern": "^/[^\\x00]*$"
+    },
+    "scope_level": {
+      "description": "hive: the Hive's own projectless work. workspace: one workspace as a whole. project: one registered project.",
+      "enum": [
+        "hive",
+        "workspace",
+        "project"
+      ]
+    },
+    "scope_rules": {
+      "description": "Applied by every schema that carries the flat scope fields scope_level, home_id, workspace_id, project_id, clone_id, task_id and generation.",
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "scope_level"
+            ],
+            "properties": {
+              "scope_level": {
+                "const": "hive"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "workspace_id": false,
+              "project_id": false,
+              "clone_id": false
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "scope_level"
+            ],
+            "properties": {
+              "scope_level": {
+                "const": "workspace"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "workspace_id"
+            ],
+            "properties": {
+              "project_id": false,
+              "clone_id": false
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "scope_level"
+            ],
+            "properties": {
+              "scope_level": {
+                "const": "project"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "workspace_id",
+              "project_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "generation"
+            ]
+          },
+          "then": {
+            "required": [
+              "task_id"
+            ]
+          }
+        }
+      ]
+    },
+    "record_ref": {
+      "description": "A reference to one durable record. The revision and digest are given whenever the reference binds a particular state of the record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "id"
+      ],
+      "properties": {
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*){1,3}$"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        },
+        "record_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        }
+      }
+    },
+    "file_ref": {
+      "description": "One file by path, size and digest. The path is relative to the base its containing schema names.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "digest",
+        "bytes"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
+        },
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "bytes": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      }
+    },
+    "authority": {
+      "description": "A reference to the recorded authority an operation relies on. It is a pointer the callee verifies, never a grant by itself.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "none",
+            "word",
+            "posture",
+            "charter",
+            "rule",
+            "instruction"
+          ]
+        },
+        "ref": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "none"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "ref": false
+            }
+          },
+          "else": {
+            "required": [
+              "ref"
+            ]
+          }
+        }
+      ]
+    },
+    "caller": {
+      "description": "Attribution of who issued a request. It is not authentication and grants nothing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "package",
+            "supervisor",
+            "worker",
+            "operator",
+            "test"
+          ]
+        },
+        "package": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/package_name"
+        },
+        "command": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+        },
+        "session_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/session_id"
+        },
+        "session_generation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+        },
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "generation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "package"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "package",
+              "command"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "supervisor"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "session_id",
+              "session_generation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "worker"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "task_id",
+              "generation"
+            ]
+          }
+        }
+      ]
+    },
+    "writer": {
+      "description": "The command that wrote a durable record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package",
+        "command",
+        "operation",
+        "implementation_version"
+      ],
+      "properties": {
+        "package": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/package_name"
+        },
+        "command": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+        },
+        "operation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/operation_name"
+        },
+        "implementation_version": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
+        }
+      }
+    },
+    "open_object": {
+      "description": "A designated open member. Its content is defined by the schema its kind registers, or is carried verbatim.",
+      "type": "object"
+    }
+  }
+}

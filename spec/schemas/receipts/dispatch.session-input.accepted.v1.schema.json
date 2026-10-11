@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:receipts:dispatch.session-input.accepted:v1",
+  "title": "Receipt body: dispatch.session-input.accepted",
+  "description": "One input was placed durably in a session's canonical input sequence. It proves acceptance, never delivery to the model nor a reply. See spec/session-messages.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "input_id",
+    "session_id",
+    "session_generation",
+    "input_sequence",
+    "client",
+    "text_digest",
+    "text_bytes"
+  ],
+  "properties": {
+    "input_id": {
+      "description": "Chosen by the client and reused on retry, so a retried input is accepted once.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/input_id"
+    },
+    "session_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/session_id"
+    },
+    "session_generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "input_sequence": {
+      "description": "The input's place in the session's one input order, whichever client sent it.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "client": {
+      "enum": [
+        "dock",
+        "terminal"
+      ]
+    },
+    "text_digest": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    },
+    "text_bytes": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+    },
+    "message_id": {
+      "description": "The operator message the input became, once that message is recorded.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/message_id"
+    }
+  }
+}

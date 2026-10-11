@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:package:v1",
+  "title": "Package declaration",
+  "description": "The file hive-package.json of each package directory and of the contract library. See spec/packages.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "name",
+    "kind",
+    "title",
+    "owns",
+    "plan_stage",
+    "commands",
+    "home_paths",
+    "kind_prefixes",
+    "receipt_kinds",
+    "test_target",
+    "test_scope",
+    "calls",
+    "executes",
+    "platform",
+    "toolchain",
+    "libraries",
+    "imports"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.package"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "name": {
+      "enum": [
+        "pool",
+        "spawning-pool",
+        "dispatch",
+        "shadow",
+        "synapse",
+        "word",
+        "ui",
+        "contract"
+      ]
+    },
+    "kind": {
+      "description": "package: one of the seven owners, with commands, a test target and at most one store. library: the shared contract library, which owns no command and no store.",
+      "enum": [
+        "package",
+        "library"
+      ]
+    },
+    "title": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/label"
+    },
+    "owns": {
+      "description": "What the package is the single owner of, in one paragraph.",
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_stage": {
+      "description": "The stage of the ordered implementation plan that builds the package.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 7
+    },
+    "executable": {
+      "description": "The one executable the package builds. Every other command name of the package is a link to it.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "purpose",
+          "operations"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "operations": {
+            "description": "The operations the design names. Every command also has capabilities. A later stage adds an operation by amending this list.",
+            "type": "array",
+            "items": {
+              "$ref": "urn:hive:schema:common:v1#/$defs/operation_name"
+            }
+          }
+        }
+      }
+    },
+    "home_paths": {
+      "description": "The paths of a private home that only this package writes, relative to the home.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
+      }
+    },
+    "kind_prefixes": {
+      "description": "The first segment of every record, receipt, event and error name the package owns.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      }
+    },
+    "receipt_kinds": {
+      "description": "The receipt kinds registered so far. A kind with a body names its schema.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "asserts"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/kind_name"
+          },
+          "asserts": {
+            "description": "The one fact a receipt of this kind establishes.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "body_schema": {
+            "type": "string",
+            "pattern": "^urn:hive:schema:receipts:[a-z0-9.-]+:v[1-9][0-9]*$"
+          }
+        }
+      }
+    },
+    "test_target": {
+      "type": "string",
+      "pattern": "^test-[a-z][a-z0-9-]*$"
+    },
+    "test_scope": {
+      "description": "What the target must prove, from the design.",
+      "type": "string",
+      "minLength": 1
+    },
+    "calls": {
+      "description": "The packages whose commands this package may call. The declared graph has no cycle.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/package_name"
+      }
+    },
+    "executes": {
+      "description": "The external executables the package may run. See spec/distribution.md.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core",
+        "transitional",
+        "optional",
+        "project"
+      ],
+      "properties": {
+        "core": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "git",
+              "gh",
+              "tmux",
+              "claude",
+              "codex"
+            ]
+          }
+        },
+        "transitional": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "no-mistakes"
+            ]
+          }
+        },
+        "optional": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "chrome-devtools-axi"
+            ]
+          }
+        },
+        "project": {
+          "description": "True when the package runs a project's own declared validation commands.",
+          "type": "boolean"
+        }
+      }
+    },
+    "platform": {
+      "description": "Platform utilities the package runs as separate processes, each with its reason. Expected to stay empty.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "reason"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "language",
+        "version"
+      ],
+      "properties": {
+        "language": {
+          "enum": [
+            "go"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^1\\.[0-9]+$"
+        },
+        "browser": {
+          "description": "For the package that serves a page: the hand-written browser languages it ships, with no build step.",
+          "type": "array",
+          "items": {
+            "enum": [
+              "html",
+              "css",
+              "javascript"
+            ]
+          }
+        }
+      }
+    },
+    "libraries": {
+      "description": "Third-party modules compiled into the package's executable. Each has an import record.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "module",
+          "import_id"
+        ],
+        "properties": {
+          "module": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "import_id": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/slug"
+          }
+        }
+      }
+    },
+    "imports": {
+      "description": "The import records the package is the maintenance owner of.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/slug"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "package"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "executable"
+        ],
+        "properties": {
+          "commands": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "executable": false,
+          "commands": {
+            "maxItems": 0
+          },
+          "home_paths": {
+            "maxItems": 0
+          },
+          "calls": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ]
+}

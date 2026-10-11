@@ -1,0 +1,53 @@
+{
+  "schema": "hive.package",
+  "schema_version": "1.0",
+  "name": "shadow",
+  "kind": "package",
+  "title": "Shadow",
+  "owns": "Bounded observations; due polls; due-time wakes for scheduled jobs, dated holds and rule expiries; durable wakes and their acknowledgments; reconciled state.",
+  "plan_stage": 4,
+  "executable": "hive-shadow",
+  "commands": [
+    {
+      "name": "hive-shadow",
+      "purpose": "Observations, poll cursors, next-due times, the wake queue and handled sequences.",
+      "operations": []
+    },
+    {
+      "name": "hive-state",
+      "purpose": "Reconciled current state of an owned task, session or run.",
+      "operations": []
+    }
+  ],
+  "home_paths": [
+    "shadow"
+  ],
+  "kind_prefixes": [
+    "shadow"
+  ],
+  "receipt_kinds": [],
+  "test_target": "test-shadow",
+  "test_scope": "Replay, unknown and stale observations, backoff, wake ownership and one wake per record, schedule revision and due occurrence without a timer process.",
+  "calls": [
+    "pool",
+    "dispatch",
+    "synapse",
+    "word"
+  ],
+  "executes": {
+    "core": [
+      "gh",
+      "tmux"
+    ],
+    "transitional": [],
+    "optional": [],
+    "project": false
+  },
+  "platform": [],
+  "toolchain": {
+    "language": "go",
+    "version": "1.27"
+  },
+  "libraries": [],
+  "imports": []
+}

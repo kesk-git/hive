@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-fleet.provision.response:v1",
+  "title": "hive-fleet provision: response body, identity slice",
+  "description": "Every identity the request named, whether this invocation created it or found it. See spec/identities.md, Creating identities.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "home",
+    "projects"
+  ],
+  "properties": {
+    "home": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "created",
+        "record"
+      ],
+      "properties": {
+        "created": {
+          "type": "boolean"
+        },
+        "record": {
+          "$ref": "urn:hive:schema:home:v1"
+        }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "created",
+        "record"
+      ],
+      "properties": {
+        "created": {
+          "type": "boolean"
+        },
+        "record": {
+          "$ref": "urn:hive:schema:workspace:v1"
+        }
+      }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "created",
+          "record",
+          "clones"
+        ],
+        "properties": {
+          "created": {
+            "type": "boolean"
+          },
+          "record": {
+            "$ref": "urn:hive:schema:project:v1"
+          },
+          "clones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "created",
+                "record"
+              ],
+              "properties": {
+                "created": {
+                  "type": "boolean"
+                },
+                "record": {
+                  "$ref": "urn:hive:schema:clone:v1"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

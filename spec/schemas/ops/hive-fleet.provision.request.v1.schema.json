@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-fleet.provision.request:v1",
+  "title": "hive-fleet provision: request body, identity slice",
+  "description": "Body version 1.0 covers identity records only. See spec/identities.md, Creating identities.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "home"
+  ],
+  "properties": {
+    "home": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "name"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "hive",
+            "fleet"
+          ]
+        },
+        "name": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/label"
+        },
+        "parent_home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "fleet"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "parent_home_id"
+            ]
+          },
+          "else": {
+            "properties": {
+              "parent_home_id": false
+            }
+          }
+        }
+      ]
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slug",
+        "name"
+      ],
+      "properties": {
+        "slug": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/slug"
+        },
+        "name": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/label"
+        }
+      }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slug",
+          "name",
+          "repository",
+          "clones"
+        ],
+        "properties": {
+          "slug": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/slug"
+          },
+          "name": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/label"
+          },
+          "repository": {
+            "$ref": "urn:hive:schema:project:v1#/$defs/repository"
+          },
+          "clones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "worktree_root"
+              ],
+              "properties": {
+                "worktree_root": {
+                  "description": "Any path inside the clone. The command resolves the physical common directory and top level itself.",
+                  "$ref": "urn:hive:schema:common:v1#/$defs/absolute_path"
+                },
+                "remote_name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._/-]{1,100}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "home": {
+            "properties": {
+              "role": {
+                "const": "fleet"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "workspace"
+        ]
+      },
+      "else": {
+        "properties": {
+          "workspace": false,
+          "projects": false
+        }
+      }
+    }
+  ]
+}

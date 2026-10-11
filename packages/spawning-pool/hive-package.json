@@ -1,0 +1,61 @@
+{
+  "schema": "hive.package",
+  "schema_version": "1.0",
+  "name": "spawning-pool",
+  "kind": "package",
+  "title": "Spawning Pool",
+  "owns": "The Spawning Pool: the Hive-owned worktrees, their leases, and the acquire, observe and release receipts that bind a physical worktree to one home, workspace, project, clone, task generation and branch. It holds working copies and never work items.",
+  "plan_stage": 3,
+  "executable": "hive-spawning-pool",
+  "commands": [
+    {
+      "name": "hive-spawning-pool",
+      "purpose": "Leases on isolated worktrees in the Hive-owned namespace.",
+      "operations": [
+        "acquire",
+        "observe",
+        "release"
+      ]
+    }
+  ],
+  "home_paths": [
+    "spawning-pool"
+  ],
+  "kind_prefixes": [
+    "spawning-pool"
+  ],
+  "receipt_kinds": [
+    {
+      "kind": "spawning-pool.acquire",
+      "asserts": "A worktree was leased to one task generation, with its physical worktree, base and branch."
+    },
+    {
+      "kind": "spawning-pool.observe",
+      "asserts": "The state of one lease and its worktree was read at the stated time."
+    },
+    {
+      "kind": "spawning-pool.release",
+      "asserts": "A lease was ended and its worktree returned, after the preservation checks passed."
+    }
+  ],
+  "test_target": "test-spawning-pool",
+  "test_scope": "Isolation, concurrency, interrupted operations and preservation.",
+  "calls": [],
+  "executes": {
+    "core": [
+      "git"
+    ],
+    "transitional": [],
+    "optional": [],
+    "project": false
+  },
+  "platform": [],
+  "toolchain": {
+    "language": "go",
+    "version": "1.27"
+  },
+  "libraries": [],
+  "imports": [
+    "treehouse"
+  ]
+}
