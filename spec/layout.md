@@ -32,7 +32,11 @@ packages/
     internal/                        all of the package's code
     testdata/                        fixtures for the package's own tests
     upstream/<import_id>/            upstream licence and notice texts, unchanged
-integration/                         tests of the command contracts between packages
+integration/
+  calls/                             tests of the command contracts between packages
+  distribution/                      the checks of the distribution contract
+  imports/                           the checks of the import records
+  testcmd/                           a test-only command built from contract/, never delivered
 imports/
   README.md
   <import_id>.json                   one import record per body of upstream material

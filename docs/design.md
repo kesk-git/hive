@@ -173,7 +173,7 @@ Licence evidence is tied to the inspected package or upstream revision, and unkn
 
 | Tool | What it provides | Hive component | Origin | Licence evidence | Disposition |
 | --- | --- | --- | --- | --- | --- |
-| Git | Source identity, worktree engine and local landing | `spawning-pool`, `synapse` | [git/git](https://github.com/git/git); Apple distribution | GPL-2.0 upstream; exact Apple notices not gathered | **K**, core source-control dependency |
+| Git | Source identity, worktree engine and local landing | `spawning-pool`, `dispatch`, `synapse` | [git/git](https://github.com/git/git); Apple distribution | GPL-2.0 upstream; exact Apple notices not gathered | **K**, core source-control dependency |
 | gh | GitHub REST/GraphQL transport, publication and checks | `dispatch`, `shadow`, `synapse` forge adapter | [cli/cli](https://github.com/cli/cli) | MIT | **K**, core forge dependency |
 | tmux | Visible sessions and terminal control | `dispatch`, `shadow` runtime adapter | [tmux/tmux](https://github.com/tmux/tmux) | ISC permission form, with per-file notices | **K**, core terminal dependency |
 | Claude Code | Local and qualified Void execution | `dispatch`, `synapse` | Anthropic | Proprietary CLI/service | **K**, core harness dependency |
