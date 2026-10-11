@@ -133,7 +133,7 @@ This is the implementation contract; this documentation change imports no source
 5. **Order:** licence and contracts, Pool, worktree pool, session and metering, gate, review surface within the UI, then end-to-end proof.
 
 The strategy ruling does not perform its implementation or Assimilate this documentation Harvest.
-The licence file is a separate subsequent change and must precede source imports.
+The licence file was added as its own change before any source import, which it must still precede.
 Implementation uses new Hive-owned state and leaves the existing firstmate installation, private homes, worktree pools, status displays and shared no-mistakes configuration untouched.
 
 ### Repository and package contracts
@@ -466,7 +466,7 @@ Pressing **Done** ends the review. It persists the Done event in the current fee
 The five core executables are the normal installed profile; the transitional gate and optional browser stack are explicit exceptions, not permission to add the rest of the scout's tooling.
 Project build/test commands may require their own tools and environments; those belong to that project's validation configuration, not Hive's bootstrap or infrastructure ownership.
 The native UI, including its on-demand [Review](#review) surface, works on loopback without a separate review-page product, hosting wrapper or VPN dependency; optional tailnet access uses the operator's existing, verified private network identity.
-MIT is the chosen licence, but Hive has no licence file yet; record imported portions, upstream repository and exact revision, copyright/licence and third-party notices, retained tests, local changes and maintenance owner before code import.
+MIT is the chosen licence, and the licence file is in place; record imported portions, upstream repository and exact revision, copyright/licence and third-party notices, retained tests, local changes and maintenance owner before code import.
 Retained dependencies keep their own terms, including applicable Apache notices; do not relabel proprietary or unresolved source as MIT.
 No credentials, private home state, decision corpus or global configuration notes enter a public import.
 
