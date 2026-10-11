@@ -1,12 +1,15 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
 	"slices"
+	"time"
 	"unicode/utf8"
 
+	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
@@ -16,7 +19,7 @@ import (
 // The names of the two invocations every command answers without an
 // operation of its own.
 const (
-	CapabilitiesOperation = "capabilities"
+	CapabilitiesOperation = envelope.CapabilitiesOperation
 	VersionFlag           = "--version"
 )
 
@@ -52,12 +55,8 @@ type Executable struct {
 	// Waiting says how a mutating operation waits for its store's lock.
 	Waiting store.Waiting
 	// Storeless declares that the package owns no part of the home and keeps
-	// no store, as word persists through the Pool. A mutating operation of a
-	// storeless executable opens no store, takes no lock, makes no replay
-	// check and records no outcome. Its handler persists through the commands
-	// of the package it calls, sending the same request_id, so that replay is
-	// the callee's, and the receipts it returns are those of a response it
-	// accepted from that callee. It returns no records and no events.
+	// no store, as word persists through the Pool. Check refuses a storeless
+	// executable with a supported mutating operation.
 	Storeless bool
 	// Journal opens the home journal of the home at dir for a transaction
 	// that appends events. Nil means the executable appends none; a
@@ -98,13 +97,10 @@ type Call struct {
 	Request *envelope.Request
 	// Home is the home the command was pointed at, checked.
 	Home *store.Home
-	// Store is the package's store in the home, opened for a mutating
-	// operation and nil for a read-only one and for a storeless executable.
+	// Store is the package's store in the home, opened and locked for a
+	// mutating operation and nil for a read-only one. The handler reads
+	// through it; what it writes it returns in its Result.
 	Store *store.Store
-	// Lock holds the store's transaction lock for a mutating operation. The
-	// handler may replace single records through it; the records, receipts
-	// and events it returns in its Result are committed with the outcome.
-	Lock *store.Writer
 	// Clock is the executable's clock.
 	Clock clock.Clock
 	// Stderr carries diagnostics for a person. Nothing in it is parsed.
@@ -113,6 +109,10 @@ type Call struct {
 	Executable *Executable
 	Command    *Command
 	Operation  *Operation
+
+	// recordedAt is the one time at which the records of a mutating
+	// invocation are written.
+	recordedAt time.Time
 }
 
 // Result is what a handler returns for ok.
@@ -120,12 +120,8 @@ type Result struct {
 	// Body is the operation's own response. It is required.
 	Body map[string]any
 	// Records, Receipts and Events are what the operation writes, committed
-	// in one transaction with the recorded outcome. A record is written with
-	// its record_revision at Expected+1 and its updated_at at the call's
-	// Clock, which holds still for the invocation, so that a digest or a
-	// reference the handler makes of the record is of the record as stored.
-	// A read-only operation returns none, and a storeless executable returns
-	// receipts only.
+	// in one transaction with the recorded outcome. A record is written as
+	// Call.Finalize makes it. A read-only operation returns none.
 	Records  []store.RecordWrite
 	Receipts []envelope.Receipt
 	Events   []store.Event
@@ -143,6 +139,43 @@ func (c *Call) Writer() envelope.Writer {
 		Operation:             c.Operation.Name,
 		ImplementationVersion: c.Executable.Version,
 	}
+}
+
+// Finalize returns the record as the store writes it, with its
+// record_revision at Expected+1 and its updated_at at the one time the
+// invocation's records are written, and the digest of that record. A handler
+// that names a record's digest in its body or in a receipt returns the
+// finalized record and takes the digest from here, so that what it returns is
+// what is stored. A record the handler returns without it is finalized the
+// same way before anything is sealed.
+func (c *Call) Finalize(w store.RecordWrite) (store.RecordWrite, string, error) {
+	if c.Store == nil {
+		return w, "", errors.New("cli: a read-only operation writes no record")
+	}
+	at, err := clock.Format(c.recordedAt)
+	if err != nil {
+		return w, "", err
+	}
+	v, err := canon.Parse(w.Content)
+	if err != nil {
+		return w, "", fmt.Errorf("cli: content for %s: %w", w.Path, err)
+	}
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return w, "", fmt.Errorf("cli: content for %s is not a JSON object", w.Path)
+	}
+	obj["record_revision"] = w.Expected + 1
+	obj["updated_at"] = at
+	out, err := canon.Encode(obj)
+	if err != nil {
+		return w, "", fmt.Errorf("cli: content for %s: %w", w.Path, err)
+	}
+	digest, err := canon.RecordDigest(out)
+	if err != nil {
+		return w, "", fmt.Errorf("cli: content for %s: %w", w.Path, err)
+	}
+	w.Content = out
+	return w, digest, nil
 }
 
 // Stamp is the clock's time as a timestamp.
@@ -243,9 +276,6 @@ func (e *Executable) Check() error {
 	if n := utf8.RuneCountInString(e.Version); n == 0 || n > 100 {
 		return fmt.Errorf("cli: the implementation version is one to one hundred characters")
 	}
-	if e.Storeless && e.Journal != nil {
-		return fmt.Errorf("cli: the executable %s is storeless and appends no events", e.Name)
-	}
 	if e.command(e.Name) == nil {
 		return fmt.Errorf("cli: the executable %s does not list the command of its own name", e.Name)
 	}
@@ -269,6 +299,9 @@ func (e *Executable) Check() error {
 			ops = append(ops, op.Name)
 			if op.State == envelope.Supported && op.Handle == nil {
 				return fmt.Errorf("cli: %s %s is supported and has no handler", c.Name, op.Name)
+			}
+			if e.Storeless && op.State == envelope.Supported && op.Mutates {
+				return fmt.Errorf("cli: %s %s mutates, and the executable %s is storeless: the delegating handoff is defined with the package that needs it", c.Name, op.Name, e.Name)
 			}
 		}
 		if err := e.Capabilities(c).Check(); err != nil {

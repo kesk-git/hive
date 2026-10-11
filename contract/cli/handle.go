@@ -181,7 +181,12 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	// The whole request, before anything else is read or written.
 	req, err := envelope.DecodeRequest(inv.Request)
 	if err != nil {
-		return fail(e.requestID(inv.Request), envelope.AsFailure(err)), nil
+		f := envelope.AsFailure(err)
+		id := e.requestID(inv.Request)
+		if id == "" && f.Err.Code != envelope.CodeMalformedRequest {
+			f = envelope.Common(envelope.CodeMalformedRequest, "the request names no request_id that can be read: "+f.Err.Message)
+		}
+		return fail(id, f), nil
 	}
 	if err := req.Addressed(c.Name, op.Name); err != nil {
 		return fail(req.RequestID, envelope.AsFailure(err)), nil
@@ -211,11 +216,10 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		return fail(req.RequestID, envelope.AsFailure(err)), nil
 	}
 
-	pin := &pinned{Clock: e.clock()}
 	call := &Call{
 		Request:    req,
 		Home:       home,
-		Clock:      pin,
+		Clock:      e.clock(),
 		Stderr:     inv.Stderr,
 		Executable: e,
 		Command:    c,
@@ -245,46 +249,22 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		}
 		return resp, true
 	}
-	// notStored is the fault of a handler that returns what only a store
-	// writes, where this invocation has none.
-	notStored := func() *envelope.Response {
-		return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the operation returned records or events, and this invocation keeps no store"))
-	}
 
 	if !op.Mutates {
-		pin.pin()
 		res, err := e.run(call)
 		if err != nil {
 			resp, _ := failed(envelope.AsFailure(err))
 			return resp, nil
 		}
 		if len(res.Records)+len(res.Receipts)+len(res.Events) > 0 {
-			return notStored(), nil
+			return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "a read-only operation records nothing, and it returned records")), nil
 		}
 		return ok(res.Body, nil), res.After
 	}
 
-	// A mutating operation of a storeless executable keeps no store: it
-	// persists through the commands of the package it calls, which replay.
-	if e.Storeless {
-		pin.pin()
-		res, err := e.run(call)
-		if err != nil {
-			resp, _ := failed(envelope.AsFailure(err))
-			return resp, nil
-		}
-		if len(res.Records)+len(res.Events) > 0 {
-			return notStored(), nil
-		}
-		resp := ok(res.Body, res.Receipts)
-		if bad := e.preflight(c, resp); bad != nil {
-			return bad, nil
-		}
-		return resp, res.After
-	}
-
 	// A mutating operation: the store's lock, then the replay check.
-	st, w, err := e.open(home, pin)
+	at := &recordClock{}
+	st, w, err := e.open(home, at)
 	if err != nil {
 		return fail(req.RequestID, envelope.AsFailure(err)), nil
 	}
@@ -305,9 +285,9 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		resp.Replayed = true
 		return resp, nil
 	}
-	call.Store, call.Lock = st, w
+	at.at = e.clock().Now()
+	call.Store, call.recordedAt = st, at.at
 
-	pin.pin()
 	res, err := e.run(call)
 	if err != nil {
 		f := envelope.AsFailure(err)
@@ -324,6 +304,14 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		}
 		return resp, nil
 	}
+	// The records are final before anything is sealed.
+	for i := range res.Records {
+		rec, _, err := call.Finalize(res.Records[i])
+		if err != nil {
+			return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the operation returned a record that cannot be written: "+err.Error())), nil
+		}
+		res.Records[i] = rec
+	}
 	resp = ok(res.Body, res.Receipts)
 	// The response is checked and sized before anything is written, so that a
 	// response too large to return leaves nothing behind.
@@ -336,22 +324,11 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	return resp, res.After
 }
 
-// pinned is the executable's clock held still once pinned, so that the time
-// a handler stamps on a record is the time the store writes into it, and the
-// receipts and the response carry the same time as the records they name.
-type pinned struct {
-	clock.Clock
-	at time.Time
-}
+// recordClock is the clock of the store: the one time at which the records of
+// an invocation are written, set once its lock is held.
+type recordClock struct{ at time.Time }
 
-func (p *pinned) pin() { p.at = p.Clock.Now() }
-
-func (p *pinned) Now() time.Time {
-	if p.at.IsZero() {
-		return p.Clock.Now()
-	}
-	return p.at
-}
+func (c *recordClock) Now() time.Time { return c.at }
 
 // preflight stamps the response and checks that it can be written whole:
 // valid under the response schema and within the command's limit. It returns
@@ -522,11 +499,14 @@ func (e *Executable) commit(st *store.Store, w *store.Writer, requestID, digest 
 	tx.Outcome = outcome
 	if _, err := w.Commit(tx); err != nil {
 		// Once the intent is durable the transaction is the store's to
-		// complete, and the next lock does; the response that promises
-		// nothing changed is then false, and the outcome is unknown until the
-		// same request is sent again.
-		if _, serr := os.Lstat(filepath.Join(st.Dir, filepath.FromSlash(store.IntentPath(st.Package(), requestID)))); serr == nil || !errors.Is(serr, fs.ErrNotExist) {
-			return envelope.Common(envelope.CodeOutcomeUnknown, "the transaction was interrupted after it was recorded; sending the same request again completes it: "+err.Error())
+		// complete, and the next lock does; and once the outcome is written
+		// only the intent's removal is left. The response that promises
+		// nothing changed is false from the intent on, and the outcome is
+		// unknown until the same request is sent again.
+		for _, rel := range []string{store.IntentPath(st.Package(), requestID), store.OutcomePath(st.Package(), requestID)} {
+			if _, serr := os.Lstat(filepath.Join(st.Dir, filepath.FromSlash(rel))); serr == nil || !errors.Is(serr, fs.ErrNotExist) {
+				return envelope.Common(envelope.CodeOutcomeUnknown, "the transaction was interrupted after it was recorded; sending the same request again completes it: "+err.Error())
+			}
 		}
 		return storeFailure(err)
 	}

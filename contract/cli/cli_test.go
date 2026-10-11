@@ -62,7 +62,7 @@ func TestCheck(t *testing.T) {
 	})
 	bad("package not a package", func(e *Executable) { e.Package = "contract" })
 	bad("version over a hundred characters", func(e *Executable) { e.Version = strings.Repeat("é", 101) })
-	bad("storeless with a journal", func(e *Executable) { e.Storeless = true })
+	bad("storeless with a mutating operation", func(e *Executable) { e.Storeless = true })
 	// The limits are characters: a hundred two-byte ones are not too many.
 	e := *h.exe
 	e.Version = strings.Repeat("é", 100)
@@ -199,11 +199,11 @@ func TestInvalid(t *testing.T) {
 		{"not json", []byte("hello\n"), "malformed_request", false},
 		{"truncated", good[:len(good)-10], "malformed_request", false},
 		{"two documents", append(append([]byte{}, good...), good...), "malformed_request", false},
-		{"not an object", []byte("[]\n"), "schema_violation", false},
+		{"not an object", []byte("[]\n"), "malformed_request", false},
 		{"newer envelope", request(t, "echo", 1, func(m map[string]any) { m["schema_version"] = "1.1" }), "unsupported_version", true},
 		{"unknown field", request(t, "echo", 1, func(m map[string]any) { m["extra"] = 1 }), "schema_violation", true},
 		{"missing field", request(t, "echo", 1, func(m map[string]any) { delete(m, "caller") }), "schema_violation", true},
-		{"request_id of another kind", request(t, "echo", 1, func(m map[string]any) { m["request_id"] = workspaceID }), "schema_violation", false},
+		{"request_id of another kind", request(t, "echo", 1, func(m map[string]any) { m["request_id"] = workspaceID }), "malformed_request", false},
 		{"another command", request(t, "echo", 1, func(m map[string]any) { m["command"] = "hive-pool" }), "envelope_mismatch", true},
 		{"another operation", request(t, "put", 1, nil), "envelope_mismatch", true},
 		{"body version not accepted", request(t, "echo", 1, func(m map[string]any) { m["operation_version"] = "2.0" }), "unsupported_version", true},
@@ -397,7 +397,7 @@ func TestReadOnly(t *testing.T) {
 		resp := h.invoke(t, home, "echo", req)
 		expect(t, resp, envelope.Ok, "")
 		if resp.Replayed || resp.RequestID != id(ids.Request, 1) || resp.Command != "hive-fleet" || resp.Operation != "echo" || resp.CompletedAt != "2026-10-11T08:00:00.000Z" ||
-			resp.Responder != (envelope.Responder{Package: "dispatch", Command: "hive-fleet", ImplementationVersion: "0.1.0-test", ContractVersion: "1.0"}) || len(resp.Receipts) != 0 {
+			resp.Responder != (envelope.Responder{Package: "dispatch", Command: "hive-fleet", ImplementationVersion: "0.1.0-test", ContractVersion: envelope.ContractVersion}) || len(resp.Receipts) != 0 {
 			t.Errorf("%+v", resp)
 		}
 		if resp.Body["scope"] != "hive" || resp.Body["home"] != homeID || resp.Body["echo"].(map[string]any)["home"].(map[string]any)["name"] != "A home" {
@@ -784,13 +784,17 @@ func TestUnavailable(t *testing.T) {
 		t.Errorf("%+v", r)
 	}
 
-	// A request file that cannot be read.
+	// A request file that cannot be read: no request was read, so the
+	// response names none and a caller does not accept it as an answer.
 	code, out, _ := h.run("hive-fleet", nil, "echo", "--home", home, "--request-file", filepath.Join(home, "nothing.json"))
-	resp, err := envelope.Accept(out, code, "")
-	if err != nil {
-		t.Fatal(err)
+	resp, err := envelope.DecodeResponse(out)
+	if err != nil || resp.ExitCode() != code {
+		t.Fatalf("exit %d: %v", code, err)
 	}
 	expect(t, resp, envelope.Unavailable, "source_unreadable")
+	if _, err := envelope.Accept(out, code, id(ids.Request, 1)); envelope.AsFailure(err) == nil {
+		t.Error("a response that answers no request was accepted for one")
+	}
 }
 
 // Transport: the request from a file or standard input, the response to a
@@ -993,9 +997,10 @@ func TestInterruptedCommitIsUnknownUntilCompleted(t *testing.T) {
 	}
 }
 
-// A record the handler stamps with the call's time is the record the store
-// writes, so the digest the response and the receipt carry is the digest of
-// the record on disk, though the clock moves between every reading.
+// A record is final before anything is sealed: the digest the response and
+// the receipt carry, taken from Finalize, is the digest of the record on disk
+// though the clock moves between every reading, and a record returned without
+// Finalize is written as Finalize would make it.
 func TestRecordIsFinalBeforeItIsSealed(t *testing.T) {
 	h := newHarness(t)
 	h.exe.Clock = &ticking{at: epoch}
@@ -1010,105 +1015,76 @@ func TestRecordIsFinalBeforeItIsSealed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Body["digest"] != rec.Digest || resp.Receipts[0].Subject.Digest != rec.Digest {
+	if resp.Body["digest"] != rec.Digest || resp.Receipts[0].Subject.Digest != rec.Digest || rec.Revision != 1 {
 		t.Errorf("the response says %v, the receipt %s, the record on disk %s", resp.Body["digest"], resp.Receipts[0].Subject.Digest, rec.Digest)
 	}
-	v, err := canon.Parse(rec.Data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v.(map[string]any)["updated_at"] != resp.Body["updated_at"] {
-		t.Errorf("updated_at %v on disk, %v answered", v.(map[string]any)["updated_at"], resp.Body["updated_at"])
+	// The handler's own clock is live.
+	tick := h.invoke(t, home, "tick", request(t, "tick", 3, nil))
+	if tick.Body["a"] == tick.Body["b"] {
+		t.Errorf("the clock of a read-only call held still: %v", tick.Body)
 	}
 	// What the outcome recorded is what was returned and what was stored.
 	again := h.invoke(t, home, "stamp", request(t, "stamp", 1, nil))
 	if !again.Replayed || again.Body["digest"] != rec.Digest {
 		t.Errorf("%+v", again)
 	}
+
+	expect(t, h.invoke(t, home, "raw", request(t, "raw", 2, nil)), envelope.Ok, "")
+	raw, err := st.ReadRecord(store.RecordPath("dispatch", "thing", "raw"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _ := canon.Parse(raw.Data)
+	if raw.Revision != 1 || v.(map[string]any)["updated_at"] == "2020-01-01T00:00:00.000Z" {
+		t.Errorf("a record returned unfinalized was written as it was: %s", raw.Data)
+	}
 }
 
-// An executable that owns no part of the home keeps no store: a mutating
-// operation of it opens none, takes no lock, records no outcome and writes
-// no record, and returns the receipts of the callee it persisted through,
-// which replays by the same request_id.
+// An executable that owns no part of the home keeps no store, and Check holds
+// it to that: it may run read-only operations and declare mutating ones
+// unsupported or parked, and a supported mutating operation is refused.
 func TestStorelessExecutable(t *testing.T) {
 	h := newHarness(t)
-	home := newHome(t)
-	say := &Operation{
-		OperationDecl: envelope.OperationDecl{Name: "say", State: envelope.Supported, Mode: envelope.Unary, Mutates: true, Versions: []string{"1.0"},
-			RequestSchema: testRequestSchema, ResponseSchema: testResponseSchema, ReceiptKinds: []string{}, Executes: []string{}, Calls: []string{}},
-		Handle: func(c *Call) (*Result, error) {
-			name := c.Request.Body["home"].(map[string]any)["name"].(string)
-			switch name {
-			case "record":
-				return &Result{Body: map[string]any{}, Records: []store.RecordWrite{{Path: store.RecordPath("dispatch", "thing", "x"), Content: []byte(`{}`)}}}, nil
-			case "event":
-				return &Result{Body: map[string]any{}, Events: []store.Event{{ID: id(ids.Event, 1), Content: []byte(`{}`)}}}, nil
-			}
-			// Persist through the callee with the same request_id, and return
-			// the receipts of the response accepted from it.
-			callee := request(t, "put", 1, func(m map[string]any) {
-				m["request_id"] = c.Request.RequestID
-				m["body"].(map[string]any)["home"].(map[string]any)["name"] = name
-			})
-			code, out, _ := h.run("hive-fleet", callee, "put", HomeOption, c.Home.Dir)
-			resp, err := envelope.Accept(out, code, c.Request.RequestID)
-			if err != nil {
-				return nil, err
-			}
-			if resp.Status != envelope.Ok {
-				return nil, errors.New("the callee did not complete")
-			}
-			return &Result{Body: map[string]any{"said": name}, Receipts: resp.Receipts}, nil
-		},
-	}
+	read := &Operation{OperationDecl: envelope.OperationDecl{Name: "look", State: envelope.Supported, Mode: envelope.Unary, Versions: []string{"1.0"},
+		RequestSchema: testRequestSchema, ResponseSchema: testResponseSchema, ReceiptKinds: []string{}, Executes: []string{}, Calls: []string{}},
+		Handle: func(c *Call) (*Result, error) { return &Result{Body: map[string]any{"seen": true}}, nil }}
+	closed := &Operation{OperationDecl: envelope.OperationDecl{Name: "say", State: envelope.Unsupported, Reason: "built at stage 4", Mode: envelope.Unary, Mutates: true, Versions: []string{}, ReceiptKinds: []string{}, Executes: []string{}, Calls: []string{}}}
+	parked := &Operation{OperationDecl: envelope.OperationDecl{Name: "mute", State: envelope.Parked, Reason: "held closed by decision 7", Mode: envelope.Unary, Mutates: true, Versions: []string{"1.0"}, ReceiptKinds: []string{}, Executes: []string{}, Calls: []string{}}}
 	word := &Executable{Package: "word", Name: "hive-word", Version: "0.1.0-test", Storeless: true,
-		Commands: []*Command{{Name: "hive-word", Operations: []*Operation{say}}}, Clock: h.clk}
+		Commands: []*Command{{Name: "hive-word", Operations: []*Operation{read, closed, parked}}}, Clock: h.clk}
 	if err := word.Check(); err != nil {
 		t.Fatal(err)
 	}
-	send := func(n int, name string) *envelope.Response {
+	home := newHome(t)
+	before := tree(t, home)
+	send := func(operation string) *envelope.Response {
 		t.Helper()
-		req := request(t, "say", n, func(m map[string]any) {
-			m["command"] = "hive-word"
-			m["body"].(map[string]any)["home"].(map[string]any)["name"] = name
-		})
+		req := request(t, operation, 1, func(m map[string]any) { m["command"] = "hive-word" })
 		var stdout, stderr bytes.Buffer
-		code := word.Main([]string{"hive-word", "say", HomeOption, home}, bytes.NewReader(req), &stdout, &stderr)
-		resp, err := envelope.Accept(stdout.Bytes(), code, id(ids.Request, n))
+		code := word.Main([]string{"hive-word", operation, HomeOption, home}, bytes.NewReader(req), &stdout, &stderr)
+		resp, err := envelope.Accept(stdout.Bytes(), code, id(ids.Request, 1))
 		if err != nil {
 			t.Fatalf("%v\n%s", err, stdout.String())
 		}
 		return resp
 	}
+	if resp := send("look"); resp.Status != envelope.Ok || resp.Body["seen"] != true {
+		t.Errorf("%+v", resp)
+	}
+	expect(t, send("say"), envelope.Refused, "unsupported_operation")
+	expect(t, send("mute"), envelope.Refused, "operation_parked")
+	same(t, before, tree(t, home))
 
-	resp := send(1, "first")
-	expect(t, resp, envelope.Ok, "")
-	if resp.Body["said"] != "first" || len(resp.Receipts) != 1 || resp.Receipts[0].Writer.Package != "dispatch" {
-		t.Fatalf("%+v", resp)
+	say := *closed
+	say.State, say.Versions, say.RequestSchema, say.ResponseSchema = envelope.Supported, []string{"1.0"}, testRequestSchema, testResponseSchema
+	say.Handle = func(c *Call) (*Result, error) { return &Result{Body: map[string]any{}}, nil }
+	word.Commands = []*Command{{Name: "hive-word", Operations: []*Operation{read, &say}}}
+	err := word.Check()
+	if err == nil || !strings.Contains(err.Error(), "delegating handoff") {
+		t.Errorf("Check: %v", err)
 	}
-	for _, p := range []string{"word", "locks/word.lock", "word/requests"} {
-		if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(p))); err == nil {
-			t.Errorf("%s was created", p)
-		}
-	}
-	if _, err := os.Stat(filepath.Join(home, filepath.FromSlash(store.ReceiptPath("dispatch", resp.Receipts[0].ReceiptID)))); err != nil {
-		t.Errorf("the callee's receipt is not on disk: %v", err)
-	}
-	// The same request again: the callee replays, and the receipts passed
-	// through are the same; the executable itself records and replays nothing.
-	files := tree(t, home)
-	again := send(1, "first")
-	expect(t, again, envelope.Ok, "")
-	if again.Replayed || len(again.Receipts) != 1 || again.Receipts[0].ReceiptID != resp.Receipts[0].ReceiptID || h.calls["put"] != 1 {
-		t.Errorf("%+v, calls %d", again, h.calls["put"])
-	}
-	same(t, files, tree(t, home))
-
-	// A storeless handler that returns what only a store writes is at fault.
-	for _, name := range []string{"record", "event"} {
-		fault := send(2, name)
-		expect(t, fault, envelope.Failed, "internal")
-		same(t, files, tree(t, home))
+	var stdout, stderr bytes.Buffer
+	if code := word.Main([]string{"hive-word", "look", HomeOption, home}, bytes.NewReader(request(t, "look", 1, nil)), &stdout, &stderr); code != 1 || stdout.Len() != 0 {
+		t.Errorf("Main: exit %d, stdout %q", code, stdout.String())
 	}
 }

@@ -10,10 +10,13 @@ import (
 	"github.com/kesk-git/hive/contract/schema"
 )
 
-// ContractVersion is the version of the command contract this build
-// implements: the schema_version every envelope carries and every responder
-// reports.
-const ContractVersion = "1.0"
+// ContractVersion is the version of the specification this build implements,
+// which every responder and every capability declaration reports.
+const ContractVersion = "1.3"
+
+// SchemaVersion is the schema_version of the four envelopes. The envelope
+// schemas are unchanged since the first version of the specification.
+const SchemaVersion = "1.0"
 
 // The schema names and identifiers of the four documents.
 const (

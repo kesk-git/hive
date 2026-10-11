@@ -2,7 +2,7 @@ package envelope
 
 // Receipt is the receipt envelope (spec/receipts.md): an immutable record
 // that one named fact was established. Its schema and schema_version are
-// fixed: hive.receipt at ContractVersion. An empty string or a zero number is
+// fixed: hive.receipt at SchemaVersion. An empty string or a zero number is
 // an absent field; Evidence is written as an empty array when nil.
 type Receipt struct {
 	ReceiptID     string
@@ -25,7 +25,7 @@ type Receipt struct {
 // reads, valid under receipt.v1. It fails with a *Failure as DecodeRequest
 // does.
 func DecodeReceipt(data []byte) (*Receipt, error) {
-	obj, err := decodeDocument(data, ReceiptSchema, ReceiptSchemaID, ContractVersion)
+	obj, err := decodeDocument(data, ReceiptSchema, ReceiptSchemaID, SchemaVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func readReceipt(f fields) (*Receipt, error) {
 func (r *Receipt) Tree() map[string]any {
 	m := map[string]any{
 		"schema":         ReceiptSchema,
-		"schema_version": ContractVersion,
+		"schema_version": SchemaVersion,
 		"receipt_id":     r.ReceiptID,
 		"kind":           r.Kind,
 		"kind_version":   r.KindVersion,

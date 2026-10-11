@@ -191,14 +191,14 @@ func TestFailureRules(t *testing.T) {
 		if err := f.Check(); (err == nil) != c.ok {
 			t.Errorf("%d characters: Check %v", c.chars, err)
 		}
-		r := &Response{Command: "hive-pool", Status: Failed, Responder: Responder{Package: "pool", Command: "hive-pool", ImplementationVersion: "0.1.0", ContractVersion: ContractVersion},
+		r := &Response{RequestID: "req_01arz3ndektsv4rrffq69g5fav", Command: "hive-pool", Status: Failed, Responder: Responder{Package: "pool", Command: "hive-pool", ImplementationVersion: "0.1.0", ContractVersion: ContractVersion},
 			CompletedAt: "2026-10-11T08:00:00.000Z", Error: &f.Err}
 		out, err := r.Encode()
 		if c.ok {
 			if err != nil {
 				t.Fatalf("%d characters: %v", c.chars, err)
 			}
-			if _, err := Accept(out, 1, ""); err != nil {
+			if _, err := Accept(out, 1, "req_01arz3ndektsv4rrffq69g5fav"); err != nil {
 				t.Errorf("%d characters: %v", c.chars, err)
 			}
 		} else if err == nil {
@@ -525,6 +525,11 @@ func TestAccept(t *testing.T) {
 		{"null with a refusal", nullID(t, "refused", 4, "home_mismatch"), 4, "req_01arz3ndektsv4rrffq69g5fav"},
 		{"null with another invalid code", nullID(t, "invalid", 3, "schema_violation"), 3, "req_01arz3ndektsv4rrffq69g5fav"},
 		{"an identity where the caller has none", good, 0, ""},
+		{"null failed where the caller has none", nullID(t, "failed", 1, "internal"), 1, ""},
+		{"null with a hold", nullHeld(t), 10, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"too_large about the response", tooLarge(t, func(e map[string]any) { e["detail"] = map[string]any{"record": "response"} }), 7, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"too_large without the detail", tooLarge(t, func(e map[string]any) { delete(e, "detail") }), 7, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"too_large within the limit", tooLarge(t, func(e map[string]any) { e["actual_bytes"] = e["limit_bytes"] }), 7, "req_01arz3ndektsv4rrffq69g5fav"},
 		{"not a response", []byte("ok\n"), 0, ""},
 	}
 	for _, c := range cases {
@@ -552,15 +557,35 @@ func TestAccept(t *testing.T) {
 		{"usage", nullID(t, "usage", 2, "usage"), 2, Usage},
 		{"a request that is no record", nullID(t, "invalid", 3, "malformed_request"), 3, Invalid},
 	} {
-		r, err := Accept(c.out, c.exit, id)
-		if err != nil || r.Status != c.status || r.RequestID != "" {
-			t.Errorf("%s: %v %+v", c.name, err, r)
+		for _, caller := range []string{id, ""} {
+			r, err := Accept(c.out, c.exit, caller)
+			if err != nil || r.Status != c.status || r.RequestID != "" {
+				t.Errorf("%s for %q: %v %+v", c.name, caller, err, r)
+			}
 		}
 	}
-	// A caller that carries no identity accepts a null one with any status.
-	if _, err := Accept(nullID(t, "failed", 1, "internal"), 1, ""); err != nil {
-		t.Error(err)
+	// The capabilities invocation takes no request and answers with none.
+	caps := tree(t, fixture(t, "response-ok.json"))
+	caps["request_id"], caps["operation"] = nil, CapabilitiesOperation
+	if r, err := Accept(encode(t, caps), 0, ""); err != nil || r.Status != Ok {
+		t.Errorf("capabilities: %v", err)
 	}
+}
+
+// tooLarge is the too_large response of a request over the limit, edited.
+func tooLarge(t *testing.T, edit func(e map[string]any)) []byte {
+	t.Helper()
+	m := tree(t, fixture(t, "response-too-large.json"))
+	edit(m["error"].(map[string]any))
+	return encode(t, m)
+}
+
+// nullHeld is a held response whose request_id is null.
+func nullHeld(t *testing.T) []byte {
+	t.Helper()
+	m := tree(t, fixture(t, "response-held.json"))
+	m["request_id"] = nil
+	return encode(t, m)
 }
 
 // nullID is a failure response of the status, code and exit code whose
@@ -627,6 +652,20 @@ func TestCapabilitiesRoundTrip(t *testing.T) {
 	want, _ := canon.Line(data)
 	if !bytes.Equal(out, want) {
 		t.Errorf("Encode is not the canonical form:\n%s\n%s", out, want)
+	}
+	// The specification version a command reports is not the schema version of
+	// the envelope: a declaration of this build's specification, or an older
+	// one, is read, a newer one is not, and every envelope carries 1.0.
+	for version, ok := range map[string]bool{ContractVersion: true, "1.0": true, "1.4": false, "2.0": false} {
+		m := tree(t, data)
+		m["contract_version"] = version
+		_, err := DecodeCapabilities(m)
+		if (err == nil) != ok {
+			t.Errorf("contract_version %s: %v", version, err)
+		}
+	}
+	if m := c.Tree(); m["schema_version"] != SchemaVersion || m["contract_version"] != c.ContractVersion {
+		t.Errorf("%v %v", m["schema_version"], m["contract_version"])
 	}
 	// A declaration with no operations is valid; one with a supported
 	// operation that names no schemas or versions is not.

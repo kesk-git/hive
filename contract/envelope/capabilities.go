@@ -2,6 +2,10 @@ package envelope
 
 import "fmt"
 
+// CapabilitiesOperation is the name of the one operation every command
+// answers without a request.
+const CapabilitiesOperation = "capabilities"
+
 // Size limits of the command contract (spec/commands.md, Size and
 // Invocation).
 const (
@@ -124,7 +128,7 @@ func (c *Capabilities) Tree() map[string]any {
 	}
 	m := map[string]any{
 		"schema":                 CapabilitiesSchema,
-		"schema_version":         ContractVersion,
+		"schema_version":         SchemaVersion,
 		"command":                c.Command,
 		"package":                c.Package,
 		"executable":             c.Executable,

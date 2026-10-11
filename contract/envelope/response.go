@@ -6,7 +6,7 @@ import (
 
 // Response is the one document a command writes for each invocation
 // (spec/commands.md, The response). Its schema and schema_version are fixed:
-// hive.response at ContractVersion. Its exit code is that of its Status. An
+// hive.response at SchemaVersion. Its exit code is that of its Status. An
 // empty RequestID is written null, and so is an empty Operation; Receipts
 // nil is written as an empty array. Body is present only with ok and Error
 // with every other status.
@@ -56,7 +56,7 @@ func (r *Response) Check() error {
 func (r *Response) Tree() map[string]any {
 	m := map[string]any{
 		"schema":         ResponseSchema,
-		"schema_version": ContractVersion,
+		"schema_version": SchemaVersion,
 		"command":        r.Command,
 		"status":         string(r.Status),
 		"exit_code":      int64(r.ExitCode()),
@@ -127,7 +127,7 @@ func (r *Response) Encode() ([]byte, error) {
 // as DecodeRequest does; Accept is the caller's rule, which turns such a
 // failure into unknown.
 func DecodeResponse(data []byte) (*Response, error) {
-	obj, err := decodeDocument(data, ResponseSchema, ResponseSchemaID, ContractVersion)
+	obj, err := decodeDocument(data, ResponseSchema, ResponseSchemaID, SchemaVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -243,13 +243,14 @@ func readError(f fields) (*Error, error) {
 
 // Accept is the caller's rule for a response (spec/commands.md, The
 // response): the whole output parses, follows the schema, echoes the
-// caller's request_id ("" for an invocation that carries none) and agrees
-// with the process's exit code. A request_id that is not null is the
-// caller's in every case; a null one is accepted only with a status the
-// callee reaches before it can read the request's identity. Anything else is
-// a *Failure of status unknown, never success and never an empty result; a
-// process that ended by a signal or a timeout gave no output and is unknown
-// the same way.
+// caller's request_id and agrees with the process's exit code. A request_id
+// that is not null is the caller's in every case. A null one is accepted only
+// where the callee answers before it can read the request's identity or the
+// invocation carries no request: usage, invalid with code malformed_request,
+// too_large because the request exceeded the limit, and the capabilities
+// invocation. Anything else is a *Failure of status unknown, never success
+// and never an empty result; a process that ended by a signal or a timeout
+// gave no output and is unknown the same way.
 func Accept(output []byte, exit int, requestID string) (*Response, error) {
 	unknown := func(format string, args ...any) error {
 		return Common(CodeOutcomeUnknown, fmt.Sprintf(format, args...))
@@ -264,7 +265,11 @@ func Accept(output []byte, exit int, requestID string) (*Response, error) {
 	if err != nil {
 		return nil, unknown("the response is not a response: %v", err)
 	}
-	if r.RequestID != requestID && (r.RequestID != "" || !r.unreadIdentity()) {
+	if r.RequestID == "" {
+		if !r.mayCarryNoRequestID() {
+			return nil, unknown("the response answers no request")
+		}
+	} else if r.RequestID != requestID {
 		return nil, unknown("the response answers another request")
 	}
 	if r.ExitCode() != exit {
@@ -273,15 +278,22 @@ func Accept(output []byte, exit int, requestID string) (*Response, error) {
 	return r, nil
 }
 
-// unreadIdentity reports whether the response is one a callee gives before it
-// can read the request's identity: usage, too_large for a request over the
-// limit, and invalid with code malformed_request.
-func (r *Response) unreadIdentity() bool {
+// mayCarryNoRequestID reports whether a response with a null request_id is
+// one the contract allows: the capabilities invocation, which takes no
+// request, or an answer given before the request's identity could be read.
+func (r *Response) mayCarryNoRequestID() bool {
+	if r.Operation == CapabilitiesOperation {
+		return true
+	}
 	switch r.Status {
-	case Usage, TooLarge:
+	case Usage:
 		return true
 	case Invalid:
 		return r.Error != nil && r.Error.Code == CodeMalformedRequest
+	case TooLarge:
+		e := r.Error
+		return e != nil && e.Code == CodeRecordTooLarge && e.Detail["record"] == "request" &&
+			e.LimitBytes != nil && e.ActualBytes != nil && *e.ActualBytes > *e.LimitBytes
 	}
 	return false
 }

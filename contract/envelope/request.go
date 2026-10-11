@@ -9,7 +9,7 @@ import (
 
 // Request is the one document a caller sends to a command (spec/commands.md,
 // The request). Its schema and schema_version are fixed: hive.request at
-// ContractVersion. An empty string or a zero number is an absent field; nil
+// SchemaVersion. An empty string or a zero number is an absent field; nil
 // ExpectedRevisions is absent, an empty non-nil list is present and empty.
 type Request struct {
 	Command          string
@@ -34,7 +34,7 @@ type Request struct {
 // malformed_request for bytes that are not a record, unsupported_version for
 // a newer envelope, schema_violation otherwise.
 func DecodeRequest(data []byte) (*Request, error) {
-	obj, err := decodeDocument(data, RequestSchema, RequestSchemaID, ContractVersion)
+	obj, err := decodeDocument(data, RequestSchema, RequestSchemaID, SchemaVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func readRequest(f fields) (*Request, error) {
 func (r *Request) Tree() map[string]any {
 	m := map[string]any{
 		"schema":            RequestSchema,
-		"schema_version":    ContractVersion,
+		"schema_version":    SchemaVersion,
 		"command":           r.Command,
 		"operation":         r.Operation,
 		"operation_version": r.OperationVersion,

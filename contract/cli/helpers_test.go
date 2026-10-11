@@ -203,7 +203,7 @@ func newHarness(t testing.TB) *harness {
 	fleet := &Command{Name: "hive-fleet", Limits: envelope.Limits{MaxRequestBytes: 4096, MaxResponseBytes: 4096}, Operations: []*Operation{
 		// echo answers with the request's body and scope; read-only.
 		{OperationDecl: decl("echo", false), Handle: count("echo", func(c *Call) (*Result, error) {
-			if c.Store != nil || c.Lock != nil {
+			if c.Store != nil {
 				return nil, errors.New("a read-only operation was given the store")
 			}
 			unknown := make([]any, 0, len(c.Home.Unknown))
@@ -280,16 +280,12 @@ func newHarness(t testing.TB) *harness {
 			f.Receipts = []envelope.Receipt{rc}
 			return nil, f
 		})},
-		// stamp writes one record stamped with the call's own time, and
-		// answers with the digest of the record as it made it, which is the
-		// digest of the record as stored when the time holds still.
+		// stamp writes one record stamped with the time Finalize gives it, and
+		// answers with the digest Finalize gives, which is the digest of the
+		// record as stored though the clock moves between every reading.
 		{OperationDecl: decl("stamp", true), Handle: count("stamp", func(c *Call) (*Result, error) {
-			at, err := c.Stamp()
-			if err != nil {
-				return nil, err
-			}
-			content := mustEncode(map[string]any{"schema": "dispatch.thing", "schema_version": "1.0", "name": "stamped", "record_revision": int64(1), "updated_at": at})
-			digest, err := canon.RecordDigest(content)
+			rec, digest, err := c.Finalize(store.RecordWrite{Path: store.RecordPath("dispatch", "thing", "stamped"),
+				Content: []byte(`{"schema":"dispatch.thing","schema_version":"1.0","name":"stamped","updated_at":"2026-10-11T07:59:59.000Z"}`)})
 			if err != nil {
 				return nil, err
 			}
@@ -298,11 +294,13 @@ func newHarness(t testing.TB) *harness {
 			if err != nil {
 				return nil, err
 			}
-			return &Result{
-				Body:     map[string]any{"digest": digest, "updated_at": at},
-				Records:  []store.RecordWrite{{Path: store.RecordPath("dispatch", "thing", "stamped"), Content: content}},
-				Receipts: []envelope.Receipt{rc},
-			}, nil
+			return &Result{Body: map[string]any{"digest": digest}, Records: []store.RecordWrite{rec}, Receipts: []envelope.Receipt{rc}}, nil
+		})},
+		// unfinalized writes one record without finalizing it, with metadata
+		// that is not the store's.
+		{OperationDecl: decl("raw", true), Handle: count("raw", func(c *Call) (*Result, error) {
+			return &Result{Body: map[string]any{}, Records: []store.RecordWrite{{Path: store.RecordPath("dispatch", "thing", "raw"),
+				Content: []byte(`{"schema":"dispatch.thing","schema_version":"1.0","name":"raw","record_revision":7,"updated_at":"2020-01-01T00:00:00.000Z"}`)}}}, nil
 		})},
 		// fail ends as the body's name says: a plain error, a panic, an
 		// unknown outcome, a failure that breaks the contract, a body that
@@ -323,6 +321,12 @@ func newHarness(t testing.TB) *harness {
 				return nil, envelope.Fail(envelope.Unavailable, "dispatch.adapter_down", "the adapter is down").Retry()
 			}
 			return nil, errors.New("something of its own")
+		})},
+		// tick answers with two readings of the call's clock.
+		{OperationDecl: decl("tick", false), Handle: count("tick", func(c *Call) (*Result, error) {
+			a, _ := c.Stamp()
+			b, _ := c.Stamp()
+			return &Result{Body: map[string]any{"a": a, "b": b}}, nil
 		})},
 		// big answers with a body of the size the body's name gives.
 		{OperationDecl: decl("big", false), Handle: count("big", func(c *Call) (*Result, error) {
