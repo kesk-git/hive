@@ -111,7 +111,7 @@ Adding a code is a minor change. A code is never reused for another meaning.
 
 ## Size
 
-- Each command declares `max_request_bytes` and `max_response_bytes`. The default for both is 67,108,864 bytes; a command may declare more or less.
+- Each command declares `max_request_bytes` and `max_response_bytes`. The default for both is 67,108,864 bytes; a command may declare more or less, but never less than holds the `outcome_unknown` answer of a transaction whose commit was interrupted: that answer is never replaced by `too_large`, which would promise that nothing changed.
 - A request larger than the limit is `too_large` before it is parsed. A response that would be larger is `too_large` in place of the response.
 - The error carries `code` `record_too_large`, `limit_bytes` and `actual_bytes`, and names in `detail` which record or field was too large where the command knows.
 - Because a request never travels as an argument, no request is bounded by the platform's limit on arguments. The integration target proves this for every call between packages with a record of 2,097,152 bytes, which is above that limit on every supported platform: the record arrives whole, or the caller receives `too_large` and nothing else.
