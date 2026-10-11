@@ -12,8 +12,9 @@
 // operation's state and version, takes the store's lock and answers a
 // replayed request from its recorded outcome, runs the handler, writes the
 // handler's records, receipts and events with the recorded outcome in one
-// transaction, and writes one complete response, or too_large in its place,
-// with the exit code its status fixes. The capabilities operation and
+// transaction, and writes one complete response, or too_large in its place
+// while nothing is durable (outcome_unknown once a transaction is), with the
+// exit code its status fixes. The capabilities operation and
 // --version are answered here too, from the declaration.
 //
 // A handler sees a Call and returns a Result. It never writes a response,
