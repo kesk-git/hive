@@ -44,9 +44,9 @@
 // neither is ever repaired by guessing. A closed segment never changes and is
 // read once; in the last one, which a writer repairing the tail may change
 // under a read, a line is returned only after its bytes have been read a
-// second time and found identical, and Head counts the last line the same way. A Reader marks an entry
-// Late when a later event of its source, by source_sequence or else by
-// occurred_at, was recorded before it; on resuming it reads the retained
-// lines up to the cursor for what they say of each source, so that the mark is
-// relative to the journal as kept.
+// second time and found identical, and Head counts the last line the same
+// way. A Reader marks an entry Late when a later event of its source, by
+// source_sequence or else by occurred_at, was recorded before it; on resuming
+// it reads the retained lines up to the cursor for what they say of each
+// source, so that the mark is relative to the journal as kept.
 package journal

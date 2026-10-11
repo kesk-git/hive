@@ -46,8 +46,9 @@ type mark struct {
 }
 
 // Reader reads the journal after a cursor, in order. It takes no lock: a
-// line is whole once its line feed is there, and a torn tail is ignored
-// until a writer has repaired it. A Reader is for one goroutine.
+// line of a closed segment is whole once its line feed is there, one of the
+// last segment only once it has been read twice alike, and a torn tail is
+// ignored until a writer has repaired it. A Reader is for one goroutine.
 type Reader struct {
 	j *Journal
 	// cursor is the home_sequence of the last entry Next returned.
