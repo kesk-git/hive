@@ -1,0 +1,11 @@
+{
+  "text": "kept as written",
+  "count": 3,
+  "nested": {
+    "list": [
+      1,
+      null,
+      true
+    ]
+  }
+}

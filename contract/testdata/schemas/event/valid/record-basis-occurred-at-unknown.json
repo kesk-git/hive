@@ -1,0 +1,29 @@
+{
+  "schema": "hive.event",
+  "schema_version": "1.0",
+  "event_id": "evt_01j9xk3m2nq4r5s6t7v8w9xyzj",
+  "kind": "pool.item.changed",
+  "kind_version": "1.0",
+  "source": {
+    "package": "pool",
+    "source_id": "pool"
+  },
+  "home_sequence": 3,
+  "scope_level": "hive",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "correlation_id": "corr_01j9xk3m2nq4r5s6t7v8w9xyzg",
+  "occurred_at": "2026-10-11T08:00:01.250Z",
+  "observed_at": "2026-10-11T08:00:01.250Z",
+  "recorded_at": "2026-10-11T08:00:02.500Z",
+  "basis": {
+    "kind": "record",
+    "ref": {
+      "schema": "pool.item",
+      "id": "item_01j9xk3m2nq4r5s6t7v8w9xyzp",
+      "record_revision": 5,
+      "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab"
+    }
+  },
+  "body": {},
+  "occurred_at_known": false
+}

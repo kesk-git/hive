@@ -1,0 +1,53 @@
+{
+  "schema": "hive.request",
+  "schema_version": "1.0",
+  "command": "hive-spawning-pool",
+  "operation": "acquire",
+  "operation_version": "1.0",
+  "request_id": "req_01j9xk3m2nq4r5s6t7v8w9xyzf",
+  "correlation_id": "corr_01j9xk3m2nq4r5s6t7v8w9xyzg",
+  "causation": {
+    "schema": "hive.receipt",
+    "id": "rcpt_01j9xk3m2nq4r5s6t7v8w9xyzp",
+    "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza"
+  },
+  "issued_at": "2026-10-11T08:00:00.000Z",
+  "caller": {
+    "kind": "package",
+    "package": "dispatch",
+    "command": "hive-dispatch"
+  },
+  "scope_level": "project",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "workspace_id": "ws_01j9xk3m2nq4r5s6t7v8w9xyzb",
+  "project_id": "ws_01j9xk3m2nq4r5s6t7v8w9xyzb",
+  "clone_id": "clone_01j9xk3m2nq4r5s6t7v8w9xyzd",
+  "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze",
+  "generation": 2,
+  "source_revision": "3f786850e387550fdab836ed7e6dc881de23001b",
+  "expected_revisions": [
+    {
+      "schema": "spawning-pool.lease",
+      "id": "lease_01j9xk3m2nq4r5s6t7v8w9xyzp",
+      "record_revision": 4
+    },
+    {
+      "schema": "dispatch.clone",
+      "id": "clone_01j9xk3m2nq4r5s6t7v8w9xyzd",
+      "record_revision": 1
+    }
+  ],
+  "authority": {
+    "kind": "word",
+    "ref": {
+      "schema": "word.record",
+      "id": "word_01j9xk3m2nq4r5s6t7v8w9xyzp",
+      "record_revision": 1
+    }
+  },
+  "body": {
+    "base": "main",
+    "branch": "task/01j9xk3m2nq4r5s6t7v8w9xyze",
+    "purpose": "assimilation"
+  }
+}

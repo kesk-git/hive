@@ -1,0 +1,39 @@
+{
+  "schema": "hive.receipt",
+  "schema_version": "1.0",
+  "receipt_id": "rcpt_01j9xk3m2nq4r5s6t7v8w9xyzh",
+  "kind": "dispatch.session-input.accepted",
+  "kind_version": "1.0",
+  "written_at": "2026-10-11T08:00:01.250Z",
+  "writer": {
+    "package": "dispatch",
+    "command": "hive-dispatch",
+    "operation": "accept-input",
+    "implementation_version": "0.1.0"
+  },
+  "request_id": "req_01j9xk3m2nq4r5s6t7v8w9xyzf",
+  "correlation_id": "corr_01j9xk3m2nq4r5s6t7v8w9xyzg",
+  "scope_level": "hive",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "authority": {
+    "kind": "none"
+  },
+  "evidence": [],
+  "body": {
+    "input_id": "inp_01j9xk3m2nq4r5s6t7v8w9xyzn",
+    "session_id": "sess_01j9xk3m2nq4r5s6t7v8w9xyzk",
+    "session_generation": 1,
+    "input_sequence": 12,
+    "client": "dock",
+    "text_digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab",
+    "text_bytes": 42,
+    "message_id": "msg_01j9xk3m2nq4r5s6t7v8w9xyzm"
+  },
+  "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze",
+  "generation": 1,
+  "subject": {
+    "schema": "dispatch.session",
+    "id": "sess_01j9xk3m2nq4r5s6t7v8w9xyzk",
+    "record_revision": 7
+  }
+}

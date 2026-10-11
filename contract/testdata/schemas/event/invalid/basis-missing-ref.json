@@ -1,0 +1,22 @@
+{
+  "schema": "hive.event",
+  "schema_version": "1.0",
+  "event_id": "evt_01j9xk3m2nq4r5s6t7v8w9xyzj",
+  "kind": "dispatch.home.created",
+  "kind_version": "1.0",
+  "source": {
+    "package": "dispatch",
+    "source_id": "dispatch"
+  },
+  "home_sequence": 1,
+  "scope_level": "hive",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "correlation_id": "corr_01j9xk3m2nq4r5s6t7v8w9xyzg",
+  "occurred_at": "2026-10-11T08:00:01.250Z",
+  "observed_at": "2026-10-11T08:00:01.250Z",
+  "recorded_at": "2026-10-11T08:00:02.500Z",
+  "basis": {
+    "kind": "receipt"
+  },
+  "body": {}
+}

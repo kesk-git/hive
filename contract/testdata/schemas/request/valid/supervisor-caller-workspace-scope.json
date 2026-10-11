@@ -1,0 +1,31 @@
+{
+  "schema": "hive.request",
+  "schema_version": "1.0",
+  "command": "hive-pool",
+  "operation": "add-item",
+  "operation_version": "1.0",
+  "request_id": "req_01j9xk3m2nq4r5s6t7v8w9xyzf",
+  "correlation_id": "corr_01j9xk3m2nq4r5s6t7v8w9xyzg",
+  "issued_at": "2026-10-11T08:00:00.000Z",
+  "caller": {
+    "kind": "supervisor",
+    "session_id": "sess_01j9xk3m2nq4r5s6t7v8w9xyzk",
+    "session_generation": 2
+  },
+  "scope_level": "workspace",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "authority": {
+    "kind": "posture",
+    "ref": {
+      "schema": "pool.posture",
+      "id": "posture_01j9xk3m2nq4r5s6t7v8w9xyzp",
+      "record_revision": 2
+    }
+  },
+  "body": {
+    "title": "Repair the widget",
+    "kind": "task"
+  },
+  "workspace_id": "ws_01j9xk3m2nq4r5s6t7v8w9xyzb",
+  "expected_revisions": []
+}

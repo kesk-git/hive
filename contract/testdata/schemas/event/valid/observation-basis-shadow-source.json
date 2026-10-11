@@ -1,0 +1,36 @@
+{
+  "schema": "hive.event",
+  "schema_version": "1.0",
+  "event_id": "evt_01j9xk3m2nq4r5s6t7v8w9xyzp",
+  "kind": "shadow.check-run.completed",
+  "kind_version": "1.0",
+  "source": {
+    "package": "shadow",
+    "source_id": "shadow:github:acme/widgets",
+    "source_sequence": 9001
+  },
+  "home_sequence": 2,
+  "scope_level": "workspace",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "correlation_id": "corr_01j9xk3m2nq4r5s6t7v8w9xyzg",
+  "occurred_at": "2026-10-11T08:00:00.000Z",
+  "observed_at": "2026-10-11T08:00:01.250Z",
+  "recorded_at": "2026-10-11T08:00:02.500Z",
+  "basis": {
+    "kind": "observation",
+    "ref": {
+      "schema": "shadow.observation",
+      "id": "obs_01j9xk3m2nq4r5s6t7v8w9xyzp",
+      "record_revision": 1
+    }
+  },
+  "body": {
+    "conclusion": "success"
+  },
+  "workspace_id": "ws_01j9xk3m2nq4r5s6t7v8w9xyzb",
+  "causation": {
+    "schema": "hive.event",
+    "id": "evt_01j9xk3m2nq4r5s6t7v8w9xyzj"
+  },
+  "occurred_at_known": true
+}

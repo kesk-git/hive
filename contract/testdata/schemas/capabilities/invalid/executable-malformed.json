@@ -1,0 +1,15 @@
+{
+  "schema": "hive.capabilities",
+  "schema_version": "1.0",
+  "command": "hive-word",
+  "package": "word",
+  "executable": "word",
+  "contract_version": "1.0",
+  "implementation_version": "0.1.0",
+  "limits": {
+    "max_argument_bytes": 4096,
+    "max_request_bytes": 67108864,
+    "max_response_bytes": 67108864
+  },
+  "operations": []
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "hive.response",
+  "schema_version": "1.0",
+  "request_id": "",
+  "command": "hive-dispatch",
+  "operation": "describe-home",
+  "status": "ok",
+  "exit_code": 0,
+  "responder": {
+    "package": "dispatch",
+    "command": "hive-dispatch",
+    "implementation_version": "0.1.0",
+    "contract_version": "1.0"
+  },
+  "completed_at": "2026-10-11T08:00:02.500Z",
+  "replayed": false,
+  "receipts": [],
+  "body": {
+    "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+    "record_revision": 1
+  }
+}
