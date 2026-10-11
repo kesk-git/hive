@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:event:v1",
+  "title": "Event envelope",
+  "description": "One line of a home's event journal. See spec/events.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "event_id",
+    "kind",
+    "kind_version",
+    "source",
+    "home_sequence",
+    "scope_level",
+    "home_id",
+    "correlation_id",
+    "occurred_at",
+    "observed_at",
+    "recorded_at",
+    "basis",
+    "body"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.event"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "event_id": {
+      "description": "Stable for the event. A replay or a reconnect yields the same identity, never a new one.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/event_id"
+    },
+    "kind": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/kind_name"
+    },
+    "kind_version": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/schema_version"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package",
+        "source_id"
+      ],
+      "properties": {
+        "package": {
+          "description": "The package that wrote the line. It equals the first segment of kind, except for the journal's own repair event.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/package_name"
+        },
+        "source_id": {
+          "description": "The registered source the event came from: the package itself, or an observed source it registered.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*(:[A-Za-z0-9._/-]+){0,4}$",
+          "maxLength": 300
+        },
+        "source_sequence": {
+          "description": "The source's own order, where it has one.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        }
+      }
+    },
+    "home_sequence": {
+      "description": "The position of this line in its home's journal: consecutive from 1, with no gap.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "clone_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/clone_id"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "source_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/git_revision"
+    },
+    "correlation_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/correlation_id"
+    },
+    "causation": {
+      "description": "The request, receipt or event that directly caused this event, where there is one.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    },
+    "occurred_at": {
+      "description": "When the thing happened at its source, as far as the source states it.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "observed_at": {
+      "description": "When Hive read it.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "recorded_at": {
+      "description": "When the line became durable in the journal.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "occurred_at_known": {
+      "description": "False when the source gave no time of its own and occurred_at repeats observed_at.",
+      "type": "boolean"
+    },
+    "basis": {
+      "description": "The durable receipt, observation or record that establishes the event, at its revision.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "receipt",
+            "observation",
+            "record"
+          ]
+        },
+        "ref": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      }
+    },
+    "body": {
+      "description": "The kind's own content, validated against the schema registered for the kind. Empty for a kind that registers none.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ]
+}

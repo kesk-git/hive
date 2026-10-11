@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:receipt:v1",
+  "title": "Receipt envelope",
+  "description": "An immutable record that one named fact was established. See spec/receipts.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "receipt_id",
+    "kind",
+    "kind_version",
+    "written_at",
+    "writer",
+    "request_id",
+    "correlation_id",
+    "scope_level",
+    "home_id",
+    "authority",
+    "evidence",
+    "body"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.receipt"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "receipt_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+    },
+    "kind": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/kind_name"
+    },
+    "kind_version": {
+      "description": "The version of this kind's body schema.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/schema_version"
+    },
+    "written_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "request_id": {
+      "description": "The request whose handling wrote this receipt.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+    },
+    "correlation_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/correlation_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "clone_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/clone_id"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "source_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/git_revision"
+    },
+    "authority": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/authority"
+    },
+    "subject": {
+      "description": "The record this receipt is about, at the revision the fact holds for.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    },
+    "evidence": {
+      "description": "What the fact rests on. Empty when the receipt is its own evidence.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "ref"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "ref": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          }
+        }
+      }
+    },
+    "body": {
+      "description": "The kind's own content, validated against the schema registered for the kind. Empty for a kind that registers none.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ]
+}

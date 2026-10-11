@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:events:hive.journal.tail-repaired:v1",
+  "title": "Event body: hive.journal.tail-repaired",
+  "description": "The journal's own repair event. A final line without its line feed, an append that was never acknowledged, was removed before this line was appended. The event's basis is the journal's own record: kind record, a ref with schema hive.journal and id equal to segment, and the last intact home_sequence before the repair is this event's home_sequence minus one. See spec/events.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "segment",
+    "removed_bytes",
+    "removed_digest"
+  ],
+  "properties": {
+    "segment": {
+      "description": "The file name of the segment the bytes were removed from.",
+      "type": "string",
+      "pattern": "^events-[0-9]{20}\\.jsonl$"
+    },
+    "removed_bytes": {
+      "description": "The length of what was removed.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "removed_digest": {
+      "description": "The digest of the bytes removed, taken before the removal.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    }
+  }
+}

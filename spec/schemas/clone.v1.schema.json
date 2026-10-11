@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:clone:v1",
+  "title": "Clone identity record",
+  "description": "One physical clone of one project's repository. See spec/identities.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "clone_id",
+    "project_id",
+    "workspace_id",
+    "home_id",
+    "git_common_dir",
+    "worktree_root",
+    "object_format",
+    "origin",
+    "state",
+    "verified_at",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.clone"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "clone_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/clone_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "git_common_dir": {
+      "description": "The clone's Git common directory, as a physical path. This is what the identity is bound to.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/absolute_path"
+    },
+    "worktree_root": {
+      "description": "The top level of the clone's main working tree, as a physical path.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/absolute_path"
+    },
+    "object_format": {
+      "enum": [
+        "sha1",
+        "sha256"
+      ]
+    },
+    "origin": {
+      "description": "The remote the clone was registered with, kept as evidence. Two clones of one origin are two clones.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "remote",
+            "none"
+          ]
+        },
+        "remote_name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._/-]{1,100}$"
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "remote"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "remote_name",
+              "url"
+            ]
+          },
+          "else": {
+            "properties": {
+              "remote_name": false,
+              "url": false
+            }
+          }
+        }
+      ]
+    },
+    "state": {
+      "enum": [
+        "active",
+        "retired"
+      ]
+    },
+    "verified_at": {
+      "description": "When the recorded paths were last confirmed against the clone itself.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  }
+}

@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:review-final:v1",
+  "title": "Final review record",
+  "description": "The file final.json, written once by Done. It records that the review ended and what Done included, and nothing else. See spec/review.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "review_id",
+    "scope_level",
+    "home_id",
+    "task_id",
+    "generation",
+    "done",
+    "operator",
+    "completed_at",
+    "final_revision",
+    "rounds",
+    "decisions",
+    "unsubmitted_drafts",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.review-final"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "review_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/review_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "done": {
+      "description": "The Done event this record was written from.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "round_id",
+        "event_id",
+        "sequence"
+      ],
+      "properties": {
+        "round_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/feedback_event_id"
+        },
+        "sequence": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        }
+      }
+    },
+    "operator": {
+      "$ref": "urn:hive:schema:review:v1#/$defs/operator"
+    },
+    "completed_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "final_revision": {
+      "$ref": "urn:hive:schema:review:v1#/$defs/revision_ref"
+    },
+    "rounds": {
+      "description": "Every round, with the feedback sequences Done included and the reply where one was written.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "round_id",
+          "feedback"
+        ],
+        "properties": {
+          "round_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "feedback": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "digest",
+              "last_sequence"
+            ],
+            "properties": {
+              "path": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
+              },
+              "digest": {
+                "description": "The events digest: the digest of the canonical form of the file's events array from sequence 1 through last_sequence. It stays true when later events are appended. See spec/review.md.",
+                "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+              },
+              "last_sequence": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "reply": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+          }
+        }
+      }
+    },
+    "decisions": {
+      "description": "Each card the review presented, with what was known of its decision when Done was pressed. A pending entry is still owed.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "card",
+          "state"
+        ],
+        "properties": {
+          "card": {
+            "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "accepted",
+              "released",
+              "completed",
+              "superseded"
+            ]
+          },
+          "receipt": {
+            "description": "The word receipt that establishes the state. Absent while pending.",
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "pending"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "receipt": false
+              }
+            },
+            "else": {
+              "required": [
+                "receipt"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "unsubmitted_drafts": {
+      "description": "Text saved and never submitted. Listed so that nothing typed is lost, and never applied as an answer.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "round_id",
+          "sequence",
+          "kind"
+        ],
+        "properties": {
+          "round_id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sequence": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+          },
+          "kind": {
+            "enum": [
+              "target",
+              "note",
+              "card-draft"
+            ]
+          }
+        }
+      }
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ]
+}

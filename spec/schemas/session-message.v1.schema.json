@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:session-message:v1",
+  "title": "Session message",
+  "description": "One message of one supervisor conversation, as the same-session adapter records it. See spec/session-messages.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "message_id",
+    "session_id",
+    "session_generation",
+    "home_id",
+    "harness",
+    "sequence",
+    "role",
+    "parts",
+    "streaming_revision",
+    "completion",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.session-message"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "message_id": {
+      "description": "Stable for the message across streaming updates, reconnects and history retrieval.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/message_id"
+    },
+    "session_id": {
+      "description": "The one supervisor conversation. It survives a restart.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/session_id"
+    },
+    "session_generation": {
+      "description": "The process generation of the session that produced or accepted the message.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "harness": {
+      "enum": [
+        "claude",
+        "codex"
+      ]
+    },
+    "sequence": {
+      "description": "The message's place in the conversation: strictly increasing within one session_id and continuing across its generations.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "role": {
+      "description": "operator: the Hive Mind's input, from the dock or an external terminal. supervisor: the session's own output. system: a notice from the harness or from Hive, never an answer.",
+      "enum": [
+        "operator",
+        "supervisor",
+        "system"
+      ]
+    },
+    "input_id": {
+      "description": "For an operator message: the input whose receipt placed it in the canonical input sequence.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/input_id"
+    },
+    "parts": {
+      "description": "The message's content in order. A part keeps its index for the life of the message.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "index",
+          "kind"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "attachment",
+              "artifact"
+            ]
+          },
+          "text": {
+            "description": "Exactly as produced or typed. Never summarized, trimmed or reflowed.",
+            "type": "string"
+          },
+          "attachment": {
+            "description": "A file in the session's home, relative to the home.",
+            "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+          },
+          "artifact": {
+            "description": "A link to a registered review revision.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "review_id",
+              "task_id",
+              "generation"
+            ],
+            "properties": {
+              "review_id": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/review_id"
+              },
+              "task_id": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+              },
+              "generation": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "text"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "attachment": false,
+                "artifact": false
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "attachment"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "attachment"
+              ],
+              "properties": {
+                "text": false,
+                "artifact": false
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "artifact"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "artifact"
+              ],
+              "properties": {
+                "text": false,
+                "attachment": false
+              }
+            }
+          }
+        ]
+      }
+    },
+    "streaming_revision": {
+      "description": "0 for a message recorded whole. Otherwise it rises by one with each recorded update while the message streams.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "completion": {
+      "description": "streaming: more may follow. complete: the message is whole. interrupted: it ended early and what is recorded is all there is. unknown: its end could not be observed.",
+      "enum": [
+        "streaming",
+        "complete",
+        "interrupted",
+        "unknown"
+      ]
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "role": {
+            "const": "operator"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "input_id"
+        ],
+        "properties": {
+          "completion": {
+            "const": "complete"
+          },
+          "streaming_revision": {
+            "const": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "input_id": false
+        }
+      }
+    }
+  ]
+}

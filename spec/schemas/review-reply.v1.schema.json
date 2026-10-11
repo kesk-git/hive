@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:review-reply:v1",
+  "title": "Review reply file",
+  "description": "The Lictor's reply to one round, round-NNNN.reply.json. Written once. See spec/review.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "review_id",
+    "round_id",
+    "scope_level",
+    "home_id",
+    "task_id",
+    "generation",
+    "lictor",
+    "feedback",
+    "responses",
+    "written_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.review-reply"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "review_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/review_id"
+    },
+    "round_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "lictor": {
+      "$ref": "urn:hive:schema:review:v1#/$defs/lictor"
+    },
+    "feedback": {
+      "description": "The feedback the reply answers: the round's file, the last event sequence the Lictor read and the digest of the events through it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "digest",
+        "last_sequence"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
+        },
+        "digest": {
+          "description": "The events digest: the digest of the canonical form of the file's events array from sequence 1 through last_sequence. It stays true when later events are appended. See spec/review.md.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "last_sequence": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        }
+      }
+    },
+    "responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "response_id",
+          "answers",
+          "text"
+        ],
+        "properties": {
+          "response_id": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/response_id"
+          },
+          "answers": {
+            "description": "What this response answers, by the original identities. The operator's words stay in the feedback file.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event_id"
+            ],
+            "properties": {
+              "event_id": {
+                "description": "The submit event that carried it.",
+                "$ref": "urn:hive:schema:common:v1#/$defs/feedback_event_id"
+              },
+              "note_id": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/note_id"
+              },
+              "question_id": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+              },
+              "card_id": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/card_id"
+              }
+            }
+          },
+          "text": {
+            "type": "string"
+          },
+          "picture": {
+            "description": "A picture of the element the response concerns, where one helps. A declared asset of the review.",
+            "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+          },
+          "raises_card": {
+            "description": "A decision the Lictor's response puts to the Hive Mind, as the card that word holds for it.",
+            "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
+          }
+        }
+      }
+    },
+    "next_revision": {
+      "description": "The revision written in answer to this round, where one was asked for.",
+      "$ref": "urn:hive:schema:review:v1#/$defs/revision_ref"
+    },
+    "written_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ]
+}

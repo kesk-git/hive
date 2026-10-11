@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:capabilities:v1",
+  "title": "Capability declaration",
+  "description": "The response body of every command's capabilities operation. See spec/commands.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "command",
+    "package",
+    "executable",
+    "contract_version",
+    "implementation_version",
+    "limits",
+    "operations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.capabilities"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "command": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+    },
+    "package": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/package_name"
+    },
+    "executable": {
+      "description": "The package executable this command name resolves to.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+    },
+    "contract_version": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/schema_version"
+    },
+    "implementation_version": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
+    },
+    "source_revision": {
+      "description": "The revision of this repository the executable was built from.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/git_revision"
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_argument_bytes",
+        "max_request_bytes",
+        "max_response_bytes"
+      ],
+      "properties": {
+        "max_argument_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "max_request_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_response_bytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "operations": {
+      "description": "Every operation of the command other than capabilities. Empty for a command whose only operation is capabilities.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "state",
+          "mode",
+          "mutates",
+          "versions",
+          "receipt_kinds",
+          "executes",
+          "calls"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/operation_name"
+          },
+          "state": {
+            "description": "supported: callable. unsupported: declared by the contract, not callable in this build. parked: built, and held closed by a recorded decision.",
+            "enum": [
+              "supported",
+              "unsupported",
+              "parked"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "mode": {
+            "description": "unary: one request, one response, then exit. resident: the response is written once the operation has durably started, and the process then runs until stopped.",
+            "enum": [
+              "unary",
+              "resident"
+            ]
+          },
+          "mutates": {
+            "type": "boolean"
+          },
+          "versions": {
+            "description": "The operation body versions this build accepts.",
+            "type": "array",
+            "items": {
+              "$ref": "urn:hive:schema:common:v1#/$defs/schema_version"
+            }
+          },
+          "request_schema": {
+            "type": "string",
+            "pattern": "^urn:hive:schema:[a-z0-9.:-]+$"
+          },
+          "response_schema": {
+            "type": "string",
+            "pattern": "^urn:hive:schema:[a-z0-9.:-]+$"
+          },
+          "receipt_kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "urn:hive:schema:common:v1#/$defs/kind_name"
+            }
+          },
+          "executes": {
+            "description": "The external executables this operation may run. See spec/distribution.md.",
+            "type": "array",
+            "items": {
+              "enum": [
+                "git",
+                "gh",
+                "tmux",
+                "claude",
+                "codex",
+                "no-mistakes",
+                "chrome-devtools-axi",
+                "project-validation"
+              ]
+            }
+          },
+          "calls": {
+            "description": "The commands of other packages this operation may call.",
+            "type": "array",
+            "items": {
+              "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "supported"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "request_schema",
+                "response_schema"
+              ],
+              "properties": {
+                "versions": {
+                  "minItems": 1
+                }
+              }
+            },
+            "else": {
+              "required": [
+                "reason"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}
