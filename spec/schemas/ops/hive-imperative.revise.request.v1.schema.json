@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-imperative.revise.request:v1",
+  "title": "hive-imperative revise: request body",
+  "description": "Writes the next revision of an item's Imperative, whole. Steering that changes scope revises here first; the affected admission checks are then repeated by the caller. The envelope's expected_revisions names the Imperative record's revision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "class",
+    "task",
+    "setup",
+    "rules",
+    "definition_of_done",
+    "supersedes_reason"
+  ],
+  "properties": {
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "class": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dispatch_class"
+    },
+    "task": {
+      "$ref": "urn:hive:schema:records:pool.imperative:v1#/$defs/task_section"
+    },
+    "setup": {
+      "$ref": "urn:hive:schema:ops:hive-imperative.create.request:v1#/$defs/setup_input"
+    },
+    "rules": {
+      "$ref": "urn:hive:schema:records:pool.imperative:v1#/$defs/rules_section"
+    },
+    "definition_of_done": {
+      "$ref": "urn:hive:schema:records:pool.imperative:v1#/$defs/definition_of_done"
+    },
+    "supersedes_reason": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    }
+  }
+}

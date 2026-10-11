@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.propagate.request:v1",
+  "title": "hive-memory propagate: request body",
+  "description": "Records what one consumer received, or acknowledged, of a projection at a rendering and digest. Receipt and acknowledgment are two steps and two receipts. A step already recorded for the same consumer, rendering and digest is returned unchanged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "projection_id",
+    "consumer",
+    "step",
+    "rendering",
+    "digest",
+    "at"
+  ],
+  "properties": {
+    "projection_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+    },
+    "consumer": {
+      "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/consumer_ref"
+    },
+    "step": {
+      "enum": [
+        "received",
+        "acknowledged"
+      ]
+    },
+    "rendering": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "digest": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    },
+    "at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "evidence": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    }
+  }
+}

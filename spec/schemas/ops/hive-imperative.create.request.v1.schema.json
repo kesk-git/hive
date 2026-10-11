@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-imperative.create.request:v1",
+  "title": "hive-imperative create: request body",
+  "description": "Writes revision 1 of an item's canonical Imperative. The Placement axis is not in the request: the command copies the item's requested place into Setup at the item revision it reads, so the Imperative renders the place from the item. Setup's placement is therefore defined as setup_input here, which is the record's setup without placement. See spec/pool.md, The Imperative.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "class",
+    "task",
+    "setup",
+    "rules",
+    "definition_of_done"
+  ],
+  "properties": {
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "class": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dispatch_class"
+    },
+    "task": {
+      "$ref": "urn:hive:schema:records:pool.imperative:v1#/$defs/task_section"
+    },
+    "setup": {
+      "$ref": "urn:hive:schema:ops:hive-imperative.create.request:v1#/$defs/setup_input"
+    },
+    "rules": {
+      "$ref": "urn:hive:schema:records:pool.imperative:v1#/$defs/rules_section"
+    },
+    "definition_of_done": {
+      "$ref": "urn:hive:schema:records:pool.imperative:v1#/$defs/definition_of_done"
+    }
+  },
+  "$defs": {
+    "setup_input": {
+      "description": "The record's setup without placement, which the command supplies from the item. The repository is read from the project record where the scope names a project; for the Hive's own projectless work it is given here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_branch",
+        "source_branch",
+        "output_branch_rule",
+        "role",
+        "harness",
+        "dependencies",
+        "tools",
+        "access",
+        "isolation"
+      ],
+      "properties": {
+        "repository": {
+          "$ref": "urn:hive:schema:project:v1#/$defs/repository"
+        },
+        "base_branch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "base_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/git_revision"
+        },
+        "source_branch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "source_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/git_revision"
+        },
+        "output_branch_rule": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "role": {
+          "enum": [
+            "swarm",
+            "lictor"
+          ]
+        },
+        "harness": {
+          "enum": [
+            "claude",
+            "codex",
+            "policy"
+          ]
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          }
+        },
+        "access": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "credentials"
+          ],
+          "properties": {
+            "credentials": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/secret_ref"
+              }
+            },
+            "network": {
+              "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+            }
+          }
+        },
+        "isolation": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+          }
+        }
+      }
+    }
+  }
+}

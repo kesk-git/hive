@@ -27,7 +27,7 @@ Owner: the package that writes an event owns its kind. The journal is shared and
 
 ## Kinds
 
-A kind is the owning package's name, a subject and a fact in the past tense: `dispatch.launch.accepted`, `synapse.readiness.invalidated`. A kind whose content needs more than the envelope has a body schema at `spec/schemas/events/<kind>.v<major>.schema.json`; a kind that registers none has an empty body. Stage 1 registers no event kind beyond the journal's own, below, whose body schema is [`events/hive.journal.tail-repaired.v1`](schemas/events/hive.journal.tail-repaired.v1.schema.json). Each stage registers its kinds as it builds them.
+A kind is the owning package's name, a subject and a fact in the past tense: `dispatch.launch.accepted`, `synapse.readiness.invalidated`. A kind whose content needs more than the envelope has a body schema at `spec/schemas/events/<kind>.v<major>.schema.json`; a kind that registers none has an empty body. Stage 1 registers no event kind beyond the journal's own, below, whose body schema is [`events/hive.journal.tail-repaired.v1`](schemas/events/hive.journal.tail-repaired.v1.schema.json). Each stage registers its kinds as it builds them: stage 2 registers the Pool's seventeen, each with an empty body, in [pool.md](pool.md#receipts-and-events).
 
 ## The three times
 

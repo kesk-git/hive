@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-admit.approve.request:v1",
+  "title": "hive-admit approve: request body",
+  "description": "Records the required ruling for an admission a check held for missing authority. The envelope's authority must be of kind word, and the Pool verifies it by the decision intake's check that the operator's word stands, defined in its own definition of this stage; until that definition lands, a word authority is authority_insufficient. It records the ruling and nothing else; the caller then runs check again, which reads the approval. It is not a routine extra wait.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admission_id"
+  ],
+  "properties": {
+    "admission_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/admission_id"
+    }
+  }
+}

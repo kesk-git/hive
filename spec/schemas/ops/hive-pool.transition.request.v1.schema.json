@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.transition.request:v1",
+  "title": "hive-pool transition: request body",
+  "description": "Moves one item between queued, in-flight, done and archived under the transition rules of spec/pool.md. A failed transition is reported as failed, never as done.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "to"
+  ],
+  "properties": {
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "to": {
+      "enum": [
+        "queued",
+        "in-flight",
+        "done",
+        "archived"
+      ]
+    },
+    "evidence": {
+      "description": "For done: the Harvest, report or landing the completion rests on, added to the item's links.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/link"
+      }
+    },
+    "note": {
+      "description": "A line appended to the body.",
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "description": "For archived, or for a reopen: why.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "at": {
+      "description": "The closing time to record for done, where the caller knows it; otherwise the command's clock.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    }
+  }
+}

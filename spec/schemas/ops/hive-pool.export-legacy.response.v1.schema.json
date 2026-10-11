@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.export-legacy.response:v1",
+  "title": "hive-pool export-legacy: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "text",
+    "digest",
+    "bytes",
+    "exact",
+    "items"
+  ],
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "digest": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    },
+    "bytes": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+    },
+    "exact": {
+      "description": "True when the text equals the migration's source byte for byte: nothing it covers was modified since the import, an item's holds included.",
+      "type": "boolean"
+    },
+    "items": {
+      "description": "The items rendered, each with whether it was emitted verbatim or re-rendered.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "form"
+        ],
+        "properties": {
+          "task_id": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+          },
+          "legacy_id": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/legacy_id"
+          },
+          "form": {
+            "enum": [
+              "verbatim",
+              "rendered"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

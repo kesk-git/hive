@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-spec.define.request:v1",
+  "title": "hive-spec define: request body",
+  "description": "Writes a specification revision: revision 1 of a new specification, or the next revision of an existing one, whole. For every item currently bound to any revision of this specification, a revision whose criteria differ from the criteria of the revision that item is bound to invalidates that item's acceptance and clears the criteria from the item; the item's definition returns to defining. See spec/pool.md, Specifications.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "text",
+    "criteria"
+  ],
+  "properties": {
+    "specification_id": {
+      "description": "Absent creates a new specification; present revises it, with the envelope's expected_revisions naming its revision.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/specification_id"
+    },
+    "title": {
+      "description": "Required for a new specification.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/label"
+    },
+    "text": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/criterion"
+      }
+    },
+    "task_ids": {
+      "description": "Items this specification is being defined for. An item with no accepted binding to this specification moves to definition defining; an item whose accepted binding survives this revision, because its criteria are unchanged against the revision it is bound to, keeps definition accepted and its binding.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+      }
+    }
+  }
+}

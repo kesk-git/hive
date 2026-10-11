@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.read.response:v1",
+  "title": "hive-pool read: response body",
+  "description": "A projection: the records read, whole, with the home, the time and the journal cursor they were read at. For items, the derived blocked, held and ready facts come beside each item and are never stored.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "projection",
+    "kind",
+    "records"
+  ],
+  "properties": {
+    "projection": {
+      "$ref": "urn:hive:schema:ops:hive-pool.read.response:v1#/$defs/projection_header"
+    },
+    "kind": {
+      "enum": [
+        "item",
+        "hold",
+        "admission",
+        "imperative",
+        "specification",
+        "rule",
+        "projection",
+        "migration"
+      ]
+    },
+    "records": {
+      "description": "Each record whole, of the kind asked for.",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "urn:hive:schema:records:pool.item:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.hold:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.admission:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.imperative:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.specification:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.rule:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.projection:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.migration:v1"
+          }
+        ]
+      }
+    },
+    "derived": {
+      "description": "For items: the derived facts per item. For projections: the freshness per projection, computed at the read from the rules in force. In the order of records.",
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "urn:hive:schema:ops:hive-pool.read.response:v1#/$defs/derived_item"
+          },
+          {
+            "$ref": "urn:hive:schema:ops:hive-pool.read.response:v1#/$defs/derived_projection"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "projection_header": {
+      "description": "What every projection the Pool returns identifies: its home, when it was read, the journal cursor at that moment, and whether the read was complete.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "home_id",
+        "read_at",
+        "journal_cursor",
+        "complete"
+      ],
+      "properties": {
+        "home_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+        },
+        "read_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "journal_cursor": {
+          "description": "The last home_sequence in the journal when the read began; 0 for an empty journal. A reader resumes the journal after it.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "complete": {
+          "description": "False when a limit cut the list, or a record of the kind could not be read; then omitted names what is missing.",
+          "type": "boolean"
+        },
+        "omitted": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "reason"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "reason": {
+                "enum": [
+                  "limit",
+                  "record_malformed",
+                  "unsupported_version"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "derived_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "blocked",
+        "held",
+        "ready",
+        "active_blockers",
+        "active_holds"
+      ],
+      "properties": {
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "blocked": {
+          "description": "True when the item is not done and a blocked-by edge names an item of this Pool that does not carry the completion marker: one that is queued or in-flight, or archived without ever having been done. A blocker carrying the marker, done or archived after it was done, satisfies the edge whether or not its closing time is known.",
+          "type": "boolean"
+        },
+        "held": {
+          "description": "True when an active hold is in force at the time of the read. A dated hold other than a word hold is inactive on and after its until time; a word hold is never made inactive by a date, which is a revisit date that readers show and nothing more, and stays in force until the decision intake releases it.",
+          "type": "boolean"
+        },
+        "ready": {
+          "description": "Queued, not blocked, not held and not a decision item.",
+          "type": "boolean"
+        },
+        "active_blockers": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+          }
+        },
+        "active_holds": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
+          }
+        }
+      }
+    },
+    "derived_projection": {
+      "description": "A projection's freshness at the moment of the read, never stored: fresh when the rules in force for its scope resolve to the rendering's digest with no conflict.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projection_id",
+        "state",
+        "stale_sources"
+      ],
+      "properties": {
+        "projection_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+        },
+        "state": {
+          "enum": [
+            "fresh",
+            "stale"
+          ]
+        },
+        "stale_sources": {
+          "description": "Rules whose revision differs from the one rendered, rules now in force that the rendering did not read, and rules it read that are no longer in force.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          }
+        }
+      }
+    }
+  }
+}

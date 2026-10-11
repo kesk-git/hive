@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-spec.close.request:v1",
+  "title": "hive-spec close: request body",
+  "description": "Closes accepted requirements against a verified landing: binds the landed head, the landing receipt, the proof receipts and the resolved findings to the accepted revision, in one transaction. Landing and closure are separate: a failed closure leaves the landing stood and the closure pending for replay under the same request identity; it never reports the requirements landed because the code merged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specification_id",
+    "revision",
+    "task_id",
+    "generation",
+    "landed_revision",
+    "landing",
+    "proof",
+    "resolved_findings"
+  ],
+  "properties": {
+    "specification_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/specification_id"
+    },
+    "revision": {
+      "description": "The accepted revision the item carries.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "landed_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/git_revision"
+    },
+    "landing": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    },
+    "proof": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+      }
+    },
+    "resolved_findings": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+      }
+    }
+  }
+}

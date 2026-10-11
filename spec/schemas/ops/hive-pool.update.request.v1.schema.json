@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.update.request:v1",
+  "title": "hive-pool update: request body",
+  "description": "Applies a patch to one item and reports which fields changed. A patch that changes nothing writes nothing. The envelope's expected_revisions names the item's revision. See spec/pool.md, Items.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "patch"
+  ],
+  "properties": {
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "patch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/label"
+        },
+        "body": {
+          "description": "Replaces the body whole.",
+          "type": "string"
+        },
+        "add_body_lines": {
+          "description": "Lines appended to the body when not already present.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deliverable": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/deliverable"
+        },
+        "class": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dispatch_class"
+        },
+        "priority": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/priority"
+        },
+        "placement_requested": {
+          "description": "A change of the requested place after a generation opened does not touch that generation; the next generation reads it.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/placement"
+        },
+        "delivery": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/delivery"
+        },
+        "specification_required": {
+          "type": "boolean"
+        },
+        "definition": {
+          "description": "needed or defining may be set here. accepted is set only by hive-spec accept.",
+          "enum": [
+            "not-required",
+            "needed",
+            "defining"
+          ]
+        },
+        "add_links": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/link"
+          }
+        },
+        "add_deps": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"
+          }
+        },
+        "remove_deps": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"
+          }
+        },
+        "schedule": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/schedule"
+        },
+        "clear_schedule": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

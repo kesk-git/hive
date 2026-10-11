@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-rule.amend.response:v1",
+  "title": "hive-rule amend: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rule"
+  ],
+  "properties": {
+    "rule": {
+      "$ref": "urn:hive:schema:records:pool.rule:v1"
+    }
+  }
+}

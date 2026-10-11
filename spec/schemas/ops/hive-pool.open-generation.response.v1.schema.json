@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.open-generation.response:v1",
+  "title": "hive-pool open-generation: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "item",
+    "generation"
+  ],
+  "properties": {
+    "item": {
+      "$ref": "urn:hive:schema:records:pool.item:v1"
+    },
+    "generation": {
+      "description": "The generation opened: its number and the place, Imperative revision and admission it runs under.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/generation_entry"
+    }
+  }
+}

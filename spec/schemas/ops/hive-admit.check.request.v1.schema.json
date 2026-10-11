@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-admit.check.request:v1",
+  "title": "hive-admit check: request body",
+  "description": "Runs the admission checks of spec/pool.md against an admission's Imperative revision, the item as it stands and the evidence the caller supplies, and records the result with its receipt. It may be run again: every launch path runs it, and a later check with new evidence may admit what an earlier one held. The response status follows the result: ok for admitted, refused for refused, held for held.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admission_id",
+    "placement"
+  ],
+  "properties": {
+    "admission_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/admission_id"
+    },
+    "placement": {
+      "description": "requested: check the place the item requests. resolved: check the place the caller's policy resolved, named with the policy receipt.",
+      "$ref": "urn:hive:schema:records:pool.admission:v1#/$defs/placement_check"
+    },
+    "source_branch": {
+      "description": "What the caller established about the source branch. Required for a check to admit a Void placement; absent, a Void placement is held for an unpushed branch.",
+      "$ref": "urn:hive:schema:records:pool.admission:v1#/$defs/source_branch_evidence"
+    },
+    "rules_digest": {
+      "description": "The resolved-rule digest the caller resolved for this dispatch, recorded with the check.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "placement": {
+            "properties": {
+              "kind": {
+                "const": "resolved"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "placement": {
+            "required": [
+              "resolved_by"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

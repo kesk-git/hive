@@ -1,0 +1,261 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.migration:v1",
+  "title": "Legacy migration",
+  "description": "The explicit identity migration of one legacy Markdown backlog into the Pool, at pool/records/migration/<migration_id>.json. It keeps the source text and every entry's exact lines, so that an unmodified item exports byte for byte and every legacy identity resolves to one Pool item or to a recorded exclusion. It is written once by an import that writes; a dry run writes nothing. See spec/pool.md, Legacy import and export.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "migration_id",
+    "scope_level",
+    "home_id",
+    "source",
+    "zone",
+    "preamble",
+    "sections",
+    "entries",
+    "free_lines",
+    "imported_at",
+    "request_id",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.migration"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "migration_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/migration_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "source": {
+      "description": "The legacy file as read: its physical path, which never leaves this home, its digest, size and the text itself, kept exactly, carriage returns and final newline included.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "digest",
+        "bytes",
+        "text",
+        "read_at"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/absolute_path"
+        },
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "bytes": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+        },
+        "text": {
+          "type": "string"
+        },
+        "read_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        }
+      }
+    },
+    "zone": {
+      "description": "The zone the import was told to read the legacy calendar dates in.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/zone"
+    },
+    "preamble": {
+      "description": "The lines before the first section, kept exactly.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sections": {
+      "description": "Every section header in order, as written, with the state it maps to or none for an unrecognized section that passes through.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "header",
+          "state"
+        ],
+        "properties": {
+          "header": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "in-flight",
+              "done",
+              "none"
+            ]
+          }
+        }
+      }
+    },
+    "entries": {
+      "description": "One entry per legacy bullet with an identifier, in file order.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.migration:v1#/$defs/entry"
+      }
+    },
+    "free_lines": {
+      "description": "Every line without an identifier, by its line number from 1, kept exactly and never addressed by identity.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "line",
+          "text"
+        ],
+        "properties": {
+          "line": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "imported_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "request_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ],
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "legacy_id",
+        "first_line",
+        "lines",
+        "section",
+        "disposition"
+      ],
+      "properties": {
+        "legacy_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/legacy_id"
+        },
+        "first_line": {
+          "description": "The line number of the bullet, from 1.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "lines": {
+          "description": "The bullet and its indented continuation lines, exactly as written.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "section": {
+          "type": "string"
+        },
+        "disposition": {
+          "description": "item: a Pool item was created. excluded: nothing was created, for the reason given; a persistent Fleet entry is excluded, never made an ordinary task. duplicate: a later entry with an identity already seen.",
+          "enum": [
+            "item",
+            "excluded",
+            "duplicate"
+          ]
+        },
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "hold_id": {
+          "description": "The hold created from the entry's hold tags, where it had them.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
+        },
+        "reason": {
+          "description": "For an exclusion or a duplicate.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "warnings": {
+          "description": "What the parser could not read canonically and kept verbatim instead.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "item"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "task_id"
+            ],
+            "properties": {
+              "reason": false
+            }
+          },
+          "else": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "task_id": false,
+              "hold_id": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}

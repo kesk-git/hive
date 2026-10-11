@@ -1,0 +1,428 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.rule:v1",
+  "title": "Rule",
+  "description": "One ruling, kept verbatim with its origin, scope, status, effective and expiry times, one rendered rule line and its attributed amendments, at pool/records/rule/<rule_id>.json. A temporary rule is this same record with an expiry time, a lift condition or both. See spec/pool.md, Rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "rule_id",
+    "scope_level",
+    "home_id",
+    "subject",
+    "words",
+    "origin",
+    "rule_line",
+    "applies",
+    "status",
+    "effective_at",
+    "authority",
+    "amendments",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.rule"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "rule_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "task_id": {
+      "description": "Given when the rule is narrowed to one task generation, as a change that rides an Imperative revision is.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "subject": {
+      "description": "What the rule governs, as a fixed key such as lane-limit, model-default or delivery-posture. Two rules in force on one subject at one scope are a conflict unless one of them names the other in changes.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z][a-z0-9-]{0,62}){0,3}$"
+    },
+    "words": {
+      "description": "The Hive Mind's exact words, or the request text as submitted. Never rewritten.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "origin": {
+      "description": "Where the words came from: the intake receipt, session input, policy request or instruction, by reference, and the kind of source.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "ruling",
+            "policy-request",
+            "instruction",
+            "trial",
+            "legacy"
+          ]
+        },
+        "ref": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      }
+    },
+    "rule_line": {
+      "description": "The one rendered rule line: the operational interpretation of the words, supplied by the recorder, without its source suffix. The resolver appends the source and revision.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "applies": {
+      "description": "Which roles the rule applies to. Empty means every role.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/role"
+      }
+    },
+    "status": {
+      "description": "in-force, expired, lifted or ended. The resolver reads the clock as well: a rule in-force past its expiry time is excluded before its expiry receipt exists, and one that is not yet effective is excluded until it is. A supersession is never a status: it is read from the superseding rule's changes at each resolution.",
+      "enum": [
+        "in-force",
+        "expired",
+        "lifted",
+        "ended"
+      ]
+    },
+    "effective_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "expires_at": {
+      "description": "A temporary rule's expiry time. The resolver excludes the rule from this instant on, whether or not the expiry receipt has been written.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "lift": {
+      "description": "A temporary rule's lift condition: the receipt kind and the record it must be about. The rule binds until the owner records the lift with that receipt as evidence.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_kind",
+        "subject"
+      ],
+      "properties": {
+        "receipt_kind": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/kind_name"
+        },
+        "subject": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      }
+    },
+    "changes": {
+      "description": "The standing rule this rule supersedes or qualifies, by identity and revision. That rule is never edited and nothing is recorded on it. The relation is read at each resolution: a superseded rule is excluded only while this rule is itself in force for the scope, the role and the instant resolved, so a temporary rule that expires, is lifted or is not yet effective leaves the standing rule in force. A qualifying rule and the rule it qualifies are both in force and are not a conflict, at one scope or across scopes: the narrower scope's rule does not override the rule it qualifies.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "record_revision",
+        "relation"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+        },
+        "record_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "relation": {
+          "enum": [
+            "supersedes",
+            "qualifies"
+          ]
+        }
+      }
+    },
+    "authority": {
+      "description": "The applying authority, with its intake receipt where the rule was applied by a request.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/authority"
+    },
+    "intake": {
+      "description": "The intake receipt of the request that applied the rule, where there is one.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    },
+    "links": {
+      "description": "Requirement and evidence links.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/link"
+      }
+    },
+    "amendments": {
+      "description": "Attributed revisions of the rule's operation, never of its words or dates: an extension, an early end, a lift, a supersession or a note. Each is appended.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/amendment"
+      }
+    },
+    "expiry": {
+      "description": "Once the expiry was noticed and honoured: the receipt and the time it was recorded.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_id",
+        "recorded_at",
+        "noticed_at"
+      ],
+      "properties": {
+        "receipt_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        },
+        "recorded_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "noticed_at": {
+          "description": "When the owning supervisor noticed the expiry, from the Shadow's wake. Lateness is this time against expires_at.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        }
+      }
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "expired"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expires_at",
+          "expiry"
+        ]
+      },
+      "else": {
+        "properties": {
+          "expiry": false
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "role": {
+      "description": "The roles the design resolves policy for: the Hive, Fleet supervisors, the eight dispatch classes, reviewers, fixers and validation steps.",
+      "enum": [
+        "hive",
+        "fleet",
+        "class-0",
+        "class-1",
+        "class-2",
+        "class-3",
+        "class-4",
+        "class-5",
+        "class-6",
+        "class-7",
+        "reviewer",
+        "fixer",
+        "validation"
+      ]
+    },
+    "amendment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "kind",
+        "words",
+        "authority",
+        "recorded_at",
+        "recorded_by",
+        "request_id",
+        "receipt_id"
+      ],
+      "properties": {
+        "sequence": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "kind": {
+          "description": "extend: a later expiry. end: an earlier end. lift: the lift condition was met. note: an attributed remark.",
+          "enum": [
+            "extend",
+            "end",
+            "lift",
+            "note"
+          ]
+        },
+        "words": {
+          "description": "The amendment's exact words.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "new_expires_at": {
+          "description": "For extend or end: the new expiry time. The original expires_at is never changed.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "evidence": {
+          "description": "For a lift: the receipt the lift condition named.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "authority": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/authority"
+        },
+        "recorded_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "recorded_by": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        "receipt_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "extend",
+                  "end"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "new_expires_at"
+            ]
+          },
+          "else": {
+            "properties": {
+              "new_expires_at": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "lift"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "evidence"
+            ]
+          }
+        }
+      ]
+    },
+    "resolved_rule": {
+      "description": "One rule as the resolver applies it: the rendered line with its source and revision appended, and why it applies.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "record_revision",
+        "scope_level",
+        "subject",
+        "line",
+        "effective_at"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+        },
+        "record_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "scope_level": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+        },
+        "subject": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z][a-z0-9-]{0,62}){0,3}$"
+        },
+        "line": {
+          "description": "The rule line followed by its source: the rule identity and record revision in brackets.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "effective_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "expires_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "temporary": {
+          "description": "True when the rule carries an expiry time or a lift condition.",
+          "type": "boolean"
+        }
+      }
+    },
+    "conflict": {
+      "description": "Two rules in force on one subject at one scope, neither naming the other in changes. An unresolved conflict holds the action that depends on the subject.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject",
+        "scope_level",
+        "rules"
+      ],
+      "properties": {
+        "subject": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z][a-z0-9-]{0,62}){0,3}$"
+        },
+        "scope_level": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+          }
+        }
+      }
+    }
+  }
+}

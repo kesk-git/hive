@@ -1,0 +1,349 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.admission:v1",
+  "title": "Admission record",
+  "description": "One immutable admission request and every check made against it, at pool/records/admission/<admission_id>.json. The request is preserved as given; checks are appended and never changed. See spec/pool.md, Admission.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "admission_id",
+    "task_id",
+    "scope_level",
+    "home_id",
+    "imperative_revision",
+    "imperative_digest",
+    "request",
+    "checks",
+    "state",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.admission"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "admission_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/admission_id"
+    },
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "clone_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/clone_id"
+    },
+    "imperative_revision": {
+      "description": "The Imperative revision this admission is bound to. The Imperative record is keyed by the task.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "imperative_digest": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    },
+    "request": {
+      "description": "The original request, preserved: the words the dispatch was asked in and who asked.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "words",
+        "caller",
+        "authority",
+        "received_at"
+      ],
+      "properties": {
+        "words": {
+          "description": "The instruction as given, exactly.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "caller": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "authority": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/authority"
+        },
+        "received_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "source": {
+          "description": "The intake receipt or record the words came from, where there is one.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      }
+    },
+    "checks": {
+      "description": "Every check made, in order. The last one is the admission's current result.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.admission:v1#/$defs/check"
+      }
+    },
+    "approval": {
+      "description": "The required ruling, once recorded by hive-admit approve.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "recorded_at",
+        "request_id"
+      ],
+      "properties": {
+        "authority": {
+          "description": "The Mind's word that supplies the authority a check found missing, as the decision intake's check that the operator's word stands verifies it.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/authority"
+        },
+        "recorded_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        }
+      }
+    },
+    "state": {
+      "description": "created: no check yet. admitted, refused, held: the result of the last check. A later check may change it; an earlier check is never changed.",
+      "enum": [
+        "created",
+        "admitted",
+        "refused",
+        "held"
+      ]
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ],
+  "$defs": {
+    "source_branch_evidence": {
+      "description": "What the caller established about the source branch, as evidence: the branch, its revision where known, whether it is pushed to the project's forge, and the observation or receipt that says so. The Pool runs no Git and verifies nothing itself.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branch",
+        "pushed",
+        "observed_at"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/git_revision"
+        },
+        "pushed": {
+          "description": "true: the branch at this revision is on the forge. false: it is not. unknown: the caller could not establish it. Admission holds on anything but true.",
+          "enum": [
+            "true",
+            "false",
+            "unknown"
+          ]
+        },
+        "observed_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "evidence": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      }
+    },
+    "placement_check": {
+      "description": "The place checked: the item's requested place, or the place a later stage's policy resolved, named by the caller.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "requested",
+            "resolved"
+          ]
+        },
+        "value": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/placement"
+        },
+        "resolved_by": {
+          "description": "For a resolved place: the policy receipt that resolved it.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      }
+    },
+    "finding": {
+      "description": "One check that did not pass, with the fixed code of the rule and the field it concerns.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/error_code"
+        },
+        "field": {
+          "description": "The Imperative field concerned, as a path such as task.standard or rules.boundary.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+        },
+        "message": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "consequence": {
+          "description": "For a guess: what would change in what gets built.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "checked_at",
+        "request_id",
+        "imperative_revision",
+        "item_revision",
+        "placement",
+        "result",
+        "findings",
+        "receipt_id"
+      ],
+      "properties": {
+        "sequence": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "checked_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        "imperative_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "item_revision": {
+          "description": "The item's revision the check read, so that a later change of the item is visible.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "placement": {
+          "$ref": "urn:hive:schema:records:pool.admission:v1#/$defs/placement_check"
+        },
+        "source_branch": {
+          "$ref": "urn:hive:schema:records:pool.admission:v1#/$defs/source_branch_evidence"
+        },
+        "specification": {
+          "description": "The accepted specification revision the item carried, where it required one.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
+        },
+        "rules_digest": {
+          "description": "The resolved-rule digest at the time of the check, where the caller supplied one.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "result": {
+          "enum": [
+            "admitted",
+            "refused",
+            "held"
+          ]
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.admission:v1#/$defs/finding"
+          }
+        },
+        "hold_id": {
+          "description": "For a held result: the hold placed.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
+        },
+        "receipt_id": {
+          "description": "The receipt that establishes this check's result.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "held"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "hold_id"
+            ]
+          },
+          "else": {
+            "properties": {
+              "hold_id": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "result": {
+                "const": "admitted"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "findings": {
+                "maxItems": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "findings": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
