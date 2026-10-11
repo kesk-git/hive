@@ -208,7 +208,7 @@ func TestWaitingDefaults(t *testing.T) {
 	sh.Release()
 	wr = lock(t, s)
 	wr.Release()
-	if _, err := wr.Replace(id("req", 1), RecordPath("item", id("task", 1)), []byte(`{}`), 0); !errors.Is(err, errReleased) {
+	if _, err := wr.Replace(id("req", 1), RecordPath("pool", "item", id("task", 1)), []byte(`{}`), 0); !errors.Is(err, errReleased) {
 		t.Errorf("Replace after Release: %v", err)
 	}
 	if _, err := wr.Commit(Tx{}); !errors.Is(err, errReleased) {

@@ -29,6 +29,8 @@ func homeContent(t *testing.T) []byte {
 	return out
 }
 
+var wsD = "dispatch/registry/workspaces/" + id("ws", 1) + ".json"
+
 // provision is the transaction that creates a home: home.json and the
 // registry's record, together.
 func provision(t *testing.T) Tx {
@@ -36,7 +38,7 @@ func provision(t *testing.T) Tx {
 		RequestID: req9,
 		Records: []RecordWrite{
 			{HomeFilePath, homeContent(t), 0},
-			{ws1, []byte(`{"slug":"alpha"}`), 0},
+			{wsD, []byte(`{"slug":"alpha"}`), 0},
 		},
 		Receipts: []Receipt{{rcpt1, []byte(`{"receipt_id":"` + rcpt1 + `","kind":"dispatch.home.created"}`)}},
 		Outcome:  []byte(`{"status":"ok"}`),
@@ -72,7 +74,7 @@ func TestDispatchWritesHomeJSONInATransaction(t *testing.T) {
 	if err != nil || rec.Revision != 1 || rec.Digest != got.Records[0].Digest {
 		t.Errorf("ReadRecord = %+v, %v", rec, err)
 	}
-	if _, err := s.ReadRecord(ws1); err != nil {
+	if _, err := s.ReadRecord(wsD); err != nil {
 		t.Error(err)
 	}
 
@@ -101,57 +103,64 @@ func TestTopLevelPathsAreOwned(t *testing.T) {
 	}
 	before := tree(t, home)
 
-	// The names of another package's top-level path land below the writer's
-	// own directory, and the top of the home is untouched.
+	// A path is relative to the home. A package's own directory and, for
+	// dispatch, home.json are the only paths it may name: every other path,
+	// reviews/ and anything under it included, is refused as outside the store.
 	for _, tc := range []struct{ pkg, path string }{
 		{"pool", HomeFilePath},
 		{"spawning-pool", HomeFilePath},
-		{"shadow", "reviews/a/review.json"},
 		{"synapse", HomeFilePath},
+		{"ui", HomeFilePath},
+		{"shadow", "reviews/a/review.json"},
 		{"dispatch", "reviews/a/review.json"},
+		{"ui", "reviews/a/review.json"},
+		{"ui", "reviews/a/final.json"},
 		{"ui", "home.json/x.json"},
+		{"dispatch", "home.json/x.json"},
+		{"dispatch", RecordPath("pool", "item", id("task", 1))},
+		{"dispatch", RecordPath("ui", "item", id("task", 1))},
+		{"ui", RecordPath("dispatch", "item", id("task", 1))},
+		{"dispatch", "journal/x.json"},
+		{"dispatch", "locks/x.json"},
+		{"dispatch", "records/item/x.json"},
+		{"ui", "records/item/x.json"},
+		{"dispatch", "../home.json"},
+		{"dispatch", "../../home.json"},
+		{"dispatch", "../"},
 	} {
-		t.Run(tc.pkg+" "+tc.path, func(t *testing.T) {
+		t.Run("outside "+tc.pkg+" "+tc.path, func(t *testing.T) {
 			s := stores[tc.pkg]
 			w := lock(t, s)
 			defer w.Release()
-			if _, err := w.Replace(req1, tc.path, []byte(`{}`), 0); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := os.Stat(filepath.Join(home, tc.pkg, filepath.FromSlash(tc.path))); err != nil {
-				t.Errorf("not written below %s/: %v", tc.pkg, err)
-			}
-			for _, top := range []string{homeFile, "reviews"} {
-				if _, err := os.Lstat(filepath.Join(home, top)); err == nil {
-					t.Errorf("%s was written at the top of the home", top)
+			for what, err := range map[string]error{
+				"Replace": func() error { _, err := w.Replace(req1, tc.path, []byte(`{}`), 0); return err }(),
+				"Commit": func() error {
+					_, err := w.Commit(Tx{RequestID: req2, Records: []RecordWrite{{tc.path, []byte(`{}`), 0}}, Outcome: []byte(`{}`)})
+					return err
+				}(),
+				"ReadRecord": func() error { _, err := s.ReadRecord(tc.path); return err }(),
+				"Read":       func() error { _, err := s.Read(tc.path); return err }(),
+			} {
+				if err == nil || errors.Is(err, os.ErrNotExist) {
+					t.Errorf("%s = %v; want a refusal", what, err)
+				} else if tc.path[0] != '.' && !strings.Contains(err.Error(), "outside the store") {
+					t.Errorf("%s = %v; want the path refused as outside the store", what, err)
 				}
 			}
 		})
 	}
-	for _, pkg := range storePackages {
-		os.RemoveAll(filepath.Join(home, pkg))
-	}
-	for _, pkg := range storePackages {
-		stores[pkg], _, _ = open(t, home, pkg)
-		lock(t, stores[pkg]).Release()
-	}
-	sameTree(t, "after the writes below the packages", tree(t, home), before)
+	sameTree(t, "after the refused writes", tree(t, home), before)
 
 	for _, tc := range []struct{ pkg, path string }{
-		{"dispatch", "../journal/x.json"},
-		{"dispatch", "../home.json"},
-		{"dispatch", "../../home.json"},
-		{"dispatch", "../"},
-		{"dispatch", "home.json/../../home.json"},
-		{"ui", "../reviews/a/review.json"},
-		{"ui", "reviews/"},
-		{"ui", "reviews/../home.json"},
-		{"ui", "reviews/a/../../home.json"},
-		{"ui", "reviews/a//review.json"},
-		{"ui", "reviews/a/Review.json"},
-		{"ui", "reviews/a/review"},
-		{"ui", "reviews/a/x.json.tmp"},
-		{"ui", "/reviews/a/review.json"},
+		{"dispatch", "dispatch/../home.json"},
+		{"dispatch", "dispatch/../../home.json"},
+		{"dispatch", "dispatch/"},
+		{"dispatch", "dispatch/home.json/../x.json"},
+		{"ui", "ui/records//x.json"},
+		{"ui", "ui/records/Review.json"},
+		{"ui", "ui/records/review"},
+		{"ui", "ui/records/x.json.tmp"},
+		{"ui", "/ui/records/x.json"},
 	} {
 		t.Run("refused "+tc.pkg+" "+tc.path, func(t *testing.T) {
 			s := stores[tc.pkg]
@@ -183,7 +192,7 @@ func TestTopLevelPathsAreOwned(t *testing.T) {
 		t.Fatal(err)
 	}
 	pool := stores["pool"]
-	write(t, pool, IntentPath(req9), []byte(strings.Replace(string(data), `"package":"dispatch"`, `"package":"pool"`, 1)))
+	write(t, pool, IntentPath("pool", req9), []byte(strings.Replace(string(data), `"package":"dispatch"`, `"package":"pool"`, 1)))
 	if _, err := pool.Lock(); !errors.Is(err, ErrRecordMalformed) {
 		t.Fatalf("Lock = %v; want ErrRecordMalformed", err)
 	}
@@ -222,7 +231,7 @@ func TestTopLevelTransactionsRecover(t *testing.T) {
 			})
 			w.Release()
 			done := tree(t, home)
-			durable := slices.Index(steps, "syncdir "+IntentPath(req9))
+			durable := slices.Index(steps, "syncdir "+IntentPath(tc.pkg, req9))
 			for i, step := range steps {
 				t.Run(step, func(t *testing.T) {
 					s, home := fresh()

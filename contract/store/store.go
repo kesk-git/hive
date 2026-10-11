@@ -93,7 +93,7 @@ type Record struct {
 	Digest string
 }
 
-// ReadRecord reads the record at rel, a path below the store, without a
+// ReadRecord reads the record at rel, a path relative to the home, without a
 // lock: the record is replaced atomically, so it is whole. A missing record
 // is reported with fs.ErrNotExist; a record that cannot be read, is not a
 // record file or has no record_revision is ErrRecordMalformed.

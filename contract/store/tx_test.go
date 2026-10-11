@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	task2 = RecordPath("item", id("task", 2))
-	ws1   = "registry/workspaces/" + id("ws", 1) + ".json"
+	task2 = RecordPath("pool", "item", id("task", 2))
+	ws1   = "pool/registry/workspaces/" + id("ws", 1) + ".json"
 	rcpt1 = id("rcpt", 1)
 	rcpt2 = id("rcpt", 2)
 	evt1  = id("evt", 1)
@@ -93,12 +93,12 @@ func TestCommitWritesEverythingInOrder(t *testing.T) {
 		}
 	}
 	want := []string{
-		"create " + IntentPath(req9),
+		"create " + IntentPath("pool", req9),
 		"create " + task1, "create " + task2, "create " + ws1,
-		"create " + ReceiptPath(rcpt1), "create " + ReceiptPath(rcpt2),
-		"events " + IntentPath(req9),
-		"create " + OutcomePath(req9),
-		"remove " + IntentPath(req9),
+		"create " + ReceiptPath("pool", rcpt1), "create " + ReceiptPath("pool", rcpt2),
+		"events " + IntentPath("pool", req9),
+		"create " + OutcomePath("pool", req9),
+		"remove " + IntentPath("pool", req9),
 	}
 	if !slices.Equal(order, want) {
 		t.Errorf("order = %v\nwant %v", order, want)
@@ -119,12 +119,12 @@ func TestCommitWritesEverythingInOrder(t *testing.T) {
 		}
 	}
 	for _, id := range []string{rcpt1, rcpt2} {
-		data, err := s.Read(ReceiptPath(id))
+		data, err := s.Read(ReceiptPath("pool", id))
 		if err != nil || parsed(t, data)["receipt_id"] != id {
 			t.Errorf("receipt %s = %q, %v", id, data, err)
 		}
 	}
-	if data, err := s.Read(OutcomePath(req9)); err != nil || parsed(t, data)["status"] != "ok" {
+	if data, err := s.Read(OutcomePath("pool", req9)); err != nil || parsed(t, data)["status"] != "ok" {
 		t.Errorf("outcome = %q, %v", data, err)
 	}
 	if !slices.Equal(j.order, []string{evt1, evt2}) || j.appends != 1 {
@@ -133,7 +133,7 @@ func TestCommitWritesEverythingInOrder(t *testing.T) {
 	if !bytes.Equal(j.lines[evt1], []byte(`{"event_id":"`+evt1+`","kind":"pool.item.created"}`)) {
 		t.Errorf("event content %q is not canonical", j.lines[evt1])
 	}
-	if _, err := os.Stat(s.abs(IntentPath(req9))); !errNotExist(err) {
+	if _, err := os.Stat(s.abs(IntentPath("pool", req9))); !errNotExist(err) {
 		t.Error("the intent remains")
 	}
 	if temps := temps(t, s.Dir); len(temps) != 0 {
@@ -163,7 +163,7 @@ func TestCommitSmallest(t *testing.T) {
 	if j.appends != 0 {
 		t.Error("the journal was touched without events")
 	}
-	if _, err := s.Read(OutcomePath(req9)); err != nil {
+	if _, err := s.Read(OutcomePath("pool", req9)); err != nil {
 		t.Error(err)
 	}
 }
@@ -174,9 +174,9 @@ func TestCommitChecksBeforeWriting(t *testing.T) {
 	s, j := seeded(t)
 	w := lock(t, s)
 	defer w.Release()
-	write(t, s, ReceiptPath(id("rcpt", 7)), []byte("{}\n"))
-	write(t, s, OutcomePath(id("req", 7)), []byte("{}\n"))
-	write(t, s, RecordPath("item", id("task", 7)), []byte("{\"record_revision\":1,\n"))
+	write(t, s, ReceiptPath("pool", id("rcpt", 7)), []byte("{}\n"))
+	write(t, s, OutcomePath("pool", id("req", 7)), []byte("{}\n"))
+	write(t, s, RecordPath("pool", "item", id("task", 7)), []byte("{\"record_revision\":1,\n"))
 	before := tree(t, s.Dir)
 
 	tests := []struct {
@@ -187,7 +187,10 @@ func TestCommitChecksBeforeWriting(t *testing.T) {
 		{"a record at another revision", func(tx *Tx) { tx.Records[0].Expected = 2 }, ErrRevisionConflict},
 		{"a record to replace that is absent", func(tx *Tx) { tx.Records[1].Expected = 1 }, ErrRevisionConflict},
 		{"a record to create that is present", func(tx *Tx) { tx.Records[0].Expected = 0 }, ErrAlreadyExists},
-		{"a record that is malformed", func(tx *Tx) { tx.Records[1].Path = RecordPath("item", id("task", 7)); tx.Records[1].Expected = 1 }, ErrRecordMalformed},
+		{"a record that is malformed", func(tx *Tx) {
+			tx.Records[1].Path = RecordPath("pool", "item", id("task", 7))
+			tx.Records[1].Expected = 1
+		}, ErrRecordMalformed},
 		{"a receipt that is present", func(tx *Tx) { tx.Receipts[0].ID = id("rcpt", 7) }, ErrAlreadyExists},
 		{"an outcome that is present", func(tx *Tx) { tx.RequestID = id("req", 7) }, ErrAlreadyExists},
 		{"the same record twice", func(tx *Tx) { tx.Records[1].Path = task1; tx.Records[1].Expected = 1 }, nil},
@@ -196,7 +199,7 @@ func TestCommitChecksBeforeWriting(t *testing.T) {
 		{"a request that is not one", func(tx *Tx) { tx.RequestID = "req_x" }, nil},
 		{"a receipt whose id is not one", func(tx *Tx) { tx.Receipts[0].ID = id("task", 3) }, nil},
 		{"an event whose id is not one", func(tx *Tx) { tx.Events[0].ID = id("rcpt", 3) }, nil},
-		{"a record path among the receipts", func(tx *Tx) { tx.Records[1].Path = ReceiptPath(id("rcpt", 8)) }, nil},
+		{"a record path among the receipts", func(tx *Tx) { tx.Records[1].Path = ReceiptPath("pool", id("rcpt", 8)) }, nil},
 		{"record content that is not an object", func(tx *Tx) { tx.Records[2].Content = []byte(`"alpha"`) }, nil},
 		{"receipt content that is not JSON", func(tx *Tx) { tx.Receipts[1].Content = []byte(`{`) }, nil},
 		{"event content with a fraction", func(tx *Tx) { tx.Events[1].Content = []byte(`{"n":0.5}`) }, nil},
@@ -265,7 +268,7 @@ func TestCommitInterruptedAtEachStep(t *testing.T) {
 	created := record(t, map[string]any{"n": int64(1), "title": "created"}, 1, "2026-10-11T08:00:00.000Z")
 	// The intent is on disk from its rename on. Before that the transaction
 	// never happened; from then on recovery completes it.
-	durable := slices.Index(steps, "syncdir "+IntentPath(req9))
+	durable := slices.Index(steps, "syncdir "+IntentPath("pool", req9))
 
 	for i, step := range steps {
 		t.Run(step, func(t *testing.T) {
@@ -287,7 +290,7 @@ func TestCommitInterruptedAtEachStep(t *testing.T) {
 				t.Fatal(err)
 			}
 			intentThere := false
-			if _, err := os.Stat(s.abs(IntentPath(req9))); err == nil {
+			if _, err := os.Stat(s.abs(IntentPath("pool", req9))); err == nil {
 				intentThere = true
 			}
 			if intentThere != (i >= durable) {
@@ -306,7 +309,7 @@ func TestCommitInterruptedAtEachStep(t *testing.T) {
 			if !slices.Equal(j.order, wantEvents) {
 				t.Errorf("journal after recovery = %v, want %v", j.order, wantEvents)
 			}
-			if _, err := os.Stat(s.abs(IntentPath(req9))); !errNotExist(err) {
+			if _, err := os.Stat(s.abs(IntentPath("pool", req9))); !errNotExist(err) {
 				t.Error("the intent remains after recovery")
 			}
 
@@ -343,7 +346,7 @@ func TestRecoveryInterruptedAtEachStep(t *testing.T) {
 	if slices.Contains(steps, "create "+task1) {
 		t.Error("recovery rewrote a record already at the intended digest")
 	}
-	if !slices.Contains(steps, "create "+task2) || !slices.Contains(steps, "events "+IntentPath(req9)) {
+	if !slices.Contains(steps, "create "+task2) || !slices.Contains(steps, "events "+IntentPath("pool", req9)) {
 		t.Errorf("recovery steps = %v", steps)
 	}
 	for _, step := range steps {
@@ -405,10 +408,10 @@ func TestRecoveryDecidesByWhatItFinds(t *testing.T) {
 	})
 	t.Run("a receipt and an outcome already written are left", func(t *testing.T) {
 		s, _ := afterIntent(t)
-		write(t, s, ReceiptPath(rcpt1), []byte(`{"kind":"pool.item.created","receipt_id":"`+rcpt1+`"}`+"\n"))
-		write(t, s, OutcomePath(req9), []byte(`{"request_id":"`+req9+`","status":"ok"}`+"\n"))
+		write(t, s, ReceiptPath("pool", rcpt1), []byte(`{"kind":"pool.item.created","receipt_id":"`+rcpt1+`"}`+"\n"))
+		write(t, s, OutcomePath("pool", req9), []byte(`{"request_id":"`+req9+`","status":"ok"}`+"\n"))
 		steps := trace(t, s, func() { lock(t, s).Release() })
-		for _, rel := range []string{ReceiptPath(rcpt1), OutcomePath(req9)} {
+		for _, rel := range []string{ReceiptPath("pool", rcpt1), OutcomePath("pool", req9)} {
 			if slices.Contains(steps, "create "+rel) {
 				t.Errorf("%s was rewritten", rel)
 			}
@@ -437,14 +440,14 @@ func TestRecoveryDecidesByWhatItFinds(t *testing.T) {
 			write(t, s, task1, []byte("{\"record_revision\":1,\n"))
 		}, task1},
 		{"a receipt present with other content", func(t *testing.T, s *Store) {
-			write(t, s, ReceiptPath(rcpt2), []byte("{\"other\":true}\n"))
-		}, ReceiptPath(rcpt2)},
+			write(t, s, ReceiptPath("pool", rcpt2), []byte("{\"other\":true}\n"))
+		}, ReceiptPath("pool", rcpt2)},
 		{"a receipt that is malformed", func(t *testing.T, s *Store) {
-			write(t, s, ReceiptPath(rcpt2), []byte("{"))
-		}, ReceiptPath(rcpt2)},
+			write(t, s, ReceiptPath("pool", rcpt2), []byte("{"))
+		}, ReceiptPath("pool", rcpt2)},
 		{"an outcome present with other content", func(t *testing.T, s *Store) {
-			write(t, s, OutcomePath(req9), []byte("{\"status\":\"failed\"}\n"))
-		}, OutcomePath(req9)},
+			write(t, s, OutcomePath("pool", req9), []byte("{\"status\":\"failed\"}\n"))
+		}, OutcomePath("pool", req9)},
 	}
 	for _, tc := range stops {
 		t.Run(tc.name, func(t *testing.T) {
@@ -456,7 +459,7 @@ func TestRecoveryDecidesByWhatItFinds(t *testing.T) {
 				if !errors.Is(err, ErrRecordMalformed) || w != nil {
 					t.Fatalf("Lock %d = %v, %v; want ErrRecordMalformed", i, w, err)
 				}
-				if !strings.Contains(err.Error(), IntentPath(req9)) || !strings.Contains(err.Error(), tc.names) {
+				if !strings.Contains(err.Error(), IntentPath("pool", req9)) || !strings.Contains(err.Error(), tc.names) {
 					t.Errorf("error %q names neither the intent nor %s", err, tc.names)
 				}
 				if Code(err) != "record_malformed" {
@@ -474,7 +477,7 @@ func TestRecoveryDecidesByWhatItFinds(t *testing.T) {
 				if !errors.Is(err, ErrRecordMalformed) || l != nil {
 					t.Fatalf("LockShared = %v, %v; want ErrRecordMalformed", l, err)
 				}
-				if !strings.Contains(err.Error(), IntentPath(req9)) || !strings.Contains(err.Error(), tc.names) {
+				if !strings.Contains(err.Error(), IntentPath("pool", req9)) || !strings.Contains(err.Error(), tc.names) {
 					t.Errorf("error %q names neither the intent nor %s", err, tc.names)
 				}
 			}
@@ -556,7 +559,7 @@ func TestTornIntent(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.Release()
-	rel := IntentPath(req9)
+	rel := IntentPath("pool", req9)
 
 	torn := map[string][]byte{
 		"cut in half":                                    whole[:len(whole)/2],
@@ -568,13 +571,13 @@ func TestTornIntent(t *testing.T) {
 		"a version that is not one":                      bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"one"`), 1),
 		"an older major version":                         bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"0.9"`), 1),
 		"content that is not an object":                  bytes.Replace(whole, []byte(`"body":{"n":1,"record_revision":1,"title":"created","updated_at":"2026-10-11T08:00:00.000Z"}`), []byte(`"body":[]`), 1),
-		"an absent record that names a revision":         bytes.Replace(whole, []byte(`"expected":"absent","path":"pool/`+task2), []byte(`"expected":"absent","expected_revision":1,"path":"pool/`+task2), 1),
-		"a path with a parent segment":                   bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"pool/records/../item/x.json`), 1),
-		"a path that leaves the home":                    bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"../home.json`), 1),
-		"a record in the list of receipts":               bytes.Replace(whole, []byte(`"path":"pool/`+ReceiptPath(rcpt1)), []byte(`"path":"pool/`+task2), 1),
-		"a path of another store":                        bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"shadow/`+task2), 1),
-		"a top-level path the package does not own":      bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"home.json`), 1),
-		"a top-level directory the package does not own": bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"reviews/x.json`), 1),
+		"an absent record that names a revision":         bytes.Replace(whole, []byte(`"expected":"absent","path":"`+task2), []byte(`"expected":"absent","expected_revision":1,"path":"`+task2), 1),
+		"a path with a parent segment":                   bytes.Replace(whole, []byte(`"path":"`+task2), []byte(`"path":"pool/records/../item/x.json`), 1),
+		"a path that leaves the home":                    bytes.Replace(whole, []byte(`"path":"`+task2), []byte(`"path":"../home.json`), 1),
+		"a record in the list of receipts":               bytes.Replace(whole, []byte(`"path":"`+ReceiptPath("pool", rcpt1)), []byte(`"path":"`+task2), 1),
+		"a path of another store":                        bytes.Replace(whole, []byte(`"path":"`+task2), []byte(`"path":"`+RecordPath("shadow", "item", id("task", 2))), 1),
+		"a top-level path the package does not own":      bytes.Replace(whole, []byte(`"path":"`+task2), []byte(`"path":"home.json`), 1),
+		"a top-level directory the package does not own": bytes.Replace(whole, []byte(`"path":"`+task2), []byte(`"path":"reviews/x.json`), 1),
 		"a package that has no store":                    bytes.Replace(whole, []byte(`"package":"pool"`), []byte(`"package":"word"`), 1),
 		"another package":                                bytes.Replace(whole, []byte(`"package":"pool"`), []byte(`"package":"shadow"`), 1),
 		"another request":                                bytes.Replace(whole, []byte(`"request_id":"`+req9), []byte(`"request_id":"`+req2), 1),
@@ -617,8 +620,8 @@ func TestTornIntent(t *testing.T) {
 	})
 	t.Run("a torn temporary file of an intent is removed", func(t *testing.T) {
 		s, j := seeded(t)
-		write(t, s, "tmp/"+req9+tempSuffix, whole[:len(whole)/2])
-		write(t, s, "tx/notes.txt", []byte("not an intent"))
+		write(t, s, "pool/tmp/"+req9+tempSuffix, whole[:len(whole)/2])
+		write(t, s, "pool/tx/notes.txt", []byte("not an intent"))
 		before := tree(t, s.Dir)
 		lock(t, s).Release()
 		delete(before, "pool/tmp/"+req9+tempSuffix)
@@ -650,8 +653,8 @@ func TestIntentRoundTrip(t *testing.T) {
 	if !canon.IsCanonical(data[:len(data)-1]) {
 		t.Error("the intent is not in canonical form")
 	}
-	write(t, s, IntentPath(req9), data)
-	back, err := s.readIntent(IntentPath(req9))
+	write(t, s, IntentPath("pool", req9), data)
+	back, err := s.readIntent(IntentPath("pool", req9))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -677,13 +680,13 @@ func TestIntentRoundTrip(t *testing.T) {
 			t.Errorf("event %d read back %+v", i, b)
 		}
 	}
-	if back.outcome.rel != OutcomePath(req9) || !bytes.Equal(back.outcome.data, in.outcome.data) {
+	if back.outcome.rel != OutcomePath("pool", req9) || !bytes.Equal(back.outcome.data, in.outcome.data) {
 		t.Errorf("outcome read back %+v", back.outcome)
 	}
 	// The spec's words: a created record states that it is expected absent.
 	doc := parsed(t, data)
 	rec := doc["records"].([]any)[1].(map[string]any)
-	if rec["expected"] != "absent" || rec["expected_revision"] != nil || rec["path"] != "pool/"+task2 {
+	if rec["expected"] != "absent" || rec["expected_revision"] != nil || rec["path"] != task2 {
 		t.Errorf("created record entry = %v", rec)
 	}
 	rec = doc["records"].([]any)[0].(map[string]any)
@@ -703,7 +706,7 @@ func TestJournalFailureKeepsTheIntent(t *testing.T) {
 		t.Fatalf("Commit = %v", err)
 	}
 	w.Release()
-	if _, err := os.Stat(s.abs(IntentPath(req9))); err != nil {
+	if _, err := os.Stat(s.abs(IntentPath("pool", req9))); err != nil {
 		t.Fatal("the intent was discarded")
 	}
 	if _, err := s.Lock(); err == nil {
@@ -723,16 +726,16 @@ func TestRecoveryCompletesEveryIntent(t *testing.T) {
 	w := lock(t, s)
 	first := plan(t, s, fullTx())
 	firstData, _ := s.encodeIntent(first)
-	second := Tx{RequestID: req2, Records: []RecordWrite{{RecordPath("item", id("task", 5)), []byte(`{"n":5}`), 0}}, Outcome: []byte(`{"status":"ok"}`)}
+	second := Tx{RequestID: req2, Records: []RecordWrite{{RecordPath("pool", "item", id("task", 5)), []byte(`{"n":5}`), 0}}, Outcome: []byte(`{"status":"ok"}`)}
 	secondData, _ := s.encodeIntent(plan(t, s, second))
 	w.Release()
-	write(t, s, IntentPath(req9), firstData)
-	write(t, s, IntentPath(req2), secondData)
+	write(t, s, IntentPath("pool", req9), firstData)
+	write(t, s, IntentPath("pool", req2), secondData)
 	lock(t, s).Release()
 	if entries, _ := os.ReadDir(filepath.Join(s.dir, txDir)); len(entries) != 0 {
 		t.Errorf("intents remain: %v", entries)
 	}
-	for _, rel := range []string{task1, task2, ws1, RecordPath("item", id("task", 5)), ReceiptPath(rcpt1), OutcomePath(req9), OutcomePath(req2)} {
+	for _, rel := range []string{task1, task2, ws1, RecordPath("pool", "item", id("task", 5)), ReceiptPath("pool", rcpt1), OutcomePath("pool", req9), OutcomePath("pool", req2)} {
 		if _, err := s.Read(rel); err != nil && !errors.Is(err, ErrRecordMalformed) {
 			t.Errorf("%s: %v", rel, err)
 		}
@@ -757,7 +760,7 @@ func TestNewerIntentIsUnsupported(t *testing.T) {
 	for _, version := range []string{"1.1", "1.10", "2.0", "10.0", "99999999999999999999.0"} {
 		t.Run(version, func(t *testing.T) {
 			s, j := seeded(t)
-			write(t, s, IntentPath(req9), bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"`+version+`"`), 1))
+			write(t, s, IntentPath("pool", req9), bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"`+version+`"`), 1))
 			before := tree(t, s.Dir)
 			for _, take := range []func() error{
 				func() error { _, err := s.Lock(); return err },
@@ -770,7 +773,7 @@ func TestNewerIntentIsUnsupported(t *testing.T) {
 				if Code(err) != "unsupported_version" {
 					t.Errorf("Code = %q", Code(err))
 				}
-				if !strings.Contains(err.Error(), IntentPath(req9)) {
+				if !strings.Contains(err.Error(), IntentPath("pool", req9)) {
 					t.Errorf("error %q does not name the intent", err)
 				}
 				sameTree(t, "after a refused intent", tree(t, s.Dir), before)
@@ -794,7 +797,7 @@ func TestWritesFlushEveryDirectoryOnTheWay(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	for _, rel := range []string{IntentPath(req9), ws1, ReceiptPath(rcpt1), OutcomePath(req9)} {
+	for _, rel := range []string{IntentPath("pool", req9), ws1, ReceiptPath("pool", rcpt1), OutcomePath("pool", req9)} {
 		at := slices.Index(steps, "syncdir "+rel)
 		if at < 0 {
 			t.Fatalf("%s was never flushed: %v", rel, steps)
@@ -808,8 +811,8 @@ func TestWritesFlushEveryDirectoryOnTheWay(t *testing.T) {
 		}
 		dirs := strings.Split(rel, "/")
 		var want []string
-		for k := len(dirs) - 2; k >= 0; k-- {
-			want = append(want, "syncdir "+path.Join(append([]string{"pool"}, dirs[:k]...)...)+"/")
+		for k := len(dirs) - 2; k >= 1; k-- {
+			want = append(want, "syncdir "+path.Join(dirs[:k]...)+"/")
 		}
 		want = append(want, "syncdir ./", "syncdir pool/tmp/")
 		if !slices.Equal(chain, want) {
@@ -823,7 +826,7 @@ func TestWritesFlushEveryDirectoryOnTheWay(t *testing.T) {
 // writes nothing, but flushes it, and the directories above it, before it
 // removes the intent: a record, a receipt and the outcome alike.
 func TestRecoveryFlushesWhatIsAlreadyVisible(t *testing.T) {
-	for _, rel := range []string{task2, ws1, ReceiptPath(rcpt2), OutcomePath(req9)} {
+	for _, rel := range []string{task2, ws1, ReceiptPath("pool", rcpt2), OutcomePath("pool", req9)} {
 		t.Run(rel, func(t *testing.T) {
 			s, _ := seeded(t)
 			w := lock(t, s)
@@ -840,7 +843,7 @@ func TestRecoveryFlushesWhatIsAlreadyVisible(t *testing.T) {
 			if slices.Contains(steps, "create "+rel) {
 				t.Error("recovery wrote the file again")
 			}
-			flushed, removed := slices.Index(steps, "syncdir "+rel), slices.Index(steps, "remove "+IntentPath(req9))
+			flushed, removed := slices.Index(steps, "syncdir "+rel), slices.Index(steps, "remove "+IntentPath("pool", req9))
 			if flushed < 0 || removed < 0 || flushed > removed {
 				t.Errorf("flush at %d, intent removed at %d: %v", flushed, removed, steps)
 			}
@@ -875,7 +878,7 @@ func TestRecoveryFlushesTheIntentBeforeWriting(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			s, _ := seeded(t)
 			w := lock(t, s)
-			faultAt(s, "syncdir "+IntentPath(req9), 1)
+			faultAt(s, "syncdir "+IntentPath("pool", req9), 1)
 			if _, err := w.Commit(fullTx()); !errors.Is(err, errCrash) {
 				t.Fatal(err)
 			}
@@ -886,7 +889,7 @@ func TestRecoveryFlushesTheIntentBeforeWriting(t *testing.T) {
 					t.Fatal(err)
 				}
 			})
-			flushed, first := slices.Index(steps, "syncdir "+IntentPath(req9)), slices.IndexFunc(steps, func(step string) bool {
+			flushed, first := slices.Index(steps, "syncdir "+IntentPath("pool", req9)), slices.IndexFunc(steps, func(step string) bool {
 				return strings.HasPrefix(step, "create ")
 			})
 			if flushed < 0 || first < 0 || flushed > first {
@@ -921,13 +924,14 @@ func TestIntentPathsAreRelativeToTheHome(t *testing.T) {
 	home := newHome(t)
 	d, _, _ := open(t, home, "dispatch")
 	got := paths(t, d, provision(t))
-	want := []string{"home.json", "dispatch/" + ws1, "dispatch/" + ReceiptPath(rcpt1), "dispatch/" + OutcomePath(req9)}
+	want := []string{"home.json", wsD, ReceiptPath("dispatch", rcpt1), OutcomePath("dispatch", req9)}
 	if !slices.Equal(got, want) {
 		t.Errorf("dispatch intent paths = %v, want %v", got, want)
 	}
 	u, _, _ := open(t, home, "ui")
-	got = paths(t, u, Tx{RequestID: req9, Records: []RecordWrite{{task1, []byte(`{}`), 0}}, Outcome: []byte(`{}`)})
-	want = []string{"ui/" + task1, "ui/" + OutcomePath(req9)}
+	uTask := RecordPath("ui", "item", id("task", 1))
+	got = paths(t, u, Tx{RequestID: req9, Records: []RecordWrite{{uTask, []byte(`{}`), 0}}, Outcome: []byte(`{}`)})
+	want = []string{uTask, OutcomePath("ui", req9)}
 	if !slices.Equal(got, want) {
 		t.Errorf("ui intent paths = %v, want %v", got, want)
 	}
@@ -948,7 +952,7 @@ func TestRecoveryFlushesTxWhenNoIntentRemains(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.Release()
-	if _, err := os.Stat(s.abs(IntentPath(req9))); !errNotExist(err) {
+	if _, err := os.Stat(s.abs(IntentPath("pool", req9))); !errNotExist(err) {
 		t.Fatal("the intent remains")
 	}
 	steps := trace(t, s, func() { lock(t, s).Release() })

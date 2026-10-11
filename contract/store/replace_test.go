@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	task1 = RecordPath("item", id("task", 1))
+	task1 = RecordPath("pool", "item", id("task", 1))
 	req1  = id("req", 1)
 	req2  = id("req", 2)
 )
@@ -84,7 +84,7 @@ func TestReplaceRefusesAndWritesNothing(t *testing.T) {
 	if _, err := w.Replace(req1, task1, []byte(`{"n":1}`), 0); err != nil {
 		t.Fatal(err)
 	}
-	bad := RecordPath("item", id("task", 2))
+	bad := RecordPath("pool", "item", id("task", 2))
 	write(t, s, bad, []byte("{\"n\":1,\"record_revision\":1,\n"))
 	before := tree(t, home)
 
@@ -97,7 +97,7 @@ func TestReplaceRefusesAndWritesNothing(t *testing.T) {
 	}{
 		{"create over a present record", task1, `{"n":2}`, 0, ErrAlreadyExists},
 		{"replace at another revision", task1, `{"n":2}`, 2, ErrRevisionConflict},
-		{"replace an absent record", RecordPath("item", id("task", 3)), `{"n":2}`, 1, ErrRevisionConflict},
+		{"replace an absent record", RecordPath("pool", "item", id("task", 3)), `{"n":2}`, 1, ErrRevisionConflict},
 		{"replace a malformed record", bad, `{"n":2}`, 1, ErrRecordMalformed},
 		{"a negative expected revision", task1, `{"n":2}`, -1, nil},
 		{"content that is not an object", task1, `[1]`, 1, nil},
@@ -109,9 +109,9 @@ func TestReplaceRefusesAndWritesNothing(t *testing.T) {
 		{"a path without .json", "records/item/x", `{}`, 0, nil},
 		{"a temporary file", "records/item/x.json.req.tmp", `{}`, 0, nil},
 		{"a path in tmp", "tmp/x.json", `{}`, 0, nil},
-		{"a receipt as a record", ReceiptPath(id("rcpt", 1)), `{}`, 0, nil},
-		{"an outcome as a record", OutcomePath(req1), `{}`, 0, nil},
-		{"an intent as a record", IntentPath(req1), `{}`, 0, nil},
+		{"a receipt as a record", ReceiptPath("pool", id("rcpt", 1)), `{}`, 0, nil},
+		{"an outcome as a record", OutcomePath("pool", req1), `{}`, 0, nil},
+		{"an intent as a record", IntentPath("pool", req1), `{}`, 0, nil},
 		{"an empty path", "", `{}`, 0, nil},
 		{"a request that is not one", task1, `{}`, 1, nil},
 	}
@@ -224,15 +224,15 @@ func TestTemporaryFilesAreNeverRecords(t *testing.T) {
 	}
 	w.Release()
 	whole := record(t, map[string]any{"n": int64(2)}, 2, "2026-10-11T08:00:00.000Z")
-	write(t, s, "tmp/"+req2+tempSuffix, whole)
-	write(t, s, "tmp/"+id("req", 3)+tempSuffix, whole[:len(whole)/2])
-	write(t, s, "tmp/"+id("req", 4)+tempSuffix, nil)
-	write(t, s, "tmp/"+id("req", 5)+tempSuffix, []byte(`{"schema":"hive.tx-in`))
+	write(t, s, "pool/tmp/"+req2+tempSuffix, whole)
+	write(t, s, "pool/tmp/"+id("req", 3)+tempSuffix, whole[:len(whole)/2])
+	write(t, s, "pool/tmp/"+id("req", 4)+tempSuffix, nil)
+	write(t, s, "pool/tmp/"+id("req", 5)+tempSuffix, []byte(`{"schema":"hive.tx-in`))
 	rec, err := s.ReadRecord(task1)
 	if err != nil || rec.Revision != 1 {
 		t.Fatalf("ReadRecord with temporary files beside = %+v, %v", rec, err)
 	}
-	for _, rel := range []string{"tmp/" + req2 + tempSuffix, "tmp/" + req2 + ".json"} {
+	for _, rel := range []string{"pool/tmp/" + req2 + tempSuffix, "pool/tmp/" + req2 + ".json"} {
 		if _, err := s.ReadRecord(rel); err == nil {
 			t.Errorf("a temporary file %s was read as a record", rel)
 		}
@@ -279,7 +279,7 @@ func TestReadReceiptsAndOutcomes(t *testing.T) {
 	s, _, _ := open(t, home, "pool")
 	w := lock(t, s)
 	defer w.Release()
-	rel := ReceiptPath(rcpt1)
+	rel := ReceiptPath("pool", rcpt1)
 	if _, err := w.Commit(Tx{
 		RequestID: req1,
 		Receipts:  []Receipt{{rcpt1, []byte("{ \"b\": 2,\n\"a\": 1 }")}},
@@ -291,7 +291,7 @@ func TestReadReceiptsAndOutcomes(t *testing.T) {
 	if err != nil || string(data) != "{\"a\":1,\"b\":2}\n" {
 		t.Fatalf("Read = %q, %v", data, err)
 	}
-	if _, err := s.Read(OutcomePath(req2)); !errors.Is(err, fs.ErrNotExist) {
+	if _, err := s.Read(OutcomePath("pool", req2)); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("Read of a missing file: %v", err)
 	}
 	if _, err := s.ReadRecord(rel); err == nil {
@@ -300,8 +300,8 @@ func TestReadReceiptsAndOutcomes(t *testing.T) {
 	if _, err := s.Read("requests/x.tmp"); err == nil {
 		t.Error("a temporary name was read")
 	}
-	write(t, s, OutcomePath(req2), []byte("{\"a\":1}"))
-	if _, err := s.Read(OutcomePath(req2)); !errors.Is(err, ErrRecordMalformed) {
+	write(t, s, OutcomePath("pool", req2), []byte("{\"a\":1}"))
+	if _, err := s.Read(OutcomePath("pool", req2)); !errors.Is(err, ErrRecordMalformed) {
 		t.Errorf("Read of a file without its line feed: %v", err)
 	}
 	// Nothing writes a receipt outside a transaction: the receipt of a second

@@ -107,7 +107,7 @@ func (w *Writer) Commit(tx Tx) (*Committed, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := w.s.writeFile(IntentPath(in.request), in.request, data); err != nil {
+	if err := w.s.writeFile(IntentPath(w.s.pkg, in.request), in.request, data); err != nil {
 		return nil, err
 	}
 	if err := w.s.complete(in); err != nil {
@@ -157,7 +157,7 @@ func (s *Store) plan(tx Tx) (*intent, error) {
 		if err := ids.Check(r.ID, ids.Receipt); err != nil {
 			return nil, err
 		}
-		rel := ReceiptPath(r.ID)
+		rel := ReceiptPath(s.pkg, r.ID)
 		if err := once(rel); err != nil {
 			return nil, err
 		}
@@ -192,7 +192,7 @@ func (s *Store) plan(tx Tx) (*intent, error) {
 	if len(tx.Outcome) == 0 {
 		return nil, fmt.Errorf("store: the transaction has no outcome to record")
 	}
-	rel := OutcomePath(tx.RequestID)
+	rel := OutcomePath(s.pkg, tx.RequestID)
 	if err := s.expectAbsent(rel); err != nil {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func (s *Store) complete(in *intent) error {
 		if s.journal == nil {
 			return ErrNoJournal
 		}
-		if err := s.step("events " + IntentPath(in.request)); err != nil {
+		if err := s.step("events " + IntentPath(s.pkg, in.request)); err != nil {
 			return err
 		}
 		if err := s.journal.Append(slices.Clone(in.events)); err != nil {
@@ -232,7 +232,7 @@ func (s *Store) complete(in *intent) error {
 	if err := s.put(in.request, in.outcome); err != nil {
 		return err
 	}
-	return s.removeFile(IntentPath(in.request))
+	return s.removeFile(IntentPath(s.pkg, in.request))
 }
 
 // put writes a file of an intent, or, when recovery found it already at the
@@ -258,7 +258,7 @@ func (s *Store) recover() error {
 		return err
 	}
 	for _, name := range names {
-		rel := txDir + "/" + name
+		rel := s.pkg + "/" + txDir + "/" + name
 		in, err := s.readIntent(rel)
 		if err != nil {
 			return err
@@ -350,7 +350,7 @@ func (s *Store) encodeIntent(in *intent) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		m := map[string]any{"path": s.homePath(f.rel), "digest": f.digest, "body": content}
+		m := map[string]any{"path": f.rel, "digest": f.digest, "body": content}
 		if f.absent {
 			m["expected"] = "absent"
 		} else {
@@ -443,17 +443,13 @@ func (s *Store) readIntent(rel string) (*intent, error) {
 		return nil, bad("the intent is for another store")
 	}
 	request, _ := doc["request_id"].(string)
-	if IntentPath(request) != rel {
+	if IntentPath(s.pkg, request) != rel {
 		return nil, bad("request_id does not name the intent")
 	}
 	in := &intent{request: request}
 	file := func(v any, record bool) (*intentFile, error) {
 		m, _ := v.(map[string]any)
-		home, _ := m["path"].(string)
-		rel, err := s.fromHomePath(home)
-		if err != nil {
-			return nil, bad("%v", err)
-		}
+		rel, _ := m["path"].(string)
 		if err := s.checkPath(rel); err != nil {
 			return nil, bad("%v", err)
 		}
@@ -491,7 +487,7 @@ func (s *Store) readIntent(rel string) (*intent, error) {
 		return nil, err
 	}
 	for _, r := range in.receipts {
-		if dir, _, _ := strings.Cut(r.rel, "/"); dir != receiptsDir {
+		if dir, _, _ := strings.Cut(s.inner(r.rel), "/"); dir != receiptsDir {
 			return nil, bad("%s is not a receipt", r.rel)
 		}
 	}
@@ -509,7 +505,7 @@ func (s *Store) readIntent(rel string) (*intent, error) {
 	if in.outcome, err = file(doc["outcome"], false); err != nil {
 		return nil, err
 	}
-	if in.outcome.rel != OutcomePath(request) {
+	if in.outcome.rel != OutcomePath(s.pkg, request) {
 		return nil, bad("the outcome is not that of the request")
 	}
 	return in, nil

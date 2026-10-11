@@ -24,56 +24,34 @@ const (
 	tmpDir      = "tmp"
 )
 
-// The one top-level path of the home that a package may write besides its own
-// directory in this lane is home.json, which the table of spec/records.md gives
-// to dispatch. A package names it by its path in the home, and a path of its
-// own directory never is that path. No other path outside a package's
-// directory is its to write.
-// HomeFilePath is the path of home.json, as dispatch names it.
+// HomeFilePath is the path of home.json, the one path outside a package's own
+// directory that a package may write: dispatch's, by the table of
+// spec/records.md.
 const HomeFilePath = homeFile
 
-// owned reports whether rel names the top-level path of the home that the
-// package owns, rather than a path of its own directory.
-func (s *Store) owned(rel string) bool {
-	return s.pkg == "dispatch" && rel == homeFile
-}
-
-// abs returns the absolute path of rel, a slash path below the store or the
-// top-level path of the home the package owns.
+// abs returns the absolute path of rel, a path relative to the home.
 func (s *Store) abs(rel string) string {
-	if s.owned(rel) {
-		return filepath.Join(s.Dir, filepath.FromSlash(rel))
-	}
-	return filepath.Join(s.dir, filepath.FromSlash(rel))
+	return filepath.Join(s.Dir, filepath.FromSlash(rel))
 }
 
-// homePath is the path of rel relative to the home, the form an intent holds.
-func (s *Store) homePath(rel string) string {
-	if s.owned(rel) {
-		return rel
-	}
-	return s.pkg + "/" + rel
+// inner returns rel without the directory of the package, or rel itself for
+// home.json.
+func (s *Store) inner(rel string) string {
+	return strings.TrimPrefix(rel, s.pkg+"/")
 }
 
-// fromHomePath is the inverse of homePath. A path of the home that is neither
-// the package's own directory nor the top-level path it owns is not the
-// package's to write.
-func (s *Store) fromHomePath(p string) (string, error) {
-	if s.owned(p) {
-		return p, nil
-	}
-	if rel, ok := strings.CutPrefix(p, s.pkg+"/"); ok && !s.owned(rel) {
-		return rel, nil
-	}
-	return "", fmt.Errorf("store: path %q is outside the store of %s", p, s.pkg)
-}
-
-// checkPath checks a path below the store, or the top-level path the package
-// owns: slash-separated, every segment a lowercase file name, ending in
-// .json.
+// checkPath checks a path relative to the home: it lies inside the package's
+// own directory, or is home.json for dispatch, and is slash-separated, every
+// segment a lowercase file name, ending in .json. Every other path is refused,
+// reviews/ and anything under it among them.
 func (s *Store) checkPath(rel string) error {
 	if rel == "" {
 		return fmt.Errorf("store: empty path")
+	}
+	if rel != HomeFilePath || s.pkg != "dispatch" {
+		if !strings.HasPrefix(rel, s.pkg+"/") {
+			return fmt.Errorf("store: path %q is outside the store of %s", rel, s.pkg)
+		}
 	}
 	for _, seg := range strings.Split(rel, "/") {
 		if seg == "" || seg == "." || seg == ".." {
@@ -99,25 +77,33 @@ func (s *Store) checkRecordPath(rel string) error {
 	if err := s.checkPath(rel); err != nil {
 		return err
 	}
-	switch first, _, _ := strings.Cut(rel, "/"); first {
+	switch first, _, _ := strings.Cut(s.inner(rel), "/"); first {
 	case receiptsDir, requestsDir, txDir, tmpDir:
 		return fmt.Errorf("store: path %q is not a record path: %s/ holds no replaceable record", rel, first)
 	}
 	return nil
 }
 
-// RecordPath is the path of a replaceable record of one kind, the kind
-// written without its package prefix: records/<kind>/<id>.json.
-func RecordPath(kind, id string) string { return "records/" + kind + "/" + id + ".json" }
+// RecordPath is the path of a replaceable record of one kind of the package
+// pkg, the kind written without its package prefix:
+// <pkg>/records/<kind>/<id>.json.
+func RecordPath(pkg, kind, id string) string { return pkg + "/records/" + kind + "/" + id + ".json" }
 
-// ReceiptPath is the path of a receipt: receipts/<receipt_id>.json.
-func ReceiptPath(receiptID string) string { return receiptsDir + "/" + receiptID + ".json" }
+// ReceiptPath is the path of a receipt of the package pkg:
+// <pkg>/receipts/<receipt_id>.json.
+func ReceiptPath(pkg, receiptID string) string {
+	return pkg + "/" + receiptsDir + "/" + receiptID + ".json"
+}
 
-// OutcomePath is the path of a recorded outcome: requests/<request_id>.json.
-func OutcomePath(requestID string) string { return requestsDir + "/" + requestID + ".json" }
+// OutcomePath is the path of a recorded outcome of the package pkg:
+// <pkg>/requests/<request_id>.json.
+func OutcomePath(pkg, requestID string) string {
+	return pkg + "/" + requestsDir + "/" + requestID + ".json"
+}
 
-// IntentPath is the path of the intent of a transaction: tx/<request_id>.json.
-func IntentPath(requestID string) string { return txDir + "/" + requestID + ".json" }
+// IntentPath is the path of the intent of a transaction of the package pkg:
+// <pkg>/tx/<request_id>.json.
+func IntentPath(pkg, requestID string) string { return pkg + "/" + txDir + "/" + requestID + ".json" }
 
 // step is the point at which a test interrupts the store, as a crash would.
 // In a delivered executable fault is nil and nothing happens.
