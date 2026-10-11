@@ -1,0 +1,9 @@
+{
+  "schema_version": "1.0",
+  "schema": "hive.event",
+  "event_id": "evt_01jb2m3n4p5q6r7s8t9vwxyz0a",
+  "home_sequence": 7,
+  "occurred_at_known": true,
+  "body": {"unknown": {"z": 1, "a": [true, null]}},
+  "recorded_at": "2026-10-11T08:00:00.000Z"
+}
