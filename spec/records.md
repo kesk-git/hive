@@ -59,7 +59,7 @@ A private home is a directory outside every project repository, selected explici
 
 - A home directory is created with access for its owner only, and so is every file and directory in it.
 - A package writes only its own paths and reads only its own paths, with the three exceptions of [packages.md](packages.md#what-ownership-means): the journal and the locks, the identity records and the files of a review directory, each read through the contract library's validated reader and written only by its owner. Nothing else at the top level of a home is created by Hive, and a command that finds an entry it does not know leaves it alone and says so in its response.
-- Inside its own directory every package uses the same four places, and defines the rest itself:
+- Inside its own directory every package uses the same five places, and defines the rest itself:
 
 | Path under `<package>/` | Holds |
 | --- | --- |
@@ -67,6 +67,7 @@ A private home is a directory outside every project repository, selected explici
 | `receipts/<receipt_id>.json` | The [receipts](receipts.md) the package wrote. Written once. |
 | `requests/<request_id>.json` | The recorded outcome of each mutating request, for [replay](commands.md#replay). |
 | `tx/<request_id>.json` | The intent of a transaction in progress. |
+| `tmp/<request_id>.tmp` | The temporary file of a write in progress, for a record anywhere under the package's directory and for `home.json` alike. |
 
 The identity registry is the one store this specification places beyond that: `dispatch/registry/`, as [identities.md](identities.md) lists.
 
@@ -74,12 +75,12 @@ The identity registry is the one store this specification places beyond that: `d
 
 A record is replaced, never edited in place.
 
-1. Write the new content to a temporary file in the same directory, named for the request that writes it.
+1. Write the new content to a temporary file in the package's `tmp/` directory, named for the request that writes it.
 2. Flush the file to stable storage.
-3. Rename it over the record's name.
-4. Flush the directory.
+3. Rename it over the record's name. The home is one file system, so the rename is atomic wherever the record sits in it.
+4. Flush both directories the rename touched.
 
-A reader therefore sees the whole old record or the whole new one. A temporary file left by a crash is removed by the next writer that takes the store's lock; it is never read as a record.
+A reader therefore sees the whole old record or the whole new one. A temporary file left by a crash is removed by the next writer that takes the store's lock, which empties `tmp/` and removes nothing else; it is never read as a record.
 
 Each replacement raises `record_revision` by one and sets `updated_at`. A mutation names the revision it expects for every record it depends on; a different revision on disk is a `conflict` with code `revision_conflict` and nothing is written.
 
@@ -91,7 +92,7 @@ A mutation that changes more than one record of a store is one transaction.
 
 1. Take the store's lock.
 2. Check every expected revision, and that every record to be created is absent.
-3. Write the **intent** to `tx/<request_id>.json`: every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. The entry of a record being created has no revision to expect and instead states that the record is expected to be absent. Flush it.
+3. Write the **intent** to `tx/<request_id>.json`, a record of schema [`hive.tx-intent`](schemas/tx-intent.v1.schema.json): every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. The entry of a record being created has no revision to expect and instead states that the record is expected to be absent. Flush it.
 4. Write the records, then the receipts, then append the events.
 5. Write the outcome to `requests/<request_id>.json`.
 6. Remove the intent and release the lock.
