@@ -257,12 +257,11 @@ func (p *patternParser) repeat() error {
 		if err != nil {
 			return err
 		}
-		hi := lo
 		if p.more() && p.peek() == ',' {
 			p.pos++
-			hi = -1
 			if p.more() && p.peek() != '}' {
-				if hi, err = p.count(); err != nil {
+				hi, err := p.count()
+				if err != nil {
 					return err
 				}
 				if hi < lo {
