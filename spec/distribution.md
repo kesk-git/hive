@@ -81,17 +81,18 @@ A Hive executable starts another program only through `contract/exec`, and only 
 1. one of the six, where its package declares it;
 2. the exception above, where its package declares it and the operation selected it;
 3. a project's declared validation command, where its package declares `project`;
-4. another Hive command, where its package declares the call.
+4. another Hive command, where its package declares the call;
+5. a platform utility the package declares under `platform`, with its reason.
 
-- `contract/exec` takes the program as one of those named kinds and its arguments as a list. It never passes a command line through a shell, and never builds one from text.
-- A package that needs a platform utility as a separate process lists it in its declaration under `platform` with its reason. Every list is empty at stage 1, and the expectation is that they stay empty: what the earlier shell implementation asked of `ps`, `stat`, `shasum` and the like, the standard library does in process.
+- `contract/exec` takes the program as one of those named kinds and its arguments as a list. It never passes a command line through a shell, and never builds one from text. It builds the child's environment itself, from nothing. The only way a resolved value enters a child is the one declared variable that Tendril, the launch primitive of the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section, which sits in this path, sets there, never an argument; and a program that needs a value is started directly, never through tmux.
+- A package that needs a platform utility as a separate process lists it in its declaration under `platform` with its reason. Every list is empty at stage 1. The lists stay empty except for a utility the design names, the first being `security`, the Mac's own keychain tool, declared by `dispatch` and `synapse` in the stages that build them; what the earlier shell implementation asked of `ps`, `stat`, `shasum` and the like, the standard library does in process. A platform utility is part of the platform and is not a seventh dependency.
 - A harness started inside tmux is started by tmux from an argument list Hive gives it. The Imperative reaches the harness by argument vector or a supported input channel, as the design requires, and is never interpolated into shell code.
 
 ## Resident processes and listeners
 
 - The only operations that keep running are the Shadow's bounded observer and, when selected, the UI server. Both are declared `resident`. Nothing else stays behind after a command returns, and no new always-on service is added.
 - The only listener Hive opens is the UI server's, bound to loopback, or to the operator's existing private-network interface when that is selected. There is never a public listener.
-- Hive makes no network connection of its own. Every connection is made by one of the six, under that program's own configuration and credentials.
+- Hive makes no network connection of its own. Every connection is made by one of the six, under that program's own configuration and credentials, or, for a program run under the identity a Spoor names, under the one value Tendril resolved from the platform's store into that process.
 
 ## How it is proved
 
@@ -102,7 +103,7 @@ A Hive executable starts another program only through `contract/exec`, and only 
 3. Any Go package other than `contract/exec` imports the standard library's process-execution package.
 4. A package starts a program its declaration does not list, found by the kinds passed to `contract/exec`.
 5. Any `platform` list is non-empty without a reason, or names a program that is one of the six.
-6. The integration tests fail when run with a search path that holds only the artefact's `bin/`, recorded fakes of `gh`, `tmux`, `claude`, `codex` and `no-mistakes`, and the real `git`: that is, with no seventh program reachable.
+6. The integration tests fail when run with a search path that holds only the artefact's `bin/`, recorded fakes of `gh`, `tmux`, `claude`, `codex` and `no-mistakes`, a recorded fake of `security`, which stands for the declared platform utility and not for a seventh dependency, and the real `git`: that is, with no seventh program reachable.
 7. The repository holds a build file of another toolchain.
 
 A passing run is evidence about the artefact it ran against. It is not a claim that any installation already runs it.
