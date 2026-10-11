@@ -10,7 +10,7 @@ Each package states what it owns in its declaration, `packages/<name>/hive-packa
 | --- | --- | --- | --- | --- | --- |
 | `pool` | The Pool: work items, admission, Imperatives, specifications, rules and generated knowledge | `hive-pool` | `pool/` | `test-pool` | 2 |
 | `spawning-pool` | The Spawning Pool: Hive-owned worktrees, leases and their receipts | `hive-spawning-pool` | `spawning-pool/` | `test-spawning-pool` | 3 |
-| `dispatch` | Sessions, Fleet provisioning and the identity registry, policy, metering, reservations, scheduled jobs, steering, continuity | `hive-dispatch` | `home.json`, `dispatch/` | `test-dispatch` | 4 |
+| `dispatch` | Sessions, Fleet provisioning and the identity registry, policy, metering, reservations, schedules, steering, continuity | `hive-dispatch` | `home.json`, `dispatch/` | `test-dispatch` | 4 |
 | `shadow` | Observations, due polls, wakes and acknowledgments | `hive-shadow` | `shadow/` | `test-shadow` | 4 |
 | `synapse` | Validation obligations, review and fix custody, evidence, readiness, Assimilation | `hive-synapse` | `synapse/` | `test-synapse` | 5 |
 | `word` | The single decision intake | `hive-word` | none | `test-word` | 2 |
@@ -55,7 +55,7 @@ A declaration lists, for each command, the operations the design names. Every co
 | `word` | `pool` | `word` uses `pool` for persistence. |
 | `dispatch` | `pool`, `spawning-pool` | The dispatcher reads accepted admission and specification revisions and acquires an isolated worktree. |
 | `synapse` | `word` | Assimilation refuses an unresolved Mind's word hold. |
-| `shadow` | `pool`, `dispatch`, `synapse`, `word` | The Shadow reads scheduled-job records, dated holds, rule expiries and the attributed Synapse run. |
+| `shadow` | `pool`, `dispatch`, `synapse`, `word` | The Shadow reads schedule records, dated holds, rule expiries and the attributed Synapse run. |
 | `ui` | `pool`, `dispatch`, `shadow`, `synapse`, `word` | The UI reads scoped projections, sends answers to `word` and submits session input and policy requests to `dispatch`. |
 
 These lists are the flows the design states and no more. They are a starting declaration: the stage that builds a package amends that package's own list when it finds a call it needs, as a minor change of this specification.
