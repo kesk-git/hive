@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-rule.resolve.request:v1",
   "title": "hive-rule resolve: request body",
-  "description": "Computes the rules effective for the envelope's scope, a role and a time: Hive, then workspace, then project where the scope names one, then a rule narrowed to the task generation named, with the narrower scope winning on a subject and an explicit supersession honoured. A rule past its expiry time is excluded by the clock, before any receipt exists. Read-only.",
+  "description": "Computes the rules effective for the envelope's scope, a role and a time: Hive, then workspace, then project where the scope names one, then a rule narrowed to the task generation named, with the narrower scope winning on a subject and a supersession honoured only while the superseding rule is itself in force for the scope, the role and the instant. A rule past its expiry time is excluded by the clock, before any receipt exists. Read-only.",
   "type": "object",
   "additionalProperties": false,
   "required": [

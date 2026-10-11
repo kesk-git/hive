@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:records:pool.projection:v1",
   "title": "Knowledge projection",
-  "description": "One generated knowledge projection for one scope and audience, at pool/records/projection/<projection_id>.json: the rendered instructions, the sources at the revisions they were rendered from, the renderer and digest, its freshness, and what each consumer received and acknowledged. A projection is derived and never authority. See spec/pool.md, Generated knowledge.",
+  "description": "One generated knowledge projection for one scope and audience, at pool/records/projection/<projection_id>.json: the rendered instructions, the sources at the revisions they were rendered from, the renderer and digest, and what each consumer received and acknowledged. A projection is derived and never authority, and its freshness is not stored: it is computed at each read and check from the rules in force at that moment. See spec/pool.md, Generated knowledge.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -111,8 +111,7 @@
         "sources",
         "text",
         "digest",
-        "bytes",
-        "state"
+        "bytes"
       ],
       "properties": {
         "rendering": {
@@ -126,14 +125,15 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
         },
         "rules_digest": {
-          "description": "The resolved-rule digest the rendering was made from.",
+          "description": "The resolved-rule digest the rendering was made from. A rendering is fresh while the rules now in force for its scope resolve to this digest.",
           "$ref": "urn:hive:schema:common:v1#/$defs/digest"
         },
         "sources": {
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/source"
-          }
+          },
+          "description": "Every rule the resolution applied at the instant it was made, at the revision read."
         },
         "text": {
           "description": "The rendered instructions.",
@@ -145,48 +145,8 @@
         },
         "bytes": {
           "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
-        },
-        "state": {
-          "description": "fresh: every source is at the revision read. stale: a source changed since; the projection cannot authorize work until re-rendered.",
-          "enum": [
-            "fresh",
-            "stale"
-          ]
-        },
-        "stale_since": {
-          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
-        },
-        "stale_sources": {
-          "description": "The sources that moved, each with the revision now current.",
-          "type": "array",
-          "items": {
-            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
-          }
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "const": "stale"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "stale_since",
-              "stale_sources"
-            ]
-          },
-          "else": {
-            "properties": {
-              "stale_since": false,
-              "stale_sources": false
-            }
-          }
-        }
-      ]
+      }
     },
     "consumer_ref": {
       "description": "Who consumed the projection: a supervisor session by identity and generation, a task generation, or a named instruction file.",

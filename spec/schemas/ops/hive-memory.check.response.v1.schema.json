@@ -42,7 +42,8 @@
             "enum": [
               "fresh",
               "stale"
-            ]
+            ],
+            "description": "Computed at the check from the rules in force at checked_at: fresh when they resolve to the rendering's digest and have no conflict, stale otherwise."
           },
           "bytes": {
             "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
@@ -51,7 +52,7 @@
             "type": "boolean"
           },
           "stale_sources": {
-            "description": "Sources whose current revision differs from the one rendered.",
+            "description": "Rules whose revision differs from the one rendered, rules now in force that the rendering did not read, and rules it read that are no longer in force at checked_at (expired by the clock, lifted, ended, superseded or not yet effective).",
             "type": "array",
             "items": {
               "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"

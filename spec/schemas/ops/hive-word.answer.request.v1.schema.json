@@ -13,7 +13,8 @@
   ],
   "properties": {
     "card": {
-      "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
+      "$ref": "urn:hive:schema:review:v1#/$defs/card_binding",
+      "description": "The card the answer was given on, with the card, question, held item and decision round at the revisions the Hive Mind was shown. They are recorded with the answer as what was shown. Only the question revision and the card revision are grounds to treat the answer as changed: an answer to one card of a round never makes another card of the same round stale."
     },
     "option_id": {
       "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
@@ -22,7 +23,8 @@
       "type": "string"
     },
     "text": {
-      "type": "string"
+      "type": "string",
+      "description": "The free text exactly as given. Empty only when an option was chosen or Later was chosen; an answer holds an option, or Later, or text that is not empty, and an answer with none of the three is invalid and applies nothing."
     },
     "later": {
       "type": "object",
@@ -37,7 +39,8 @@
       }
     },
     "source": {
-      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer_source"
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer_source",
+      "description": "The evidence the answer rests on, required: a review submission, a session input or an operator request. See the answer_source of records/pool.question.v1."
     },
     "answered_at": {
       "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
@@ -66,6 +69,27 @@
           "option_label": false
         }
       }
+    },
+    {
+      "anyOf": [
+        {
+          "required": [
+            "option_id"
+          ]
+        },
+        {
+          "required": [
+            "later"
+          ]
+        },
+        {
+          "properties": {
+            "text": {
+              "minLength": 1
+            }
+          }
+        }
+      ]
     }
   ]
 }

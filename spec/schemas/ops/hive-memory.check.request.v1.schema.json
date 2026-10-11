@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-memory.check.request:v1",
   "title": "hive-memory check: request body",
-  "description": "Reports, for the projections of the envelope's scope, duplication between projections, budget violations, stale sources and consumer drift, against the budgets given. It repairs nothing and copies nothing. Read-only.",
+  "description": "Reports, for the projections of the envelope's scope, duplication between projections, budget violations, stale sources and consumer drift, against the budgets given. Freshness is computed here from the rules in force at the command's clock, additions and time boundaries included. It repairs nothing and copies nothing. Read-only.",
   "type": "object",
   "additionalProperties": false,
   "required": [

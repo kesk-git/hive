@@ -26,12 +26,11 @@
         "decision-round",
         "projection",
         "migration",
-        "move",
         "request-outcome"
       ]
     },
     "records": {
-      "description": "Each record whole, of the kind asked for. A request-outcome is the recorded response document.",
+      "description": "Each record whole, of the kind asked for. A request-outcome is the store's replay record of one earlier mutating request: the response it recorded with the digest of the request and the request that caused it.",
       "type": "array",
       "items": {
         "anyOf": [
@@ -66,19 +65,23 @@
             "$ref": "urn:hive:schema:records:pool.migration:v1"
           },
           {
-            "$ref": "urn:hive:schema:records:pool.move:v1"
-          },
-          {
-            "$ref": "urn:hive:schema:response:v1"
+            "$ref": "urn:hive:schema:ops:hive-pool.read.response:v1#/$defs/request_outcome"
           }
         ]
       }
     },
     "derived": {
-      "description": "For items: the derived facts per item, in the order of records.",
+      "description": "For items: the derived facts per item. For projections: the freshness per projection, computed at the read from the rules in force. In the order of records.",
       "type": "array",
       "items": {
-        "$ref": "urn:hive:schema:ops:hive-pool.read.response:v1#/$defs/derived_item"
+        "anyOf": [
+          {
+            "$ref": "urn:hive:schema:ops:hive-pool.read.response:v1#/$defs/derived_item"
+          },
+          {
+            "$ref": "urn:hive:schema:ops:hive-pool.read.response:v1#/$defs/derived_projection"
+          }
+        ]
       }
     }
   },
@@ -173,6 +176,60 @@
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
+          }
+        }
+      }
+    },
+    "request_outcome": {
+      "description": "What the store recorded for one completed mutating request, so that a caller without a store of its own can verify a retry against the request it first made before it does anything that depends on the current state.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "request_digest",
+        "response"
+      ],
+      "properties": {
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        "request_digest": {
+          "description": "The digest of the canonical form of the request the store completed.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "causation": {
+          "description": "The request's own causation as the store recorded it: for a request word made, the hive-word request with the digest of its canonical form, the fingerprint a retry of that request is compared with.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "response": {
+          "$ref": "urn:hive:schema:response:v1"
+        }
+      }
+    },
+    "derived_projection": {
+      "description": "A projection's freshness at the moment of the read, never stored: fresh when the rules in force for its scope resolve to the rendering's digest with no conflict.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projection_id",
+        "state",
+        "stale_sources"
+      ],
+      "properties": {
+        "projection_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+        },
+        "state": {
+          "enum": [
+            "fresh",
+            "stale"
+          ]
+        },
+        "stale_sources": {
+          "description": "Rules whose revision differs from the one rendered, rules now in force that the rendering did not read, and rules it read that are no longer in force.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
           }
         }
       }

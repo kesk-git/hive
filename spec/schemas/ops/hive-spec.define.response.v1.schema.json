@@ -13,7 +13,7 @@
       "$ref": "urn:hive:schema:records:pool.specification:v1"
     },
     "invalidated": {
-      "description": "The items whose accepted criteria this revision invalidated.",
+      "description": "The items whose accepted criteria this revision invalidated, each by comparison with the revision it was bound to.",
       "type": "array",
       "items": {
         "$ref": "urn:hive:schema:common:v1#/$defs/task_id"

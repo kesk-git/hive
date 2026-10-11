@@ -23,7 +23,6 @@
         "decision-round",
         "projection",
         "migration",
-        "move",
         "request-outcome"
       ]
     },
@@ -50,7 +49,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
         },
         "states": {
-          "description": "Item, hold, question, round, rule or move states to include, in the kind's own vocabulary.",
+          "description": "Item, hold, question, round or rule states to include, in the kind's own vocabulary.",
           "type": "array",
           "items": {
             "type": "string",

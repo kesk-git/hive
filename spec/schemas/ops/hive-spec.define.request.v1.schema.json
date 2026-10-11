@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-spec.define.request:v1",
   "title": "hive-spec define: request body",
-  "description": "Writes a specification revision: revision 1 of a new specification, or the next revision of an existing one, whole. A revision that changes an accepted criterion invalidates the acceptance and clears the criteria from every item that carried it; the affected items' definition returns to defining. See spec/pool.md, Specifications.",
+  "description": "Writes a specification revision: revision 1 of a new specification, or the next revision of an existing one, whole. For every item currently bound to any revision of this specification, a revision whose criteria differ from the criteria of the revision that item is bound to invalidates that item's acceptance and clears the criteria from the item; the item's definition returns to defining. See spec/pool.md, Specifications.",
   "type": "object",
   "additionalProperties": false,
   "required": [

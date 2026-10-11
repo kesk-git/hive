@@ -25,7 +25,7 @@
   ],
   "receipt_kinds": [],
   "test_target": "test-word",
-  "test_scope": "Complete rounds, authorized answers, deduplication and unresolved holds. From stage 2: an option qualified by free text kept as one answer; free text alone as a complete answer; Later recorded as a deferral and never an approval; a stale card refused; an answer to a changed question held for reconciliation; a worker's answer refused; verification that reads the record and never the reference.",
+  "test_scope": "Complete rounds, authorized answers, deduplication and unresolved holds. From stage 2: an option qualified by free text kept as one answer; free text alone as a complete answer; Later recorded as a deferral and never an approval; a stale card refused; an answer to a changed question held for reconciliation; a worker's answer refused; a review submission verified against its round file; one submission answering two cards of one round; an answer with no option, deferral or text invalid; replay verified by the digest of the original request; verification that reads the record and never the reference.",
   "calls": [
     "pool"
   ],

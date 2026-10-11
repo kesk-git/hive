@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-rule.record.request:v1",
   "title": "hive-rule record: request body",
-  "description": "Records a ruling verbatim with its origin, scope from the envelope, subject, one rendered rule line and its applying authority. A temporary rule gives an expiry time, a lift condition or both. The words and dates given here are never changed afterwards. See spec/pool.md, Rules.",
+  "description": "Records a ruling verbatim with its origin, scope from the envelope, subject, one rendered rule line and its applying authority. A temporary rule gives an expiry time, a lift condition or both. The words and dates given here are never changed afterwards, and a rule it supersedes or qualifies is not written to. See spec/pool.md, Rules.",
   "type": "object",
   "additionalProperties": false,
   "required": [

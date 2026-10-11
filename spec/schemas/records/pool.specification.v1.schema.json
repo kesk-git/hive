@@ -60,9 +60,12 @@
         "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/revision"
       }
     },
-    "acceptance": {
-      "description": "The current acceptance. Absent until a revision is accepted; replaced by a later acceptance; marked invalidated by a revision that changes an accepted criterion.",
-      "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/acceptance"
+    "acceptances": {
+      "description": "Every acceptance recorded, one per item it was recorded for, each at the revision that item was bound to. Appended by accept; an entry is marked invalidated by a later revision whose criteria differ from the criteria of the revision that entry accepted, whichever revision that is.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/acceptance"
+      }
     },
     "closures": {
       "description": "Every closure recorded, each binding accepted requirements to a landed head and its proof.",
@@ -153,7 +156,7 @@
           }
         },
         "changed_criteria": {
-          "description": "For a revision after the first: the criteria whose text or evidence differs from the revision before, by identity. An acceptance of that earlier revision is invalidated when this list is not empty.",
+          "description": "For a revision after the first: the criteria whose text or evidence differs from the revision before, by identity, as information. Invalidation does not read this list: it compares this revision's criteria with the criteria of each revision an item is currently bound to.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.specification:v1#/$defs/criterion_id"
@@ -182,6 +185,7 @@
       "additionalProperties": false,
       "required": [
         "revision",
+        "task_id",
         "digest",
         "state",
         "accepted_at",
@@ -210,7 +214,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/caller"
         },
         "task_id": {
-          "description": "The item the acceptance was recorded for, where it was recorded for one.",
+          "description": "The item the acceptance was recorded for and bound to.",
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
         },
         "admission": {
@@ -228,7 +232,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
         },
         "invalidated_by": {
-          "description": "The revision whose changed criteria invalidated this acceptance.",
+          "description": "The revision whose criteria differ from the criteria this acceptance accepted.",
           "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
         },
         "invalidated_at": {
@@ -257,7 +261,8 @@
             }
           }
         }
-      ]
+      ],
+      "description": "One acceptance of one revision for one item."
     },
     "closure": {
       "description": "Accepted requirements closed against a landed head. Recorded after a verified landing, separately from the landing itself.",

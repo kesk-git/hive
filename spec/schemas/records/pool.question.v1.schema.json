@@ -310,7 +310,7 @@
       }
     },
     "answer_source": {
-      "description": "Where the answer came from, bound to the evidence that carries the Hive Mind's words. Two answers with the same source are one answer.",
+      "description": "The evidence the answer rests on, required and recorded with the answer, so a reader always sees where the words came from. A review submission is the submit event of a review round. A session input is the input receipt of the supervisor session the words were typed into. An operator request is the request_id of the hive-word answer request typed at a terminal; it has no further evidence, and the record shows it as exactly that. Two answers with the same source are one answer.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -319,19 +319,18 @@
       "properties": {
         "kind": {
           "enum": [
-            "operator",
-            "session-input",
             "review-submission",
-            "supervisor-relay"
+            "session-input",
+            "operator-request"
           ]
         },
-        "input_id": {
-          "description": "For session input: the input the words arrived in.",
-          "$ref": "urn:hive:schema:common:v1#/$defs/input_id"
+        "task_id": {
+          "description": "For a review submission: the task of the review directory the round file lives in.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
         },
-        "feedback_event_id": {
-          "description": "For a review submission: the submit event.",
-          "$ref": "urn:hive:schema:common:v1#/$defs/feedback_event_id"
+        "generation": {
+          "description": "For a review submission: the generation of the review directory.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
         },
         "review_id": {
           "$ref": "urn:hive:schema:common:v1#/$defs/review_id"
@@ -340,26 +339,24 @@
           "type": "integer",
           "minimum": 1
         },
-        "ref": {
-          "description": "For a supervisor relay: the record the words were taken from.",
-          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        "feedback_event_id": {
+          "description": "For a review submission: the submit event of the round's feedback file that carries the words.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/feedback_event_id"
+        },
+        "input_id": {
+          "description": "For a session input: the input the words arrived in.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/input_id"
+        },
+        "receipt_id": {
+          "description": "For a session input: the input receipt of the supervisor session that accepted it.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        },
+        "request_id": {
+          "description": "For an operator request: the request_id of the hive-word answer request, which is the key of the source.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
         }
       },
       "allOf": [
-        {
-          "if": {
-            "properties": {
-              "kind": {
-                "const": "session-input"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "input_id"
-            ]
-          }
-        },
         {
           "if": {
             "properties": {
@@ -370,24 +367,63 @@
           },
           "then": {
             "required": [
-              "feedback_event_id",
+              "task_id",
+              "generation",
               "review_id",
-              "round_id"
-            ]
+              "round_id",
+              "feedback_event_id"
+            ],
+            "properties": {
+              "input_id": false,
+              "receipt_id": false,
+              "request_id": false
+            }
           }
         },
         {
           "if": {
             "properties": {
               "kind": {
-                "const": "supervisor-relay"
+                "const": "session-input"
               }
             }
           },
           "then": {
             "required": [
-              "ref"
-            ]
+              "input_id",
+              "receipt_id"
+            ],
+            "properties": {
+              "task_id": false,
+              "generation": false,
+              "review_id": false,
+              "round_id": false,
+              "feedback_event_id": false,
+              "request_id": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "operator-request"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "request_id"
+            ],
+            "properties": {
+              "task_id": false,
+              "generation": false,
+              "review_id": false,
+              "round_id": false,
+              "feedback_event_id": false,
+              "input_id": false,
+              "receipt_id": false
+            }
           }
         }
       ]
@@ -417,7 +453,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
         },
         "card": {
-          "description": "The card the answer was given on, with the question, held item and decision round at their revisions: the same binding the review files use.",
+          "description": "The card the answer was given on, with the question, held item and decision round at the revisions the Hive Mind was shown. They are recorded as what was shown; only the question revision and the card revision are grounds to treat the answer as changed.",
           "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
         },
         "option_id": {
@@ -428,7 +464,7 @@
           "type": "string"
         },
         "text": {
-          "description": "The free text exactly as given, whitespace included; empty when an option was chosen with no text.",
+          "description": "The free text exactly as given, whitespace included. May be empty only when an option was chosen or Later was chosen.",
           "type": "string"
         },
         "later": {
@@ -517,6 +553,27 @@
               "later": false
             }
           }
+        },
+        {
+          "anyOf": [
+            {
+              "required": [
+                "option_id"
+              ]
+            },
+            {
+              "required": [
+                "later"
+              ]
+            },
+            {
+              "properties": {
+                "text": {
+                  "minLength": 1
+                }
+              }
+            }
+          ]
         }
       ]
     }

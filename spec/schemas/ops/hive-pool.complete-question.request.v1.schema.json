@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-pool.complete-question.request:v1",
   "title": "hive-pool complete-question: request body",
-  "description": "Marks an answered question complete: nothing further is owed on it. Refused for a question without an applied answer. The operation word persists completion through.",
+  "description": "Marks an answered question complete: nothing further is owed on it. Refused for a question without an applied answer. The operation word persists completion through. Refused with authority_insufficient unless the request is made by the hive-word command of the package word, on a hive-word request: the caller names that command and the envelope's causation is the hive-word request, schema hive.request, with its request_id and the digest of its canonical form.",
   "type": "object",
   "additionalProperties": false,
   "required": [

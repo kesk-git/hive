@@ -138,40 +138,6 @@
         }
       }
     },
-    "moved_from": {
-      "description": "Set on an item that arrived by a multi-home move: the home it came from and the move record.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "home_id",
-        "move_id"
-      ],
-      "properties": {
-        "home_id": {
-          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
-        },
-        "move_id": {
-          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/move_id"
-        }
-      }
-    },
-    "moved_to": {
-      "description": "Set on an item that left by a multi-home move. The item stays, in state moved, so its identity and history resolve.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "home_id",
-        "move_id"
-      ],
-      "properties": {
-        "home_id": {
-          "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
-        },
-        "move_id": {
-          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/move_id"
-        }
-      }
-    },
     "legacy": {
       "description": "For an item imported from a legacy backlog: its legacy identity and the migration that created it. Legacy words are kept here verbatim and never interpreted as authority.",
       "type": "object",
@@ -270,10 +236,6 @@
       "type": "string",
       "pattern": "^migr_[0-7][0-9a-hjkmnp-tv-z]{25}$"
     },
-    "move_id": {
-      "type": "string",
-      "pattern": "^move_[0-7][0-9a-hjkmnp-tv-z]{25}$"
-    },
     "legacy_id": {
       "description": "A legacy backlog identifier, as the upstream grammar accepts it.",
       "type": "string",
@@ -323,13 +285,12 @@
       ]
     },
     "item_state": {
-      "description": "queued, in-flight and done are the three legacy sections. archived is a retired item, never deleted. moved is an item that left by a multi-home move.",
+      "description": "queued, in-flight and done are the three legacy sections. archived is a retired item, never deleted.",
       "enum": [
         "queued",
         "in-flight",
         "done",
-        "archived",
-        "moved"
+        "archived"
       ]
     },
     "definition_state": {

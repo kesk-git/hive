@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-rule.amend.request:v1",
   "title": "hive-rule amend: request body",
-  "description": "Appends an attributed amendment to a rule: an extension, an early end, a lift honoured by its named receipt, a supersession by another rule, or a note. The original words and dates stay; the rule's status and the time the resolver uses change. The envelope's expected_revisions names the rule's revision and its authority is the amendment's.",
+  "description": "Appends an attributed amendment to a rule: an extension, an early end, a lift honoured by its named receipt, or a note. The original words and dates stay; the rule's status and the time the resolver uses change. A supersession is not an amendment: it is the changes of the superseding rule, read at each resolution. The envelope's expected_revisions names the rule's revision and its authority is the amendment's.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,7 +19,6 @@
         "extend",
         "end",
         "lift",
-        "supersede",
         "note"
       ]
     },
@@ -31,7 +30,7 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
     },
     "evidence": {
-      "description": "For a lift: the receipt that meets the lift condition, which must be of the kind and about the subject the condition names. For a supersession: the superseding rule.",
+      "description": "For a lift: the receipt that meets the lift condition, which must be of the kind and about the subject the condition names.",
       "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
     }
   },
@@ -62,10 +61,7 @@
       "if": {
         "properties": {
           "kind": {
-            "enum": [
-              "lift",
-              "supersede"
-            ]
+            "const": "lift"
           }
         }
       },
