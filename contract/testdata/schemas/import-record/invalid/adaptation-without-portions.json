@@ -1,0 +1,42 @@
+{
+  "schema": "hive.import",
+  "schema_version": "1.0",
+  "import_id": "example-tree",
+  "kind": "adaptation",
+  "owner": "spawning-pool",
+  "recorded_on": "2026-10-11",
+  "upstream": {
+    "name": "example-tree",
+    "repository": "https://forge.example/upstream/example-tree",
+    "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "licence": {
+    "spdx": "MIT",
+    "copyright": [
+      "Copyright (c) 2023 A",
+      "Copyright (c) 2025 B"
+    ],
+    "files": [
+      {
+        "path": "packages/spawning-pool/upstream/example-tree/LICENSE",
+        "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab",
+        "bytes": 1069
+      },
+      {
+        "path": "packages/spawning-pool/upstream/example-tree/NOTICE",
+        "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "bytes": 88,
+        "media_type": "text/plain"
+      }
+    ]
+  },
+  "portions": [],
+  "retained_tests": [],
+  "transitive": [],
+  "excluded": [],
+  "local_changes": "The parser is re-expressed in Go and reads whole-number fields only.",
+  "audit": {
+    "audited_on": "2026-10-10",
+    "statement": "The selected source, its tests and its one transitive library were examined; the licence of each file was established from the file itself."
+  }
+}

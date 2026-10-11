@@ -1,0 +1,18 @@
+{
+  "schema": "hive.tx-intent",
+  "schema_version": "1.0",
+  "request_id": "req_01j9xk3m2nq4r5s6t7v8w9xyzf",
+  "package": "dispatch",
+  "records": [],
+  "receipts": [],
+  "events": [],
+  "outcome": {
+    "path": "dispatch/requests/req_01j9xk3m2nq4r5s6t7v8w9xyzf.json",
+    "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "body": {
+      "schema": "hive.response",
+      "status": "ok"
+    },
+    "expected": "absent"
+  }
+}

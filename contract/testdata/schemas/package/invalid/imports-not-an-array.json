@@ -1,0 +1,153 @@
+{
+  "schema": "hive.package",
+  "schema_version": "1.0",
+  "name": "dispatch",
+  "kind": "package",
+  "title": "Dispatch",
+  "owns": "Session launch and control; Fleet provisioning and the workspace, project and clone registry, including each home's identity record, which every package of the same home reads through the contract library; effective policy; the native quota, context and usage readers; reservations; scheduled-job records; steering and lifecycle control; continuity.",
+  "plan_stage": 4,
+  "executable": "hive-dispatch",
+  "commands": [
+    {
+      "name": "hive-dispatch",
+      "purpose": "Launch intent and receipt, the task execution record, runtime ownership and capacity reservation.",
+      "operations": []
+    },
+    {
+      "name": "hive-fleet",
+      "purpose": "The workspace charter, the parent channel and the registered home, workspace, project and clone identities.",
+      "operations": [
+        "provision",
+        "route",
+        "recover"
+      ]
+    },
+    {
+      "name": "hive-schedule",
+      "purpose": "Scheduled-job records and their transitions.",
+      "operations": [
+        "file",
+        "due",
+        "hold",
+        "retire"
+      ]
+    },
+    {
+      "name": "hive-session-start",
+      "purpose": "The home lock, the startup digest and bounded reconciliation at session start.",
+      "operations": []
+    },
+    {
+      "name": "hive-policy",
+      "purpose": "Role and profile selection with its rule digest, resource evidence and permitted fallbacks.",
+      "operations": [
+        "resolve"
+      ]
+    },
+    {
+      "name": "hive-context",
+      "purpose": "Context and capacity observations and checkpoint readiness.",
+      "operations": [
+        "observe",
+        "checkpoint"
+      ]
+    },
+    {
+      "name": "hive-park",
+      "purpose": "Parking owned work at a safe checkpoint or gate, with its custody and resume authority.",
+      "operations": []
+    },
+    {
+      "name": "hive-resume",
+      "purpose": "Resuming parked work once, after fresh evidence, policy and authority are rechecked.",
+      "operations": []
+    },
+    {
+      "name": "hive-send",
+      "purpose": "Durable steering messages, their delivery acceptance and their acknowledgment.",
+      "operations": []
+    },
+    {
+      "name": "hive-control",
+      "purpose": "Verified lifecycle operations on an exact session generation.",
+      "operations": [
+        "stop"
+      ]
+    },
+    {
+      "name": "hive-stow",
+      "purpose": "Saving unrecorded decisions, open work and handover facts, and checkpointing active operations.",
+      "operations": []
+    },
+    {
+      "name": "hive-recover",
+      "purpose": "Recovery from a checkpoint, reusing existing work.",
+      "operations": []
+    },
+    {
+      "name": "hive-sync",
+      "purpose": "Guarded synchronization of a project copy.",
+      "operations": []
+    },
+    {
+      "name": "hive-retire",
+      "purpose": "The retirement queue: releasing owned execution resources once every applicable receipt is in.",
+      "operations": []
+    }
+  ],
+  "home_paths": [
+    "home.json",
+    "dispatch"
+  ],
+  "kind_prefixes": [
+    "dispatch"
+  ],
+  "receipt_kinds": [
+    {
+      "kind": "dispatch.home.created",
+      "asserts": "A private home was given its identity record."
+    },
+    {
+      "kind": "dispatch.workspace.registered",
+      "asserts": "A workspace was registered with the Fleet home that owns it."
+    },
+    {
+      "kind": "dispatch.project.registered",
+      "asserts": "A project was registered under one workspace."
+    },
+    {
+      "kind": "dispatch.clone.registered",
+      "asserts": "A physical clone was bound to one project."
+    },
+    {
+      "kind": "dispatch.session-input.accepted",
+      "asserts": "One input was placed durably in a session's canonical input sequence.",
+      "body_schema": "urn:hive:schema:receipts:dispatch.session-input.accepted:v1"
+    }
+  ],
+  "test_target": "test-dispatch",
+  "test_scope": "Admission, profile resolution, observation provenance, exact-target recovery and scheduled-job transitions from filing through due, run, hold and retirement.",
+  "calls": [
+    "pool",
+    "spawning-pool"
+  ],
+  "executes": {
+    "core": [
+      "git",
+      "gh",
+      "tmux",
+      "claude",
+      "codex"
+    ],
+    "transitional": [],
+    "optional": [],
+    "project": false
+  },
+  "platform": [],
+  "toolchain": {
+    "language": "go",
+    "version": "1.27"
+  },
+  "libraries": [],
+  "imports": "example-upstream"
+}

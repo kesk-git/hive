@@ -1,0 +1,36 @@
+{
+  "schema": "hive.import",
+  "schema_version": "1.0",
+  "import_id": "example-module",
+  "kind": "dependency",
+  "owner": "contract",
+  "recorded_on": "2026-10-11",
+  "upstream": {
+    "name": "example-module",
+    "repository": "https://forge.example/upstream/example-module",
+    "revision": "3f786850e387550fdab836ed7e6dc881de23001b",
+    "module": "forge.example/upstream/example-module@v1.4.0"
+  },
+  "licence": {
+    "spdx": "MIT",
+    "copyright": [
+      "Copyright (c) 2024 Example Upstream Authors"
+    ],
+    "files": [
+      {
+        "path": "packages/pool/upstream/example-upstream/LICENSE",
+        "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab",
+        "bytes": 1069
+      }
+    ]
+  },
+  "portions": [],
+  "retained_tests": [],
+  "transitive": [],
+  "excluded": [],
+  "local_changes": "None; the module is compiled in as pinned.",
+  "audit": {
+    "audited_on": "2026-10-10",
+    "statement": "The selected source, its tests and its one transitive library were examined; the licence of each file was established from the file itself."
+  }
+}

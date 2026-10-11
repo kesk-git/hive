@@ -1,0 +1,44 @@
+{
+  "schema": "hive.import",
+  "schema_version": "1.0",
+  "import_id": "example-font",
+  "kind": "asset",
+  "owner": "ui",
+  "recorded_on": "2026-10-11",
+  "upstream": {
+    "name": "example-upstream",
+    "repository": "https://forge.example/upstream/example-upstream",
+    "revision": "3f786850e387550fdab836ed7e6dc881de23001b",
+    "tag": "v0.2.6"
+  },
+  "licence": {
+    "spdx": "MIT",
+    "copyright": [
+      "Copyright (c) 2024 Example Upstream Authors"
+    ],
+    "files": [
+      {
+        "path": "packages/pool/upstream/example-upstream/LICENSE",
+        "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab",
+        "bytes": 1069
+      }
+    ]
+  },
+  "portions": [
+    {
+      "hive_path": "packages/ui/internal/assets/example.woff2",
+      "upstream_paths": [
+        "fonts/example.woff2"
+      ],
+      "disposition": "copied"
+    }
+  ],
+  "retained_tests": [],
+  "transitive": [],
+  "excluded": [],
+  "local_changes": "The parser is re-expressed in Go and reads whole-number fields only.",
+  "audit": {
+    "audited_on": "2026-10-10",
+    "statement": "The selected source, its tests and its one transitive library were examined; the licence of each file was established from the file itself."
+  }
+}

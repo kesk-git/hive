@@ -1,0 +1,63 @@
+{
+  "schema": "hive.package",
+  "schema_version": "1.0",
+  "name": "synapse",
+  "kind": "package",
+  "title": "Synapse",
+  "owns": "Validation obligations; review and fix custody; evidence and readiness; the guarded Assimilation interfaces.",
+  "plan_stage": 5,
+  "executable": "hive-synapse",
+  "commands": [
+    {
+      "name": "hive-synapse",
+      "purpose": "The run ledger, review packets, finding decisions, bound head and base, fix rounds and executor.",
+      "operations": [
+        "start",
+        "collect",
+        "respond"
+      ]
+    },
+    {
+      "name": "hive-assimilate",
+      "purpose": "Authorized, head-bound merging of a Harvest, verified against the forge afterwards.",
+      "operations": []
+    },
+    {
+      "name": "hive-assimilate-local",
+      "purpose": "Guarded fast-forward landing of a validated local-only branch.",
+      "operations": []
+    }
+  ],
+  "home_paths": [
+    "synapse"
+  ],
+  "kind_prefixes": [
+    "synapse"
+  ],
+  "receipt_kinds": [],
+  "test_target": "test-synapse",
+  "test_scope": "Head-bound proof, finding gates, one fixer and landing authority.",
+  "calls": [
+    "word"
+  ],
+  "executes": {
+    "core": [
+      "git",
+      "gh",
+      "claude",
+      "codex"
+    ],
+    "transitional": [
+      "no-mistakes"
+    ],
+    "optional": [],
+    "project": true
+  },
+  "platform": [],
+  "toolchain": {
+    "language": "go",
+    "version": "1.27"
+  },
+  "libraries": [],
+  "imports": []
+}
