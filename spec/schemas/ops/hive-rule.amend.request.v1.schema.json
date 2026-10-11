@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-rule.amend.request:v1",
   "title": "hive-rule amend: request body",
-  "description": "Appends an attributed amendment to a rule: an extension, an early end, a lift honoured by its named receipt, or a note. The original words and dates stay; the rule's status and the time the resolver uses change. A supersession is not an amendment: it is the changes of the superseding rule, read at each resolution. The envelope's expected_revisions names the rule's revision and its authority is the amendment's.",
+  "description": "Appends an attributed amendment to a rule: an extension, an early end, a lift honoured by the receipt that met the lift condition, or a note. A lift carries that receipt whole, as evidence the caller supplies: the Pool checks its kind and its subject against the lift condition and records it with the lift, calling nothing and reading no other package's store. The original words and dates stay; the rule's status and the time the resolver uses change. A supersession is not an amendment: it is the changes of the superseding rule, read at each resolution. The envelope's expected_revisions names the rule's revision and its authority is the amendment's.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -29,8 +29,12 @@
       "description": "For extend or end.",
       "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
     },
+    "receipt": {
+      "description": "For a lift: the receipt that meets the lift condition, whole, which must be of the kind and about the subject the condition names. The Pool checks the receipt itself and reads nothing else for it.",
+      "$ref": "urn:hive:schema:receipt:v1"
+    },
     "evidence": {
-      "description": "For a lift: the receipt that meets the lift condition, which must be of the kind and about the subject the condition names.",
+      "description": "For a lift: the same receipt by reference, where the caller also names it. The receipt carried whole is what the Pool checks.",
       "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
     }
   },
@@ -67,8 +71,13 @@
       },
       "then": {
         "required": [
-          "evidence"
+          "receipt"
         ]
+      },
+      "else": {
+        "properties": {
+          "receipt": false
+        }
       }
     }
   ]

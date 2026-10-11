@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-spec.accept.request:v1",
   "title": "hive-spec accept: request body",
-  "description": "Records the acceptance of a specification revision by the Fleet's supervisor, or the Hive for its own item, and binds its criteria to the item by revision and digest. Technical acceptance settles no product choice, and a word hold the item carries stays until the decision intake releases it. The item's definition becomes accepted and any definition hold is released.",
+  "description": "Records the acceptance of a specification revision by the Fleet's supervisor, or the Hive for its own item, and binds its criteria to the item by revision and digest. Technical acceptance settles no product choice, and a word hold the item carries stays until the decision intake releases it. The item's definition becomes accepted and any definition hold is released, as is the definition hold of every item that resolves its effective specification through it.",
   "type": "object",
   "additionalProperties": false,
   "required": [

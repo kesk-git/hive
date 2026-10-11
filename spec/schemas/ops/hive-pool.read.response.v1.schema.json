@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-pool.read.response:v1",
   "title": "hive-pool read: response body",
-  "description": "A projection: the records read, whole, with the home, the time and the journal cursor they were read at. For items, the derived blocked, held and ready facts come beside each item and are never stored.",
+  "description": "A projection: the records read, whole, with the home, the time and the journal cursor they were read at. For items, the derived blocked, held, ready and landed facts come beside each item and are never stored.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -135,6 +135,7 @@
         "blocked",
         "held",
         "ready",
+        "landed",
         "active_blockers",
         "active_holds"
       ],
@@ -143,24 +144,34 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
         },
         "blocked": {
-          "description": "True when the item is not done and a blocked-by edge names an item of this Pool that does not carry the completion marker: one that is queued or in-flight, or archived without ever having been done. A blocker carrying the marker, done or archived after it was done, satisfies the edge whether or not its closing time is known.",
+          "description": "True when the item has not landed and it, or any ancestor, has a blocked-by edge that names an item of this Pool that has not landed: a leaf that is queued or in-flight, or archived without ever having been done, or a Target or a Prey with Hunts whose items beneath it have not all landed. A blocker that has landed satisfies the edge whether or not its closing time is known.",
           "type": "boolean"
         },
         "held": {
-          "description": "True when an active hold is in force at the time of the read. A dated hold other than a word hold is inactive on and after its until time; a word hold is never made inactive by a date, which is a revisit date that readers show and nothing more, and stays in force until the decision intake releases it.",
+          "description": "True when the item, or any ancestor, has an active hold in force at the time of the read. A dated hold other than a word hold is inactive on and after its until time; a word hold is never made inactive by a date, which is a revisit date that readers show and nothing more, and stays in force until the decision intake releases it.",
           "type": "boolean"
         },
         "ready": {
-          "description": "Queued, not blocked, not held and not a decision item.",
+          "description": "Queued, not blocked, not held (each read on the item and on its ancestors), not a decision item, not a Target and not a Prey that has a Hunt beneath it.",
+          "type": "boolean"
+        },
+        "landed": {
+          "description": "Effective completion, derived from the parent edges that point at the item. A Target has landed when at least one Prey points at it and every one of them has landed; a Prey with Hunts when at least one Hunt points at it and every one has landed; a Hunt, a Prey with no Hunt, or an item with no level, when it carries the completion marker.",
+          "type": "boolean"
+        },
+        "building": {
+          "description": "On a Target: true when any item beneath it is in flight.",
           "type": "boolean"
         },
         "active_blockers": {
+          "description": "The items that block it: those its own blocked-by edges and its ancestors' name and that have not landed.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
           }
         },
         "active_holds": {
+          "description": "The active holds on the item and on its ancestors.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
@@ -169,7 +180,7 @@
       }
     },
     "derived_projection": {
-      "description": "A projection's freshness at the moment of the read, never stored: fresh when the rules in force for its scope resolve to the rendering's digest with no conflict.",
+      "description": "A projection's freshness at the moment of the read, never stored: fresh when the rules in force for its scope resolve to the rendering's rules_digest, the resolved-rule digest, with no conflict. The comparison names the rules digest and never the digest of the rendered text.",
       "type": "object",
       "additionalProperties": false,
       "required": [

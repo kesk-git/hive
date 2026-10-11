@@ -1,6 +1,6 @@
 # Spawning Pool
 
-The Spawning Pool holds the Hive-owned worktrees and their leases, and the acquire, observe and release receipts that bind a physical worktree to one home, workspace, project, clone, task generation and branch. It holds working copies and never work items.
+The Spawning Pool holds the Hive-owned worktrees and their leases, and the acquire, observe and release receipts that bind a physical worktree to one home, workspace, project, clone, task generation and branch. It holds working copies and never Pool items.
 
 | | |
 | --- | --- |

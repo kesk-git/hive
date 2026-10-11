@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:records:pool.item:v1",
   "title": "Pool item",
-  "description": "One durable work item of the Pool, at pool/records/item/<task_id>.json. It describes work, never a persistent agent, and never assumes that its work has a worktree. This file also holds the definitions shared by every Pool record. See spec/pool.md.",
+  "description": "One durable item of the Pool, a Target, a Prey, a Hunt or a decision with no level, at pool/records/item/<task_id>.json. It describes work, never a persistent agent, and never assumes that its work has a worktree. This file also holds the definitions shared by every Pool record. See spec/pool.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,7 +15,6 @@
     "title",
     "state",
     "definition",
-    "placement_requested",
     "deps",
     "links",
     "generations",
@@ -61,6 +60,14 @@
       "description": "The item's notes, kept exactly as written.",
       "type": "string"
     },
+    "level": {
+      "description": "The item's level: target, prey or hunt. Required by add for a new item whose deliverable is not a decision; a decision item has none, and an imported legacy item may lack it until its owner sets it. No other item lacks one, so a decision item given work gains a level in the same update.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/level"
+    },
+    "wave": {
+      "description": "On a Target only: the Wave the Target belongs to on the project's roadmap, as the define step or the roadmap round recorded it. A grouping for the roadmap's order, never a level and never an owner.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/wave"
+    },
     "state": {
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/item_state"
     },
@@ -68,7 +75,7 @@
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/definition_state"
     },
     "deliverable": {
-      "description": "What a generation of this item produces. Absent until intake assigns it. decision never dispatches.",
+      "description": "What a generation of this item produces. Absent until intake assigns it, and absent on a Target, which carries no deliverable. decision never dispatches.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/deliverable"
     },
     "class": {
@@ -79,19 +86,19 @@
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/priority"
     },
     "placement_requested": {
-      "description": "The place requested for this item's work. Recorded here, rendered into the Imperative's Setup, resolved by policy at a later stage.",
+      "description": "The place requested for this item's work. Recorded here, rendered into the Imperative's Setup, resolved by policy at a later stage. Required on every item but a Target, which carries no requested placement.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/placement"
     },
     "delivery": {
-      "description": "The item's delivery axes, declared separately: validation, publication and Assimilation authority. Absent until intake declares them.",
+      "description": "The item's delivery axes, declared separately: validation, publication and Assimilation authority. Absent until intake declares them, and absent on a Target, which carries no delivery axes.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/delivery"
     },
     "specification_required": {
-      "description": "True when build dispatch needs an accepted specification revision. Absent means false.",
+      "description": "True when build dispatch needs an accepted specification revision. Absent means false. An item also needs one when the item it resolves through, its parent, does.",
       "type": "boolean"
     },
     "specification": {
-      "description": "The accepted specification revision whose criteria this item carries. Set by hive-spec accept and cleared by an invalidation.",
+      "description": "The accepted specification revision whose criteria this item carries. Set by hive-spec accept and cleared by an invalidation. An item with none reads the effective specification of its parent, a Hunt its Prey's and a Prey its Target's; see spec/pool.md, Specifications.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
     },
     "deps": {
@@ -107,11 +114,11 @@
       }
     },
     "schedule": {
-      "description": "A not-before gate or a recurrence as declared on the item. The item owns the work; the dispatcher's scheduled-job record, a later stage's, carries the schedule's runs. A date here dispatches nothing by itself.",
+      "description": "A not-before gate or a recurrence as declared on the item. The item owns the work; the dispatcher's schedule record, a later stage's, carries the schedule's runs. A date here dispatches nothing by itself.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/schedule"
     },
     "generations": {
-      "description": "Every execution generation opened on this item, in order, numbered from 1. At most one is open at a time.",
+      "description": "Every execution generation opened on this item, in order, numbered from 1. At most one is open at a time. Empty on a Target, which carries no generations.",
       "type": "array",
       "items": {
         "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/generation_entry"
@@ -190,7 +197,7 @@
       }
     },
     "completed": {
-      "description": "The completion marker: true once the item has reached done. Cleared on reopen and kept when a done item is archived, so that the completion survives archival. It is the one fact that satisfies a dependency; an item archived without having been done has none.",
+      "description": "The completion marker: true once the item has reached done, which a Target and a Prey that has a Hunt beneath it never do. Cleared on reopen and kept when a done item is archived, so that the completion survives archival. It is the one fact that lands a leaf, and a dependency reads the landing; an item archived without having been done has none.",
       "const": true
     },
     "closed_at": {
@@ -217,6 +224,81 @@
   "allOf": [
     {
       "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    },
+    {
+      "if": {
+        "required": [
+          "level"
+        ],
+        "properties": {
+          "level": {
+            "const": "target"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "deliverable": false,
+          "placement_requested": false,
+          "delivery": false,
+          "generations": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "placement_requested"
+        ],
+        "properties": {
+          "wave": false
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "deliverable"
+        ],
+        "properties": {
+          "deliverable": {
+            "const": "decision"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "level": false
+        }
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "legacy"
+              ]
+            },
+            {
+              "required": [
+                "deliverable"
+              ],
+              "properties": {
+                "deliverable": {
+                  "const": "decision"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "then": {
+        "required": [
+          "level"
+        ]
+      }
     },
     {
       "if": {
@@ -398,6 +480,37 @@
         "decision"
       ]
     },
+    "level": {
+      "description": "target: describes work that others do, grouped on the roadmap by a Wave. prey: a Target's part, worked by one Swarm or Lictor when it has no Hunt beneath it. hunt: what one Swarm or Lictor works, beneath a Prey.",
+      "enum": [
+        "target",
+        "prey",
+        "hunt"
+      ]
+    },
+    "wave": {
+      "description": "A Wave on the project's roadmap: its slug, its title and its ordinal in the roadmap's order, as the define step or the roadmap round recorded them. Carried by a Target only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slug",
+        "title",
+        "ordinal"
+      ],
+      "properties": {
+        "slug": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/slug"
+        },
+        "title": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/label"
+        },
+        "ordinal": {
+          "description": "The Wave's place in the roadmap's order, counted from 1.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
     "dispatch_class": {
       "type": "integer",
       "minimum": 0,
@@ -457,7 +570,7 @@
       ]
     },
     "dependency": {
-      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready and out of every generation while its blocker has not completed, and a blocker has completed only when it carries the completion marker, which survives archival: an item done, or archived after it was done. The closing time is never what satisfies the edge. An archived blocker that never completed satisfies nothing. An edge to an item that does not exist is resolved. reason is free text carried across a round trip and never read for state.",
+      "description": "An edge to another item of the same Pool. blocked-by keeps the item, and every item beneath it, out of ready and out of every generation while its blocker has not landed. A leaf, a Hunt or a Prey with no Hunt, has landed when it carries the completion marker, which survives archival: an item done, or archived after it was done. A Prey with Hunts has landed when at least one Hunt points at it and every one has landed, and a Target when at least one Prey points at it and every one has landed. The closing time is never what satisfies the edge. An archived blocker that never landed satisfies nothing. An edge to an item that does not exist is resolved. A parent edge obeys the parent rule of spec/pool.md, Levels: a Hunt has exactly one, to a Prey; a Prey has at most one, to a Target; a Target has none; add and update refuse a violation with pool.hierarchy, a Hunt attached to a Prey that carries the completion marker, is in flight or has an open generation included, and a Target's blocked-by edges name the Targets it depends on. reason is free text carried across a round trip and never read for state.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -745,7 +858,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
         },
         "ready": {
-          "description": "True: only items that are queued, not blocked and not actively held.",
+          "description": "True: only items that are queued, not blocked and not actively held, each read on the item and on its ancestors, not a decision item, not a Target and not a Prey that has a Hunt beneath it.",
           "type": "boolean"
         },
         "limit": {

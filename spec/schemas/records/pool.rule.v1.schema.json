@@ -296,8 +296,12 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
         },
         "evidence": {
-          "description": "For a lift: the receipt the lift condition named.",
+          "description": "For a lift: the receipt the lift condition named, by reference.",
           "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "receipt": {
+          "description": "For a lift: the receipt as the request carried it, whole, recorded with the lift once the Pool has checked its kind and its subject against the lift condition. Absent on a lift recorded before the request carried the receipt.",
+          "$ref": "urn:hive:schema:receipt:v1"
         },
         "authority": {
           "$ref": "urn:hive:schema:common:v1#/$defs/authority"
@@ -350,6 +354,11 @@
             "required": [
               "evidence"
             ]
+          },
+          "else": {
+            "properties": {
+              "receipt": false
+            }
           }
         }
       ]
