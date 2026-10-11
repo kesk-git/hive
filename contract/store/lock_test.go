@@ -211,9 +211,6 @@ func TestWaitingDefaults(t *testing.T) {
 	if _, err := wr.Replace(id("req", 1), RecordPath("item", id("task", 1)), []byte(`{}`), 0); !errors.Is(err, errReleased) {
 		t.Errorf("Replace after Release: %v", err)
 	}
-	if _, err := wr.WriteOnce(id("req", 1), ReceiptPath(id("rcpt", 1)), []byte(`{}`)); !errors.Is(err, errReleased) {
-		t.Errorf("WriteOnce after Release: %v", err)
-	}
 	if _, err := wr.Commit(Tx{}); !errors.Is(err, errReleased) {
 		t.Errorf("Commit after Release: %v", err)
 	}

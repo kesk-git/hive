@@ -38,7 +38,9 @@ type Options struct {
 	Waiting Waiting
 }
 
-// Store is one package's part of one home: <home>/<package>/.
+// Store is one package's part of one home: <home>/<package>/, and the
+// top-level path of the home the table of spec/records.md gives the package
+// besides it (home.json for dispatch, reviews/ for ui).
 type Store struct {
 	*Home
 	pkg     string
@@ -103,7 +105,7 @@ type Record struct {
 // is reported with fs.ErrNotExist; a record that cannot be read, is not a
 // record file or has no record_revision is ErrRecordMalformed.
 func (s *Store) ReadRecord(rel string) (*Record, error) {
-	if err := checkRecordPath(rel); err != nil {
+	if err := s.checkRecordPath(rel); err != nil {
 		return nil, err
 	}
 	data, err := s.readFile(rel)
@@ -132,7 +134,7 @@ func (s *Store) ReadRecord(rel string) (*Record, error) {
 // Read reads a file written once, a receipt or a recorded outcome, without a
 // lock, and checks its form. A missing file is reported with fs.ErrNotExist.
 func (s *Store) Read(rel string) ([]byte, error) {
-	if err := checkPath(rel); err != nil {
+	if err := s.checkPath(rel); err != nil {
 		return nil, err
 	}
 	return s.readFile(rel)
@@ -163,9 +165,31 @@ func (s *Store) Lock() (*Writer, error) {
 }
 
 // LockShared takes the store's lock shared, for a reader that needs several
-// records to agree. It writes nothing and recovers nothing.
+// records to agree. A transaction a crash left behind is completed first, by
+// the roll-forward Lock runs, so the records the reader sees are those of a
+// whole transaction; where recovery stops the store, LockShared fails with
+// the error Lock fails with. The shared lock itself writes nothing.
 func (s *Store) LockShared() (*Lock, error) {
-	return Acquire(s.Dir, s.pkg, true, s.waiting)
+	for {
+		l, err := Acquire(s.Dir, s.pkg, true, s.waiting)
+		if err != nil {
+			return nil, err
+		}
+		pending, err := s.intents()
+		if err != nil {
+			l.Release()
+			return nil, err
+		}
+		if len(pending) == 0 {
+			return l, nil
+		}
+		l.Release()
+		w, err := s.Lock()
+		if err != nil {
+			return nil, err
+		}
+		w.Release()
+	}
 }
 
 // Release releases the lock. The Writer is not usable afterwards.
@@ -201,7 +225,7 @@ func (w *Writer) Replace(requestID, rel string, content []byte, expected int64) 
 	if err := ids.Check(requestID, ids.Request); err != nil {
 		return Written{}, err
 	}
-	if err := checkRecordPath(rel); err != nil {
+	if err := w.s.checkRecordPath(rel); err != nil {
 		return Written{}, err
 	}
 	if err := w.s.expectRevision(rel, expected); err != nil {
@@ -215,32 +239,6 @@ func (w *Writer) Replace(requestID, rel string, content []byte, expected int64) 
 		return Written{}, err
 	}
 	return Written{rel, expected + 1, p.digest}, nil
-}
-
-// WriteOnce writes a file that is never replaced: a receipt or a recorded
-// outcome. The file must be absent, or the write is ErrAlreadyExists.
-// content is a JSON object in any spacing, written in canonical form.
-func (w *Writer) WriteOnce(requestID, rel string, content []byte) (string, error) {
-	if w.lock == nil {
-		return "", errReleased
-	}
-	if err := ids.Check(requestID, ids.Request); err != nil {
-		return "", err
-	}
-	if err := checkPath(rel); err != nil {
-		return "", err
-	}
-	if err := w.s.expectAbsent(rel); err != nil {
-		return "", err
-	}
-	p, err := w.s.prepareOnce(rel, content)
-	if err != nil {
-		return "", err
-	}
-	if err := w.s.writeFile(rel, requestID, p.data); err != nil {
-		return "", err
-	}
-	return p.digest, nil
 }
 
 // expectRevision checks that the record at rel has the revision expected, or

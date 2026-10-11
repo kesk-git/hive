@@ -4,7 +4,7 @@ This directory holds the contracts of the first stage of the [ordered implementa
 
 [The design](../docs/design.md) says what Hive is and why. This specification says where each thing lives, who owns it and what proves it. Where the two differ, the design governs and the difference is a defect in this specification.
 
-Contract version: **1.1**. Version 1.0 was accepted on 2026-10-11; 1.1, later the same day, corrects the distribution contract to six dependencies, with no-mistakes as the long-lived plugin point behind Synapse, by the Hive Mind's ruling on the shape of the gate's stage. It is a minor change: no schema, record or package declaration changed.
+Contract version: **1.2**. Version 1.0 was accepted on 2026-10-11; 1.1, later the same day, corrects the distribution contract to six dependencies, with no-mistakes as the long-lived plugin point behind Synapse, by the Hive Mind's ruling on the shape of the gate's stage. It is a minor change: no schema, record or package declaration changed. Version 1.2, later the same day, commits the schema of the transaction intent, `tx-intent.v1`, which [records.md](records.md#writing-several-records) requires of every record. It is a minor change: it adds a schema and changes no record that existed.
 
 ## What is defined
 

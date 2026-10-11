@@ -27,13 +27,38 @@ func (s *Store) abs(rel string) string {
 	return filepath.Join(s.dir, filepath.FromSlash(rel))
 }
 
-// checkPath checks a path below the store: slash-separated, every segment a
-// lowercase file name, ending in .json and never a temporary file.
-func checkPath(rel string) error {
-	if rel == "" {
+// up leads a path that names a top-level path of the home instead of one
+// below the store's directory.
+const up = "../"
+
+// topLevel gives each package the one top-level path of the home, besides its
+// own directory, that the table of spec/records.md gives it: home.json for
+// dispatch and everything under reviews/ for ui. No other path outside a
+// package's directory is its to write.
+var topLevel = map[string]string{"dispatch": homeFile, "ui": "reviews"}
+
+// HomeFilePath is the path of home.json, as dispatch names it.
+const HomeFilePath = up + homeFile
+
+// ReviewPath is the path of a file of a review directory, as ui names it:
+// rel is relative to reviews/.
+func ReviewPath(rel string) string { return up + "reviews/" + rel }
+
+// checkPath checks a path below the store, or a top-level path the package
+// owns: slash-separated, every segment a lowercase file name, ending in .json
+// and never a temporary file.
+func (s *Store) checkPath(rel string) error {
+	body, outside := strings.CutPrefix(rel, up)
+	if outside {
+		top := topLevel[s.pkg]
+		if top == "" || body != top && !(top != homeFile && strings.HasPrefix(body, top+"/")) {
+			return fmt.Errorf("store: path %q is outside the store of %s", rel, s.pkg)
+		}
+	}
+	if body == "" {
 		return fmt.Errorf("store: empty path")
 	}
-	for _, seg := range strings.Split(rel, "/") {
+	for _, seg := range strings.Split(body, "/") {
 		if seg == "" || seg == "." || seg == ".." {
 			return fmt.Errorf("store: path %q has an empty, . or .. segment", rel)
 		}
@@ -47,7 +72,7 @@ func checkPath(rel string) error {
 			return fmt.Errorf("store: path %q names a temporary file", rel)
 		}
 	}
-	if !strings.HasSuffix(rel, ".json") {
+	if !strings.HasSuffix(body, ".json") {
 		return fmt.Errorf("store: path %q does not end in .json", rel)
 	}
 	return nil
@@ -55,8 +80,8 @@ func checkPath(rel string) error {
 
 // checkRecordPath is checkPath for a replaceable record, which never sits
 // among the receipts, the recorded outcomes or the intents.
-func checkRecordPath(rel string) error {
-	if err := checkPath(rel); err != nil {
+func (s *Store) checkRecordPath(rel string) error {
+	if err := s.checkPath(rel); err != nil {
 		return err
 	}
 	switch first, _, _ := strings.Cut(rel, "/"); first {
@@ -94,7 +119,8 @@ func (s *Store) step(name string) error {
 // over the record's name, and the directory is flushed. A reader sees the
 // whole old file or the whole new one. A write that fails leaves the record
 // as it was and removes its temporary file; an interruption leaves the
-// temporary file for the next writer to remove.
+// temporary file for the next writer to remove. When it returns, the file and
+// every directory on its way down from the home are durable.
 func (s *Store) writeFile(rel, requestID string, data []byte) error {
 	full := s.abs(rel)
 	dir := filepath.Dir(full)
@@ -138,10 +164,39 @@ func (s *Store) writeFile(rel, requestID string, data []byte) error {
 		os.Remove(tmp)
 		return fmt.Errorf("store: %w", err)
 	}
+	return s.syncChain(rel)
+}
+
+// syncChain flushes the directory of the file at rel and every directory
+// above it up to the home's, so that the file's entry, and the entry of every
+// directory created on the way to it, are durable. Recovery calls it for a
+// file it finds already written, which a crash may have left visible but not
+// flushed.
+func (s *Store) syncChain(rel string) error {
 	if err := s.step("syncdir " + rel); err != nil {
 		return err
 	}
-	return syncDir(dir)
+	for dir := filepath.Dir(s.abs(rel)); ; dir = filepath.Dir(dir) {
+		if err := syncDir(dir); err != nil {
+			return err
+		}
+		if dir == s.Dir {
+			return nil
+		}
+		if err := s.step("syncdir " + s.relDir(filepath.Dir(dir))); err != nil {
+			return err
+		}
+	}
+}
+
+// relDir names a directory by its slash path below the home, for the steps
+// of a test.
+func (s *Store) relDir(dir string) string {
+	rel, err := filepath.Rel(s.Dir, dir)
+	if err != nil {
+		return dir + "/"
+	}
+	return filepath.ToSlash(rel) + "/"
 }
 
 // removeFile removes the file at rel and flushes its directory.
@@ -170,14 +225,12 @@ func syncDir(dir string) error {
 	return nil
 }
 
-// sweepTemps removes every temporary file under the store. A writer holding
-// the lock calls it, so no temporary file it finds is still being written.
+// sweepTemps removes every temporary file under the store, and under the
+// top-level path of the home it owns. A writer holding the lock calls it, so
+// no temporary file it finds is still being written.
 func (s *Store) sweepTemps() error {
 	dirty := map[string]bool{}
-	err := filepath.WalkDir(s.dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
+	sweep := func(p string, d fs.DirEntry) error {
 		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), tempSuffix) {
 			if err := os.Remove(p); err != nil {
 				return err
@@ -185,7 +238,32 @@ func (s *Store) sweepTemps() error {
 			dirty[filepath.Dir(p)] = true
 		}
 		return nil
-	})
+	}
+	walk := func(root string) error {
+		return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			return sweep(p, d)
+		})
+	}
+	err := walk(s.dir)
+	if top := topLevel[s.pkg]; err == nil && top == homeFile {
+		var entries []fs.DirEntry
+		if entries, err = os.ReadDir(s.Dir); err == nil {
+			for _, e := range entries {
+				if strings.HasPrefix(e.Name(), homeFile+".") {
+					if err = sweep(filepath.Join(s.Dir, e.Name()), e); err != nil {
+						break
+					}
+				}
+			}
+		}
+	} else if err == nil && top != "" {
+		if err = walk(filepath.Join(s.Dir, top)); errNotExist(err) {
+			err = nil
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("store: removing temporary files: %w", err)
 	}

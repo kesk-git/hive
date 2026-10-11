@@ -6,7 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/schema"
@@ -26,8 +28,42 @@ var knownDirs = []string{journalDir, locksDir, "pool", "spawning-pool", "dispatc
 // the order of the table. word persists through pool and has none.
 var storePackages = []string{"pool", "spawning-pool", "dispatch", "shadow", "synapse", "ui"}
 
-// homeSchema is the schema of home.json.
-const homeSchema = "urn:hive:schema:home:v1"
+// The schema of home.json: its $id, the name its records carry and the
+// newest version this build reads.
+const (
+	homeSchema  = "urn:hive:schema:home:v1"
+	homeRecord  = "hive.home"
+	homeVersion = "1.0"
+)
+
+var versionForm = regexp.MustCompile(`^([1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
+
+// checkVersion refuses, as ErrUnsupportedVersion, a record of the schema
+// name whose schema_version is newer than known, in its major or its minor
+// part. A record that is of another schema or has no version of the form
+// MAJOR.MINOR is left to its schema to refuse as malformed.
+func checkVersion(obj map[string]any, name, known string) error {
+	if obj["schema"] != name {
+		return nil
+	}
+	v, _ := obj["schema_version"].(string)
+	got, want := versionForm.FindStringSubmatch(v), versionForm.FindStringSubmatch(known)
+	if got == nil || want == nil {
+		return nil
+	}
+	if c := cmpNumbers(got[1], want[1]); c > 0 || c == 0 && cmpNumbers(got[2], want[2]) > 0 {
+		return fmt.Errorf("%w: %s is at version %s, this build reads up to %s", ErrUnsupportedVersion, name, v, known)
+	}
+	return nil
+}
+
+// cmpNumbers compares two decimal numbers written without leading zeros.
+func cmpNumbers(a, b string) int {
+	if len(a) != len(b) {
+		return len(a) - len(b)
+	}
+	return strings.Compare(a, b)
+}
 
 // ownerOnly is the access of every directory and file of a home.
 const (
@@ -139,7 +175,8 @@ func insideRepository(dir string) error {
 
 // readHomeRecord reads home.json through the embedded schema and returns its
 // home_id. A file that is not a valid home record is malformed, and a cached
-// or guessed identity never stands in for it.
+// or guessed identity never stands in for it. A home record of a newer
+// version is refused as unsupported.
 func readHomeRecord(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -148,6 +185,17 @@ func readHomeRecord(path string) (string, error) {
 	if err := canon.CheckFile(data); err != nil {
 		return "", fmt.Errorf("%w: %s: %v", ErrRecordMalformed, homeFile, err)
 	}
+	v, err := canon.Parse(data)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s: %v", ErrRecordMalformed, homeFile, err)
+	}
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("%w: %s: a record is a JSON object", ErrRecordMalformed, homeFile)
+	}
+	if err := checkVersion(obj, homeRecord, homeVersion); err != nil {
+		return "", fmt.Errorf("%w: %s", err, homeFile)
+	}
 	reg, err := schema.Embedded()
 	if err != nil {
 		return "", err
@@ -155,11 +203,7 @@ func readHomeRecord(path string) (string, error) {
 	if err := reg.Validate(homeSchema, data); err != nil {
 		return "", fmt.Errorf("%w: %s: %v", ErrRecordMalformed, homeFile, err)
 	}
-	v, err := canon.Parse(data)
-	if err != nil {
-		return "", fmt.Errorf("%w: %s: %v", ErrRecordMalformed, homeFile, err)
-	}
-	id, _ := v.(map[string]any)["home_id"].(string)
+	id, _ := obj["home_id"].(string)
 	return id, nil
 }
 

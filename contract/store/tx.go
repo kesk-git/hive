@@ -9,6 +9,7 @@ import (
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/schema"
 )
 
 // Tx is a mutation of several files of one store, written as one
@@ -57,11 +58,12 @@ type Committed struct {
 	Records []Written
 }
 
-// The intent record. It has no schema file of its own; its shape is fixed
-// here and read strictly.
+// The intent record: the name its records carry, the newest version this
+// build reads and the schema file that fixes its shape.
 const (
-	intentSchema  = "hive.tx-intent"
+	intentRecord  = "hive.tx-intent"
 	intentVersion = "1.0"
+	intentSchema  = "urn:hive:schema:tx-intent:v1"
 )
 
 // intent is a transaction as written to tx/<request_id>.json: every file to
@@ -136,7 +138,7 @@ func (s *Store) plan(tx Tx) (*intent, error) {
 		return nil
 	}
 	for _, r := range tx.Records {
-		if err := checkRecordPath(r.Path); err != nil {
+		if err := s.checkRecordPath(r.Path); err != nil {
 			return nil, err
 		}
 		if err := once(r.Path); err != nil {
@@ -203,21 +205,16 @@ func (s *Store) plan(tx Tx) (*intent, error) {
 }
 
 // complete writes what an intent says, in the order spec/records.md fixes,
-// and removes the intent. A file recovery marked as already written is left.
+// and removes the intent. A file recovery marked as already written is not
+// written again.
 func (s *Store) complete(in *intent) error {
 	for _, r := range in.records {
-		if r.skip {
-			continue
-		}
-		if err := s.writeFile(r.rel, in.request, r.data); err != nil {
+		if err := s.put(in.request, r); err != nil {
 			return err
 		}
 	}
 	for _, r := range in.receipts {
-		if r.skip {
-			continue
-		}
-		if err := s.writeFile(r.rel, in.request, r.data); err != nil {
+		if err := s.put(in.request, r); err != nil {
 			return err
 		}
 	}
@@ -232,27 +229,32 @@ func (s *Store) complete(in *intent) error {
 			return fmt.Errorf("store: appending the events of %s: %w", in.request, err)
 		}
 	}
-	if !in.outcome.skip {
-		if err := s.writeFile(in.outcome.rel, in.request, in.outcome.data); err != nil {
-			return err
-		}
+	if err := s.put(in.request, in.outcome); err != nil {
+		return err
 	}
 	return s.removeFile(IntentPath(in.request))
+}
+
+// put writes a file of an intent, or, when recovery found it already at the
+// intended digest, flushes it and the directories above it instead: it is
+// visible, but the crash may have come before it was durable, and the intent
+// is removed only once it is.
+func (s *Store) put(request string, f *intentFile) error {
+	if f.skip {
+		return s.syncChain(f.rel)
+	}
+	return s.writeFile(f.rel, request, f.data)
 }
 
 // recover brings the store to a consistent state under the exclusive lock:
 // it rolls every intent forward and removes every temporary file. Intents
 // are completed in name order, each in full before the next.
 func (s *Store) recover() error {
-	entries, err := os.ReadDir(filepath.Join(s.dir, txDir))
-	if err != nil && !errNotExist(err) {
-		return fmt.Errorf("store: %w", err)
+	names, err := s.intents()
+	if err != nil {
+		return err
 	}
-	for _, e := range entries {
-		name := e.Name()
-		if !e.Type().IsRegular() || !strings.HasSuffix(name, ".json") {
-			continue
-		}
+	for _, name := range names {
 		rel := txDir + "/" + name
 		in, err := s.readIntent(rel)
 		if err != nil {
@@ -266,6 +268,21 @@ func (s *Store) recover() error {
 		}
 	}
 	return s.sweepTemps()
+}
+
+// intents lists the names of the intents in the store, in name order.
+func (s *Store) intents() ([]string, error) {
+	entries, err := os.ReadDir(filepath.Join(s.dir, txDir))
+	if err != nil && !errNotExist(err) {
+		return nil, fmt.Errorf("store: %w", err)
+	}
+	var names []string
+	for _, e := range entries {
+		if e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".json") {
+			names = append(names, e.Name())
+		}
+	}
+	return names, nil
 }
 
 // classify decides, for each file of an intent, whether recovery writes it
@@ -314,7 +331,7 @@ func (s *Store) encodeIntent(in *intent) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		m := map[string]any{"path": f.rel, "digest": f.digest, "content": content}
+		m := map[string]any{"path": f.rel, "digest": f.digest, "body": content}
 		if f.absent {
 			m["expected"] = "absent"
 		} else {
@@ -348,14 +365,14 @@ func (s *Store) encodeIntent(in *intent) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		events = append(events, map[string]any{"event_id": e.ID, "content": content})
+		events = append(events, map[string]any{"event_id": e.ID, "body": content})
 	}
 	outcome, err := file(in.outcome)
 	if err != nil {
 		return nil, err
 	}
 	doc := map[string]any{
-		"schema":         intentSchema,
+		"schema":         intentRecord,
 		"schema_version": intentVersion,
 		"request_id":     in.request,
 		"package":        s.pkg,
@@ -371,8 +388,12 @@ func (s *Store) encodeIntent(in *intent) ([]byte, error) {
 	return append(out, '\n'), nil
 }
 
-// readIntent reads the intent at rel strictly. A torn or otherwise malformed
-// intent is ErrRecordMalformed naming it; it is never discarded.
+// readIntent reads the intent at rel: its form, its version, its shape
+// through the schema of the intent, and then what only the store can check,
+// that it is this store's, names its own request and holds files whose
+// digests are those of their content. A torn or otherwise malformed intent is
+// ErrRecordMalformed naming it, and one of a newer version is
+// ErrUnsupportedVersion; neither is ever discarded.
 func (s *Store) readIntent(rel string) (*intent, error) {
 	bad := func(format string, args ...any) error {
 		return fmt.Errorf("%w: intent %s: %s", ErrRecordMalformed, rel, fmt.Sprintf(format, args...))
@@ -389,69 +410,47 @@ func (s *Store) readIntent(rel string) (*intent, error) {
 	if !ok {
 		return nil, bad("not a JSON object")
 	}
-	if doc["schema"] != intentSchema || doc["schema_version"] != intentVersion {
-		return nil, bad("not a %s %s record", intentSchema, intentVersion)
+	if err := checkVersion(doc, intentRecord, intentVersion); err != nil {
+		return nil, fmt.Errorf("intent %s: %w", rel, err)
+	}
+	reg, err := schema.Embedded()
+	if err != nil {
+		return nil, err
+	}
+	if err := reg.Validate(intentSchema, data); err != nil {
+		return nil, bad("%v", err)
 	}
 	if doc["package"] != s.pkg {
 		return nil, bad("the intent is for another store")
 	}
 	request, _ := doc["request_id"].(string)
-	if ids.Check(request, ids.Request) != nil || IntentPath(request) != rel {
+	if IntentPath(request) != rel {
 		return nil, bad("request_id does not name the intent")
-	}
-	for _, key := range []string{"records", "receipts", "events", "outcome"} {
-		if _, ok := doc[key]; !ok {
-			return nil, bad("%s is missing", key)
-		}
-	}
-	if len(doc) != 8 {
-		return nil, bad("unknown member")
 	}
 	in := &intent{request: request}
 	file := func(v any, record bool) (*intentFile, error) {
-		m, ok := v.(map[string]any)
-		if !ok {
-			return nil, bad("a file entry is not an object")
-		}
+		m, _ := v.(map[string]any)
 		rel, _ := m["path"].(string)
-		if err := checkPath(rel); err != nil {
+		if err := s.checkPath(rel); err != nil {
 			return nil, bad("%v", err)
 		}
-		if record != (checkRecordPath(rel) == nil) {
+		if record != (s.checkRecordPath(rel) == nil) {
 			return nil, bad("%s is in the wrong list", rel)
 		}
 		digest, _ := m["digest"].(string)
-		if !canon.ValidDigest(digest) {
-			return nil, bad("%s has no digest", rel)
-		}
-		content, ok := m["content"].(map[string]any)
-		if !ok {
-			return nil, bad("%s has no content", rel)
-		}
-		out, err := canon.Encode(content)
+		body, _ := m["body"].(map[string]any)
+		out, err := canon.Encode(body)
 		if err != nil || canon.FileDigest(out) != digest {
 			return nil, bad("the content of %s does not match its digest", rel)
 		}
-		f := &intentFile{prepared: prepared{rel, append(out, '\n'), digest}}
-		switch expected := m["expected"]; {
-		case expected == "absent" && len(m) == 4:
-			f.absent = true
-		case expected == "revision" && record && len(m) == 5:
-			rev, ok := m["expected_revision"].(int64)
-			if !ok || ids.CheckNumber(rev) != nil {
-				return nil, bad("%s has no expected revision", rel)
-			}
-			f.expected = rev
-		default:
-			return nil, bad("%s has no expected state", rel)
+		f := &intentFile{prepared: prepared{rel, append(out, '\n'), digest}, absent: m["expected"] == "absent"}
+		if !f.absent {
+			f.expected, _ = m["expected_revision"].(int64)
 		}
 		return f, nil
 	}
 	list := func(key string, record bool) ([]*intentFile, error) {
-		arr, ok := doc[key].([]any)
-		if !ok {
-			return nil, bad("%s is not a list", key)
-		}
+		arr, _ := doc[key].([]any)
 		var out []*intentFile
 		for _, v := range arr {
 			f, err := file(v, record)
@@ -473,24 +472,12 @@ func (s *Store) readIntent(rel string) (*intent, error) {
 			return nil, bad("%s is not a receipt", r.rel)
 		}
 	}
-	events, ok := doc["events"].([]any)
-	if !ok {
-		return nil, bad("events is not a list")
-	}
+	events, _ := doc["events"].([]any)
 	for _, v := range events {
-		m, ok := v.(map[string]any)
-		if !ok || len(m) != 2 {
-			return nil, bad("an event entry is not an event")
-		}
+		m, _ := v.(map[string]any)
 		id, _ := m["event_id"].(string)
-		if ids.Check(id, ids.Event) != nil {
-			return nil, bad("an event has no event_id")
-		}
-		content, ok := m["content"].(map[string]any)
-		if !ok {
-			return nil, bad("event %s has no content", id)
-		}
-		out, err := canon.Encode(content)
+		body, _ := m["body"].(map[string]any)
+		out, err := canon.Encode(body)
 		if err != nil {
 			return nil, bad("event %s: %v", id, err)
 		}

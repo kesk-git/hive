@@ -91,7 +91,7 @@ A mutation that changes more than one record of a store is one transaction.
 
 1. Take the store's lock.
 2. Check every expected revision, and that every record to be created is absent.
-3. Write the **intent** to `tx/<request_id>.json`: every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. The entry of a record being created has no revision to expect and instead states that the record is expected to be absent. Flush it.
+3. Write the **intent** to `tx/<request_id>.json`, a record of schema [`hive.tx-intent`](schemas/tx-intent.v1.schema.json): every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. The entry of a record being created has no revision to expect and instead states that the record is expected to be absent. Flush it.
 4. Write the records, then the receipts, then append the events.
 5. Write the outcome to `requests/<request_id>.json`.
 6. Remove the intent and release the lock.

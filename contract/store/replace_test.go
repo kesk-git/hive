@@ -156,7 +156,10 @@ func TestReplaceInterruptedAtEachStep(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	want := []string{"create " + task1, "fill " + task1, "sync " + task1, "rename " + task1, "syncdir " + task1}
+	want := []string{
+		"create " + task1, "fill " + task1, "sync " + task1, "rename " + task1,
+		"syncdir " + task1, "syncdir pool/records/", "syncdir pool/", "syncdir ./",
+	}
 	if !slices.Equal(steps, want) {
 		t.Fatalf("steps = %v, want %v", steps, want)
 	}
@@ -269,28 +272,24 @@ func TestTemporaryFilesAreNeverRecords(t *testing.T) {
 	sameTree(t, "after a refused write", tree(t, home), before)
 }
 
-func TestWriteOnce(t *testing.T) {
+// A receipt and a recorded outcome are written only by a transaction, and
+// read back whole.
+func TestReadReceiptsAndOutcomes(t *testing.T) {
 	home := newHome(t)
 	s, _, _ := open(t, home, "pool")
 	w := lock(t, s)
 	defer w.Release()
-	rel := ReceiptPath(id("rcpt", 1))
-	digest, err := w.WriteOnce(req1, rel, []byte("{ \"b\": 2,\n\"a\": 1 }"))
-	if err != nil {
+	rel := ReceiptPath(rcpt1)
+	if _, err := w.Commit(Tx{
+		RequestID: req1,
+		Receipts:  []Receipt{{rcpt1, []byte("{ \"b\": 2,\n\"a\": 1 }")}},
+		Outcome:   []byte(`{"status":"ok"}`),
+	}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := s.Read(rel)
-	if err != nil || string(data) != "{\"a\":1,\"b\":2}\n" || digest != canon.FileDigest([]byte(`{"a":1,"b":2}`)) {
-		t.Fatalf("Read = %q, %v; digest %s", data, err, digest)
-	}
-	if _, err := w.WriteOnce(req2, rel, []byte(`{"a":1,"b":2}`)); !errors.Is(err, ErrAlreadyExists) {
-		t.Errorf("a second write: %v", err)
-	}
-	if _, err := w.WriteOnce(req2, OutcomePath(req2), []byte(`[]`)); err == nil {
-		t.Error("a non-object was written")
-	}
-	if _, err := w.WriteOnce(req2, "requests/x.tmp", []byte(`{}`)); err == nil {
-		t.Error("a temporary name was written")
+	if err != nil || string(data) != "{\"a\":1,\"b\":2}\n" {
+		t.Fatalf("Read = %q, %v", data, err)
 	}
 	if _, err := s.Read(OutcomePath(req2)); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("Read of a missing file: %v", err)
@@ -298,10 +297,20 @@ func TestWriteOnce(t *testing.T) {
 	if _, err := s.ReadRecord(rel); err == nil {
 		t.Error("a receipt was read as a record")
 	}
+	if _, err := s.Read("requests/x.tmp"); err == nil {
+		t.Error("a temporary name was read")
+	}
 	write(t, s, OutcomePath(req2), []byte("{\"a\":1}"))
 	if _, err := s.Read(OutcomePath(req2)); !errors.Is(err, ErrRecordMalformed) {
 		t.Errorf("Read of a file without its line feed: %v", err)
 	}
+	// Nothing writes a receipt outside a transaction: the receipt of a second
+	// request that names the same receipt is refused whole.
+	before := tree(t, home)
+	if _, err := w.Commit(Tx{RequestID: req2, Receipts: []Receipt{{rcpt1, []byte(`{"a":1,"b":2}`)}}, Outcome: []byte(`{"status":"ok"}`)}); !errors.Is(err, ErrAlreadyExists) {
+		t.Errorf("a second write of the receipt: %v", err)
+	}
+	sameTree(t, "after a refused receipt", tree(t, home), before)
 }
 
 func TestReadRecordRefusesMalformedRecords(t *testing.T) {
@@ -378,9 +387,13 @@ func TestSizeLimit(t *testing.T) {
 	}
 	sameTree(t, "after a refused record", tree(t, home), before)
 
-	_, err = w.WriteOnce(req2, ReceiptPath(id("rcpt", 1)), []byte(`{"x":"`+strings.Repeat("y", 70)+`"}`))
-	if !errors.As(err, &se) || se.Actual != 70+9 {
-		t.Fatalf("WriteOnce over the limit: %v", err)
+	_, err = w.Commit(Tx{
+		RequestID: req2,
+		Receipts:  []Receipt{{id("rcpt", 1), []byte(`{"x":"` + strings.Repeat("y", 70) + `"}`)}},
+		Outcome:   []byte(`{"ok":true}`),
+	})
+	if !errors.As(err, &se) || se.Path != ReceiptPath(id("rcpt", 1)) || se.Actual != 70+9 {
+		t.Fatalf("a receipt over the limit: %v", err)
 	}
 	sameTree(t, "after a refused receipt", tree(t, home), before)
 

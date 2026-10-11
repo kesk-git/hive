@@ -13,6 +13,11 @@ var (
 	// form, or an intent that recovery cannot complete. Nothing repairs it by
 	// guessing (spec/records.md, Writing one record).
 	ErrRecordMalformed = errors.New("store: record is malformed")
+	// ErrUnsupportedVersion reports a record whose schema_version is newer,
+	// major or minor, than this build reads. It is refused and never
+	// rewritten, and it is not a malformed record (spec/records.md,
+	// Versioning).
+	ErrUnsupportedVersion = errors.New("store: record version is newer than this build reads")
 	// ErrRevisionConflict reports a record whose revision on disk is not the
 	// one a mutation expected. Nothing is written.
 	ErrRevisionConflict = errors.New("store: record revision differs from the one expected")
@@ -56,6 +61,8 @@ func Code(err error) string {
 	switch {
 	case errors.Is(err, ErrRecordMalformed):
 		return "record_malformed"
+	case errors.Is(err, ErrUnsupportedVersion):
+		return "unsupported_version"
 	case errors.Is(err, ErrRevisionConflict):
 		return "revision_conflict"
 	case errors.Is(err, ErrAlreadyExists):

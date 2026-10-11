@@ -179,6 +179,22 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			os.WriteFile(p, []byte(strings.Replace(string(data), `"role":"hive"`, `"role":"fleet"`, 1)), fileMode)
 			return home
 		}, ErrRecordMalformed},
+		{"home.json of a newer minor version", func(t *testing.T, home string) string {
+			newerHome(t, home, "1.1")
+			return home
+		}, ErrUnsupportedVersion},
+		{"home.json of a newer major version", func(t *testing.T, home string) string {
+			newerHome(t, home, "2.0")
+			return home
+		}, ErrUnsupportedVersion},
+		{"home.json with a version that is not one", func(t *testing.T, home string) string {
+			newerHome(t, home, "one")
+			return home
+		}, ErrRecordMalformed},
+		{"home.json of an older major version", func(t *testing.T, home string) string {
+			newerHome(t, home, "0.9")
+			return home
+		}, ErrRecordMalformed},
 		{"home.json empty", func(t *testing.T, home string) string {
 			os.WriteFile(filepath.Join(home, homeFile), nil, fileMode)
 			return home
@@ -213,6 +229,36 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			}
 		})
 	}
+}
+
+// newerHome gives home.json the schema version given.
+func newerHome(t *testing.T, home, version string) {
+	t.Helper()
+	p := filepath.Join(home, homeFile)
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = []byte(strings.Replace(string(data), `"schema_version":"1.0"`, `"schema_version":"`+version+`"`, 1))
+	if err := os.WriteFile(p, data, fileMode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A newer home record is refused as unsupported_version and never as a
+// malformed one, by CheckHome and by every Open.
+func TestNewerHomeIsUnsupported(t *testing.T) {
+	home := fullHome(t)
+	newerHome(t, home, "1.1")
+	before := tree(t, home)
+	_, err := CheckHome(home)
+	if !errors.Is(err, ErrUnsupportedVersion) || errors.Is(err, ErrRecordMalformed) || Code(err) != "unsupported_version" {
+		t.Fatalf("CheckHome = %v, code %q", err, Code(err))
+	}
+	if _, err := Open(home, "dispatch", Options{}); !errors.Is(err, ErrUnsupportedVersion) {
+		t.Errorf("Open = %v", err)
+	}
+	sameTree(t, "after a refused home", tree(t, home), before)
 }
 
 func TestCheckHomeNamesWhatIsWrong(t *testing.T) {
@@ -276,6 +322,7 @@ func TestOpenRefuses(t *testing.T) {
 func TestCode(t *testing.T) {
 	tests := map[error]string{
 		ErrRecordMalformed:           "record_malformed",
+		ErrUnsupportedVersion:        "unsupported_version",
 		ErrRevisionConflict:          "revision_conflict",
 		ErrAlreadyExists:             "already_exists",
 		ErrLockHeld:                  "lock_held",

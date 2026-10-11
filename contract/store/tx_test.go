@@ -3,7 +3,9 @@ package store
 import (
 	"bytes"
 	"errors"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -465,13 +467,81 @@ func TestRecoveryDecidesByWhatItFinds(t *testing.T) {
 					t.Error("events were appended")
 				}
 			}
-			// The stopped lock was released: a shared reader is not kept out.
-			l, err := s.LockShared()
-			if err != nil {
-				t.Fatal(err)
+			// A reader that needs the records to agree is stopped the same way,
+			// and the lock it took is released: the stopped store is not held.
+			for i := 0; i < 2; i++ {
+				l, err := s.LockShared()
+				if !errors.Is(err, ErrRecordMalformed) || l != nil {
+					t.Fatalf("LockShared = %v, %v; want ErrRecordMalformed", l, err)
+				}
+				if !strings.Contains(err.Error(), IntentPath(req9)) || !strings.Contains(err.Error(), tc.names) {
+					t.Errorf("error %q names neither the intent nor %s", err, tc.names)
+				}
 			}
-			l.Release()
+			sameTree(t, "after a stopped shared lock", tree(t, s.Dir), before)
+			if _, err := s.Lock(); errors.Is(err, ErrLockHeld) {
+				t.Error("a stopped shared lock was left held")
+			}
 		})
+	}
+}
+
+// A reader that takes the lock shared sees the records of a whole
+// transaction: a crash between two records is completed first, by the same
+// roll-forward, and the events and the outcome are written once.
+func TestSharedLockCompletesATransaction(t *testing.T) {
+	want, wantEvents := committed(t)
+	s, j := seeded(t)
+	w := lock(t, s)
+	faultAt(s, "create "+task2, 1) // the intent and task1 are written, task2 is not
+	if _, err := w.Commit(fullTx()); !errors.Is(err, errCrash) {
+		t.Fatal(err)
+	}
+	w.Release()
+	s.fault = nil
+	if rec, err := s.ReadRecord(task1); err != nil || rec.Revision != 2 {
+		t.Fatalf("task1 before the shared lock = %+v, %v", rec, err)
+	}
+	if _, err := s.ReadRecord(task2); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("task2 before the shared lock: %v", err)
+	}
+
+	l, err := s.LockShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !l.Shared() || l.Name() != "pool" {
+		t.Errorf("lock = %+v", l)
+	}
+	sameTree(t, "under the shared lock", tree(t, s.Dir), want)
+	if !slices.Equal(j.order, wantEvents) {
+		t.Errorf("journal = %v", j.order)
+	}
+	// It is the shared lock that is held: another reader gets in, a writer
+	// does not.
+	other, err := s.LockShared()
+	if err != nil {
+		t.Fatal(err)
+	}
+	other.Release()
+	if _, err := s.Lock(); !errors.Is(err, ErrLockHeld) {
+		t.Errorf("Lock against the shared lock: %v", err)
+	}
+	l.Release()
+
+	// With nothing to complete the shared lock writes nothing and appends
+	// nothing.
+	appends := j.appends
+	steps := trace(t, s, func() {
+		l, err := s.LockShared()
+		if err != nil {
+			t.Fatal(err)
+		}
+		l.Release()
+		s.step("done")
+	})
+	if !slices.Equal(steps, []string{"done"}) || j.appends != appends {
+		t.Errorf("a shared lock with nothing to complete did %v, %d appends", steps, j.appends-appends)
 	}
 }
 
@@ -489,19 +559,26 @@ func TestTornIntent(t *testing.T) {
 	rel := IntentPath(req9)
 
 	torn := map[string][]byte{
-		"cut in half":                        whole[:len(whole)/2],
-		"cut before its line feed":           whole[:len(whole)-1],
-		"empty":                              nil,
-		"not JSON":                           []byte("intent\n"),
-		"not an object":                      []byte("[]\n"),
-		"another schema":                     bytes.Replace(whole, []byte(intentSchema), []byte("hive.other"), 1),
-		"another version":                    bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"1.1"`), 1),
-		"another package":                    bytes.Replace(whole, []byte(`"package":"pool"`), []byte(`"package":"shadow"`), 1),
-		"another request":                    bytes.Replace(whole, []byte(`"request_id":"`+req9), []byte(`"request_id":"`+req2), 1),
-		"a digest that does not match":       bytes.Replace(whole, []byte(`"title":"replaced"`), []byte(`"title":"other"`), 1),
-		"an unknown member":                  bytes.Replace(whole, []byte(`"schema":`), []byte(`"extra":1,"schema":`), 1),
-		"no outcome":                         bytes.Replace(whole, []byte(`"outcome":`), []byte(`"outcomes":`), 1),
-		"a record without an expected state": bytes.Replace(whole, []byte(`"expected":"revision","expected_revision":1`), []byte(`"expected":"maybe"`), 1),
+		"cut in half":                                whole[:len(whole)/2],
+		"cut before its line feed":                   whole[:len(whole)-1],
+		"empty":                                      nil,
+		"not JSON":                                   []byte("intent\n"),
+		"not an object":                              []byte("[]\n"),
+		"another schema":                             bytes.Replace(whole, []byte(intentRecord), []byte("hive.other"), 1),
+		"a version that is not one":                  bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"one"`), 1),
+		"an older major version":                     bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"0.9"`), 1),
+		"content that is not an object":              bytes.Replace(whole, []byte(`"body":{"n":1,"record_revision":1,"title":"created","updated_at":"2026-10-11T08:00:00.000Z"}`), []byte(`"body":[]`), 1),
+		"an absent record that names a revision":     bytes.Replace(whole, []byte(`"expected":"absent","path":"`+task2), []byte(`"expected":"absent","expected_revision":1,"path":"`+task2), 1),
+		"a path with a parent segment":               bytes.Replace(whole, []byte(`"path":"`+task2), []byte(`"path":"records/../item/x.json`), 1),
+		"a record in the list of receipts":           bytes.Replace(whole, []byte(`"path":"`+ReceiptPath(rcpt1)), []byte(`"path":"`+task2), 1),
+		"a path outside the package":                 bytes.Replace(whole, []byte(`"path":"`+task2), []byte(`"path":"../home.json`), 1),
+		"a package that has no store":                bytes.Replace(whole, []byte(`"package":"pool"`), []byte(`"package":"word"`), 1),
+		"another package":                            bytes.Replace(whole, []byte(`"package":"pool"`), []byte(`"package":"shadow"`), 1),
+		"another request":                            bytes.Replace(whole, []byte(`"request_id":"`+req9), []byte(`"request_id":"`+req2), 1),
+		"a digest that does not match":               bytes.Replace(whole, []byte(`"title":"replaced"`), []byte(`"title":"other"`), 1),
+		"an unknown member":                          bytes.Replace(whole, []byte(`"schema":`), []byte(`"extra":1,"schema":`), 1),
+		"no outcome":                                 bytes.Replace(whole, []byte(`"outcome":`), []byte(`"outcomes":`), 1),
+		"a record without an expected state":         bytes.Replace(whole, []byte(`"expected":"revision","expected_revision":1`), []byte(`"expected":"maybe"`), 1),
 		"a record with an expected revision of zero": bytes.Replace(whole, []byte(`"expected_revision":1`), []byte(`"expected_revision":0`), 1),
 		"an event without its id":                    bytes.ReplaceAll(whole, []byte(`"event_id":"`+evt1+`"`), []byte(`"event_id":"x"`)),
 	}
@@ -662,5 +739,111 @@ func TestRecoveryCompletesEveryIntent(t *testing.T) {
 	}
 	if !slices.Equal(j.order, []string{evt1, evt2}) {
 		t.Errorf("journal = %v", j.order)
+	}
+}
+
+// An intent, a home record or a record of a newer version than this build
+// reads, major or minor, is refused as unsupported_version, never as a
+// malformed record, and never rewritten or discarded.
+func TestNewerIntentIsUnsupported(t *testing.T) {
+	s, _ := seeded(t)
+	whole, err := s.encodeIntent(plan(t, s, fullTx()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, version := range []string{"1.1", "1.10", "2.0", "10.0", "99999999999999999999.0"} {
+		t.Run(version, func(t *testing.T) {
+			s, j := seeded(t)
+			write(t, s, IntentPath(req9), bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"`+version+`"`), 1))
+			before := tree(t, s.Dir)
+			for _, take := range []func() error{
+				func() error { _, err := s.Lock(); return err },
+				func() error { _, err := s.LockShared(); return err },
+			} {
+				err := take()
+				if !errors.Is(err, ErrUnsupportedVersion) || errors.Is(err, ErrRecordMalformed) {
+					t.Fatalf("error = %v; want ErrUnsupportedVersion only", err)
+				}
+				if Code(err) != "unsupported_version" {
+					t.Errorf("Code = %q", Code(err))
+				}
+				if !strings.Contains(err.Error(), IntentPath(req9)) {
+					t.Errorf("error %q does not name the intent", err)
+				}
+				sameTree(t, "after a refused intent", tree(t, s.Dir), before)
+				if j.appends != 0 {
+					t.Error("events were appended")
+				}
+			}
+		})
+	}
+}
+
+// Every file of a transaction is durable before its intent is removed, and
+// so is every directory on its way: a file in a directory the write created
+// has the directory's own entry flushed up to the home.
+func TestWritesFlushEveryDirectoryOnTheWay(t *testing.T) {
+	s, _ := seeded(t)
+	w := lock(t, s)
+	defer w.Release()
+	steps := trace(t, s, func() {
+		if _, err := w.Commit(fullTx()); err != nil {
+			t.Fatal(err)
+		}
+	})
+	for _, rel := range []string{IntentPath(req9), ws1, ReceiptPath(rcpt1), OutcomePath(req9)} {
+		at := slices.Index(steps, "syncdir "+rel)
+		if at < 0 {
+			t.Fatalf("%s was never flushed: %v", rel, steps)
+		}
+		var chain []string
+		for _, step := range steps[at+1:] {
+			if !strings.HasPrefix(step, "syncdir ") {
+				break
+			}
+			chain = append(chain, step)
+		}
+		dirs := strings.Split(rel, "/")
+		var want []string
+		for k := len(dirs) - 2; k >= 0; k-- {
+			want = append(want, "syncdir "+path.Join(append([]string{"pool"}, dirs[:k]...)...)+"/")
+		}
+		want = append(want, "syncdir ./")
+		if !slices.Equal(chain, want) {
+			t.Errorf("after %s the flushed directories are %v, want %v", rel, chain, want)
+		}
+	}
+}
+
+// A crash between a file's rename and the flush of its directory leaves the
+// file visible but not durable. Recovery finds it at its intended digest and
+// writes nothing, but flushes it, and the directories above it, before it
+// removes the intent: a record, a receipt and the outcome alike.
+func TestRecoveryFlushesWhatIsAlreadyVisible(t *testing.T) {
+	for _, rel := range []string{task2, ws1, ReceiptPath(rcpt2), OutcomePath(req9)} {
+		t.Run(rel, func(t *testing.T) {
+			s, _ := seeded(t)
+			w := lock(t, s)
+			faultAt(s, "syncdir "+rel, 1)
+			if _, err := w.Commit(fullTx()); !errors.Is(err, errCrash) {
+				t.Fatal(err)
+			}
+			w.Release()
+			s.fault = nil
+			if _, err := os.Stat(s.abs(rel)); err != nil {
+				t.Fatalf("the file is not visible: %v", err)
+			}
+			steps := trace(t, s, func() { lock(t, s).Release() })
+			if slices.Contains(steps, "create "+rel) {
+				t.Error("recovery wrote the file again")
+			}
+			flushed, removed := slices.Index(steps, "syncdir "+rel), slices.Index(steps, "remove "+IntentPath(req9))
+			if flushed < 0 || removed < 0 || flushed > removed {
+				t.Errorf("flush at %d, intent removed at %d: %v", flushed, removed, steps)
+			}
+			if !slices.Contains(steps[flushed:removed], "syncdir ./") {
+				t.Error("recovery flushed no directory above the file")
+			}
+		})
 	}
 }

@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:tx-intent:v1",
+  "title": "Transaction intent",
+  "description": "The file tx/<request_id>.json of a store: a transaction in progress, with every file it will write and every event it will append. See spec/records.md, Writing several records.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "request_id",
+    "package",
+    "records",
+    "receipts",
+    "events",
+    "outcome"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hive.tx-intent"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "request_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+    },
+    "package": {
+      "description": "The package whose store holds the intent.",
+      "enum": [
+        "pool",
+        "spawning-pool",
+        "dispatch",
+        "shadow",
+        "synapse",
+        "ui"
+      ]
+    },
+    "records": {
+      "description": "The records to replace or create, in the order they are written.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:tx-intent:v1#/$defs/record_file"
+      }
+    },
+    "receipts": {
+      "description": "The receipts to write, each once.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:tx-intent:v1#/$defs/once_file"
+      }
+    },
+    "events": {
+      "description": "The events to append to the journal, each once.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:tx-intent:v1#/$defs/event"
+      }
+    },
+    "outcome": {
+      "description": "The recorded outcome of the request, written once.",
+      "$ref": "urn:hive:schema:tx-intent:v1#/$defs/once_file"
+    }
+  },
+  "$defs": {
+    "path": {
+      "description": "A lowercase path below the store, or below the home where it starts with ../ and names a top-level path the package owns.",
+      "type": "string",
+      "pattern": "^(\\.\\./)?[a-z0-9._-]+(/[a-z0-9._-]+)*\\.json$"
+    },
+    "record_file": {
+      "description": "A record: created, expected absent, or replaced, expected at a revision. body is the new record, which a later write sets record_revision and updated_at on.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "digest",
+        "body",
+        "expected"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "urn:hive:schema:tx-intent:v1#/$defs/path"
+        },
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "body": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+        },
+        "expected": {
+          "enum": [
+            "absent",
+            "revision"
+          ]
+        },
+        "expected_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "expected": {
+                "const": "revision"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "expected_revision"
+            ]
+          },
+          "else": {
+            "properties": {
+              "expected_revision": false
+            }
+          }
+        }
+      ]
+    },
+    "once_file": {
+      "description": "A receipt or the outcome: written once, expected absent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "digest",
+        "body",
+        "expected"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "urn:hive:schema:tx-intent:v1#/$defs/path"
+        },
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "body": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+        },
+        "expected": {
+          "const": "absent"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "body"
+      ],
+      "properties": {
+        "event_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/event_id"
+        },
+        "body": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+        }
+      }
+    }
+  }
+}
