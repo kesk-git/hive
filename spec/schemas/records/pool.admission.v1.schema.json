@@ -110,7 +110,7 @@
       ],
       "properties": {
         "authority": {
-          "description": "The Mind's word that supplies the authority a check found missing, verified against the Pool's own question record.",
+          "description": "The Mind's word that supplies the authority a check found missing, as the decision intake's check that the operator's word stands verifies it.",
           "$ref": "urn:hive:schema:common:v1#/$defs/authority"
         },
         "recorded_at": {

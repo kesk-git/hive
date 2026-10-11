@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-pool.open-generation.request:v1",
   "title": "hive-pool open-generation: request body",
-  "description": "Opens the next execution generation of an item under an admitted admission and the Imperative revision it is bound to, and moves a queued item to in-flight in the same transaction. Refused while another generation is open, while an active hold stands (held), or for a decision item. Nothing is launched: the caller, a later stage's dispatcher, launches after this returns.",
+  "description": "Opens the next execution generation of an item under an admitted admission and the Imperative revision it is bound to, and moves a queued item to in-flight in the same transaction. Every open, for a queued item and for an in-flight one alike, applies the dispatch guards of the transition table: refused while another generation is open, while an active hold stands (held, a word hold included whatever date it carries), while a blocked-by edge names a blocker that has not completed (pool.blocked), while a required specification is not accepted, or for a decision item. Nothing is launched: the caller, a later stage's dispatcher, launches after this returns.",
   "type": "object",
   "additionalProperties": false,
   "required": [

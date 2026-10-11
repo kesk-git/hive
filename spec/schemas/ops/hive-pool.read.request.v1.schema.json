@@ -11,7 +11,7 @@
   ],
   "properties": {
     "kind": {
-      "description": "The record kind to read, or request-outcome for the recorded outcome of one earlier request of this store.",
+      "description": "The record kind to read.",
       "enum": [
         "item",
         "hold",
@@ -19,11 +19,8 @@
         "imperative",
         "specification",
         "rule",
-        "question",
-        "decision-round",
         "projection",
-        "migration",
-        "request-outcome"
+        "migration"
       ]
     },
     "selector": {
@@ -37,19 +34,15 @@
           "minLength": 1,
           "maxLength": 200
         },
-        "request_id": {
-          "description": "For request-outcome.",
-          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
-        },
         "task_id": {
-          "description": "Records that concern one item: its holds, admissions, questions.",
+          "description": "Records that concern one item: its holds and admissions.",
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
         },
         "project_id": {
           "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
         },
         "states": {
-          "description": "Item, hold, question, round or rule states to include, in the kind's own vocabulary.",
+          "description": "Item, hold or rule states to include, in the kind's own vocabulary.",
           "type": "array",
           "items": {
             "type": "string",
@@ -65,7 +58,7 @@
           "type": "boolean"
         },
         "due_before": {
-          "description": "Holds with an until time, questions with a revisit date, rules with an expiry time: those due at or before this instant.",
+          "description": "Holds with an until time, rules with an expiry time: those due at or before this instant.",
           "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
         },
         "limit": {

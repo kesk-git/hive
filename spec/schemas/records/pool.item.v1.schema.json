@@ -190,7 +190,7 @@
       }
     },
     "closed_at": {
-      "description": "When the item reached done. Cleared on reopen.",
+      "description": "When the item reached done: its completion. Cleared on reopen, and kept when a done item is archived, so that the completion survives archival; an item archived without having been done has none.",
       "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
     },
     "created_at": {
@@ -368,7 +368,7 @@
       ]
     },
     "dependency": {
-      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready while its blocker is queued or in-flight; a blocker that is done, or archived after it was done, no longer blocks. reason is free text carried across a round trip and never read for state.",
+      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready and out of every generation while its blocker has not completed, and a blocker has completed only when it is done, or archived after it was done: its closed_at, kept through archival, is the completion. An archived blocker that never completed satisfies nothing. An edge to an item that does not exist is resolved. reason is free text carried across a round trip and never read for state.",
       "type": "object",
       "additionalProperties": false,
       "required": [

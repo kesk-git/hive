@@ -190,7 +190,6 @@
         "state",
         "accepted_at",
         "accepted_by",
-        "open_questions",
         "receipt_id"
       ],
       "properties": {
@@ -220,13 +219,6 @@
         "admission": {
           "description": "The admission revision the acceptance relates to, where there is one.",
           "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
-        },
-        "open_questions": {
-          "description": "Product questions still open at acceptance, each a question the Hive Mind owes. Technical acceptance settles none of them.",
-          "type": "array",
-          "items": {
-            "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
-          }
         },
         "receipt_id": {
           "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"

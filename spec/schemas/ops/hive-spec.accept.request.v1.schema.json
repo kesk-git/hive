@@ -2,14 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-spec.accept.request:v1",
   "title": "hive-spec accept: request body",
-  "description": "Records the acceptance of a specification revision by the Fleet's supervisor, or the Hive for its own item, and binds its criteria to the item by revision and digest. Open product questions are listed, each a question of this Pool; technical acceptance settles none of them, and an item whose listed question is still open stays held for the Hive Mind. The item's definition becomes accepted and any definition hold is released.",
+  "description": "Records the acceptance of a specification revision by the Fleet's supervisor, or the Hive for its own item, and binds its criteria to the item by revision and digest. Technical acceptance settles no product choice, and a word hold the item carries stays until the decision intake releases it. The item's definition becomes accepted and any definition hold is released.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "specification_id",
     "revision",
-    "task_id",
-    "open_questions"
+    "task_id"
   ],
   "properties": {
     "specification_id": {
@@ -24,12 +23,6 @@
     },
     "admission": {
       "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
-    },
-    "open_questions": {
-      "type": "array",
-      "items": {
-        "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
-      }
     }
   }
 }

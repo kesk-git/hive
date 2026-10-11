@@ -4,13 +4,13 @@
   "name": "pool",
   "kind": "package",
   "title": "Pool",
-  "owns": "Pool storage and migrations; admission records; Imperatives; accepted specifications; original rules and their projections, including temporary rules with an expiry or lift condition; generated knowledge projections. It is the one store that word persists decisions in: the question and decision-round records are Pool records, written only by hive-pool.",
+  "owns": "Pool storage and migrations; admission records; Imperatives; accepted specifications; original rules and their projections, including temporary rules with an expiry or lift condition; generated knowledge projections. It is the one store that word persists decisions in.",
   "plan_stage": 2,
   "executable": "hive-pool",
   "commands": [
     {
       "name": "hive-pool",
-      "purpose": "Durable work items: identity, scope, dependencies, delivery path, dispatch class, requested place, holds, dates and generations; legacy import and export; the persistence of the Mind's word.",
+      "purpose": "Durable work items: identity, scope, dependencies, delivery path, dispatch class, requested place, holds, dates and generations; legacy import and export.",
       "operations": [
         "add",
         "read",
@@ -21,11 +21,7 @@
         "hold",
         "release",
         "import-legacy",
-        "export-legacy",
-        "hold-question",
-        "answer-question",
-        "complete-question",
-        "revise-question"
+        "export-legacy"
       ]
     },
     {
@@ -180,40 +176,12 @@
       "asserts": "One consumer acknowledged a projection at the rendering and digest named."
     },
     {
-      "kind": "pool.question.held",
-      "asserts": "A question was recorded for the Hive Mind and the item it gates was held."
-    },
-    {
-      "kind": "pool.question.revised",
-      "asserts": "The next revision of an outstanding question was recorded and its card's presentation revision raised; its hold stays and no answer changed."
-    },
-    {
-      "kind": "pool.answer.accepted",
-      "asserts": "The Hive Mind's exact answer was recorded against a question, card and round at their revisions and applied."
-    },
-    {
-      "kind": "pool.answer.unreconciled",
-      "asserts": "An answer given against an earlier question revision was recorded and awaits reconciliation; nothing was applied."
-    },
-    {
-      "kind": "pool.answer.superseded",
-      "asserts": "An earlier applied answer was superseded by the answer named, under the Hive Mind's word."
-    },
-    {
-      "kind": "pool.question.deferred",
-      "asserts": "A revisit date was recorded for a question; its hold stays."
-    },
-    {
-      "kind": "pool.question.completed",
-      "asserts": "A question was completed and nothing further is owed on it."
-    },
-    {
       "kind": "pool.legacy.imported",
       "asserts": "A legacy backlog was imported under the identity migration named, with its source digest."
     }
   ],
   "test_target": "test-pool",
-  "test_scope": "Record round trips, transitions, concurrent writes, migration and recovery, and rule expiry by the clock and lift by receipt. From stage 2: byte-exact legacy round trip and identity migration; admission with each requested place, Codex Void refused, a Void place refused for a local-only project and held for an unpushed branch; criteria carried from Pool to Imperative by revision; deterministic rendering; a home inside a repository refused; a persistent Fleet never an ordinary task; no worktree assumed; answers idempotent by source within one question, refused without an option, a deferral or text, and refused for a question that already has an applied answer unless they supersede it; a revised question with a late answer against the old revision left unreconciled and its hold unchanged; secrets by reference only.",
+  "test_scope": "Record round trips, transitions, concurrent writes, migration and recovery, and rule expiry by the clock and lift by receipt. From stage 2: byte-exact legacy round trip and identity migration; admission with each requested place, Codex Void refused, a Void place refused for a local-only project and held for an unpushed branch; criteria carried from Pool to Imperative by revision; deterministic rendering; a home inside a repository refused; a persistent Fleet never an ordinary task; no worktree assumed; dependencies satisfied only by a completion kept through archival and checked before every generation opens; an imported dated word hold still blocking after its date; secrets by reference only.",
   "calls": [],
   "executes": {
     "core": [],

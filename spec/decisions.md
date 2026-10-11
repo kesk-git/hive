@@ -208,7 +208,7 @@ These are not decided here, deliberately. Each is cheap to add later and would b
 
 | Open point | First needed |
 | --- | --- |
-| The Pool's own records and the layout inside `pool/` | Stage 2; settled in [pool.md](pool.md), with that stage's own decisions listed there and in [word.md](word.md) |
+| The Pool's own records and the layout inside `pool/` | Stage 2; settled in [pool.md](pool.md), with that stage's own decisions listed there |
 | Where the Spawning Pool keeps its worktrees on disk, and its lease record | Stage 3 |
 | A streamed form of response | Stage 4 |
 | Pending approvals in the session, and how a reader is told of a new message | Stage 4 |

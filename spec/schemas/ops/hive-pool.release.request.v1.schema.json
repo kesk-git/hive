@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-pool.release.request:v1",
   "title": "hive-pool release: request body",
-  "description": "Releases a parked, external, resource or future hold. A word hold is released only by an accepted answer through hive-word, an admission hold only by a later admission check that admits, and a definition hold only by hive-spec accept. Releasing a hold already released returns it unchanged and writes nothing.",
+  "description": "Releases a parked, external, resource or future hold. A word hold is refused: only the decision intake, defined in its own definition of this stage, releases it. An admission hold is released only by a later admission check that admits, and a definition hold only by hive-spec accept. Releasing a hold already released returns it unchanged and writes nothing.",
   "type": "object",
   "additionalProperties": false,
   "required": [
