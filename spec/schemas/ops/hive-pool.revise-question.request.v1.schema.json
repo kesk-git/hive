@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.revise-question.request:v1",
+  "title": "hive-pool revise-question: request body",
+  "description": "Appends the next revision of an outstanding question, whole, and in the same transaction raises the presentation revision of its card in its round and the card's question revision to match. The question keeps its identity, its round and its hold; nothing is released and no answer changes. Refused with pool.question_answered when the question has an applied answer. The operation word persists revisions through. Refused with authority_insufficient unless the request is made by the hive-word command of the package word, on a hive-word request: the caller names that command and the envelope's causation is the hive-word request, schema hive.request, with its request_id and the digest of its canonical form. The envelope's expected_revisions names the question's record revision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "text",
+    "consequence",
+    "options",
+    "asked_at",
+    "asked_by"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "text": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "consequence": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "recommendation": {
+      "description": "The option to present first. Required when options is not empty.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+    },
+    "options": {
+      "description": "The recommendation and the alternatives, whole: the new revision replaces the options of the one before.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/option"
+      }
+    },
+    "amount": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "asked_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "asked_by": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "options": {
+            "minItems": 1
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "recommendation"
+        ]
+      }
+    }
+  ]
+}

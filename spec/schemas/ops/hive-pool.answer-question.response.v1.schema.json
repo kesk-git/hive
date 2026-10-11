@@ -34,7 +34,7 @@
       ]
     },
     "duplicate": {
-      "description": "True when an answer with the same source was already recorded: nothing was written and the receipts are the original ones.",
+      "description": "True when an answer to this question with the same source was already recorded: nothing was written and the receipts are the original ones.",
       "type": "boolean"
     }
   }

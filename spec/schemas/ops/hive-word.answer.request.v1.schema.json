@@ -36,7 +36,8 @@
         "revisit_at": {
           "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
         }
-      }
+      },
+      "description": "Chosen only while the question has no applied answer: a deferral never supersedes."
     },
     "source": {
       "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer_source",
@@ -46,7 +47,8 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
     },
     "supersedes": {
-      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence",
+      "description": "The sequence of the question's applied answer this one replaces. Required when the question already has an applied answer, and the only way a further answer or a deferral is accepted for it."
     },
     "reconciles": {
       "$ref": "urn:hive:schema:common:v1#/$defs/sequence"

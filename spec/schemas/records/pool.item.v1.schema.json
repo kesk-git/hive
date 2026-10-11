@@ -368,7 +368,7 @@
       ]
     },
     "dependency": {
-      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready while its blocker is not done. reason is free text carried across a round trip and never read for state.",
+      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready while its blocker is queued or in-flight; a blocker that is done, or archived after it was done, no longer blocks. reason is free text carried across a round trip and never read for state.",
       "type": "object",
       "additionalProperties": false,
       "required": [

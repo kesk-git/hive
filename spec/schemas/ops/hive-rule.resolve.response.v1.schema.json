@@ -47,7 +47,7 @@
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
           },
           "reason": {
-            "description": "expired-by-clock: past its expiry time, receipt or not. not-yet-effective: before its effective time. lifted, ended. superseded: a rule in force for this scope, role and instant names it in changes with the relation supersedes. overridden: a narrower scope governs the subject. role: the rule does not apply to the role asked.",
+            "description": "expired-by-clock: past its expiry time, receipt or not. not-yet-effective: before its effective time. lifted, ended. superseded: a rule in force for this scope, role and instant names it in changes with the relation supersedes. overridden: a narrower scope governs the subject, unless the narrower rule names this one with qualifies, which keeps both. role: the rule does not apply to the role asked.",
             "enum": [
               "expired-by-clock",
               "not-yet-effective",

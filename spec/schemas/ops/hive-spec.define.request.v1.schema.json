@@ -29,7 +29,7 @@
       }
     },
     "task_ids": {
-      "description": "Items this specification is being defined for; each moves to definition defining.",
+      "description": "Items this specification is being defined for. An item with no accepted binding to this specification moves to definition defining; an item whose accepted binding survives this revision, because its criteria are unchanged against the revision it is bound to, keeps definition accepted and its binding.",
       "type": "array",
       "items": {
         "$ref": "urn:hive:schema:common:v1#/$defs/task_id"

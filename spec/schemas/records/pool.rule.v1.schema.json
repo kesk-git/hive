@@ -137,7 +137,7 @@
       }
     },
     "changes": {
-      "description": "The standing rule this rule supersedes or qualifies, by identity and revision. That rule is never edited and nothing is recorded on it. The relation is read at each resolution: a superseded rule is excluded only while this rule is itself in force for the scope, the role and the instant resolved, so a temporary rule that expires, is lifted or is not yet effective leaves the standing rule in force. A qualifying rule and the rule it qualifies are both in force and are not a conflict.",
+      "description": "The standing rule this rule supersedes or qualifies, by identity and revision. That rule is never edited and nothing is recorded on it. The relation is read at each resolution: a superseded rule is excluded only while this rule is itself in force for the scope, the role and the instant resolved, so a temporary rule that expires, is lifted or is not yet effective leaves the standing rule in force. A qualifying rule and the rule it qualifies are both in force and are not a conflict, at one scope or across scopes: the narrower scope's rule does not override the rule it qualifies.",
       "type": "object",
       "additionalProperties": false,
       "required": [

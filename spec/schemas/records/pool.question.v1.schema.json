@@ -310,7 +310,7 @@
       }
     },
     "answer_source": {
-      "description": "The evidence the answer rests on, required and recorded with the answer, so a reader always sees where the words came from. A review submission is the submit event of a review round. A session input is the input receipt of the supervisor session the words were typed into. An operator request is the request_id of the hive-word answer request typed at a terminal; it has no further evidence, and the record shows it as exactly that. Two answers with the same source are one answer.",
+      "description": "The evidence the answer rests on, required and recorded with the answer, so a reader always sees where the words came from. A review submission is the submit event of a review round. A session input is the input receipt of the supervisor session the words were typed into. An operator request is the request_id of the hive-word answer request typed at a terminal; it has no further evidence, and the record shows it as exactly that. Two answers to the same question with the same source are one answer; one source, a submit event or a session input, may carry answers to several questions, each its own.",
       "type": "object",
       "additionalProperties": false,
       "required": [

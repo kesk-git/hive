@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-pool.answer-question.request:v1",
   "title": "hive-pool answer-question: request body",
-  "description": "Records one answer exactly as given against a question, its card and its round at their revisions, and applies it in the same transaction: releases the hold, completes the question, defers it, or records it unreconciled when the question has moved on. Two answers with the same source are one answer: the second returns the first's receipt and writes nothing. The operation word persists answers through. Refused with authority_insufficient unless the request is made by the hive-word command of the package word, on a hive-word request: the caller names that command and the envelope's causation is the hive-word request, schema hive.request, with its request_id and the digest of its canonical form.",
+  "description": "Records one answer exactly as given against a question, its card and its round at their revisions, and applies it in the same transaction: releases the hold, completes the question, defers it, or records it unreconciled when the question has moved on. Two answers to the same question with the same source are one answer: the second returns the first's receipt and writes nothing, while the same source answering another question is its own answer. A question with an applied answer takes a further answer, or a deferral, only when supersedes names that applied answer: otherwise pool.answer_exists and nothing is written. Answers recorded unreconciled are not applied and do not count. The operation word persists answers through. Refused with authority_insufficient unless the request is made by the hive-word command of the package word, on a hive-word request: the caller names that command and the envelope's causation is the hive-word request, schema hive.request, with its request_id and the digest of its canonical form.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -36,7 +36,8 @@
         "revisit_at": {
           "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
         }
-      }
+      },
+      "description": "Chosen only while the question has no applied answer: a deferral never supersedes."
     },
     "source": {
       "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer_source",
@@ -46,7 +47,7 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
     },
     "supersedes": {
-      "description": "The sequence of an earlier applied answer this one replaces. Requires the envelope's authority to be the Hive Mind's word or an operator request as the answer's source.",
+      "description": "The sequence of the question's applied answer this one replaces. Required when the question already has an applied answer. Requires the envelope's authority to be the Hive Mind's word or an operator request as the answer's source.",
       "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
     },
     "reconciles": {

@@ -155,7 +155,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
         },
         "blocked": {
-          "description": "True when the item is not done and a blocked-by edge names an item of this Pool that exists and is not done.",
+          "description": "True when the item is not done and a blocked-by edge names an item of this Pool that is queued or in-flight.",
           "type": "boolean"
         },
         "held": {

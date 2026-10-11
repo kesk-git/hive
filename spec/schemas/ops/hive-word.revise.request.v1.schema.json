@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.revise.request:v1",
+  "title": "hive-word revise: request body",
+  "description": "Writes the next revision of an outstanding question, whole: its text, consequence, options and recommendation. The question keeps its identity, its round and its hold, and nothing is released. Only a question with no applied answer can be revised; one with an applied answer is changed by a superseding answer. An answer bound to the earlier revision is recorded unreconciled. word persists it through hive-pool revise-question. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "text",
+    "consequence",
+    "options"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "text": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "consequence": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "recommendation": {
+      "description": "The option to present first. Required when options is not empty.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+    },
+    "options": {
+      "description": "The recommendation and the alternatives, whole: the new revision replaces the options of the one before.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/option"
+      }
+    },
+    "amount": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "options": {
+            "minItems": 1
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "recommendation"
+        ]
+      }
+    }
+  ]
+}
