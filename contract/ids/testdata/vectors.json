@@ -7,7 +7,8 @@
     {"name": "every bit set", "prefix": "corr", "time_ms": 281474976710655, "entropy": "ffffffffffffffffffff", "id": "corr_7zzzzzzzzzzzzzzzzzzzzzzzzz"},
     {"name": "the example of the specification", "prefix": "ws", "time_ms": 1729886278806, "entropy": "2dcd83e51a4ef9df7c0a", "id": "ws_01jb2m3n4p5q6r7s8t9vwxyz0a"},
     {"name": "the ULID specification's example", "prefix": "proj", "time_ms": 1469922850259, "entropy": "d6764c61efb99302bd5b", "id": "proj_01arz3ndektsv4rrffq69g5fav"},
-    {"name": "a one-letter prefix", "prefix": "q", "time_ms": 1, "entropy": "00000000000000000001", "id": "q_00000000010000000000000001"}
+    {"name": "a one-letter prefix", "prefix": "q", "time_ms": 1, "entropy": "00000000000000000001", "id": "q_00000000010000000000000001"},
+    {"name": "the Spoor prefix", "prefix": "spoor", "time_ms": 2, "entropy": "00000000000000000002", "id": "spoor_00000000020000000000000002"}
   ],
   "invalid": [
     {"name": "empty", "id": "", "error": "form"},

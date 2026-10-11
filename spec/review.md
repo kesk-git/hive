@@ -127,7 +127,7 @@ A feedback file is replaced as events are added, and a late submission may appen
 
 ## Rules that hold across the files
 
-1. **Words are kept exactly.** Text is stored as typed, whitespace included. An amendment is a new event; nothing is replaced by a summary.
+1. **Words are kept exactly.** Text is stored as typed, whitespace included. An amendment is a new event; nothing is replaced by a summary. The one exception is the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section's: an event whose text holds a string of a credential shape on the fixed list is refused whole under rule 2, with `secret_shape_recognized`, and nothing of it is written.
 2. **Nothing is dropped under pressure.** A writer that cannot keep an event whole refuses with a precise failure. It never truncates and never reports a save that did not happen.
 3. **History only grows.** Events, manifest entries, replies and the final record are never changed once written. A late submission to an earlier round is appended to that round's file.
 4. **Files, not a listener.** Everything a review needs survives the end of the Lictor, the supervisor and the UI process. A restart replays pending submitted feedback through the same event identities.

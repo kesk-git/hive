@@ -126,6 +126,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/error_code"
         },
         "message": {
+          "description": "For a person. It holds no credential value and never the text of a request: a refusal names what it refused by field and shape only.",
           "type": "string",
           "minLength": 1,
           "maxLength": 2000
@@ -145,6 +146,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
         },
         "detail": {
+          "description": "What the status requires beyond the fields above. It holds no credential value and never the text of a request: a refusal names what it refused by field and shape only.",
           "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
         }
       }

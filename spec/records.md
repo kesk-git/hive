@@ -8,7 +8,7 @@ Owner: the contract library. Proved by `test-contract`.
 
 - Every record is one **JSON** document in **UTF-8**, with no byte-order mark, ending in a single line feed.
 - A record is one file. A journal is a file of records, one per line.
-- **Text is kept exactly as written.** Nothing normalizes Unicode, trims, reflows or re-escapes a string that came from the Hive Mind, a worker, a vendor or a forge. A writer that cannot keep a string whole refuses the write.
+- **Text is kept exactly as written.** Nothing normalizes Unicode, trims, reflows or re-escapes a string that came from the Hive Mind, a worker, a vendor or a forge. A writer that cannot keep a string whole refuses the write. A writer likewise refuses whole, `invalid` with `secret_shape_recognized` and nothing written, a body holding a string of a credential shape on the fixed list the contract library's schema package keeps, as the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section requires; the refusal names the field and the shape, never the text, and what the list does not recognize is kept exactly. No body holds a value of the secret type, which has no encoding: its JSON and text encodings fail with an error.
 - **Numbers are whole.** A record holds no fractional or exponent number and no number outside ±9,007,199,254,740,991. A value that is not whole is written as a string in a form its schema states.
 - **Times** are RFC 3339 in UTC with millisecond precision and a literal `Z`: `2026-10-11T08:00:00.000Z`. A wall-clock time in a declared zone is two fields, the UTC instant and the zone's name.
 - **Digests** are SHA-256, written `sha256:` and 64 lowercase hexadecimal digits. The digest of a file is the digest of its bytes. The digest of a record is the digest of its canonical form. A digest that binds a part of a file, which a later write may extend, says which part and is defined where it is used, as the [events digest](review.md#the-events-digest) of a review round is.
@@ -37,7 +37,7 @@ Every record carries `schema`, the name of its schema (`hive.request`, `pool.ite
 - A **minor** version adds what an older record does not need: every record valid under 1.0 is valid under 1.1 unchanged.
 - A **major** version is anything else. It has its own schema file and a named migration from the version before.
 - A reader given a record whose version is newer than it knows, major or minor, refuses it with `unsupported_version` and never rewrites it. Hive's executables are built and delivered together, so this arises only when an older build meets a newer home, and refusing is the safe answer.
-- A reader given an older major version reads it through its migration. A migration is explicit, versioned and tested, and it changes no word of the original: a field it does not recognize is carried into the record's `unknown` member unchanged, and every later writer preserves `unknown` as it found it.
+- A reader given an older major version reads it through its migration. A migration is explicit, versioned and tested, and it changes no word of the original: a field it does not recognize is carried into the record's `unknown` member unchanged, and every later writer preserves `unknown` as it found it. The owner's no-value check of the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section runs over the whole body, `unknown` included, before the migration's or the writer's first byte; a recognized value refuses that record whole, with nothing written, never redacted or reflowed.
 - A migration that rewrites records in place does so under the store's lock, one transaction per record, and can be interrupted and resumed.
 
 ## The home
@@ -51,7 +51,7 @@ A private home is a directory outside every project repository, selected explici
 | `locks/` | shared, through the contract library | Transaction lock files. |
 | `pool/` | `pool` | The Pool's store, including what `word` persists through it. |
 | `spawning-pool/` | `spawning-pool` | Leases and their receipts. |
-| `dispatch/` | `dispatch` | The identity registry, execution records, schedules, sessions, policy. |
+| `dispatch/` | `dispatch` | The identity registry, execution records, schedules, sessions, policy, and from stage 4 the Spoor records of the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section. |
 | `shadow/` | `shadow` | Observations, cursors and wakes. |
 | `synapse/` | `synapse` | The run ledger and evidence. |
 | `ui/` | `ui` | The UI's own state. |
@@ -75,10 +75,11 @@ The identity registry is the one store this specification places beyond that: `d
 
 A record is replaced, never edited in place.
 
-1. Write the new content to a temporary file in the package's `tmp/` directory, named for the request that writes it.
-2. Flush the file to stable storage.
-3. Rename it over the record's name. The home is one file system, so the rename is atomic wherever the record sits in it.
-4. Flush both directories the rename touched.
+1. The owner validates the new content against its schema, with the no-value check, before any temporary file is opened. The store's writer validates nothing, as built.
+2. Write the new content to a temporary file in the package's `tmp/` directory, named for the request that writes it.
+3. Flush the file to stable storage.
+4. Rename it over the record's name. The home is one file system, so the rename is atomic wherever the record sits in it.
+5. Flush both directories the rename touched.
 
 A reader therefore sees the whole old record or the whole new one. A temporary file left by a crash is removed by the next writer that takes the store's lock, which empties `tmp/` and removes nothing else; it is never read as a record.
 
@@ -90,12 +91,13 @@ A record that fails its schema, or cannot be read, is never repaired by guessing
 
 A mutation that changes more than one record of a store is one transaction.
 
-1. Take the store's lock.
-2. Check every expected revision, and that every record to be created is absent.
-3. Write the **intent** to `tx/<request_id>.json`, a record of schema [`hive.tx-intent`](schemas/tx-intent.v1.schema.json): every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. The entry of a record being created has no revision to expect and instead states that the record is expected to be absent. Flush it.
-4. Write the records, then the receipts, then append the events.
-5. Write the outcome to `requests/<request_id>.json`.
-6. Remove the intent and release the lock.
+1. The owner validates every body of the transaction, the records, the receipts, the events and the outcome, with the no-value check, before the intent's temporary file exists: the intent carries every body and is the first place their bytes reach disk.
+2. Take the store's lock.
+3. Check every expected revision, and that every record to be created is absent.
+4. Write the **intent** to `tx/<request_id>.json`, a record of schema [`hive.tx-intent`](schemas/tx-intent.v1.schema.json): every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. The entry of a record being created has no revision to expect and instead states that the record is expected to be absent. Flush it.
+5. Write the records, then the receipts, then append the events.
+6. Write the outcome to `requests/<request_id>.json`.
+7. Remove the intent and release the lock.
 
 Recovery **rolls forward**. The next command to take the store's lock that finds an intent completes it: a record already at the intended digest is left, a record at the expected revision is written, a record expected to be absent and still absent is written, and anything else stops the store with `record_malformed` for that transaction, naming the intent. An intent is never discarded to make recovery convenient. A receipt or event the intent names is written at most once, because each is keyed by an identifier the intent already holds.
 

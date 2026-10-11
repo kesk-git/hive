@@ -155,6 +155,14 @@
             "items": {
               "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
             }
+          },
+          "platform": {
+            "description": "The platform utilities this operation may run, each a name from the package's declared platform list. See spec/distribution.md.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]*$"
+            }
           }
         },
         "allOf": [
