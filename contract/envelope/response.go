@@ -124,8 +124,8 @@ func (r *Response) Encode() ([]byte, error) {
 
 // DecodeResponse reads a response: a Hive record, of a version this build
 // reads, valid under response.v1. It fails with a *Failure of status invalid
-// as DecodeRequest does; Accept is the caller's rule, which turns such a
-// failure into unknown.
+// as DecodeRequest does; AcceptResponse and AcceptCapabilities are the
+// caller's rules, which turn such a failure into unknown.
 func DecodeResponse(data []byte) (*Response, error) {
 	obj, err := decodeDocument(data, ResponseSchema, ResponseSchemaID, SchemaVersion)
 	if err != nil {
