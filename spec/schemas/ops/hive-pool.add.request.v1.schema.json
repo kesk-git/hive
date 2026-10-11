@@ -48,7 +48,7 @@
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/definition_state"
     },
     "deps": {
-      "description": "Each blocked-by edge must name an item of this Pool that exists; a dangling blocker is refused. The parent rule of spec/pool.md, Levels, holds for the item as added: a Hunt has exactly one parent edge, to a Prey; a Prey at most one, to a Target; a Target none; a violation, or a Hunt attached to a Prey that carries the completion marker or has an open generation, is refused with pool.hierarchy.",
+      "description": "Each blocked-by edge must name an item of this Pool that exists; a dangling blocker is refused. The parent rule of spec/pool.md, Levels, holds for the item as added: a Hunt has exactly one parent edge, to a Prey; a Prey at most one, to a Target; a Target none; a violation, or a Hunt attached to a Prey that carries the completion marker, is in flight or has an open generation, is refused with pool.hierarchy.",
       "type": "array",
       "items": {
         "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"

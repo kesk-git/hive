@@ -40,6 +40,7 @@
           "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/wave"
         },
         "deliverable": {
+          "description": "Setting swarm or lictor on a decision item that is not imported requires level in the same patch; otherwise the update is refused with pool.hierarchy. An imported item with no level is exempt until its owner sets its level.",
           "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/deliverable"
         },
         "class": {
@@ -73,7 +74,7 @@
           }
         },
         "add_deps": {
-          "description": "The parent rule of spec/pool.md, Levels, holds for the item as the patch leaves it: a Hunt has exactly one parent edge, to a Prey; a Prey at most one, to a Target; a Target none; a violation, or a Hunt attached to a Prey that carries the completion marker or has an open generation, is refused with pool.hierarchy.",
+          "description": "The parent rule of spec/pool.md, Levels, holds for the item as the patch leaves it: a Hunt has exactly one parent edge, to a Prey; a Prey at most one, to a Target; a Target none; a violation, a parent edge set, replaced or removed on an item, or above one, that is not queued, has an Imperative or has opened a generation, or a Hunt attached to a Prey that carries the completion marker, is in flight or has an open generation, is refused with pool.hierarchy.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"

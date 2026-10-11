@@ -61,7 +61,7 @@
       "type": "string"
     },
     "level": {
-      "description": "The item's level: target, prey or hunt. Required by add for a new item whose deliverable is not a decision; a decision item has none, and an imported legacy item may lack it until its owner sets it.",
+      "description": "The item's level: target, prey or hunt. Required by add for a new item whose deliverable is not a decision; a decision item has none, and an imported legacy item may lack it until its owner sets it. No other item lacks one, so a decision item given work gains a level in the same update.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/level"
     },
     "wave": {
@@ -270,6 +270,34 @@
         "properties": {
           "level": false
         }
+      }
+    },
+    {
+      "if": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "legacy"
+              ]
+            },
+            {
+              "required": [
+                "deliverable"
+              ],
+              "properties": {
+                "deliverable": {
+                  "const": "decision"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "then": {
+        "required": [
+          "level"
+        ]
       }
     },
     {
@@ -542,7 +570,7 @@
       ]
     },
     "dependency": {
-      "description": "An edge to another item of the same Pool. blocked-by keeps the item, and every item beneath it, out of ready and out of every generation while its blocker has not landed. A leaf, a Hunt or a Prey with no Hunt, has landed when it carries the completion marker, which survives archival: an item done, or archived after it was done. A Prey with Hunts has landed when at least one Hunt points at it and every one has landed, and a Target when at least one Prey points at it and every one has landed. The closing time is never what satisfies the edge. An archived blocker that never landed satisfies nothing. An edge to an item that does not exist is resolved. A parent edge obeys the parent rule of spec/pool.md, Levels: a Hunt has exactly one, to a Prey; a Prey has at most one, to a Target; a Target has none; add and update refuse a violation with pool.hierarchy, a Hunt attached to a Prey that carries the completion marker or has an open generation included, and a Target's blocked-by edges name the Targets it depends on. reason is free text carried across a round trip and never read for state.",
+      "description": "An edge to another item of the same Pool. blocked-by keeps the item, and every item beneath it, out of ready and out of every generation while its blocker has not landed. A leaf, a Hunt or a Prey with no Hunt, has landed when it carries the completion marker, which survives archival: an item done, or archived after it was done. A Prey with Hunts has landed when at least one Hunt points at it and every one has landed, and a Target when at least one Prey points at it and every one has landed. The closing time is never what satisfies the edge. An archived blocker that never landed satisfies nothing. An edge to an item that does not exist is resolved. A parent edge obeys the parent rule of spec/pool.md, Levels: a Hunt has exactly one, to a Prey; a Prey has at most one, to a Target; a Target has none; add and update refuse a violation with pool.hierarchy, a Hunt attached to a Prey that carries the completion marker, is in flight or has an open generation included, and a Target's blocked-by edges name the Targets it depends on. reason is free text carried across a round trip and never read for state.",
       "type": "object",
       "additionalProperties": false,
       "required": [
