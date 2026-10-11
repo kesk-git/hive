@@ -44,7 +44,7 @@ Every Go file that holds translated material, with the upstream files it is tran
 | `packages/pool/internal/move/move.go` | `src/backends/markdown.ts` (`moveTo`, `moveManyTo`, `requireNoSplitDeps`) | The multi-item move: every identity resolved before any write, a conflict on an identity present in the destination, no stranded dependency edge, destination first, source second, and the recorded partial state when the second write fails; re-expressed as the three-step protocol of [pool.md](pool.md#moves-between-homes). |
 | `packages/pool/internal/legacy/archive.go` | `src/backends/markdown.ts` (`prune`, the two archive files, the restore point) | Archive lookup for the export: how a legacy backlog's archive files are read so that an item pruned upstream still resolves on import, and the never-delete rule. Hive's own records are never pruned. |
 
-`src/id.ts` is not a portion: Hive's identifiers are ULIDs minted by the contract library, and only its identifier pattern is carried, inside `grammar.go`, as the legacy identifier the parser accepts. `src/lock.ts` is not a portion: Hive's transaction lock is the contract library's; its tests are re-expressed against that lock in work item 3 as native tests, not retained ones.
+`src/id.ts` is not a portion: Hive's identifiers are ULIDs minted by the contract library, and only its identifier pattern is carried, inside `grammar.go`, as the legacy identifier the parser accepts. `src/backends/lock.ts` is not a portion: Hive's transaction lock is the contract library's; its tests are re-expressed against that lock in work item 3 as native tests, not retained ones.
 
 ## Retained tests
 
