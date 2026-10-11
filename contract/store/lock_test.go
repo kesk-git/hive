@@ -144,7 +144,7 @@ func TestLockFileLeftByACrashIsNotStale(t *testing.T) {
 func TestAcquireNamesAndModes(t *testing.T) {
 	home := newHome(t)
 	w, _, _ := waiting(time.Millisecond)
-	for _, name := range []string{"", "Pool", "pool.lock", "../x", "a b", "journal/x"} {
+	for _, name := range []string{"", "Pool", "pool.lock", "../x", "a b", "journal/x", "extra", "word", "locks", "contract", "journal-2"} {
 		if _, err := Acquire(home, name, false, w); err == nil {
 			t.Errorf("Acquire(%q) succeeded", name)
 		}

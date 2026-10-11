@@ -326,8 +326,6 @@ func TestCode(t *testing.T) {
 		ErrRevisionConflict:          "revision_conflict",
 		ErrAlreadyExists:             "already_exists",
 		ErrLockHeld:                  "lock_held",
-		ErrRecordTooLarge:            "record_too_large",
-		&SizeError{"a.json", 1, 2}:   "record_too_large",
 		ErrInsideRepository:          "home_inside_repository",
 		ErrLayout:                    "",
 		ErrNoJournal:                 "",
@@ -339,9 +337,5 @@ func TestCode(t *testing.T) {
 		if got := Code(err); got != want {
 			t.Errorf("Code(%v) = %q, want %q", err, got, want)
 		}
-	}
-	e := &SizeError{"records/item/x.json", 100, 150}
-	if !strings.Contains(e.Error(), "150") || !strings.Contains(e.Error(), "100") || !strings.Contains(e.Error(), e.Path) {
-		t.Errorf("SizeError = %q", e)
 	}
 }

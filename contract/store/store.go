@@ -29,11 +29,6 @@ type Options struct {
 	// Journal receives the events of a transaction. A transaction that names
 	// events fails with ErrNoJournal when it is nil.
 	Journal Journal
-	// Limit, when positive, is the largest file the store writes: a record,
-	// a receipt or a recorded outcome over it fails whole with a *SizeError.
-	// Zero sets no limit, as spec/records.md, Size, says a record has none of
-	// its own.
-	Limit int64
 	// Waiting says how long the store waits for its lock.
 	Waiting Waiting
 }
@@ -47,7 +42,6 @@ type Store struct {
 	dir     string
 	clock   clock.Clock
 	journal Journal
-	limit   int64
 	waiting Waiting
 
 	// fault, when set by a test, is called before each step of a write with
@@ -73,7 +67,6 @@ func Open(dir, pkg string, opts Options) (*Store, error) {
 		dir:     filepath.Join(h.Dir, pkg),
 		clock:   opts.Clock,
 		journal: opts.Journal,
-		limit:   opts.Limit,
 		waiting: opts.Waiting,
 	}
 	if s.clock == nil {
@@ -319,15 +312,12 @@ func parseObject(rel string, content []byte) (map[string]any, error) {
 	return obj, nil
 }
 
-// encode writes v in canonical form and holds it to the store's limit.
+// encode writes v in canonical form.
 func (s *Store) encode(rel string, v any) (*prepared, error) {
 	out, err := canon.Encode(v)
 	if err != nil {
 		return nil, fmt.Errorf("store: content for %s: %w", rel, err)
 	}
 	data := append(out, '\n')
-	if s.limit > 0 && int64(len(data)) > s.limit {
-		return nil, &SizeError{rel, s.limit, int64(len(data))}
-	}
 	return &prepared{rel, data, canon.FileDigest(out)}, nil
 }

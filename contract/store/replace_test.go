@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/kesk-git/hive/contract/canon"
-	"github.com/kesk-git/hive/contract/clock"
 )
 
 var (
@@ -355,70 +354,5 @@ func TestReadRecordRefusesMalformedRecords(t *testing.T) {
 	}
 	if _, err := s.ReadRecord("records/item/" + strings.ToUpper(id("task", 1)) + ".json"); err == nil {
 		t.Error("an upper-case path was read")
-	}
-}
-
-// A store given a limit refuses a file over it whole, naming the limit and
-// the size, and writes nothing: not the record, not an intent.
-func TestSizeLimit(t *testing.T) {
-	home := newHome(t)
-	clk := clock.NewFake(epoch)
-	at := stamp(t, clk)
-	// The limit is exactly the size of the first record, so that record
-	// passes and one byte more fails.
-	limit := int64(len(record(t, map[string]any{"n": int64(1)}, 1, at)))
-	s, err := Open(home, "pool", Options{Clock: clk, Journal: newJournal(), Limit: limit, Waiting: Waiting{Clock: clk, Limit: time.Millisecond, Pause: clk.Advance}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := lock(t, s)
-	defer w.Release()
-	if _, err := w.Replace(req1, task1, []byte(`{"n":1}`), 0); err != nil {
-		t.Fatal(err)
-	}
-	before := tree(t, home)
-	big := []byte(`{"n":1,"x":"` + strings.Repeat("y", 10) + `"}`)
-	_, err = w.Replace(req2, task1, big, 1)
-	var se *SizeError
-	if !errors.As(err, &se) || !errors.Is(err, ErrRecordTooLarge) || Code(err) != "record_too_large" {
-		t.Fatalf("Replace over the limit: %v", err)
-	}
-	if want := int64(len(record(t, map[string]any{"n": int64(1), "x": strings.Repeat("y", 10)}, 2, at))); se.Path != task1 || se.Limit != limit || se.Actual != want {
-		t.Errorf("SizeError = %+v, want actual %d", se, want)
-	}
-	sameTree(t, "after a refused record", tree(t, home), before)
-
-	_, err = w.Commit(Tx{
-		RequestID: req2,
-		Receipts:  []Receipt{{id("rcpt", 1), []byte(`{"x":"` + strings.Repeat("y", 70) + `"}`)}},
-		Outcome:   []byte(`{"ok":true}`),
-	})
-	if !errors.As(err, &se) || se.Path != ReceiptPath(id("rcpt", 1)) || se.Actual != 70+9 {
-		t.Fatalf("a receipt over the limit: %v", err)
-	}
-	sameTree(t, "after a refused receipt", tree(t, home), before)
-
-	_, err = w.Commit(Tx{
-		RequestID: req2,
-		Records:   []RecordWrite{{task1, []byte(`{"n":2}`), 1}, {RecordPath("item", id("task", 2)), big, 0}},
-		Outcome:   []byte(`{"ok":true}`),
-	})
-	if !errors.As(err, &se) || se.Path != RecordPath("item", id("task", 2)) {
-		t.Fatalf("Commit over the limit: %v", err)
-	}
-	sameTree(t, "after a refused transaction", tree(t, home), before)
-
-	_, err = w.Commit(Tx{RequestID: req2, Records: []RecordWrite{{task1, []byte(`{"n":2}`), 1}}, Outcome: []byte(`{"x":"` + strings.Repeat("y", 70) + `"}`)})
-	if !errors.As(err, &se) || se.Path != OutcomePath(req2) {
-		t.Fatalf("Commit with an outcome over the limit: %v", err)
-	}
-	sameTree(t, "after a refused outcome", tree(t, home), before)
-
-	// Without a limit the same record is written.
-	s2, _, _ := open(t, newHome(t), "pool")
-	w2 := lock(t, s2)
-	defer w2.Release()
-	if _, err := w2.Replace(req1, task1, big, 0); err != nil {
-		t.Errorf("a store without a limit refused: %v", err)
 	}
 }

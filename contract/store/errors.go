@@ -1,9 +1,6 @@
 package store
 
-import (
-	"errors"
-	"fmt"
-)
+import "errors"
 
 // The errors of the store. Each that crosses a command boundary carries a
 // common error code of spec/commands.md, which Code reads back. Test for one
@@ -26,9 +23,6 @@ var (
 	// ErrLockHeld reports a transaction lock that was not released within the
 	// bounded wait.
 	ErrLockHeld = errors.New("store: lock held by another command")
-	// ErrRecordTooLarge reports a file larger than the limit the store was
-	// given. It is always wrapped in a *SizeError.
-	ErrRecordTooLarge = errors.New("store: record exceeds the declared limit")
 	// ErrInsideRepository reports a home inside a Git working tree, which a
 	// command refuses (spec/identities.md, The four identity records).
 	ErrInsideRepository = errors.New("store: home is inside a Git working tree")
@@ -39,21 +33,6 @@ var (
 	// was opened without a Journal to append them to.
 	ErrNoJournal = errors.New("store: the transaction names events but the store has no journal")
 )
-
-// SizeError is a file the store refused to write because it exceeds the
-// limit the store was given. It wraps ErrRecordTooLarge.
-type SizeError struct {
-	Path   string // the file, relative to the store
-	Limit  int64  // the limit in bytes
-	Actual int64  // the size the file would have had
-}
-
-func (e *SizeError) Error() string {
-	return fmt.Sprintf("store: %s is %d bytes, over the limit of %d", e.Path, e.Actual, e.Limit)
-}
-
-// Unwrap makes errors.Is(err, ErrRecordTooLarge) true.
-func (e *SizeError) Unwrap() error { return ErrRecordTooLarge }
 
 // Code returns the common error code of spec/commands.md that err carries,
 // or "" for an error that has none.
@@ -69,8 +48,6 @@ func Code(err error) string {
 		return "already_exists"
 	case errors.Is(err, ErrLockHeld):
 		return "lock_held"
-	case errors.Is(err, ErrRecordTooLarge):
-		return "record_too_large"
 	case errors.Is(err, ErrInsideRepository):
 		return "home_inside_repository"
 	}

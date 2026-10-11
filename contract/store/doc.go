@@ -19,8 +19,8 @@
 //
 // The store sets record_revision and updated_at on every record it writes,
 // writes every file in canonical form with one final line feed, and sets no
-// size limit of its own: a limit is given where a record crosses a boundary,
-// and a record over it fails whole. It validates no record against its
+// size limit of its own: a limit is stated where a record crosses a boundary
+// (spec/records.md, Size), not here. It validates no record against its
 // schema; the owner of a record does that with the schema package. The two
 // exceptions are the home record, which the layout check reads through the
 // embedded schema because the home's identity is what every command checks

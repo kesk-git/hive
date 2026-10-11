@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
+	"slices"
 	"syscall"
 	"time"
 
@@ -18,7 +18,8 @@ const DefaultLockWait = 5 * time.Second
 // lockPause is how long a waiter pauses between two attempts.
 const lockPause = 10 * time.Millisecond
 
-var lockName = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+// journalLock is the name of the journal's transaction lock.
+const journalLock = "journal"
 
 // Waiting says how a command waits for a lock. The zero value waits
 // DefaultLockWait by the system clock, pausing with time.Sleep. A test gives
@@ -67,7 +68,7 @@ type Lock struct {
 // lock waits for every other holder, a shared one for an exclusive holder
 // only. It waits as w says and then fails with ErrLockHeld.
 func Acquire(dir, name string, shared bool, w Waiting) (*Lock, error) {
-	if !lockName.MatchString(name) {
+	if name != journalLock && !slices.Contains(storePackages, name) {
 		return nil, fmt.Errorf("store: %q is not a lock name", name)
 	}
 	locks := filepath.Join(dir, locksDir)
