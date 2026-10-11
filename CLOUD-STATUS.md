@@ -18,4 +18,13 @@ Branch: `claude/secret-handling-contract-4qx7lc`, created from `fm/hive-design-s
 4. Updated `REVISION-NOTES.md`: the spec list completed, `secrets-detection` split into recognizer and detector, `secrets-ui-session` added, section log corrected.
 5. Checks on the final state: `make check` exit 0; `make test-contract` exit 0 (`contract/clock`, `contract/ids`, `contract/schema`, `contract/store` ok; `spec` has no test files). Go toolchain `go1.27.0 linux/amd64`, as go.mod requires.
 
-done claude/secret-handling-contract-4qx7lc round 2
+## Round 3
+
+1. The evidence row now says the presence check finds the item by its attributes and retrieves no value; no other sentence outside the section described the check as resolving.
+2. "Where the parts enter the plan" says once when the no-value check, the value type, a possible recognizer and the `spoor_` prefix each enter; stage 2's text agrees.
+3. The `dispatch` to `word` call is named beside `synapse` to `dispatch`, with the graph acyclic; the notes list the `spec/packages.md` row and the declaration it touches.
+4. Model transcripts have their true reason in "What Hive holds".
+5. The findings sentence and the Shadow sentence are whole either way: recognized value refused whole, unrecognized kept exactly as a found copy.
+6. Checks on the final state: `make check` exit 0; `make test-contract` exit 0.
+
+done claude/secret-handling-contract-4qx7lc round 3
