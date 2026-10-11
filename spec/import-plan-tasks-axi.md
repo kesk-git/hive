@@ -2,7 +2,7 @@
 
 This is the plan for the one import stage 2 makes: the translation of tasks-axi's backlog grammar, store rules, transitions and archives into the `pool` package. The upstream's multi-item move is not translated at this stage; see the exclusions below. It follows [imports.md](imports.md) and the [`import-record.v1`](schemas/import-record.v1.schema.json) schema field by field, so that the build can write the record from it. Nothing is imported by this plan: no source, test, fixture or documentation of the upstream is in this repository, and none enters it before the record does.
 
-**Who writes the record.** Work item 2, lane a, of the stage's build writes `imports/tasks-axi.json`, the kept licence text under `packages/pool/upstream/tasks-axi/LICENSE` and the root `NOTICE`, in the same commit as the first translated source file, or an earlier one, and adds `tasks-axi` to the `imports` list of `packages/pool/hive-package.json` in that commit. `check-imports` holds the record to paths that exist, which is why this definition does not write it: no translated source exists yet.
+**Who writes the record.** Story 2, lane a, of the stage's build writes `imports/tasks-axi.json`, the kept licence text under `packages/pool/upstream/tasks-axi/LICENSE` and the root `NOTICE`, in the same commit as the first translated source file, or an earlier one, and adds `tasks-axi` to the `imports` list of `packages/pool/hive-package.json` in that commit. `check-imports` holds the record to paths that exist, which is why this definition does not write it: no translated source exists yet.
 
 ## The record, field by field
 
@@ -43,7 +43,7 @@ Every Go file that holds translated material, with the upstream files it is tran
 | `packages/pool/internal/item/links.go` | `src/pr-url.ts`, `src/backends/markdown.ts` (link derivation) | Recognition of pull request URLs in their GitHub and Forgejo forms, report paths and generic URLs. |
 | `packages/pool/internal/legacy/archive.go` | `src/backends/markdown.ts` (`prune`, the two archive files, the restore point) | Archive lookup for the export: how a legacy backlog's archive files are read so that an item pruned upstream still resolves on import, and the never-delete rule. Hive's own records are never pruned. |
 
-`src/id.ts` is not a portion: Hive's identifiers are ULIDs minted by the contract library, and only its identifier pattern is carried, inside `grammar.go`, as the legacy identifier the parser accepts. `src/backends/lock.ts` is not a portion: Hive's transaction lock is the contract library's; its tests are re-expressed against that lock in work item 3 as native tests, not retained ones.
+`src/id.ts` is not a portion: Hive's identifiers are ULIDs minted by the contract library, and only its identifier pattern is carried, inside `grammar.go`, as the legacy identifier the parser accepts. `src/backends/lock.ts` is not a portion: Hive's transaction lock is the contract library's; its tests are re-expressed against that lock in story 3 as native tests, not retained ones.
 
 ## Retained tests
 
@@ -93,7 +93,7 @@ The translated material keeps the grammar, the round-trip rule, the transitions,
 
 ## The audit still owed
 
-Before the first translated file is committed, work item 2, lane a:
+Before the first translated file is committed, story 2, lane a:
 
 1. Reads the upstream at the exact revision, read-only, and confirms the licence file's digest and the absence of per-file headers, as stated above.
 2. Confirms that the two fixtures, if any is taken as an asset, carry no private name, path or figure, and otherwise re-expresses them.

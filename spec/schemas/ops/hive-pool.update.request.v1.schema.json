@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-pool.update.request:v1",
   "title": "hive-pool update: request body",
-  "description": "Applies a patch to one item and reports which fields changed. A patch that changes nothing writes nothing. A patch that sets level to target on an imported item that has none is the conversion of spec/pool.md, Levels: allowed only while the item has no generation, no Imperative and is queued, and it removes the deliverable, the requested placement and the delivery axes in the same transaction and reports them among the changed fields. The envelope's expected_revisions names the item's revision. See spec/pool.md, Items.",
+  "description": "Applies a patch to one item and reports which fields changed. A patch that changes nothing writes nothing. A patch that sets level to target on an imported item that has none is the conversion of spec/pool.md, Levels: allowed only while the item has no generation, no Imperative and no schedule and is queued, and it removes the deliverable, the requested placement and the delivery axes in the same transaction and reports them among the changed fields. The envelope's expected_revisions names the item's revision. See spec/pool.md, Items.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -32,7 +32,7 @@
           }
         },
         "level": {
-          "description": "The item's level, set only on an item that has none, as its owner sets it on an imported legacy item; a change of an existing level is refused with pool.hierarchy. Setting target is allowed only while the item has no generation, no Imperative and is queued, and is refused with pool.hierarchy otherwise; in the same transaction the Pool removes the deliverable, the requested placement and the delivery axes, which a Target never carries, and reports them among the fields that changed. Setting prey or hunt keeps them.",
+          "description": "The item's level, set only on an item that has none, as its owner sets it on an imported legacy item; a change of an existing level is refused with pool.hierarchy. Setting target is allowed only while the item has no generation, no Imperative and no schedule and is queued, and is refused with pool.hierarchy otherwise, a schedule being cleared first by clear_schedule; in the same transaction the Pool removes the deliverable, the requested placement and the delivery axes, which a Target never carries, and reports them among the fields that changed. Setting prey or hunt keeps them.",
           "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/level"
         },
         "wave": {
@@ -74,7 +74,7 @@
           }
         },
         "add_deps": {
-          "description": "The parent rule of spec/pool.md, Levels, holds for the item as the patch leaves it: a Hunt has exactly one parent edge, to a Prey; a Prey at most one, to a Target; a Target none; a violation, a parent edge set, replaced or removed on an item, or above one, that is not queued, has an Imperative or has opened a generation, or a Hunt attached to a Prey that carries the completion marker, is in flight or has an open generation, is refused with pool.hierarchy.",
+          "description": "The parent rule of spec/pool.md, Levels, holds for the item as the patch leaves it: a Hunt has exactly one parent edge, to a Prey; a Prey at most one, to a Target; a Target none; a violation, a parent edge set, replaced or removed on an item, or above one, that is not queued, has an Imperative or has opened a generation, a Hunt attached to a Prey that carries the completion marker, is in flight or has an open generation, or a first Hunt attached to a Prey that carries a schedule, is refused with pool.hierarchy.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"
@@ -88,9 +88,11 @@
           }
         },
         "schedule": {
+          "description": "Refused with pool.hierarchy on a Target and on a Prey that has a Hunt beneath it: a schedule belongs to a Hunt or to a Prey that is a single Hunt.",
           "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/schedule"
         },
         "clear_schedule": {
+          "description": "True removes the item's schedule, which the owner does before converting the item to a Target or attaching a first Hunt beneath it.",
           "type": "boolean"
         }
       }
