@@ -1,10 +1,10 @@
 # Distribution contract
 
-A delivered Hive needs five other programs and nothing else: **Git, gh, tmux, Claude Code and Codex CLI**. This file fixes what "delivered" means, what a Hive executable may run, and how the limit of five is proved rather than promised.
+A delivered Hive needs six other programs and nothing else: **Git, gh, tmux, Claude Code, Codex CLI and no-mistakes**. This file fixes what "delivered" means, what a Hive executable may run, and how the limit of six is proved rather than promised.
 
 Owner: the repository. Proved by `test-distribution`.
 
-## The five
+## The six
 
 | Dependency | Program run | Declared by |
 | --- | --- | --- |
@@ -13,19 +13,20 @@ Owner: the repository. Proved by `test-distribution`.
 | tmux | `tmux` | `dispatch`, `shadow` |
 | Claude Code | `claude` | `dispatch`, `synapse` |
 | Codex CLI | `codex` | `dispatch`, `synapse` |
+| no-mistakes | `no-mistakes` | `synapse` |
 
 - Hive finds each on the search path at the moment it runs it. It bundles none of them, installs none, upgrades none and changes none of their configuration.
 - Hive records the version it observed where a record depends on it, as the design's execution and capability records require. This specification sets no minimum version: the stage that first uses a program states what it needs of it and probes for that.
 - A program that is missing or refuses to run makes the operation that needs it `unavailable`, with `dependency_missing` or `dependency_unusable`. It never makes another operation fail, and never causes a fallback to another program.
+- no-mistakes is the long-lived plugin point behind Synapse, by the Hive Mind's ruling of 2026-10-11 on the shape of the gate's stage; it is one of the six, not an exception. A package declaration lists it under the key named `transitional`, which [`package.v1`](schemas/package.v1.schema.json) keeps as that field's name: the word there names the field, not the plugin's status, and renaming the field is a major change of this specification left for a later revision.
 
-Two exceptions exist, and both are named, selected and outside the five:
+One exception exists, named, selected and outside the six:
 
 | Exception | Program | When it is run | Declared by |
 | --- | --- | --- | --- |
-| Transitional gate | `no-mistakes` | Only while a required route's native gate is unqualified | `synapse` |
 | Optional browser stack | `chrome-devtools-axi` and what it needs | Only for a selected browser task | The package that first selects it; none at stage 1 |
 
-A Hive with neither exception present is whole. Neither is checked at start, and their absence is not an error until an operation that selected one is called.
+A Hive without the exception present is whole. It is not checked at start, and its absence is not an error until an operation that selected it is called.
 
 A project's own validation commands are a third thing: they belong to the project, run in the environment the project supplies, and may need whatever the project needs. They are declared as `project` and are never part of Hive's distribution.
 
@@ -71,14 +72,14 @@ Behavior that depends on the Mac is proved on the Mac. A passing Linux run does 
 - `make` drives the targets. It is a development tool and is not needed to run.
 - **No other toolchain exists in the repository**: no Node, no Python, no shell-script layer, no bundler, no generator whose output is committed. A change that needs one is a change to this contract.
 
-So the delivered core has exactly five runtime prerequisites, and a sixth cannot arrive by accident: there is nothing in the repository that could need one.
+So the delivered core has exactly six runtime prerequisites, and a seventh cannot arrive by accident: there is nothing in the repository that could need one.
 
 ## What a Hive executable may run
 
 A Hive executable starts another program only through `contract/exec`, and only one of:
 
-1. one of the five, where its package declares it;
-2. an exception above, where its package declares it and the operation selected it;
+1. one of the six, where its package declares it;
+2. the exception above, where its package declares it and the operation selected it;
 3. a project's declared validation command, where its package declares `project`;
 4. another Hive command, where its package declares the call.
 
@@ -90,7 +91,7 @@ A Hive executable starts another program only through `contract/exec`, and only 
 
 - The only operations that keep running are the Shadow's bounded observer and, when selected, the UI server. Both are declared `resident`. Nothing else stays behind after a command returns, and no new always-on service is added.
 - The only listener Hive opens is the UI server's, bound to loopback, or to the operator's existing private-network interface when that is selected. There is never a public listener.
-- Hive makes no network connection of its own. Every connection is made by one of the five, under that program's own configuration and credentials.
+- Hive makes no network connection of its own. Every connection is made by one of the six, under that program's own configuration and credentials.
 
 ## How it is proved
 
@@ -100,8 +101,8 @@ A Hive executable starts another program only through `contract/exec`, and only 
 2. An executable needs a shared library beyond the platform's own, or was built with the C toolchain involved.
 3. Any Go package other than `contract/exec` imports the standard library's process-execution package.
 4. A package starts a program its declaration does not list, found by the kinds passed to `contract/exec`.
-5. Any `platform` list is non-empty without a reason, or names a program that is one of the five.
-6. The integration tests fail when run with a search path that holds only the artefact's `bin/`, recorded fakes of `gh`, `tmux`, `claude` and `codex`, and the real `git`: that is, with no sixth program reachable.
+5. Any `platform` list is non-empty without a reason, or names a program that is one of the six.
+6. The integration tests fail when run with a search path that holds only the artefact's `bin/`, recorded fakes of `gh`, `tmux`, `claude`, `codex` and `no-mistakes`, and the real `git`: that is, with no seventh program reachable.
 7. The repository holds a build file of another toolchain.
 
 A passing run is evidence about the artefact it ran against. It is not a claim that any installation already runs it.

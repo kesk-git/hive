@@ -212,7 +212,7 @@ These are not decided here, deliberately. Each is cheap to add later and would b
 | Where the Spawning Pool keeps its worktrees on disk, and its lease record | Stage 3 |
 | A streamed form of response | Stage 4 |
 | Pending approvals in the session, and how a reader is told of a new message | Stage 4 |
-| The minimum version of each of the five, by probe | The stage that first runs each |
+| The minimum version of each of the six, by probe | The stage that first runs each |
 | Where instructions and skills sit in the artefact | The stage that first delivers one |
 | Retention periods and segment sizes | The stage that owns each store, as configuration |
 | Which package declares the optional browser stack | The stage that first selects a browser task |
