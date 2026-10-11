@@ -1,6 +1,6 @@
 # Shadow
 
-The Shadow owns bounded observations, due polls, due-time wakes for scheduled jobs, dated holds and rule expiries, durable wakes and their acknowledgments, and reconciled state.
+The Shadow owns bounded observations, due polls, due-time wakes for schedules, dated holds and rule expiries, durable wakes and their acknowledgments, and reconciled state.
 
 | | |
 | --- | --- |

@@ -4,7 +4,7 @@
   "name": "dispatch",
   "kind": "package",
   "title": "Dispatch",
-  "owns": "Session launch and control; Fleet provisioning and the workspace, project and clone registry, including each home's identity record, which every package of the same home reads through the contract library; effective policy; the native quota, context and usage readers; reservations; scheduled-job records; steering and lifecycle control; continuity.",
+  "owns": "Session launch and control; Fleet provisioning and the workspace, project and clone registry, including each home's identity record, which every package of the same home reads through the contract library; effective policy; the native quota, context and usage readers; reservations; schedule records; steering and lifecycle control; continuity.",
   "plan_stage": 4,
   "executable": "hive-dispatch",
   "commands": [
@@ -24,7 +24,7 @@
     },
     {
       "name": "hive-schedule",
-      "purpose": "Scheduled-job records and their transitions.",
+      "purpose": "Schedule records and their transitions.",
       "operations": [
         "file",
         "due",
@@ -126,7 +126,7 @@
     }
   ],
   "test_target": "test-dispatch",
-  "test_scope": "Admission, profile resolution, observation provenance, exact-target recovery and scheduled-job transitions from filing through due, run, hold and retirement.",
+  "test_scope": "Admission, profile resolution, observation provenance, exact-target recovery and schedule transitions from filing through due, run, hold and retirement.",
   "calls": [
     "pool",
     "spawning-pool"

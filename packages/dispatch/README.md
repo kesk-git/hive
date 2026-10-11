@@ -1,6 +1,6 @@
 # Dispatch
 
-Dispatch owns session launch and control; Fleet provisioning and the registry of workspaces, projects and clones, including each home's identity record; effective policy; the native quota, context and usage readers; reservations; scheduled-job records; steering and lifecycle control; and continuity.
+Dispatch owns session launch and control; Fleet provisioning and the registry of workspaces, projects and clones, including each home's identity record; effective policy; the native quota, context and usage readers; reservations; schedule records; steering and lifecycle control; and continuity.
 
 | | |
 | --- | --- |

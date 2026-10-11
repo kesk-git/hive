@@ -51,7 +51,7 @@ A private home is a directory outside every project repository, selected explici
 | `locks/` | shared, through the contract library | Transaction lock files. |
 | `pool/` | `pool` | The Pool's store, including what `word` persists through it. |
 | `spawning-pool/` | `spawning-pool` | Leases and their receipts. |
-| `dispatch/` | `dispatch` | The identity registry, execution records, scheduled jobs, sessions, policy. |
+| `dispatch/` | `dispatch` | The identity registry, execution records, schedules, sessions, policy. |
 | `shadow/` | `shadow` | Observations, cursors and wakes. |
 | `synapse/` | `synapse` | The run ledger and evidence. |
 | `ui/` | `ui` | The UI's own state. |

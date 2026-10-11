@@ -23,7 +23,7 @@
   ],
   "receipt_kinds": [],
   "test_target": "test-ui",
-  "test_scope": "Projection coverage and freshness, stale and incomplete cards, revision-bound submissions, same-session continuity, durable review rounds, receipt-driven motion, reconnect, reduced motion, context restoration, receipt display, and scheduled-job and temporary-rule lists read from records with incomplete coverage shown.",
+  "test_scope": "Projection coverage and freshness, stale and incomplete cards, revision-bound submissions, same-session continuity, durable review rounds, receipt-driven motion, reconnect, reduced motion, context restoration, receipt display, and schedule and temporary-rule lists read from records with incomplete coverage shown.",
   "calls": [
     "pool",
     "dispatch",

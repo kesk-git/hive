@@ -4,7 +4,7 @@
   "name": "shadow",
   "kind": "package",
   "title": "Shadow",
-  "owns": "Bounded observations; due polls; due-time wakes for scheduled jobs, dated holds and rule expiries; durable wakes and their acknowledgments; reconciled state.",
+  "owns": "Bounded observations; due polls; due-time wakes for schedules, dated holds and rule expiries; durable wakes and their acknowledgments; reconciled state.",
   "plan_stage": 4,
   "executable": "hive-shadow",
   "commands": [
