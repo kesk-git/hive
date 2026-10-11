@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/kesk-git/hive/contract/canon"
+	"github.com/kesk-git/hive/contract/ids"
 )
 
 // tempSuffix ends every temporary file. A record ends in .json, so a
@@ -22,43 +23,68 @@ const (
 	txDir       = "tx"
 )
 
-// abs returns the absolute path of rel, a slash path below the store.
-func (s *Store) abs(rel string) string {
-	return filepath.Join(s.dir, filepath.FromSlash(rel))
-}
-
-// up leads a path that names a top-level path of the home instead of one
-// below the store's directory.
-const up = "../"
-
 // topLevel gives each package the one top-level path of the home, besides its
 // own directory, that the table of spec/records.md gives it: home.json for
-// dispatch and everything under reviews/ for ui. No other path outside a
-// package's directory is its to write.
+// dispatch and everything under reviews/ for ui. A package names such a path
+// by its path in the home, and a path of its own directory never begins with
+// it. No other path outside a package's directory is its to write.
 var topLevel = map[string]string{"dispatch": homeFile, "ui": "reviews"}
 
 // HomeFilePath is the path of home.json, as dispatch names it.
-const HomeFilePath = up + homeFile
+const HomeFilePath = homeFile
 
 // ReviewPath is the path of a file of a review directory, as ui names it:
 // rel is relative to reviews/.
-func ReviewPath(rel string) string { return up + "reviews/" + rel }
+func ReviewPath(rel string) string { return "reviews/" + rel }
 
-// checkPath checks a path below the store, or a top-level path the package
+// owned reports whether rel names the top-level path of the home that the
+// package owns, rather than a path of its own directory.
+func (s *Store) owned(rel string) bool {
+	top := topLevel[s.pkg]
+	if top == homeFile {
+		return rel == top
+	}
+	return top != "" && strings.HasPrefix(rel, top+"/")
+}
+
+// abs returns the absolute path of rel, a slash path below the store or the
+// top-level path of the home the package owns.
+func (s *Store) abs(rel string) string {
+	if s.owned(rel) {
+		return filepath.Join(s.Dir, filepath.FromSlash(rel))
+	}
+	return filepath.Join(s.dir, filepath.FromSlash(rel))
+}
+
+// homePath is the path of rel relative to the home, the form an intent holds.
+func (s *Store) homePath(rel string) string {
+	if s.owned(rel) {
+		return rel
+	}
+	return s.pkg + "/" + rel
+}
+
+// fromHomePath is the inverse of homePath. A path of the home that is neither
+// the package's own directory nor the top-level path it owns is not the
+// package's to write.
+func (s *Store) fromHomePath(p string) (string, error) {
+	if s.owned(p) {
+		return p, nil
+	}
+	if rel, ok := strings.CutPrefix(p, s.pkg+"/"); ok && !s.owned(rel) {
+		return rel, nil
+	}
+	return "", fmt.Errorf("store: path %q is outside the store of %s", p, s.pkg)
+}
+
+// checkPath checks a path below the store, or the top-level path the package
 // owns: slash-separated, every segment a lowercase file name, ending in .json
 // and never a temporary file.
 func (s *Store) checkPath(rel string) error {
-	body, outside := strings.CutPrefix(rel, up)
-	if outside {
-		top := topLevel[s.pkg]
-		if top == "" || body != top && !(top != homeFile && strings.HasPrefix(body, top+"/")) {
-			return fmt.Errorf("store: path %q is outside the store of %s", rel, s.pkg)
-		}
-	}
-	if body == "" {
+	if rel == "" {
 		return fmt.Errorf("store: empty path")
 	}
-	for _, seg := range strings.Split(body, "/") {
+	for _, seg := range strings.Split(rel, "/") {
 		if seg == "" || seg == "." || seg == ".." {
 			return fmt.Errorf("store: path %q has an empty, . or .. segment", rel)
 		}
@@ -72,7 +98,7 @@ func (s *Store) checkPath(rel string) error {
 			return fmt.Errorf("store: path %q names a temporary file", rel)
 		}
 	}
-	if !strings.HasSuffix(body, ".json") {
+	if !strings.HasSuffix(rel, ".json") {
 		return fmt.Errorf("store: path %q does not end in .json", rel)
 	}
 	return nil
@@ -225,42 +251,58 @@ func syncDir(dir string) error {
 	return nil
 }
 
-// sweepTemps removes every temporary file under the store, and under the
-// top-level path of the home it owns. A writer holding the lock calls it, so
-// no temporary file it finds is still being written.
+// tempOf recognises the name writeFile gives a temporary file: the name of
+// the file it writes, then the request that writes it, then .tmp. It returns
+// the file's name. Nothing else is a temporary file, whatever its suffix.
+func tempOf(name string) (string, bool) {
+	base, ok := strings.CutSuffix(name, tempSuffix)
+	if !ok {
+		return "", false
+	}
+	i := strings.LastIndex(base, ".")
+	if i < 0 || ids.Check(base[i+1:], ids.Request) != nil || !strings.HasSuffix(base[:i], ".json") {
+		return "", false
+	}
+	return base[:i], true
+}
+
+// sweepTemps removes the temporary files a crash left under the store, and
+// under the top-level path of the home it owns: at the top of the home only
+// those of home.json, below reviews/ and the store's directory any. A writer
+// holding the lock calls it, so none it finds is still being written.
 func (s *Store) sweepTemps() error {
 	dirty := map[string]bool{}
-	sweep := func(p string, d fs.DirEntry) error {
-		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), tempSuffix) {
-			if err := os.Remove(p); err != nil {
-				return err
-			}
-			dirty[filepath.Dir(p)] = true
-		}
-		return nil
-	}
-	walk := func(root string) error {
+	sweep := func(root string) error {
 		return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
-			return sweep(p, d)
+			if _, ok := tempOf(d.Name()); ok && d.Type().IsRegular() {
+				if err := os.Remove(p); err != nil {
+					return err
+				}
+				dirty[filepath.Dir(p)] = true
+			}
+			return nil
 		})
 	}
-	err := walk(s.dir)
-	if top := topLevel[s.pkg]; err == nil && top == homeFile {
+	err := sweep(s.dir)
+	switch top := topLevel[s.pkg]; {
+	case err != nil:
+	case top == homeFile:
 		var entries []fs.DirEntry
 		if entries, err = os.ReadDir(s.Dir); err == nil {
 			for _, e := range entries {
-				if strings.HasPrefix(e.Name(), homeFile+".") {
-					if err = sweep(filepath.Join(s.Dir, e.Name()), e); err != nil {
+				if file, ok := tempOf(e.Name()); ok && file == homeFile && e.Type().IsRegular() {
+					if err = os.Remove(filepath.Join(s.Dir, e.Name())); err != nil {
 						break
 					}
+					dirty[s.Dir] = true
 				}
 			}
 		}
-	} else if err == nil && top != "" {
-		if err = walk(filepath.Join(s.Dir, top)); errNotExist(err) {
+	case top != "":
+		if err = sweep(filepath.Join(s.Dir, top)); errNotExist(err) {
 			err = nil
 		}
 	}

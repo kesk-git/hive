@@ -260,6 +260,9 @@ func (s *Store) recover() error {
 		if err != nil {
 			return err
 		}
+		if err := s.syncChain(rel); err != nil {
+			return err
+		}
 		if err := s.classify(rel, in); err != nil {
 			return err
 		}
@@ -331,7 +334,7 @@ func (s *Store) encodeIntent(in *intent) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		m := map[string]any{"path": f.rel, "digest": f.digest, "body": content}
+		m := map[string]any{"path": s.homePath(f.rel), "digest": f.digest, "body": content}
 		if f.absent {
 			m["expected"] = "absent"
 		} else {
@@ -430,7 +433,11 @@ func (s *Store) readIntent(rel string) (*intent, error) {
 	in := &intent{request: request}
 	file := func(v any, record bool) (*intentFile, error) {
 		m, _ := v.(map[string]any)
-		rel, _ := m["path"].(string)
+		home, _ := m["path"].(string)
+		rel, err := s.fromHomePath(home)
+		if err != nil {
+			return nil, bad("%v", err)
+		}
 		if err := s.checkPath(rel); err != nil {
 			return nil, bad("%v", err)
 		}

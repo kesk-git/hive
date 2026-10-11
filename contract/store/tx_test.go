@@ -559,28 +559,31 @@ func TestTornIntent(t *testing.T) {
 	rel := IntentPath(req9)
 
 	torn := map[string][]byte{
-		"cut in half":                                whole[:len(whole)/2],
-		"cut before its line feed":                   whole[:len(whole)-1],
-		"empty":                                      nil,
-		"not JSON":                                   []byte("intent\n"),
-		"not an object":                              []byte("[]\n"),
-		"another schema":                             bytes.Replace(whole, []byte(intentRecord), []byte("hive.other"), 1),
-		"a version that is not one":                  bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"one"`), 1),
-		"an older major version":                     bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"0.9"`), 1),
-		"content that is not an object":              bytes.Replace(whole, []byte(`"body":{"n":1,"record_revision":1,"title":"created","updated_at":"2026-10-11T08:00:00.000Z"}`), []byte(`"body":[]`), 1),
-		"an absent record that names a revision":     bytes.Replace(whole, []byte(`"expected":"absent","path":"`+task2), []byte(`"expected":"absent","expected_revision":1,"path":"`+task2), 1),
-		"a path with a parent segment":               bytes.Replace(whole, []byte(`"path":"`+task2), []byte(`"path":"records/../item/x.json`), 1),
-		"a record in the list of receipts":           bytes.Replace(whole, []byte(`"path":"`+ReceiptPath(rcpt1)), []byte(`"path":"`+task2), 1),
-		"a path outside the package":                 bytes.Replace(whole, []byte(`"path":"`+task2), []byte(`"path":"../home.json`), 1),
-		"a package that has no store":                bytes.Replace(whole, []byte(`"package":"pool"`), []byte(`"package":"word"`), 1),
-		"another package":                            bytes.Replace(whole, []byte(`"package":"pool"`), []byte(`"package":"shadow"`), 1),
-		"another request":                            bytes.Replace(whole, []byte(`"request_id":"`+req9), []byte(`"request_id":"`+req2), 1),
-		"a digest that does not match":               bytes.Replace(whole, []byte(`"title":"replaced"`), []byte(`"title":"other"`), 1),
-		"an unknown member":                          bytes.Replace(whole, []byte(`"schema":`), []byte(`"extra":1,"schema":`), 1),
-		"no outcome":                                 bytes.Replace(whole, []byte(`"outcome":`), []byte(`"outcomes":`), 1),
-		"a record without an expected state":         bytes.Replace(whole, []byte(`"expected":"revision","expected_revision":1`), []byte(`"expected":"maybe"`), 1),
-		"a record with an expected revision of zero": bytes.Replace(whole, []byte(`"expected_revision":1`), []byte(`"expected_revision":0`), 1),
-		"an event without its id":                    bytes.ReplaceAll(whole, []byte(`"event_id":"`+evt1+`"`), []byte(`"event_id":"x"`)),
+		"cut in half":                                    whole[:len(whole)/2],
+		"cut before its line feed":                       whole[:len(whole)-1],
+		"empty":                                          nil,
+		"not JSON":                                       []byte("intent\n"),
+		"not an object":                                  []byte("[]\n"),
+		"another schema":                                 bytes.Replace(whole, []byte(intentRecord), []byte("hive.other"), 1),
+		"a version that is not one":                      bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"one"`), 1),
+		"an older major version":                         bytes.Replace(whole, []byte(`"schema_version":"1.0"`), []byte(`"schema_version":"0.9"`), 1),
+		"content that is not an object":                  bytes.Replace(whole, []byte(`"body":{"n":1,"record_revision":1,"title":"created","updated_at":"2026-10-11T08:00:00.000Z"}`), []byte(`"body":[]`), 1),
+		"an absent record that names a revision":         bytes.Replace(whole, []byte(`"expected":"absent","path":"pool/`+task2), []byte(`"expected":"absent","expected_revision":1,"path":"pool/`+task2), 1),
+		"a path with a parent segment":                   bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"pool/records/../item/x.json`), 1),
+		"a path that leaves the home":                    bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"../home.json`), 1),
+		"a record in the list of receipts":               bytes.Replace(whole, []byte(`"path":"pool/`+ReceiptPath(rcpt1)), []byte(`"path":"pool/`+task2), 1),
+		"a path of another store":                        bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"shadow/`+task2), 1),
+		"a top-level path the package does not own":      bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"home.json`), 1),
+		"a top-level directory the package does not own": bytes.Replace(whole, []byte(`"path":"pool/`+task2), []byte(`"path":"reviews/x.json`), 1),
+		"a package that has no store":                    bytes.Replace(whole, []byte(`"package":"pool"`), []byte(`"package":"word"`), 1),
+		"another package":                                bytes.Replace(whole, []byte(`"package":"pool"`), []byte(`"package":"shadow"`), 1),
+		"another request":                                bytes.Replace(whole, []byte(`"request_id":"`+req9), []byte(`"request_id":"`+req2), 1),
+		"a digest that does not match":                   bytes.Replace(whole, []byte(`"title":"replaced"`), []byte(`"title":"other"`), 1),
+		"an unknown member":                              bytes.Replace(whole, []byte(`"schema":`), []byte(`"extra":1,"schema":`), 1),
+		"no outcome":                                     bytes.Replace(whole, []byte(`"outcome":`), []byte(`"outcomes":`), 1),
+		"a record without an expected state":             bytes.Replace(whole, []byte(`"expected":"revision","expected_revision":1`), []byte(`"expected":"maybe"`), 1),
+		"a record with an expected revision of zero":     bytes.Replace(whole, []byte(`"expected_revision":1`), []byte(`"expected_revision":0`), 1),
+		"an event without its id":                        bytes.ReplaceAll(whole, []byte(`"event_id":"`+evt1+`"`), []byte(`"event_id":"x"`)),
 	}
 	for name, data := range torn {
 		t.Run(name, func(t *testing.T) {
@@ -680,7 +683,7 @@ func TestIntentRoundTrip(t *testing.T) {
 	// The spec's words: a created record states that it is expected absent.
 	doc := parsed(t, data)
 	rec := doc["records"].([]any)[1].(map[string]any)
-	if rec["expected"] != "absent" || rec["expected_revision"] != nil || rec["path"] != task2 {
+	if rec["expected"] != "absent" || rec["expected_revision"] != nil || rec["path"] != "pool/"+task2 {
 		t.Errorf("created record entry = %v", rec)
 	}
 	rec = doc["records"].([]any)[0].(map[string]any)
@@ -845,5 +848,93 @@ func TestRecoveryFlushesWhatIsAlreadyVisible(t *testing.T) {
 				t.Error("recovery flushed no directory above the file")
 			}
 		})
+	}
+}
+
+// Recovery flushes the intent it found, and the directories above it, before
+// it writes anything from it: an intent renamed but not yet flushed must be
+// durable before the first record it covers is. Both ways of taking the lock
+// run that recovery.
+func TestRecoveryFlushesTheIntentBeforeWriting(t *testing.T) {
+	for name, take := range map[string]func(s *Store) error{
+		"exclusive": func(s *Store) error {
+			w, err := s.Lock()
+			if err == nil {
+				w.Release()
+			}
+			return err
+		},
+		"shared": func(s *Store) error {
+			l, err := s.LockShared()
+			if err == nil {
+				l.Release()
+			}
+			return err
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s, _ := seeded(t)
+			w := lock(t, s)
+			faultAt(s, "syncdir "+IntentPath(req9), 1)
+			if _, err := w.Commit(fullTx()); !errors.Is(err, errCrash) {
+				t.Fatal(err)
+			}
+			w.Release()
+			s.fault = nil
+			steps := trace(t, s, func() {
+				if err := take(s); err != nil {
+					t.Fatal(err)
+				}
+			})
+			flushed, first := slices.Index(steps, "syncdir "+IntentPath(req9)), slices.IndexFunc(steps, func(step string) bool {
+				return strings.HasPrefix(step, "create ")
+			})
+			if flushed < 0 || first < 0 || flushed > first {
+				t.Errorf("the intent was flushed at %d, the first write made at %d: %v", flushed, first, steps)
+			}
+			if !slices.Contains(steps[flushed:first], "syncdir ./") {
+				t.Error("recovery flushed no directory above the intent")
+			}
+		})
+	}
+}
+
+// The intent holds every path relative to the home, with no dot-dot segment:
+// the store's own directory under its package's name, and a top-level path as
+// it is in the home.
+func TestIntentPathsAreRelativeToTheHome(t *testing.T) {
+	paths := func(t *testing.T, s *Store, tx Tx) []string {
+		t.Helper()
+		data, err := s.encodeIntent(plan(t, s, tx))
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc := parsed(t, data)
+		var out []string
+		for _, key := range []string{"records", "receipts"} {
+			for _, f := range doc[key].([]any) {
+				out = append(out, f.(map[string]any)["path"].(string))
+			}
+		}
+		return append(out, doc["outcome"].(map[string]any)["path"].(string))
+	}
+	home := newHome(t)
+	d, _, _ := open(t, home, "dispatch")
+	got := paths(t, d, provision(t))
+	want := []string{"home.json", "dispatch/" + ws1, "dispatch/" + ReceiptPath(rcpt1), "dispatch/" + OutcomePath(req9)}
+	if !slices.Equal(got, want) {
+		t.Errorf("dispatch intent paths = %v, want %v", got, want)
+	}
+	u, _, _ := open(t, home, "ui")
+	review := ReviewPath("task-1/1/review-1/review.json")
+	got = paths(t, u, Tx{RequestID: req9, Records: []RecordWrite{{review, []byte(`{}`), 0}, {task1, []byte(`{}`), 0}}, Outcome: []byte(`{}`)})
+	want = []string{review, "ui/" + task1, "ui/" + OutcomePath(req9)}
+	if !slices.Equal(got, want) {
+		t.Errorf("ui intent paths = %v, want %v", got, want)
+	}
+	for _, p := range append(got, want...) {
+		if strings.Contains(p, "..") {
+			t.Errorf("path %q has a dot-dot segment", p)
+		}
 	}
 }

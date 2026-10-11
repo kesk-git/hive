@@ -117,7 +117,9 @@ func TestUIWritesReviewsInATransaction(t *testing.T) {
 }
 
 // A package writes its own directory and the one top-level path the table
-// gives it, and nothing else of the home.
+// gives it, and nothing else of the home. A path that is not the package's own
+// top-level path is a path of its own directory, and a path that leaves it is
+// refused.
 func TestTopLevelPathsAreOwned(t *testing.T) {
 	home := newHome(t)
 	stores := map[string]*Store{}
@@ -126,38 +128,61 @@ func TestTopLevelPathsAreOwned(t *testing.T) {
 		lock(t, stores[pkg]).Release()
 	}
 	before := tree(t, home)
-	tests := []struct {
-		pkg  string
-		path string
-	}{
+
+	// The names of another package's top-level path land below the writer's
+	// own directory, and the top of the home is untouched.
+	for _, tc := range []struct{ pkg, path string }{
 		{"pool", HomeFilePath},
 		{"pool", ReviewPath("a/review.json")},
 		{"spawning-pool", HomeFilePath},
 		{"shadow", ReviewPath("a/review.json")},
 		{"synapse", HomeFilePath},
 		{"dispatch", ReviewPath("a/review.json")},
-		{"ui", HomeFilePath},
+		{"ui", "home.json/x.json"},
+	} {
+		t.Run(tc.pkg+" "+tc.path, func(t *testing.T) {
+			s := stores[tc.pkg]
+			w := lock(t, s)
+			defer w.Release()
+			if _, err := w.Replace(req1, tc.path, []byte(`{}`), 0); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(home, tc.pkg, filepath.FromSlash(tc.path))); err != nil {
+				t.Errorf("not written below %s/: %v", tc.pkg, err)
+			}
+			for _, top := range []string{homeFile, "reviews"} {
+				if _, err := os.Lstat(filepath.Join(home, top)); err == nil {
+					t.Errorf("%s was written at the top of the home", top)
+				}
+			}
+		})
+	}
+	for _, pkg := range storePackages {
+		os.RemoveAll(filepath.Join(home, pkg))
+	}
+	for _, pkg := range storePackages {
+		stores[pkg], _, _ = open(t, home, pkg)
+		lock(t, stores[pkg]).Release()
+	}
+	sameTree(t, "after the writes below the packages", tree(t, home), before)
+
+	for _, tc := range []struct{ pkg, path string }{
 		{"dispatch", "../journal/x.json"},
-		{"dispatch", "../locks/x.json"},
-		{"dispatch", "../pool/records/x.json"},
-		{"dispatch", "../ui/records/x.json"},
-		{"dispatch", "../x.json"},
-		{"dispatch", "../home.json/x.json"},
+		{"dispatch", "../home.json"},
 		{"dispatch", "../../home.json"},
 		{"dispatch", "../"},
 		{"dispatch", "home.json/../../home.json"},
-		{"ui", "../reviews.json"},
-		{"ui", "../reviews/"},
-		{"ui", "../reviews/../home.json"},
-		{"ui", "../reviews/a/../../home.json"},
-		{"ui", "../reviews/a/Review.json"},
-		{"ui", "../reviews/a/review"},
-		{"ui", "../reviews/a/x.json.tmp"},
-		{"ui", "../journal/x.json"},
-		{"ui", ".." + "/reviews/a//review.json"},
-	}
-	for _, tc := range tests {
-		t.Run(tc.pkg+" "+tc.path, func(t *testing.T) {
+		{"ui", "../reviews/a/review.json"},
+		{"ui", "reviews/"},
+		{"ui", "reviews/../home.json"},
+		{"ui", "reviews/a/../../home.json"},
+		{"ui", "reviews/a//review.json"},
+		{"ui", "reviews/a/Review.json"},
+		{"ui", "reviews/a/review"},
+		{"ui", "reviews/a/x.json.tmp"},
+		{"ui", "/reviews/a/review.json"},
+	} {
+		t.Run("refused "+tc.pkg+" "+tc.path, func(t *testing.T) {
 			s := stores[tc.pkg]
 			w := lock(t, s)
 			defer w.Release()
@@ -270,4 +295,67 @@ func TestTopLevelTransactionsRecover(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A writer removes the temporary files it gave a request, recognised by their
+// exact form, and nothing else: an entry it does not know at the top of the
+// home and a file below a review directory, whatever its suffix, are left
+// alone.
+func TestSweepRemovesOnlyTheTemporaryFilesTheStoreMade(t *testing.T) {
+	tmp := func(file, req string) string { return file + "." + req + tempSuffix }
+	t.Run("dispatch", func(t *testing.T) {
+		home := newHome(t)
+		s, _, _ := open(t, home, "dispatch")
+		made := []string{tmp(homeFile, req1), "dispatch/" + tmp(task1, req2), "dispatch/" + tmp("registry/x.json", req2)}
+		kept := []string{
+			"home.json.backup.tmp", "home.json.tmp", tmp("notes.json", req1), tmp("home.json.old", req1),
+			"home.json." + req1 + ".bak", "reviews/a/" + tmp("review.json", req1), "reviews/capture.tmp",
+			"dispatch/records/item/capture.tmp", "dispatch/" + task1 + ".backup.tmp", "pool/" + tmp(task1, req1),
+		}
+		for _, name := range append(slices.Clone(made), kept...) {
+			full := filepath.Join(home, filepath.FromSlash(name))
+			os.MkdirAll(filepath.Dir(full), dirMode)
+			if err := os.WriteFile(full, []byte("x"), fileMode); err != nil {
+				t.Fatal(err)
+			}
+		}
+		lock(t, s).Release()
+		for _, name := range made {
+			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(name))); err == nil {
+				t.Errorf("%s was left", name)
+			}
+		}
+		for _, name := range kept {
+			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(name))); err != nil {
+				t.Errorf("%s was removed: %v", name, err)
+			}
+		}
+	})
+	t.Run("ui", func(t *testing.T) {
+		home := newHome(t)
+		s, _, _ := open(t, home, "ui")
+		made := []string{"reviews/a/1/b/" + tmp("review.json", req1), "reviews/" + tmp("x.json", req2), "ui/" + tmp(task1, req2)}
+		kept := []string{
+			"reviews/a/1/b/attachments/0001/capture.tmp", "reviews/a/1/b/round-0001.feedback.json.tmp",
+			"reviews/a/1/b/revision-0001.html", "reviews/a/1/b/assets/0001/x.json.backup.tmp", "home.json." + req1 + ".tmp",
+		}
+		for _, name := range append(slices.Clone(made), kept...) {
+			full := filepath.Join(home, filepath.FromSlash(name))
+			os.MkdirAll(filepath.Dir(full), dirMode)
+			if err := os.WriteFile(full, []byte("x"), fileMode); err != nil {
+				t.Fatal(err)
+			}
+		}
+		lock(t, s).Release()
+		for _, name := range made {
+			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(name))); err == nil {
+				t.Errorf("%s was left", name)
+			}
+		}
+		for _, name := range kept {
+			if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(name))); err != nil {
+				t.Errorf("%s was removed: %v", name, err)
+			}
+		}
+	})
 }

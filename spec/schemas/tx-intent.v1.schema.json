@@ -66,9 +66,15 @@
   },
   "$defs": {
     "path": {
-      "description": "A lowercase path below the store, or below the home where it starts with ../ and names a top-level path the package owns.",
-      "type": "string",
-      "pattern": "^(\\.\\./)?[a-z0-9._-]+(/[a-z0-9._-]+)*\\.json$"
+      "description": "A path to a file of one record, relative to the private home: the store's own directory, or the top-level path of the home that the layout table gives the package.",
+      "allOf": [
+        {
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
+        },
+        {
+          "pattern": "\\.json$"
+        }
+      ]
     },
     "record_file": {
       "description": "A record: created, expected absent, or replaced, expected at a revision. body is the new record, which a later write sets record_revision and updated_at on.",

@@ -226,13 +226,13 @@ func TestTemporaryFilesAreNeverRecords(t *testing.T) {
 	whole := record(t, map[string]any{"n": int64(2)}, 2, "2026-10-11T08:00:00.000Z")
 	write(t, s, task1+"."+req2+tempSuffix, whole)
 	write(t, s, task1+"."+id("req", 3)+tempSuffix, whole[:len(whole)/2])
-	write(t, s, "records/item/"+id("req", 4)+tempSuffix, nil)
+	write(t, s, "records/item/"+id("task", 9)+".json."+id("req", 4)+tempSuffix, nil)
 	write(t, s, "tx/"+id("req", 5)+".json."+id("req", 5)+tempSuffix, []byte(`{"schema":"hive.tx-in`))
 	rec, err := s.ReadRecord(task1)
 	if err != nil || rec.Revision != 1 {
 		t.Fatalf("ReadRecord with temporary files beside = %+v, %v", rec, err)
 	}
-	for _, rel := range []string{task1 + "." + req2 + tempSuffix, "records/item/" + id("req", 4) + tempSuffix} {
+	for _, rel := range []string{task1 + "." + req2 + tempSuffix, "records/item/" + id("task", 9) + ".json." + id("req", 4) + tempSuffix} {
 		if _, err := s.ReadRecord(rel); err == nil {
 			t.Errorf("a temporary file %s was read as a record", rel)
 		}
