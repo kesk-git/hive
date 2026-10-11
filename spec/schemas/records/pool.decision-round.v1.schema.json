@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.decision-round:v1",
+  "title": "Decision round",
+  "description": "One round of questions put to the Hive Mind together, with the card that presents each, at pool/records/decision-round/<decision_round_id>.json. A round is complete when every card is answered or superseded. A card is a projection of a question at a revision; its own revision rises when what it shows changes. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "decision_round_id",
+    "scope_level",
+    "home_id",
+    "origin",
+    "cards",
+    "attachments",
+    "complete",
+    "state",
+    "opened_at",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.decision-round"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "decision_round_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/decision_round_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "origin": {
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/origin"
+    },
+    "cards": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.decision-round:v1#/$defs/card"
+      }
+    },
+    "attachments": {
+      "description": "The round's attachment manifest where the round came with attachments: each by path relative to the home, digest and size, with its fetch outcome.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "fetched"
+        ],
+        "properties": {
+          "file": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+          },
+          "fetched": {
+            "description": "complete: the content at the stated digest is in the home. missing, truncated or unreadable: the round is incomplete with this as its blocker.",
+            "enum": [
+              "complete",
+              "missing",
+              "truncated",
+              "unreadable"
+            ]
+          }
+        }
+      }
+    },
+    "complete": {
+      "description": "True when every nested text, question and attachment of the round was collected whole. An incomplete round is not read and nothing in it is ruled on.",
+      "type": "boolean"
+    },
+    "incomplete_reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "state": {
+      "description": "open: at least one card awaits an answer. closed: every card is answered or superseded.",
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "opened_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "closed_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    },
+    {
+      "if": {
+        "properties": {
+          "complete": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "incomplete_reason"
+        ]
+      },
+      "else": {
+        "properties": {
+          "incomplete_reason": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "closed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "closed_at"
+        ]
+      },
+      "else": {
+        "properties": {
+          "closed_at": false
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "card_id",
+        "card_revision",
+        "question_id",
+        "question_revision",
+        "held_task_id",
+        "held_task_revision",
+        "presented_at",
+        "state"
+      ],
+      "properties": {
+        "card_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/card_id"
+        },
+        "card_revision": {
+          "description": "Rises by one whenever the question revision or the held item revision shown changes. A submission against an older card revision is stale.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "question_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+        },
+        "question_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "held_task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "held_task_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "presented_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "answered",
+            "superseded"
+          ]
+        },
+        "answer_sequence": {
+          "description": "The answer that settled the card, in the question's answers.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "answered"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "answer_sequence"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

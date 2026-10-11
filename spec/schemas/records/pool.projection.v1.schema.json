@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.projection:v1",
+  "title": "Knowledge projection",
+  "description": "One generated knowledge projection for one scope and audience, at pool/records/projection/<projection_id>.json: the rendered instructions, the sources at the revisions they were rendered from, the renderer and digest, its freshness, and what each consumer received and acknowledged. A projection is derived and never authority. See spec/pool.md, Generated knowledge.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "projection_id",
+    "scope_level",
+    "home_id",
+    "audience",
+    "current",
+    "consumers",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.projection"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "projection_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "audience": {
+      "description": "shared: instructions every supervisor of this home loads. fleet: a Fleet's own. project: one project's. One projection exists per scope and audience.",
+      "enum": [
+        "shared",
+        "fleet",
+        "project"
+      ]
+    },
+    "current": {
+      "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/rendering"
+    },
+    "consumers": {
+      "description": "Per-consumer propagation: what each received and what each acknowledged, by digest.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/consumer"
+      }
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ],
+  "$defs": {
+    "source": {
+      "description": "One record the rendering consumed, at the revision it read. The canonical owner of each fact is the package that owns the record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "owner"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "owner": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/package_name"
+        }
+      }
+    },
+    "rendering": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rendering",
+        "rendered_at",
+        "renderer_version",
+        "rules_digest",
+        "sources",
+        "text",
+        "digest",
+        "bytes",
+        "state"
+      ],
+      "properties": {
+        "rendering": {
+          "description": "Counts renderings of this projection from 1.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "rendered_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "renderer_version": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
+        },
+        "rules_digest": {
+          "description": "The resolved-rule digest the rendering was made from.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/source"
+          }
+        },
+        "text": {
+          "description": "The rendered instructions.",
+          "type": "string"
+        },
+        "digest": {
+          "description": "The digest of text.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "bytes": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+        },
+        "state": {
+          "description": "fresh: every source is at the revision read. stale: a source changed since; the projection cannot authorize work until re-rendered.",
+          "enum": [
+            "fresh",
+            "stale"
+          ]
+        },
+        "stale_since": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "stale_sources": {
+          "description": "The sources that moved, each with the revision now current.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "stale"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "stale_since",
+              "stale_sources"
+            ]
+          },
+          "else": {
+            "properties": {
+              "stale_since": false,
+              "stale_sources": false
+            }
+          }
+        }
+      ]
+    },
+    "consumer_ref": {
+      "description": "Who consumed the projection: a supervisor session by identity and generation, a task generation, or a named instruction file.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "session",
+            "generation",
+            "file"
+          ]
+        },
+        "session_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/session_id"
+        },
+        "session_generation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+        },
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "generation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+        },
+        "path": {
+          "description": "For a file: where it was written, relative to the home.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "session"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "session_id",
+              "session_generation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "generation"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "task_id",
+              "generation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "file"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "path"
+            ]
+          }
+        }
+      ]
+    },
+    "consumer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "consumer",
+        "received"
+      ],
+      "properties": {
+        "consumer": {
+          "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/consumer_ref"
+        },
+        "received": {
+          "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/propagation_step"
+        },
+        "acknowledged": {
+          "description": "Absent until the consumer acknowledged a digest. A consumer acknowledged at an older digest than current is drift.",
+          "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/propagation_step"
+        }
+      }
+    },
+    "propagation_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rendering",
+        "digest",
+        "at",
+        "receipt_id"
+      ],
+      "properties": {
+        "rendering": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "evidence": {
+          "description": "The consumer's own receipt or record, where it gave one.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "receipt_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        }
+      }
+    }
+  }
+}
