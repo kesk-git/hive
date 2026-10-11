@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-imperative.create.request:v1",
   "title": "hive-imperative create: request body",
-  "description": "Writes revision 1 of an item's canonical Imperative. The Placement axis is not in the request: the command copies the item's requested place into Setup at the item revision it reads, so the Imperative renders the place from the item. Setup's placement is therefore defined as setup_input here, which is the record's setup without placement. See spec/pool.md, The Imperative.",
+  "description": "Writes revision 1 of an item's canonical Imperative. The Placement axis is not in the request: the command copies the item's requested place into Setup at the item revision it reads, so the Imperative renders the place from the item. A Target, and a Prey that has a Hunt beneath it, is refused with pool.not_dispatchable: it describes work that others do. Setup's placement is therefore defined as setup_input here, which is the record's setup without placement. See spec/pool.md, The Imperative.",
   "type": "object",
   "additionalProperties": false,
   "required": [

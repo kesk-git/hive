@@ -31,14 +31,14 @@ Upstream names are not Hive's to rename. Treehouse's own worktree pool and the w
 
 ## Keeping it apart from the Pool
 
-The Pool is the durable work queue. The Spawning Pool holds working copies and never a work item. Both names end in the same word, so the following rules apply to prose, identifiers and the UI alike.
+The Pool is the durable work queue. The Spawning Pool holds working copies and never a Pool item, at whatever level: a Target, a Prey or a Hunt. Both names end in the same word, so the following rules apply to prose, identifiers and the UI alike.
 
 1. **Pool alone always means the work queue.** The word "Pool", "the Pool" or `pool` with nothing before it never refers to the Spawning Pool.
 2. **The Spawning Pool is never shortened.** Not "the Pool", not "the pool", not "the spawn pool", not "SP", and not `pool` or `sp` in an identifier. A sentence that has already said "the Spawning Pool" says it again rather than "the pool".
 3. **No lowercase generic "pool" for either.** A sentence that needs a common noun says "the work queue" or "the set of worktrees". The one exception is an upstream's own name, as above.
 4. **One sentence, one meaning.** Where both appear in a sentence, each is written in full and the Pool is named by what it holds if the sentence could otherwise be read two ways: "the Pool's task generations", never "Pool generations" beside "Spawning Pool".
 5. **No pattern that matches both.** A build file, a glob or a filter never selects by the suffix `pool`. Targets, directories and commands are listed by their full names. `hive-pool` and `hive-spawning-pool` share no prefix beyond `hive-`, and neither is a prefix of the other.
-6. **In the UI the Pool is a place and the Spawning Pool is a field.** **Pool** stays the name of the direct destination. "Spawning Pool" appears only as the label of a worktree lease, in the task inspector and in a preserved-copy finding. It is never a lane, a filter, a tab or a count inside the Pool view, and the Pool view never shows a control labelled with it.
+6. **In the UI the Pool is a place and the Spawning Pool is a field.** **Pool** stays the name of the direct destination. "Spawning Pool" appears only as the label of a worktree lease, in the task inspector and in a preserved-copy finding. It is never a column, a filter, a tab or a count inside the Pool view, and the Pool view never shows a control labelled with it.
 7. **Nothing spawns from the Pool.** Text never says work is "spawned from the Pool" or "waiting in the Spawning Pool". Work is queued in the Pool and dispatched from it; a worker's copy is acquired from the Spawning Pool.
 
 `test-contract` proves rule 5 for the build files and proves that no package declaration other than `packages/pool` uses the bare prefix `pool`.
