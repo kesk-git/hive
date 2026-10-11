@@ -1,0 +1,10 @@
+{
+  "home": {
+    "role": "fleet",
+    "name": "Acme Fleet"
+  },
+  "workspace": {
+    "slug": "acme",
+    "name": "Acme"
+  }
+}

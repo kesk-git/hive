@@ -1,0 +1,103 @@
+{
+  "schema": "hive.package",
+  "schema_version": "1.0",
+  "name": "pool",
+  "kind": "package",
+  "title": "Pool",
+  "owns": "Pool storage and migrations; admission records; Imperatives; accepted specifications; original rules and their projections, including temporary rules with an expiry or lift condition; generated knowledge projections. It is the one store that word persists decisions in.",
+  "plan_stage": 2,
+  "executable": "hive-pool",
+  "commands": [
+    {
+      "name": "hive-pool",
+      "purpose": "Durable work items: identity, scope, dependencies, delivery path, dispatch class, holds and dates.",
+      "operations": [
+        "add",
+        "read",
+        "update"
+      ]
+    },
+    {
+      "name": "hive-admit",
+      "purpose": "Immutable admission requests and receipts bound to an Imperative revision.",
+      "operations": [
+        "create",
+        "check",
+        "approve"
+      ]
+    },
+    {
+      "name": "hive-imperative",
+      "purpose": "The canonical Imperative: text, revision and digest, and what was delivered for each generation.",
+      "operations": [
+        "create",
+        "revise",
+        "render"
+      ]
+    },
+    {
+      "name": "hive-spec",
+      "purpose": "Specification revisions, acceptance receipts, requirement and evidence links, closure receipts.",
+      "operations": [
+        "define",
+        "accept",
+        "close"
+      ]
+    },
+    {
+      "name": "hive-rule",
+      "purpose": "Verbatim rulings, amendments, scope, effective and expiry times, supersession and the resolved-rule digest.",
+      "operations": [
+        "record",
+        "amend",
+        "expire",
+        "resolve"
+      ]
+    },
+    {
+      "name": "hive-memory",
+      "purpose": "Generated knowledge projections, the maintenance queue and per-consumer acknowledgment.",
+      "operations": [
+        "render",
+        "check",
+        "propagate"
+      ]
+    }
+  ],
+  "home_paths": [
+    "pool"
+  ],
+  "kind_prefixes": [
+    "pool"
+  ],
+  "receipt_kinds": [],
+  "test_target": "test-pool",
+  "test_scope": "Record round trips, transitions, concurrent writes, migration and recovery, and rule expiry by the clock and lift by receipt.",
+  "calls": [],
+  "executes": {
+    "core": [],
+    "transitional": [],
+    "optional": [],
+    "project": false
+  },
+  "platform": [
+    {
+      "name": "open",
+      "reason": "Shows a file to the operator in the platform's own viewer."
+    }
+  ],
+  "toolchain": {
+    "language": "go",
+    "version": "1.27"
+  },
+  "libraries": [
+    {
+      "module": "forge.example/upstream/example-lib",
+      "import_id": "example-lib"
+    }
+  ],
+  "imports": [
+    "example-upstream",
+    "example-lib"
+  ]
+}

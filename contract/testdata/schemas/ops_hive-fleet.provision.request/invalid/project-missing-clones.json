@@ -1,0 +1,31 @@
+{
+  "home": {
+    "role": "fleet",
+    "name": "Acme Fleet",
+    "parent_home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyzp"
+  },
+  "workspace": {
+    "slug": "acme",
+    "name": "Acme"
+  },
+  "projects": [
+    {
+      "slug": "widgets",
+      "name": "Widgets",
+      "repository": {
+        "kind": "github",
+        "host": "github.com",
+        "owner": "acme",
+        "name": "widgets"
+      }
+    },
+    {
+      "slug": "notes",
+      "name": "Notes",
+      "repository": {
+        "kind": "local-only"
+      },
+      "clones": []
+    }
+  ]
+}

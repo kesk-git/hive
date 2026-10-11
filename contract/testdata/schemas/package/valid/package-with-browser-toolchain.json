@@ -1,0 +1,52 @@
+{
+  "schema": "hive.package",
+  "schema_version": "1.0",
+  "name": "ui",
+  "kind": "package",
+  "title": "UI",
+  "owns": "The Hive UI: the Fleet overview, Pool and The Swarm; the session dock and the optional reader; the on-demand task, Harvest, Shadow, History and Scheduled views and the Review artifact surface; artifact serving; decision cards over scoped projections; every file of a review directory, which every package of the same home reads through the contract library.",
+  "plan_stage": 6,
+  "executable": "hive-ui",
+  "commands": [
+    {
+      "name": "hive-ui",
+      "purpose": "Serving the UI and review artifacts, the scoped feedback writer and the review files.",
+      "operations": []
+    }
+  ],
+  "home_paths": [
+    "ui",
+    "reviews"
+  ],
+  "kind_prefixes": [
+    "ui"
+  ],
+  "receipt_kinds": [],
+  "test_target": "test-ui",
+  "test_scope": "Projection coverage and freshness, stale and incomplete cards, revision-bound submissions, same-session continuity, durable review rounds, receipt-driven motion, reconnect, reduced motion, context restoration, receipt display, and scheduled-job and temporary-rule lists read from records with incomplete coverage shown.",
+  "calls": [
+    "pool",
+    "dispatch",
+    "shadow",
+    "synapse",
+    "word"
+  ],
+  "executes": {
+    "core": [],
+    "transitional": [],
+    "optional": [],
+    "project": false
+  },
+  "platform": [],
+  "toolchain": {
+    "language": "go",
+    "version": "1.27",
+    "browser": [
+      "html",
+      "css",
+      "javascript"
+    ]
+  },
+  "libraries": [],
+  "imports": []
+}
