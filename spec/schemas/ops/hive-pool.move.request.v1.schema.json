@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.move.request:v1",
+  "title": "hive-pool move: request body",
+  "description": "One step of a multi-home move. prepare runs in the source home, accept in the destination, complete in the source; abort runs in whichever home still holds an unfinished move. Each step is one transaction of its home; the caller carries the receipts across. See spec/pool.md, Moves between homes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "step"
+  ],
+  "properties": {
+    "step": {
+      "enum": [
+        "prepare",
+        "accept",
+        "complete",
+        "abort"
+      ]
+    },
+    "move_id": {
+      "description": "Absent for prepare, which mints it; required for every other step.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/move_id"
+    },
+    "task_ids": {
+      "description": "For prepare: every item to move. Each must exist, be queued or done with no open generation, and no blocked-by edge may be left stranded across the two homes.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+      }
+    },
+    "destination_home_id": {
+      "description": "For prepare.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "destination_scope": {
+      "description": "For prepare: the scope the items take in the destination. Absent keeps the source scope.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope_level"
+      ],
+      "properties": {
+        "scope_level": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+        },
+        "workspace_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+        },
+        "project_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+        }
+      ]
+    },
+    "move": {
+      "description": "For accept: the source's move record as prepare returned it.",
+      "$ref": "urn:hive:schema:records:pool.move:v1"
+    },
+    "items": {
+      "description": "For accept: the item records as prepare returned them, whole. The destination verifies each against the digest in the move record.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1"
+      }
+    },
+    "holds": {
+      "description": "For accept: the active holds that travel with the items.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.hold:v1"
+      }
+    },
+    "receipt": {
+      "description": "For accept: the source's pool.move.prepared receipt. For complete: the destination's pool.move.accepted receipt. The step is refused without it.",
+      "$ref": "urn:hive:schema:receipt:v1"
+    },
+    "reason": {
+      "description": "For abort.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "step": {
+            "const": "prepare"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "task_ids",
+          "destination_home_id"
+        ],
+        "properties": {
+          "move_id": false,
+          "move": false,
+          "items": false,
+          "holds": false,
+          "receipt": false
+        }
+      },
+      "else": {
+        "required": [
+          "move_id"
+        ],
+        "properties": {
+          "task_ids": false,
+          "destination_home_id": false,
+          "destination_scope": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "step": {
+            "const": "accept"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "move",
+          "items",
+          "holds",
+          "receipt"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "step": {
+            "const": "complete"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "receipt"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "step": {
+            "const": "abort"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      }
+    }
+  ]
+}

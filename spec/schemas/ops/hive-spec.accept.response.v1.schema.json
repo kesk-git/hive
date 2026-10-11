@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-spec.accept.response:v1",
+  "title": "hive-spec accept: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specification",
+    "item"
+  ],
+  "properties": {
+    "specification": {
+      "$ref": "urn:hive:schema:records:pool.specification:v1"
+    },
+    "item": {
+      "$ref": "urn:hive:schema:records:pool.item:v1"
+    }
+  }
+}

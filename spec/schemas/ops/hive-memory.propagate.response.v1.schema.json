@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.propagate.response:v1",
+  "title": "hive-memory propagate: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "projection",
+    "consumer"
+  ],
+  "properties": {
+    "projection": {
+      "$ref": "urn:hive:schema:records:pool.projection:v1"
+    },
+    "consumer": {
+      "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/consumer"
+    }
+  }
+}

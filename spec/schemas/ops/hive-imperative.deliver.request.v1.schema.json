@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-imperative.deliver.request:v1",
+  "title": "hive-imperative deliver: request body",
+  "description": "Records exactly what one generation was given: the revision, the rendered text's digest and size, the transport and the receipt the caller holds for the delivery. Written by the dispatcher of a later stage after the transport accepted the text; stage 2 builds and proves the write with a test caller. The generation must be open on the item.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "generation",
+    "revision",
+    "renderer_version",
+    "text_digest",
+    "text_bytes",
+    "transport",
+    "evidence"
+  ],
+  "properties": {
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "generation": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+    },
+    "revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "renderer_version": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
+    },
+    "text_digest": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+    },
+    "text_bytes": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+    },
+    "transport": {
+      "enum": [
+        "launch-prompt",
+        "steer",
+        "public-safe-prompt"
+      ]
+    },
+    "evidence": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    }
+  }
+}

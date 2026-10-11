@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.check.response:v1",
+  "title": "hive-memory check: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checked_at",
+    "projections"
+  ],
+  "properties": {
+    "checked_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "projections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "projection_id",
+          "audience",
+          "state",
+          "bytes",
+          "over_budget",
+          "stale_sources",
+          "duplicates",
+          "drift"
+        ],
+        "properties": {
+          "projection_id": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+          },
+          "audience": {
+            "enum": [
+              "shared",
+              "fleet",
+              "project"
+            ]
+          },
+          "state": {
+            "enum": [
+              "fresh",
+              "stale"
+            ]
+          },
+          "bytes": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+          },
+          "over_budget": {
+            "type": "boolean"
+          },
+          "stale_sources": {
+            "description": "Sources whose current revision differs from the one rendered.",
+            "type": "array",
+            "items": {
+              "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+            }
+          },
+          "duplicates": {
+            "description": "Rule lines that appear in this projection and in another of the same scope, which would be two copies of one fact.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rule_id",
+                "also_in"
+              ],
+              "properties": {
+                "rule_id": {
+                  "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+                },
+                "also_in": {
+                  "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+                }
+              }
+            }
+          },
+          "drift": {
+            "description": "Consumers that received or acknowledged a digest other than the current one.",
+            "type": "array",
+            "items": {
+              "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/consumer"
+            }
+          }
+        }
+      }
+    }
+  }
+}

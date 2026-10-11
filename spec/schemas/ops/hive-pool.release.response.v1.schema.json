@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.release.response:v1",
+  "title": "hive-pool release: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "hold"
+  ],
+  "properties": {
+    "hold": {
+      "$ref": "urn:hive:schema:records:pool.hold:v1"
+    }
+  }
+}

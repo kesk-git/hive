@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.update.response:v1",
+  "title": "hive-pool update: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "item",
+    "changed"
+  ],
+  "properties": {
+    "item": {
+      "$ref": "urn:hive:schema:records:pool.item:v1"
+    },
+    "changed": {
+      "description": "The fields that actually changed. Empty when the patch was idempotent, and then nothing was written and no receipt exists.",
+      "type": "array",
+      "items": {
+        "enum": [
+          "title",
+          "body",
+          "deliverable",
+          "class",
+          "priority",
+          "placement_requested",
+          "delivery",
+          "specification_required",
+          "definition",
+          "links",
+          "deps",
+          "schedule"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.export-legacy.request:v1",
+  "title": "hive-pool export-legacy: request body",
+  "description": "Renders Pool items in the legacy Markdown format and returns the text. It writes no file: the caller decides where the text goes. With a migration, an item unmodified since its import is emitted from its exact original lines and a modified item is re-rendered canonically; the free-form lines, preamble and section order of the source are kept. Read-only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "zone"
+  ],
+  "properties": {
+    "migration_id": {
+      "description": "Export the items of this migration in the source's order and form. Without it, every item the selector matches is rendered canonically.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/migration_id"
+    },
+    "selector": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/item_selector"
+    },
+    "zone": {
+      "description": "The zone calendar dates are written in.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/zone"
+    },
+    "normalize": {
+      "description": "True: re-render every item canonically, as the legacy render verb does. Absent means false.",
+      "type": "boolean"
+    }
+  }
+}

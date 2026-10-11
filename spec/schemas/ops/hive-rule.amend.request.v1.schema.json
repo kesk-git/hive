@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-rule.amend.request:v1",
+  "title": "hive-rule amend: request body",
+  "description": "Appends an attributed amendment to a rule: an extension, an early end, a lift honoured by its named receipt, a supersession by another rule, or a note. The original words and dates stay; the rule's status and the time the resolver uses change. The envelope's expected_revisions names the rule's revision and its authority is the amendment's.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rule_id",
+    "kind",
+    "words"
+  ],
+  "properties": {
+    "rule_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+    },
+    "kind": {
+      "enum": [
+        "extend",
+        "end",
+        "lift",
+        "supersede",
+        "note"
+      ]
+    },
+    "words": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "new_expires_at": {
+      "description": "For extend or end.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "evidence": {
+      "description": "For a lift: the receipt that meets the lift condition, which must be of the kind and about the subject the condition names. For a supersession: the superseding rule.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "extend",
+              "end"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "new_expires_at"
+        ]
+      },
+      "else": {
+        "properties": {
+          "new_expires_at": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "lift",
+              "supersede"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "evidence"
+        ]
+      }
+    }
+  ]
+}

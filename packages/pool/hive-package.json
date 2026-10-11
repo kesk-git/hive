@@ -4,17 +4,28 @@
   "name": "pool",
   "kind": "package",
   "title": "Pool",
-  "owns": "Pool storage and migrations; admission records; Imperatives; accepted specifications; original rules and their projections, including temporary rules with an expiry or lift condition; generated knowledge projections. It is the one store that word persists decisions in.",
+  "owns": "Pool storage and migrations; admission records; Imperatives; accepted specifications; original rules and their projections, including temporary rules with an expiry or lift condition; generated knowledge projections. It is the one store that word persists decisions in: the question and decision-round records are Pool records, written only by hive-pool.",
   "plan_stage": 2,
   "executable": "hive-pool",
   "commands": [
     {
       "name": "hive-pool",
-      "purpose": "Durable work items: identity, scope, dependencies, delivery path, dispatch class, holds and dates.",
+      "purpose": "Durable work items: identity, scope, dependencies, delivery path, dispatch class, requested place, holds, dates and generations; legacy import and export; moves between homes; the persistence of the Mind's word.",
       "operations": [
         "add",
         "read",
-        "update"
+        "update",
+        "transition",
+        "open-generation",
+        "close-generation",
+        "hold",
+        "release",
+        "move",
+        "import-legacy",
+        "export-legacy",
+        "hold-question",
+        "answer-question",
+        "complete-question"
       ]
     },
     {
@@ -32,7 +43,8 @@
       "operations": [
         "create",
         "revise",
-        "render"
+        "render",
+        "deliver"
       ]
     },
     {
@@ -70,9 +82,150 @@
   "kind_prefixes": [
     "pool"
   ],
-  "receipt_kinds": [],
+  "receipt_kinds": [
+    {
+      "kind": "pool.item.added",
+      "asserts": "An item was added to the Pool with its identity, scope and requested place."
+    },
+    {
+      "kind": "pool.item.transitioned",
+      "asserts": "An item moved from one state to another, with the evidence the caller gave."
+    },
+    {
+      "kind": "pool.hold.placed",
+      "asserts": "A hold of the stated kind was placed on an item for the reason given."
+    },
+    {
+      "kind": "pool.hold.released",
+      "asserts": "A hold on an item was released on the evidence named."
+    },
+    {
+      "kind": "pool.generation.opened",
+      "asserts": "An execution generation of an item was opened under an admitted admission, with the place requested at that moment."
+    },
+    {
+      "kind": "pool.generation.closed",
+      "asserts": "An execution generation was closed with the outcome and evidence the caller reported."
+    },
+    {
+      "kind": "pool.admission.created",
+      "asserts": "An admission request was recorded immutably, bound to an Imperative revision and digest."
+    },
+    {
+      "kind": "pool.admission.admitted",
+      "asserts": "An admission check found every required field present, the placement admissible and the authority sufficient, for the Imperative revision and item revision it read."
+    },
+    {
+      "kind": "pool.admission.refused",
+      "asserts": "An admission check refused dispatch of an Imperative revision for the findings recorded."
+    },
+    {
+      "kind": "pool.admission.held",
+      "asserts": "An admission check held dispatch of an Imperative revision on the hold named."
+    },
+    {
+      "kind": "pool.admission.approved",
+      "asserts": "The Mind's word named was recorded as the required ruling for an admission."
+    },
+    {
+      "kind": "pool.imperative.revised",
+      "asserts": "A revision of an item's canonical Imperative was recorded with its digest and the Placement axis copied from the item."
+    },
+    {
+      "kind": "pool.imperative.delivered",
+      "asserts": "One Imperative revision, at the rendered digest, was delivered to one generation by the transport named."
+    },
+    {
+      "kind": "pool.specification.defined",
+      "asserts": "A specification revision was recorded with its criteria and digest."
+    },
+    {
+      "kind": "pool.specification.accepted",
+      "asserts": "A specification revision was accepted for an item by the supervisor named, with its open product questions listed."
+    },
+    {
+      "kind": "pool.specification.invalidated",
+      "asserts": "An acceptance was invalidated by a later revision that changed an accepted criterion."
+    },
+    {
+      "kind": "pool.specification.closed",
+      "asserts": "Accepted requirements were closed against the landed head, landing and proof named."
+    },
+    {
+      "kind": "pool.rule.recorded",
+      "asserts": "A ruling was recorded verbatim with its subject, scope, authority, rule line and effective time."
+    },
+    {
+      "kind": "pool.rule.amended",
+      "asserts": "An attributed amendment of a rule's operation was recorded, leaving its words and dates unchanged."
+    },
+    {
+      "kind": "pool.rule.expired",
+      "asserts": "A rule's expiry time was noticed and honoured by its owner."
+    },
+    {
+      "kind": "pool.rule.lifted",
+      "asserts": "A rule's lift condition was met by the receipt named and the lift was honoured."
+    },
+    {
+      "kind": "pool.projection.rendered",
+      "asserts": "A knowledge projection was rendered from the sources named, at their revisions, with its digest."
+    },
+    {
+      "kind": "pool.projection.received",
+      "asserts": "One consumer received a projection at the rendering and digest named."
+    },
+    {
+      "kind": "pool.projection.acknowledged",
+      "asserts": "One consumer acknowledged a projection at the rendering and digest named."
+    },
+    {
+      "kind": "pool.question.held",
+      "asserts": "A question was recorded for the Hive Mind and the item it gates was held."
+    },
+    {
+      "kind": "pool.answer.accepted",
+      "asserts": "The Hive Mind's exact answer was recorded against a question, card and round at their revisions and applied."
+    },
+    {
+      "kind": "pool.answer.unreconciled",
+      "asserts": "An answer given against an earlier question revision was recorded and awaits reconciliation; nothing was applied."
+    },
+    {
+      "kind": "pool.answer.superseded",
+      "asserts": "An earlier applied answer was superseded by the answer named, under the Hive Mind's word."
+    },
+    {
+      "kind": "pool.question.deferred",
+      "asserts": "A revisit date was recorded for a question; its hold stays."
+    },
+    {
+      "kind": "pool.question.completed",
+      "asserts": "A question was completed and nothing further is owed on it."
+    },
+    {
+      "kind": "pool.legacy.imported",
+      "asserts": "A legacy backlog was imported under the identity migration named, with its source digest."
+    },
+    {
+      "kind": "pool.move.prepared",
+      "asserts": "Items were prepared for a move to another home and marked moving in this one."
+    },
+    {
+      "kind": "pool.move.accepted",
+      "asserts": "Items of a move were written into this home unchanged apart from scope and origin."
+    },
+    {
+      "kind": "pool.move.completed",
+      "asserts": "Items of a move were marked moved in this home on the destination's acceptance."
+    },
+    {
+      "kind": "pool.move.aborted",
+      "asserts": "A move was abandoned and its items restored to their state in this home."
+    }
+  ],
   "test_target": "test-pool",
-  "test_scope": "Record round trips, transitions, concurrent writes, migration and recovery, and rule expiry by the clock and lift by receipt.",
+  "test_scope": "Record round trips, transitions, concurrent writes, migration and recovery, and rule expiry by the clock and lift by receipt. From stage 2: byte-exact legacy round trip and identity migration; admission with each requested place, Codex Void refused, a Void place refused for a local-only project and held for an unpushed branch; criteria carried from Pool to Imperative by revision; deterministic rendering; a home inside a repository refused; a persistent Fleet never an ordinary task; no worktree assumed; answers idempotent by source; a multi-home move recovered at every step; secrets by reference only.",
   "calls": [],
   "executes": {
     "core": [],

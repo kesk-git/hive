@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.hold-question.request:v1",
+  "title": "hive-pool hold-question: request body",
+  "description": "Persists a question for the Hive Mind, its card in a decision round, and the word hold on the item it gates, in one transaction. The identities come from word, which mints them; this is the operation word persists through. A caller other than hive-word is outside the design's one intake and is refused by that package's own declaration, not by this operation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question",
+    "round",
+    "card_id"
+  ],
+  "properties": {
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "origin",
+        "text",
+        "consequence",
+        "options",
+        "asked_at",
+        "asked_by"
+      ],
+      "properties": {
+        "question_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+        },
+        "held_task_id": {
+          "description": "The item to hold. Either this or new_item.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "new_item": {
+          "description": "For a question with its own scope: the decision item to add and hold.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title"
+          ],
+          "properties": {
+            "title": {
+              "$ref": "urn:hive:schema:common:v1#/$defs/label"
+            },
+            "body": {
+              "type": "string"
+            }
+          }
+        },
+        "origin": {
+          "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/origin"
+        },
+        "text": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "consequence": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "recommendation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/option"
+          }
+        },
+        "amount": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "asked_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "asked_by": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        }
+      }
+    },
+    "round": {
+      "description": "The round the card joins: a new round with this identity, or an existing open round of this home.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_round_id",
+        "new"
+      ],
+      "properties": {
+        "decision_round_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/decision_round_id"
+        },
+        "new": {
+          "type": "boolean"
+        },
+        "origin": {
+          "description": "For a new round.",
+          "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/origin"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "file",
+              "fetched"
+            ],
+            "properties": {
+              "file": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+              },
+              "fetched": {
+                "enum": [
+                  "complete",
+                  "missing",
+                  "truncated",
+                  "unreadable"
+                ]
+              }
+            }
+          }
+        },
+        "complete": {
+          "description": "For a new round: whether it was collected whole.",
+          "type": "boolean"
+        },
+        "incomplete_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "new": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "origin",
+              "complete"
+            ]
+          }
+        }
+      ]
+    },
+    "card_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/card_id"
+    },
+    "hold_reason": {
+      "description": "The hold's reason for a person. Absent means the question's text.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    }
+  }
+}

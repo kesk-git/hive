@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-admit.create.request:v1",
+  "title": "hive-admit create: request body",
+  "description": "Records an immutable admission request against one Imperative revision, preserving the original words. It checks nothing: check does. See spec/pool.md, Admission.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "imperative_revision",
+    "words"
+  ],
+  "properties": {
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "imperative_revision": {
+      "description": "Must be the Imperative's current revision.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "words": {
+      "description": "The instruction as given, exactly.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "source": {
+      "description": "The intake receipt or record the words came from, where there is one.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    }
+  }
+}

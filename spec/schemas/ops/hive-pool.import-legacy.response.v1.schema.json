@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.import-legacy.response:v1",
+  "title": "hive-pool import-legacy: response body",
+  "description": "The parse report, and for an import that wrote, the migration and the items created.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "report"
+  ],
+  "properties": {
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "digest",
+        "bytes",
+        "entries",
+        "free_lines",
+        "warnings",
+        "round_trip_exact"
+      ],
+      "properties": {
+        "digest": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/digest"
+        },
+        "bytes": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+        },
+        "entries": {
+          "description": "One per legacy bullet with an identifier: what it would become or became.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "legacy_id",
+              "section",
+              "state",
+              "disposition"
+            ],
+            "properties": {
+              "legacy_id": {
+                "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/legacy_id"
+              },
+              "section": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "queued",
+                  "in-flight",
+                  "done",
+                  "none"
+                ]
+              },
+              "disposition": {
+                "enum": [
+                  "item",
+                  "excluded",
+                  "duplicate"
+                ]
+              },
+              "task_id": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            }
+          }
+        },
+        "free_lines": {
+          "description": "How many lines without an identifier the file holds; each is kept and never addressed by identity.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "round_trip_exact": {
+          "description": "True when rendering the parsed file back reproduces the source byte for byte. An import that writes requires it.",
+          "type": "boolean"
+        }
+      }
+    },
+    "migration": {
+      "$ref": "urn:hive:schema:records:pool.migration:v1"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1"
+      }
+    },
+    "holds": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.hold:v1"
+      }
+    }
+  }
+}

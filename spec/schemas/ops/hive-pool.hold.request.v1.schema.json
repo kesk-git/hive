@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.hold.request:v1",
+  "title": "hive-pool hold: request body",
+  "description": "Places a parked, external, resource or future hold on an item. A word hold is placed only through hive-word hold, an admission hold only by hive-admit check, and a definition hold only by the Pool itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "kind",
+    "reason"
+  ],
+  "properties": {
+    "task_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "kind": {
+      "enum": [
+        "parked",
+        "external",
+        "resource",
+        "future"
+      ]
+    },
+    "reason": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "until": {
+      "description": "Required for future; allowed for the others.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/zoned_time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "future"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "until"
+        ]
+      }
+    }
+  ]
+}
