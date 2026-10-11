@@ -143,7 +143,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
         },
         "blocked": {
-          "description": "True when the item is not done and a blocked-by edge names an item of this Pool that has not completed: one that is queued or in-flight, or archived without ever having been done. A blocker done, or archived after it was done, satisfies the edge.",
+          "description": "True when the item is not done and a blocked-by edge names an item of this Pool that does not carry the completion marker: one that is queued or in-flight, or archived without ever having been done. A blocker carrying the marker, done or archived after it was done, satisfies the edge whether or not its closing time is known.",
           "type": "boolean"
         },
         "held": {

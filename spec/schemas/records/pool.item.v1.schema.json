@@ -189,9 +189,17 @@
         }
       }
     },
+    "completed": {
+      "description": "The completion marker: true once the item has reached done. Cleared on reopen and kept when a done item is archived, so that the completion survives archival. It is the one fact that satisfies a dependency; an item archived without having been done has none.",
+      "const": true
+    },
     "closed_at": {
-      "description": "When the item reached done: its completion. Cleared on reopen, and kept when a done item is archived, so that the completion survives archival; an item archived without having been done has none.",
+      "description": "When the completion happened, as evidence of when and never what satisfies a dependency. Absent when the time is not known.",
       "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "closed_at_unknown": {
+      "description": "True on a completed item whose closing time is not known, as a legacy Done entry without a closing date is imported. No time is invented for it: the time of the import is the migration's own fact.",
+      "const": true
     },
     "created_at": {
       "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
@@ -209,6 +217,87 @@
   "allOf": [
     {
       "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "done"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "queued",
+              "in-flight"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "completed": false,
+          "closed_at": false,
+          "closed_at_unknown": false
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "closed_at"
+        ]
+      },
+      "then": {
+        "required": [
+          "completed"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "closed_at_unknown"
+        ]
+      },
+      "then": {
+        "required": [
+          "completed"
+        ],
+        "properties": {
+          "closed_at": false
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "completed"
+        ]
+      },
+      "then": {
+        "anyOf": [
+          {
+            "required": [
+              "closed_at"
+            ]
+          },
+          {
+            "required": [
+              "closed_at_unknown"
+            ]
+          }
+        ]
+      }
     }
   ],
   "$defs": {
@@ -368,7 +457,7 @@
       ]
     },
     "dependency": {
-      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready and out of every generation while its blocker has not completed, and a blocker has completed only when it is done, or archived after it was done: its closed_at, kept through archival, is the completion. An archived blocker that never completed satisfies nothing. An edge to an item that does not exist is resolved. reason is free text carried across a round trip and never read for state.",
+      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready and out of every generation while its blocker has not completed, and a blocker has completed only when it carries the completion marker, which survives archival: an item done, or archived after it was done. The closing time is never what satisfies the edge. An archived blocker that never completed satisfies nothing. An edge to an item that does not exist is resolved. reason is free text carried across a round trip and never read for state.",
       "type": "object",
       "additionalProperties": false,
       "required": [
