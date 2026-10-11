@@ -156,20 +156,35 @@ func splitRef(text string) (refParts, error) {
 	if !hasFrag {
 		return refParts{id: id}, nil
 	}
-	if !strings.HasPrefix(frag, "/") {
-		return refParts{}, errors.New("a fragment is a JSON pointer starting with /")
-	}
 	frag, err := url.PathUnescape(frag)
 	if err != nil || !utf8.ValidString(frag) {
 		return refParts{}, errors.New("the fragment is not a valid percent-encoded JSON pointer")
 	}
+	if frag == "" {
+		return refParts{id: id}, nil
+	}
+	if frag[0] != '/' {
+		return refParts{}, errors.New("a fragment is a JSON pointer: empty, or starting with /")
+	}
 	var canon strings.Builder
 	for _, tok := range strings.Split(frag[1:], "/") {
-		if strings.Contains(strings.ReplaceAll(strings.ReplaceAll(tok, "~0", ""), "~1", ""), "~") {
-			return refParts{}, errors.New("the fragment is not a JSON pointer: ~ must be followed by 0 or 1")
+		var name strings.Builder
+		for i := 0; i < len(tok); i++ {
+			if tok[i] != '~' {
+				name.WriteByte(tok[i])
+				continue
+			}
+			i++
+			switch {
+			case i < len(tok) && tok[i] == '0':
+				name.WriteByte('~')
+			case i < len(tok) && tok[i] == '1':
+				name.WriteByte('/')
+			default:
+				return refParts{}, errors.New("the fragment is not a JSON pointer: ~ must be followed by 0 or 1")
+			}
 		}
-		tok = strings.ReplaceAll(strings.ReplaceAll(tok, "~1", "/"), "~0", "~")
-		canon.WriteString("/" + escape(tok))
+		canon.WriteString("/" + escape(name.String()))
 	}
 	return refParts{id, canon.String()}, nil
 }

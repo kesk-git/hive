@@ -27,10 +27,6 @@ var keywords = []string{
 	"maximum", "allOf", "anyOf", "oneOf", "not", "if", "then", "else",
 }
 
-// Keywords lists every keyword of the profile, sorted. The boolean schemas
-// true and false are the profile's only other form.
-func Keywords() []string { return slices.Sorted(slices.Values(keywords)) }
-
 var jsonTypes = []string{"array", "boolean", "integer", "null", "number", "object", "string"}
 
 // Problem is one way a schema file falls outside the profile, or a reference

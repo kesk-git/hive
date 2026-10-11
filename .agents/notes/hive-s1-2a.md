@@ -11,4 +11,4 @@ AGENTS.md
 ## Notes
 
 
-- The schema validator is `contract/schema`: `Embedded()` loads and checks every file under `spec/schemas/` (profile, closed objects, `$id` derived from the path, references, reference cycles), and `Validate(ref, bytes)` decodes strictly (whole numbers, unique member names, no lone surrogates) before checking. A schema edit that breaks the profile fails `make test-contract` at once; `Keywords()` lists the profile of `spec/records.md`, so change both together.
+- The schema validator is `contract/schema`: `Embedded()` loads and checks every file under `spec/schemas/` (profile, closed objects, `$id` derived from the path, references, reference cycles), and `Validate(ref, bytes)` decodes strictly (whole numbers, unique member names, no lone surrogates) before checking. A schema edit that breaks the profile fails `make test-contract` at once.
