@@ -171,7 +171,7 @@
           "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
         },
         "criteria": {
-          "description": "The accepted specification revision whose criteria are rendered into this section, by revision. Absent only for an item that requires no specification.",
+          "description": "The accepted specification revision whose criteria are rendered into this section, by revision. Must equal the item's effective specification, its own binding or its parent's; absent only for an item that has none.",
           "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
         },
         "evidence": {

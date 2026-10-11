@@ -50,7 +50,7 @@
           }
         },
         "ready": {
-          "description": "Items only: queued, not blocked, not actively held.",
+          "description": "Items only: queued, not blocked, not actively held, not a decision item, not a Target and not a Prey that has a Hunt beneath it.",
           "type": "boolean"
         },
         "active": {

@@ -94,11 +94,11 @@
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/delivery"
     },
     "specification_required": {
-      "description": "True when build dispatch needs an accepted specification revision. Absent means false.",
+      "description": "True when build dispatch needs an accepted specification revision. Absent means false. An item also needs one when the item it resolves through, its parent, does.",
       "type": "boolean"
     },
     "specification": {
-      "description": "The accepted specification revision whose criteria this item carries. Set by hive-spec accept and cleared by an invalidation.",
+      "description": "The accepted specification revision whose criteria this item carries. Set by hive-spec accept and cleared by an invalidation. An item with none reads the effective specification of its parent, a Hunt its Prey's and a Prey its Target's; see spec/pool.md, Specifications.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
     },
     "deps": {
@@ -197,7 +197,7 @@
       }
     },
     "completed": {
-      "description": "The completion marker: true once the item has reached done. Cleared on reopen and kept when a done item is archived, so that the completion survives archival. It is the one fact that satisfies a dependency; an item archived without having been done has none.",
+      "description": "The completion marker: true once the item has reached done, which a Target and a Prey that has a Hunt beneath it never do. Cleared on reopen and kept when a done item is archived, so that the completion survives archival. It is the one fact that lands a leaf, and a dependency reads the landing; an item archived without having been done has none.",
       "const": true
     },
     "closed_at": {
@@ -542,7 +542,7 @@
       ]
     },
     "dependency": {
-      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready and out of every generation while its blocker has not completed, and a blocker has completed only when it carries the completion marker, which survives archival: an item done, or archived after it was done. The closing time is never what satisfies the edge. An archived blocker that never completed satisfies nothing. An edge to an item that does not exist is resolved. A parent edge points from a Hunt to a Prey or from a Prey to a Target, never otherwise; add and update refuse any other pair with pool.hierarchy, and a Target's blocked-by edges name the Targets it depends on. reason is free text carried across a round trip and never read for state.",
+      "description": "An edge to another item of the same Pool. blocked-by keeps the item out of ready and out of every generation while its blocker has not landed. A leaf, a Hunt or a Prey with no Hunt, has landed when it carries the completion marker, which survives archival: an item done, or archived after it was done. A Prey with Hunts has landed when at least one Hunt points at it and every one has landed, and a Target when at least one Prey points at it and every one has landed. The closing time is never what satisfies the edge. An archived blocker that never landed satisfies nothing. An edge to an item that does not exist is resolved. A parent edge points from a Hunt to a Prey or from a Prey to a Target, never otherwise; add and update refuse any other pair with pool.hierarchy, and a Target's blocked-by edges name the Targets it depends on. reason is free text carried across a round trip and never read for state.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -830,7 +830,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
         },
         "ready": {
-          "description": "True: only items that are queued, not blocked and not actively held.",
+          "description": "True: only items that are queued, not blocked, not actively held, not a decision item, not a Target and not a Prey that has a Hunt beneath it.",
           "type": "boolean"
         },
         "limit": {

@@ -144,7 +144,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
         },
         "blocked": {
-          "description": "True when the item is not done and a blocked-by edge names an item of this Pool that does not carry the completion marker: one that is queued or in-flight, or archived without ever having been done. A blocker carrying the marker, done or archived after it was done, satisfies the edge whether or not its closing time is known.",
+          "description": "True when the item has not landed and a blocked-by edge names an item of this Pool that has not landed: a leaf that is queued or in-flight, or archived without ever having been done, or a Target or a Prey with Hunts whose items beneath it have not all landed. A blocker that has landed satisfies the edge whether or not its closing time is known.",
           "type": "boolean"
         },
         "held": {
@@ -152,11 +152,11 @@
           "type": "boolean"
         },
         "ready": {
-          "description": "Queued, not blocked, not held and not a decision item.",
+          "description": "Queued, not blocked, not held, not a decision item, not a Target and not a Prey that has a Hunt beneath it.",
           "type": "boolean"
         },
         "landed": {
-          "description": "Derived from the parent edges that point at the item. A Target is landed when at least one Prey points at it and every one of them is completed; a Prey with Hunts when every Hunt that points at it is completed; a Hunt, or a Prey with no Hunt, when it is completed itself. Completed means the completion marker is set.",
+          "description": "Effective completion, derived from the parent edges that point at the item. A Target has landed when at least one Prey points at it and every one of them has landed; a Prey with Hunts when at least one Hunt points at it and every one has landed; a Hunt, a Prey with no Hunt, or an item with no level, when it carries the completion marker.",
           "type": "boolean"
         },
         "building": {
