@@ -10,7 +10,7 @@ func TestPatternCommonSyntax(t *testing.T) {
 		`^[a-z]{1,3}$`, `(?:ab)+`, `\x41`, `[\w-]+`, `a{2,}`, `a{3}`, `\.`, `^$`,
 		`(^|/)\.\.?(/|$)`, `[^/\x00]+`, `a|b`, `\d\D\w\W`, `\bword\b`,
 		`[a-f0-9]`, `\/`, `[\-a]`, `[a-]`, `[-a]`, `[\w-]`, `[\]]`, `[\[]`, `a{0,1000}`, `(a)(b)`, `[.]`, `[^\n\t ]+`,
-		`[(){}|*+?^$]`, `a{0}`, `a{0,0}`, `a{10}`, `a{0,}`, `(^)*`, `()`, `a|`, `(|a)`, `x-y,z:w`, `^\b$`, `(?:^a|b$)+`,
+		`[(){}|*+?^$]`, `a*?`, `a+?`, `a??`, `a{2}?`, `a{2,}?`, `a{2,3}?`, `(?:ab)+?c`, `a{0}`, `a{0,0}`, `a{10}`, `a{0,}`, `(^)*`, `()`, `a|`, `(|a)`, `x-y,z:w`, `^\b$`, `(?:^a|b$)+`,
 		`[\n\r\t\f\v\x00-\x1f]`, `\^\$\\\.\*\+\?\(\)\[\]\{\}\|`, "[\u00a0\u2000-\u200a]",
 	} {
 		if _, err := compilePattern(p); err != nil {
@@ -86,9 +86,10 @@ func TestPatternRefusals(t *testing.T) {
 		`\B*`:         "repeated assertion",
 		`(?:^)*a?{1}`: "repeat of a repeat",
 		`a{2}{3}`:     "repeat of a repeat",
-		`a*?`:         "lazy repeat",
-		`a+?`:         "lazy repeat",
-		`a{2}?`:       "lazy repeat",
+		`a*??`:        "repeat of a lazy repeat",
+		`a+?*`:        "repeat of a lazy repeat",
+		`a{2}?{3}`:    "repeat of a lazy repeat",
+		`a??+`:        "repeat of a lazy repeat",
 		`|*`:          "nothing to repeat",
 		`(*)`:         "nothing to repeat",
 		`a{1,2`:       "unclosed count",

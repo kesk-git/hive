@@ -15,7 +15,7 @@ import (
 //	alt       = seq { "|" seq }
 //	seq       = { "^" | "$" | "\b" | "\B" | atom [ repeat ] }
 //	atom      = literal | escape | class | "(" [ "?:" ] alt ")"
-//	repeat    = "?" | "*" | "+" | "{" n "}" | "{" n "," "}" | "{" n "," m "}"
+//	repeat    = ( "?" | "*" | "+" | "{" n "}" | "{" n "," "}" | "{" n "," m "}" ) [ "?" ]
 //	class     = "[" [ "^" ] item { item } "]"
 //	item      = member [ "-" member ] | "-" at the start or the end
 //	member    = any character but \ [ ] | escape except \b \B \d \D \w \W
@@ -276,6 +276,9 @@ func (p *patternParser) repeat() error {
 		p.pos++
 	default:
 		return nil
+	}
+	if p.more() && p.peek() == '?' {
+		p.pos++
 	}
 	if p.more() {
 		switch p.peek() {
