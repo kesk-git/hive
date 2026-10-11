@@ -144,15 +144,15 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
         },
         "blocked": {
-          "description": "True when the item has not landed and a blocked-by edge names an item of this Pool that has not landed: a leaf that is queued or in-flight, or archived without ever having been done, or a Target or a Prey with Hunts whose items beneath it have not all landed. A blocker that has landed satisfies the edge whether or not its closing time is known.",
+          "description": "True when the item has not landed and it, or any ancestor, has a blocked-by edge that names an item of this Pool that has not landed: a leaf that is queued or in-flight, or archived without ever having been done, or a Target or a Prey with Hunts whose items beneath it have not all landed. A blocker that has landed satisfies the edge whether or not its closing time is known.",
           "type": "boolean"
         },
         "held": {
-          "description": "True when an active hold is in force at the time of the read. A dated hold other than a word hold is inactive on and after its until time; a word hold is never made inactive by a date, which is a revisit date that readers show and nothing more, and stays in force until the decision intake releases it.",
+          "description": "True when the item, or any ancestor, has an active hold in force at the time of the read. A dated hold other than a word hold is inactive on and after its until time; a word hold is never made inactive by a date, which is a revisit date that readers show and nothing more, and stays in force until the decision intake releases it.",
           "type": "boolean"
         },
         "ready": {
-          "description": "Queued, not blocked, not held, not a decision item, not a Target and not a Prey that has a Hunt beneath it.",
+          "description": "Queued, not blocked, not held (each read on the item and on its ancestors), not a decision item, not a Target and not a Prey that has a Hunt beneath it.",
           "type": "boolean"
         },
         "landed": {
@@ -164,12 +164,14 @@
           "type": "boolean"
         },
         "active_blockers": {
+          "description": "The items that block it: those its own blocked-by edges and its ancestors' name and that have not landed.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
           }
         },
         "active_holds": {
+          "description": "The active holds on the item and on its ancestors.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"

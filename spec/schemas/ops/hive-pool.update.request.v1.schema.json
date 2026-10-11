@@ -73,13 +73,14 @@
           }
         },
         "add_deps": {
-          "description": "A parent edge must point from a Hunt to a Prey or from a Prey to a Target; any other pair is refused with pool.hierarchy.",
+          "description": "The parent rule of spec/pool.md, Levels, holds for the item as the patch leaves it: a Hunt has exactly one parent edge, to a Prey; a Prey at most one, to a Target; a Target none; a violation, or a Hunt attached to a Prey that carries the completion marker or has an open generation, is refused with pool.hierarchy.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"
           }
         },
         "remove_deps": {
+          "description": "Removing the only parent edge of a Hunt is refused with pool.hierarchy unless the same patch adds another.",
           "type": "array",
           "items": {
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/dependency"
