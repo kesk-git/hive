@@ -27,4 +27,12 @@ Branch: `claude/secret-handling-contract-4qx7lc`, created from `fm/hive-design-s
 5. The findings sentence and the Shadow sentence are whole either way: recognized value refused whole, unrecognized kept exactly as a found copy.
 6. Checks on the final state: `make check` exit 0; `make test-contract` exit 0.
 
-done claude/secret-handling-contract-4qx7lc round 3
+## Round 4
+
+1. The recognizer at the writer is written as contract: a short fixed list of credential shapes in the contract library's schema package from stage 2, a match `invalid` with `secret_shape_recognized`, refused whole, the refusal naming field and shape and never the text, mention of a prefix not matching, the list a floor; with its Prove case. The plan's two steps of the no-value check and stage 2's text agree.
+2. The detector after the fact is written: three grounds for an incident, an external scanner's report read as an instruction, no scheduled scan.
+3. The Void rule is definite: the Imperative names each Spoor by name and purpose under allowed access, the backend's `probe` establishes presence in the Void host before the launch, and an absent or unreadable Spoor is a hold, not a launch; the Prove sentence, "Render and deliver the Imperative", "Claude in the Void" and stage 4 agree.
+4. The notes' part (b) is now the record of the decisions; part (a) gains the shape list's home, the `secret_shape_recognized` code and the stage-2 acceptance case; part (c) has a round-4 line.
+5. Checks on the final state: `make check` exit 0; `make test-contract` exit 0.
+
+done claude/secret-handling-contract-4qx7lc round 4
