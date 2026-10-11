@@ -18,6 +18,11 @@ const ContractVersion = "1.3"
 // schemas are unchanged since the first version of the specification.
 const SchemaVersion = "1.0"
 
+// CapabilitiesSchemaVersion is the schema_version a capability declaration is
+// written at. 1.1 adds the operation's optional platform member; a
+// declaration at 1.0 is still read.
+const CapabilitiesSchemaVersion = "1.1"
+
 // The schema names and identifiers of the four documents.
 const (
 	RequestSchema      = "hive.request"

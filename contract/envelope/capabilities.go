@@ -128,7 +128,7 @@ func (c *Capabilities) Tree() map[string]any {
 	}
 	m := map[string]any{
 		"schema":                 CapabilitiesSchema,
-		"schema_version":         SchemaVersion,
+		"schema_version":         CapabilitiesSchemaVersion,
 		"command":                c.Command,
 		"package":                c.Package,
 		"executable":             c.Executable,

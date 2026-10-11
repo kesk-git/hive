@@ -1,6 +1,6 @@
 {
   "schema": "hive.capabilities",
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "command": "hive-fleet",
   "package": "dispatch",
   "executable": "hive-dispatch",

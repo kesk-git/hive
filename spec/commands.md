@@ -138,7 +138,7 @@ It declares the command's package and executable, the contract and implementatio
 - its `mode`: `unary` for one request and one response, or `resident` for an operation that writes its response once it has durably started and then runs until stopped, as the Shadow and the UI server do;
 - whether it mutates, the body versions it accepts and the schemas of its request and response bodies;
 - the receipt kinds it writes, the external executables it may run and the commands of other packages it may call;
-- the platform utilities it may run, carried in the operation's own `platform` member, each a name from the package's declared `platform` list. `test-contract` compares that member with the package's `platform` list as it already compares `executes`.
+- the platform utilities it may run, carried in the operation's own `platform` member, each a name from the package's declared `platform` list. The member exists from `schema_version` 1.1 of the declaration; a declaration at 1.0 holds none and is still read. `test-contract` compares that member with the package's `platform` list as it already compares `executes`.
 
 An operation the design names and the build has not reached is declared `unsupported`; calling it is `refused` with `unsupported_operation`. An operation that is built and held closed by a recorded decision is `parked`; calling it is `refused` with `operation_parked`. Neither ever falls back to another route.
 

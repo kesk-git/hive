@@ -38,7 +38,8 @@
   "test_target": "test-synapse",
   "test_scope": "Head-bound proof, finding gates, one fixer and landing authority.",
   "calls": [
-    "word"
+    "word",
+    "dispatch"
   ],
   "executes": {
     "core": [
@@ -53,7 +54,12 @@
     "optional": [],
     "project": true
   },
-  "platform": [],
+  "platform": [
+    {
+      "name": "security",
+      "reason": "Runs the platform's own keychain tool, through the one process-execution path, only to resolve a Spoor's value into the one command that needs it."
+    }
+  ],
   "toolchain": {
     "language": "go",
     "version": "1.27"

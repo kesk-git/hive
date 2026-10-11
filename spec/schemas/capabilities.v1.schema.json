@@ -21,8 +21,10 @@
       "const": "hive.capabilities"
     },
     "schema_version": {
+      "description": "1.1 adds the operation's optional platform member. A declaration at 1.0 holds none.",
       "enum": [
-        "1.0"
+        "1.0",
+        "1.1"
       ]
     },
     "command": {
@@ -194,5 +196,29 @@
         ]
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "1.0"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "operations": {
+            "items": {
+              "not": {
+                "required": [
+                  "platform"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

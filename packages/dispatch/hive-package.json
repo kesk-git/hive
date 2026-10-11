@@ -129,7 +129,8 @@
   "test_scope": "Admission, profile resolution, observation provenance, exact-target recovery and schedule transitions from filing through due, run, hold and retirement.",
   "calls": [
     "pool",
-    "spawning-pool"
+    "spawning-pool",
+    "word"
   ],
   "executes": {
     "core": [
@@ -143,7 +144,12 @@
     "optional": [],
     "project": false
   },
-  "platform": [],
+  "platform": [
+    {
+      "name": "security",
+      "reason": "Runs the platform's own keychain tool, through the one process-execution path, only to resolve a Spoor's value into the one command that needs it."
+    }
+  ],
   "toolchain": {
     "language": "go",
     "version": "1.27"

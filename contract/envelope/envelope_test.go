@@ -695,9 +695,34 @@ func TestCapabilitiesRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, _ := canon.Line(data)
+	if m := tree(t, data); m["schema_version"] != "1.0" {
+		t.Fatalf("the fixture is at %v, not the version an older build wrote", m["schema_version"])
+	}
+	current := tree(t, data)
+	current["schema_version"] = CapabilitiesSchemaVersion
+	want, err := canon.Encode(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = append(want, '\n')
 	if !bytes.Equal(out, want) {
-		t.Errorf("Encode is not the canonical form:\n%s\n%s", out, want)
+		t.Errorf("Encode is not the canonical form at %s:\n%s\n%s", CapabilitiesSchemaVersion, out, want)
+	}
+	for version, ok := range map[string]bool{"1.0": true, "1.1": true, "1.2": false, "2.0": false} {
+		m := tree(t, data)
+		m["schema_version"] = version
+		if _, err := DecodeCapabilities(m); (err == nil) != ok {
+			t.Errorf("capabilities at schema_version %s: %v", version, err)
+		}
+	}
+	older := tree(t, data)
+	older["operations"].([]any)[0].(map[string]any)["platform"] = []any{"security"}
+	if _, err := DecodeCapabilities(older); err == nil {
+		t.Error("a platform member was read from a declaration at 1.0")
+	}
+	older["schema_version"] = CapabilitiesSchemaVersion
+	if _, err := DecodeCapabilities(older); err != nil {
+		t.Errorf("a platform member was refused at %s: %v", CapabilitiesSchemaVersion, err)
 	}
 	// The specification version a command reports is not the schema version of
 	// the envelope: a declaration of this build's specification, or an older
@@ -710,7 +735,7 @@ func TestCapabilitiesRoundTrip(t *testing.T) {
 			t.Errorf("contract_version %s: %v", version, err)
 		}
 	}
-	if m := c.Tree(); m["schema_version"] != SchemaVersion || m["contract_version"] != c.ContractVersion {
+	if m := c.Tree(); m["schema_version"] != CapabilitiesSchemaVersion || m["contract_version"] != c.ContractVersion {
 		t.Errorf("%v %v", m["schema_version"], m["contract_version"])
 	}
 	// A declaration with no operations is valid; one with a supported
