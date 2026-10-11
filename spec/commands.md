@@ -66,7 +66,7 @@ One JSON document, following `response.v1`, for every invocation that gets as fa
 | `body` | The operation's own response. Present only with `ok`. |
 | `error` | Present with every other status: a `code`, a `message` for a person, `retryable`, and the fields the status requires. |
 
-**A response is complete or it is not a response.** It is one document followed by a line feed. A caller accepts it only if the whole document parses, follows the schema, echoes the caller's `request_id` and agrees with the process's exit code. Empty output, output that does not parse, or a status that disagrees with the exit code is treated as `unknown`, never as success and never as an empty result. With any status but `ok` there is no `body`: no partial result is ever returned.
+**A response is complete or it is not a response.** It is one document followed by a line feed. A caller accepts it only if the whole document parses, follows the schema, echoes the caller's `request_id` and agrees with the process's exit code. A `request_id` that is not null is the caller's in every case. A null `request_id` is accepted for a request only with a status the callee reaches before it can read the request's identity: `usage`; `invalid` with code `malformed_request`; and `too_large` that names the request as what exceeded the limit, with code `record_too_large`, `detail.record` of `request` and `actual_bytes` above `limit_bytes`. Any other response with a null `request_id`, a `too_large` about the response included, is `unknown`. The `capabilities` invocation takes no request, and its response is accepted only with a null `request_id` and the operation `capabilities`; no other response is accepted against a request's identity as a capabilities response. Empty output, output that does not parse, or a status that disagrees with the exit code is treated as `unknown`, never as success and never as an empty result. With any status but `ok` there is no `body`: no partial result is ever returned.
 
 ## Exit and error states
 
@@ -111,7 +111,7 @@ Adding a code is a minor change. A code is never reused for another meaning.
 
 ## Size
 
-- Each command declares `max_request_bytes` and `max_response_bytes`. The default for both is 67,108,864 bytes; a command may declare more or less.
+- Each command declares `max_request_bytes` and `max_response_bytes`. The default for both is 67,108,864 bytes; a command may declare more or less, but never less than holds the `outcome_unknown` answer of a transaction whose commit was interrupted: that answer is never replaced by `too_large`, which would promise that nothing changed.
 - A request larger than the limit is `too_large` before it is parsed. A response that would be larger is `too_large` in place of the response.
 - The error carries `code` `record_too_large`, `limit_bytes` and `actual_bytes`, and names in `detail` which record or field was too large where the command knows.
 - Because a request never travels as an argument, no request is bounded by the platform's limit on arguments. The integration target proves this for every call between packages with a record of 2,097,152 bytes, which is above that limit on every supported platform: the record arrives whole, or the caller receives `too_large` and nothing else.
@@ -121,7 +121,7 @@ Adding a code is a minor change. A code is never reused for another meaning.
 
 `request_id` makes a mutating operation safe to send again.
 
-- A mutating command records the outcome of each request it completes, with the digest of the request's canonical form, under its store's `requests/`.
+- A mutating command records the outcome of each request it completes, with the digest of the request's canonical form, under its store's `requests/`, as a record of schema [`hive.request-outcome`](schemas/request-outcome.v1.schema.json). A recorded outcome that fails its schema is `unavailable` with code `record_malformed` and is never replayed.
 - The same `request_id` with the same digest returns the recorded response with `replayed` true, and writes nothing.
 - The same `request_id` with a different digest is a `conflict` with code `replay_mismatch`.
 - A request that ended `unknown` is not recorded as complete. Sending it again makes the command reconcile first: it establishes what happened from its intent and from the outside system, and only then completes, refuses or reports `unknown` again. It never repeats an outside effect it cannot rule out.

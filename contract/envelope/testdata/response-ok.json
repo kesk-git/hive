@@ -1,0 +1,32 @@
+{
+  "schema": "hive.response",
+  "schema_version": "1.0",
+  "request_id": "req_01arz3ndektsv4rrffq69g5fav",
+  "command": "hive-fleet",
+  "operation": "provision",
+  "status": "ok",
+  "exit_code": 0,
+  "responder": {"package": "dispatch", "command": "hive-fleet", "implementation_version": "test", "contract_version": "1.0"},
+  "completed_at": "2026-10-11T08:00:01.000Z",
+  "replayed": false,
+  "receipts": [
+    {
+      "schema": "hive.receipt",
+      "schema_version": "1.0",
+      "receipt_id": "rcpt_01arz3ndektsv4rrffq69g5fav",
+      "kind": "dispatch.home.created",
+      "kind_version": "1.0",
+      "written_at": "2026-10-11T08:00:00.500Z",
+      "writer": {"package": "dispatch", "command": "hive-fleet", "operation": "provision", "implementation_version": "test"},
+      "request_id": "req_01arz3ndektsv4rrffq69g5fav",
+      "correlation_id": "corr_01arz3ndektsv4rrffq69g5fav",
+      "scope_level": "hive",
+      "home_id": "home_01arz3ndektsv4rrffq69g5fav",
+      "authority": {"kind": "none"},
+      "subject": {"schema": "hive.home", "id": "home_01arz3ndektsv4rrffq69g5fav", "record_revision": 1},
+      "evidence": [{"role": "request", "ref": {"schema": "hive.request", "id": "req_01arz3ndektsv4rrffq69g5fav"}}],
+      "body": {}
+    }
+  ],
+  "body": {"home": {"created": true}}
+}
