@@ -78,7 +78,7 @@
         "repository": {
           "description": "The public source location.",
           "type": "string",
-          "pattern": "^https://[^\\s]+$",
+          "pattern": "^https://[^\t\n\u000b\f\r    -     　﻿]+$",
           "maxLength": 500
         },
         "revision": {
