@@ -8,7 +8,7 @@ Nothing in this stage dispatches. The Pool records the place requested for an it
 
 ## The store
 
-Everything the Pool owns is under `pool/` in the home, in the four places [records.md](records.md#the-home) gives every package, and nowhere else:
+Everything the Pool owns is under `pool/` in the home, in the five places [records.md](records.md#the-home) gives every package, and nowhere else:
 
 | Path | Holds |
 | --- | --- |
@@ -23,11 +23,12 @@ Everything the Pool owns is under `pool/` in the home, in the four places [recor
 | `pool/records/move/<move_id>.json` | [Moves between homes](#moves-between-homes). |
 | `pool/records/question/<question_id>.json`, `pool/records/decision-round/<decision_round_id>.json` | What the Mind's word persists: see [word.md](word.md). |
 | `pool/receipts/`, `pool/requests/`, `pool/tx/` | As [records.md](records.md#the-home) fixes them. |
+| `pool/tmp/<request_id>.tmp` | The temporary file of a write in progress, as records.md fixes it. The next writer that takes the store's lock empties it. Nothing of the Pool's is read from it: a file here is never read as a record, a receipt, an intent or an outcome. |
 
 - **One writer.** `hive-pool` and its five sibling command names are one executable, and every write to `pool/` is one transaction of that executable under `locks/pool.lock`, as [records.md](records.md#writing-several-records) fixes. No other package writes under `pool/`, and `word` least of all: it calls.
 - **One reader.** Only `pool` reads under `pool/`. Every other package reads the Pool through `hive-pool read`, which returns whole records as a [projection](#reading-the-pool).
 - **Never inside a repository.** Every `hive-pool` command refuses a home inside a Git working tree with `home_inside_repository` before it reads anything, as every command does. The Pool therefore cannot write into a project's code root, and `test-pool` proves it for the import, which is the one operation given a path that may lie inside a repository: that path is read and never written.
-- **No secret value.** No record, receipt, event, intent or recorded outcome under `pool/` holds a secret value. Where a record must name a secret, it holds a `secret_ref` of [`records/pool.item.v1`](schemas/records/pool.item.v1.schema.json): the name of the platform's secret store and the entry's name in it, and nothing else. The Imperative's `access.credentials` is the one place a credential is named, and the schema admits only references there. Free text is the author's responsibility; a test of this rule is a schema test, and a request that puts a value where a reference belongs is `invalid`.
+- **No secret value.** No record, receipt, event, intent or recorded outcome under `pool/` holds a secret value. Where a record must name a secret, it holds a `secret_ref` of [`records/pool.item.v1`](schemas/records/pool.item.v1.schema.json): the secret's store, its host, the account identity and its purpose, all four and nothing else. The reference is neither the value nor a transferable authorization: holding one grants nothing, and the value is retrieved from the store at run time by whoever is entitled to it. The Imperative's `access.credentials` is the one place a credential is named, and the schema admits only references there. Free text is the author's responsibility; a test of this rule is a schema test, and a request that puts a value where a reference belongs is `invalid`.
 
 ## Identifiers
 
@@ -306,18 +307,24 @@ Beyond the design's row in [test-targets.md](test-targets.md): the byte-exact le
 
 ## Decisions taken here
 
-Where the design was silent, this file reads it as follows. Each is listed with its alternative in the stage's definition summary.
+Where the design was silent, this file reads it as follows. Each decision is followed by the alternative it rejected.
 
-1. The design's five-step passage is `state` and `definition` read together, so the legacy three states keep their transitions unchanged.
-2. Holds are records of their own, not fields of the item.
-3. A generation is an entry of the item, not a record of its own: it has no identity but the item's and its number.
-4. The Imperative is keyed by its item, one record with all revisions.
-5. The admission check is repeatable and every check is kept; `approve` records a ruling and the caller checks again.
-6. The place and the branch's state are evidence the caller supplies; the Pool runs no Git.
-7. The questions and rounds of the Mind's word are Pool records with `pool.` kinds, written by `hive-pool`; see [word.md](word.md).
-8. The move is three transactions joined by receipts, destination first, as the upstream orders its two files.
-9. The rule line is supplied by the recorder; the resolver appends the source. Conflicts are reported, never resolved by the store.
-10. A legacy kind word is kept verbatim and never mapped to a deliverable or class.
+1. The design's five-step passage is `state` and `definition` read together, so the legacy three states keep their transitions unchanged; the alternative, one five-valued state, would make the legacy import map a queued item to a guessed definition state.
+2. Holds are records of their own, not fields of the item; holds as fields could not be named by `error.hold` or a wake and would vanish with the item's archive.
+3. A generation is an entry of the item, not a record of its own: it has no identity but the item's and its number; a `pool.generation` record with a composite identifier would be one more file per launch with no second reader.
+4. The Imperative is keyed by its item, one record with all revisions; an `imp_` identity would be one more prefix with no second reader.
+5. The admission check is repeatable and every check is kept; `approve` records a ruling and the caller checks again; one check per admission would need a new admission for every re-check at a launch path.
+6. The place and the branch's state are evidence the caller supplies; the Pool runs no Git; the Pool reading the clone would give it a core dependency and a worktree assumption.
+7. The questions and rounds of the Mind's word are Pool records with `pool.` kinds, written by `hive-pool`; see [word.md](word.md); `word.` kinds written by `pool` would break the rule that a package never writes a name that begins with another's.
+8. The move is three transactions joined by receipts, destination first, as the upstream orders its two files; a re-route through a child item alone, which the `handoff` field also supports, would leave no identity-preserving move.
+9. The rule line is supplied by the recorder; the resolver appends the source. Conflicts are reported, never resolved by the store; a line derived from the words would be an interpretation the store makes on its own.
+10. A legacy kind word is kept verbatim and never mapped to a deliverable or class; a mapping table would invent intake decisions.
+11. One `read` operation on `hive-pool` serves every Pool record kind, with a projection header; a read operation per command would be ten more schema pairs of the same shape.
+12. Every receipt has an empty body, the subject at its revision and the evidence carrying the fact; body schemas would be thirty-five more files repeating the records.
+13. The seven new prefixes are declared in this file and in the `$defs` of `records/pool.item.v1`, and registered in `identities.md` and `contract/ids` by the first work item of the build in one commit, because `test-contract` holds the table and the registry in step and the definition may not edit `contract/`; adding the rows in the definition would have failed `test-contract`.
+14. A `check` that refuses or holds returns no body, with its findings in the record and the receipts, so that no non-`ok` response carries a partial result; a body on refusal would be the partial result the command contract forbids.
+15. The plan's order inside the stage, read-only import first, round trip and crash recovery proved, then one writer selected, is read as an order of proofs, not a calendar: the grammar and the read-only import start at once and touch no store, the legacy writer waits on the round trip and on the store, the one writer is the store under one lock with roll-forward, proved before the stage is accepted, and the contracts of stages 3 and 4 land first because nothing in them writes from a legacy file; a strictly serial stage would delay those contracts by the length of the translation and gain nothing, since the grammar and the store share no code.
+16. `codex-void` is refused unconditionally at stage 2, in the check itself, and un-parked only by the later minor change [the execution place](#the-execution-place) names; a parked flag in a rule or configuration record could be flipped by a value, which the design's rule that a parked backend is refused and never substituted rules out.
 
 ## Left undecided
 
@@ -328,3 +335,8 @@ Where the design was silent, this file reads it as follows. Each is listed with 
 | Which fact kinds beyond rules a projection renders, and the budgets `check` applies | The stage that owns each fact; budgets are configuration |
 | Retention of recorded request outcomes, closed migrations and completed moves | Configuration of the Pool, as decisions.md leaves it |
 | The exact text layout of a rendered Imperative beyond the order and headings fixed above | The build, under the determinism rule; it is not a contract between packages |
+| How a secret value found in free text, or in a preserved `unknown` member, is refused before any byte of it reaches disk | Hive's secret-handling contract, which is being written into the design now and changes the record and command contracts by their own rule |
+| Whether a command offers a short form at a terminal | The stage that builds the UI, in its review; the default it starts from is no short form: the request document is the one form |
+| How an imported hold with no question is shown | The UI stage's review; the default is that it is shown as a hold on its item and becomes a card only when a question is raised for it |
+| Where a decision item is shown | The UI stage's review; the default is that it appears in the Pool as a held item and its card among the waiting decisions |
+| The labels of the placement values | The UI stage's review; the defaults are Mac, Claude cloud session, By policy and Codex Void (parked) |
