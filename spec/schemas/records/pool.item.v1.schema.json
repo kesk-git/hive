@@ -65,7 +65,7 @@
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/level"
     },
     "wave": {
-      "description": "On a Target only: the Wave the Target belongs to on the project's roadmap, as the define step or the roadmap round recorded it. A grouping for the roadmap's order, never a level and never an owner.",
+      "description": "On a Target only: the Wave the Target belongs to on the project's roadmap, as the define step or the roadmap round recorded it. The Wave is the fourth level of the work hierarchy, an ordered group of Targets with an outcome on the roadmap, recorded as this grouping data on each of its Targets: it has no worker, no Pool item of its own, no owner and no state of its own.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/wave"
     },
     "state": {
@@ -114,7 +114,7 @@
       }
     },
     "schedule": {
-      "description": "A not-before gate or a recurrence as declared on the item. The item owns the work; the dispatcher's schedule record, a later stage's, carries the schedule's runs. A date here dispatches nothing by itself.",
+      "description": "A not-before gate or a recurrence as declared on the item. The item owns the work; the dispatcher's schedule record, a later stage's, carries the schedule's runs. A date here dispatches nothing by itself. Carried by a Hunt or by a Prey with no Hunt beneath it, never by a Target, which this schema states, nor by a Prey that has a Hunt beneath it, which spec/pool.md, Levels, states.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/schedule"
     },
     "generations": {
@@ -241,6 +241,7 @@
           "deliverable": false,
           "placement_requested": false,
           "delivery": false,
+          "schedule": false,
           "generations": {
             "maxItems": 0
           }
