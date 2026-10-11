@@ -1,0 +1,33 @@
+{
+  "schema": "hive.request",
+  "schema_version": "1.0",
+  "command": "hive-synapse",
+  "operation": "report-run",
+  "operation_version": "1.0",
+  "request_id": "req_01j9xk3m2nq4r5s6t7v8w9xyzf",
+  "correlation_id": "corr_01j9xk3m2nq4r5s6t7v8w9xyzg",
+  "issued_at": "2026-10-11T08:00:00.000Z",
+  "caller": {
+    "kind": "worker",
+    "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze",
+    "generation": 1
+  },
+  "scope_level": "project",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "authority": {
+    "kind": "charter",
+    "ref": {
+      "schema": "pool.charter",
+      "id": "charter_01j9xk3m2nq4r5s6t7v8w9xyzp"
+    }
+  },
+  "body": {
+    "run": "validation",
+    "outcome": "passed"
+  },
+  "workspace_id": "ws_01j9xk3m2nq4r5s6t7v8w9xyzb",
+  "project_id": "proj_01j9xk3m2nq4r5s6t7v8w9xyzc",
+  "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze",
+  "generation": 1,
+  "source_revision": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+}

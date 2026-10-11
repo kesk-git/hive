@@ -1,0 +1,19 @@
+{
+  "schema": "hive.request",
+  "schema_version": "1.0",
+  "command": "hive-dispatch",
+  "operation": "describe-home",
+  "operation_version": "1.0",
+  "request_id": "req_01j9xk3m2nq4r5s6t7v8w9xyzf",
+  "correlation_id": "corr_01j9xk3m2nq4r5s6t7v8w9xyzg",
+  "issued_at": "2026-10-11T08:00:00.000Z",
+  "caller": {
+    "kind": "test"
+  },
+  "scope_level": "clone",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "authority": {
+    "kind": "none"
+  },
+  "body": {}
+}

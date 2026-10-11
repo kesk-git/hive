@@ -1,0 +1,5 @@
+{
+  "package": "dispatch",
+  "command": "hive-dispatch",
+  "operation": "create-home"
+}

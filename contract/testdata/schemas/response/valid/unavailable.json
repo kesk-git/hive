@@ -1,0 +1,23 @@
+{
+  "schema": "hive.response",
+  "schema_version": "1.0",
+  "request_id": "req_01j9xk3m2nq4r5s6t7v8w9xyzf",
+  "command": "hive-dispatch",
+  "operation": "describe-home",
+  "status": "unavailable",
+  "exit_code": 8,
+  "responder": {
+    "package": "dispatch",
+    "command": "hive-dispatch",
+    "implementation_version": "0.1.0",
+    "contract_version": "1.0"
+  },
+  "completed_at": "2026-10-11T08:00:02.500Z",
+  "replayed": false,
+  "receipts": [],
+  "error": {
+    "code": "dependency_missing",
+    "message": "The git executable cannot be found.",
+    "retryable": false
+  }
+}

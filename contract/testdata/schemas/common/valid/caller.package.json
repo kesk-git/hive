@@ -1,0 +1,5 @@
+{
+  "kind": "package",
+  "package": "dispatch",
+  "command": "hive-dispatch"
+}

@@ -1,0 +1,43 @@
+{
+  "schema": "hive.event",
+  "schema_version": "1.0",
+  "event_id": "evt_01j9xk3m2nq4r5s6t7v8w9xyzj",
+  "kind": "spawning-pool.lease.acquired",
+  "kind_version": "1.0",
+  "source": {
+    "package": "spawning-pool",
+    "source_id": "spawning-pool",
+    "source_sequence": 17
+  },
+  "home_sequence": 42,
+  "scope_level": "project",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "workspace_id": "ws_01j9xk3m2nq4r5s6t7v8w9xyzb",
+  "project_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "clone_id": "clone_01j9xk3m2nq4r5s6t7v8w9xyzd",
+  "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze",
+  "generation": 2,
+  "source_revision": "3f786850e387550fdab836ed7e6dc881de23001b",
+  "correlation_id": "corr_01j9xk3m2nq4r5s6t7v8w9xyzg",
+  "causation": {
+    "schema": "hive.request",
+    "id": "req_01j9xk3m2nq4r5s6t7v8w9xyzf"
+  },
+  "occurred_at": "2026-10-11T08:00:01.250Z",
+  "observed_at": "2026-10-11T08:00:01.250Z",
+  "recorded_at": "2026-10-11T08:00:02.500Z",
+  "occurred_at_known": true,
+  "basis": {
+    "kind": "receipt",
+    "ref": {
+      "schema": "hive.receipt",
+      "id": "rcpt_01j9xk3m2nq4r5s6t7v8w9xyzh",
+      "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+      "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab"
+    }
+  },
+  "body": {
+    "lease": "lease_01j9xk3m2nq4r5s6t7v8w9xyzp",
+    "worktree": "worktrees/01j9xk3m2nq4r5s6t7v8w9xyze"
+  }
+}

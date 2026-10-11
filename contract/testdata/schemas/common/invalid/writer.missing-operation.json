@@ -1,0 +1,5 @@
+{
+  "package": "dispatch",
+  "command": "hive-dispatch",
+  "implementation_version": "0.1.0"
+}

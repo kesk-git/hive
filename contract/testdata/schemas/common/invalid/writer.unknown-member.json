@@ -1,0 +1,7 @@
+{
+  "package": "dispatch",
+  "command": "hive-dispatch",
+  "operation": "create-home",
+  "implementation_version": "0.1.0",
+  "host": "x"
+}
