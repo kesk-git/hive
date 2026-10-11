@@ -15,7 +15,7 @@ import (
 // reports. A contract change that asks nothing of built code does not move
 // it; when a rebase renumbers such a change, this constant is renumbered with
 // it.
-const ContractVersion = "1.4"
+const ContractVersion = "1.5"
 
 // SchemaVersion is the schema_version of the four envelopes. The envelope
 // schemas are unchanged since the first version of the specification.
