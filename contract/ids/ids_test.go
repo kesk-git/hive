@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/spec"
 )
@@ -63,9 +64,9 @@ func TestMintVectors(t *testing.T) {
 			if err := Check(got, v.Prefix); err != nil {
 				t.Fatalf("a minted identifier fails its own check: %v", err)
 			}
-			p, ms, e := split(got)
-			if p != v.Prefix || ms != v.TimeMS || hex.EncodeToString(e[:]) != v.Entropy {
-				t.Fatalf("split(%q) = %q, %d, %x; want %q, %d, %s", got, p, ms, e, v.Prefix, v.TimeMS, v.Entropy)
+			ms, e := refDecode(strings.TrimPrefix(got, string(v.Prefix)+"_"))
+			if ms != v.TimeMS || e != v.Entropy {
+				t.Fatalf("refDecode(%q) = %d, %s; want %d, %s", got, ms, e, v.TimeMS, v.Entropy)
 			}
 		})
 	}
@@ -271,12 +272,12 @@ func TestIdentifiersAgreeWithCommonSchema(t *testing.T) {
 }
 
 func TestNumbers(t *testing.T) {
-	for _, n := range []int64{1, 2, 1000, MaxNumber} {
+	for _, n := range []int64{1, 2, 1000, canon.MaxNumber} {
 		if err := CheckNumber(n); err != nil {
 			t.Errorf("CheckNumber(%d) = %v", n, err)
 		}
 	}
-	for _, n := range []int64{0, -1, MaxNumber + 1, 1 << 62} {
+	for _, n := range []int64{0, -1, canon.MaxNumber + 1, 1 << 62} {
 		if err := CheckNumber(n); !errors.Is(err, ErrNumber) {
 			t.Errorf("CheckNumber(%d) = %v; want ErrNumber", n, err)
 		}
@@ -287,7 +288,7 @@ func TestNumbers(t *testing.T) {
 	if n, err := NextNumber(41); n != 42 || err != nil {
 		t.Errorf("NextNumber(41) = %d, %v", n, err)
 	}
-	for _, n := range []int64{-1, MaxNumber, MaxNumber + 1} {
+	for _, n := range []int64{-1, canon.MaxNumber, canon.MaxNumber + 1} {
 		if _, err := NextNumber(n); !errors.Is(err, ErrNumber) {
 			t.Errorf("NextNumber(%d) error = %v; want ErrNumber", n, err)
 		}
@@ -303,12 +304,13 @@ func FuzzParseNeverPanics(f *testing.F) {
 		if err != nil {
 			return
 		}
-		pfx, ms, e := split(s)
-		if pfx != p {
-			t.Fatalf("prefix %q != %q", pfx, p)
+		ms, e := refDecode(strings.TrimPrefix(s, string(p)+"_"))
+		raw, err := hex.DecodeString(e)
+		if err != nil || len(raw) != 10 {
+			t.Fatalf("refDecode(%q) entropy %q", s, e)
 		}
-		if again := compose(p, ms, e); again != s {
-			t.Fatalf("compose(split(%q)) = %q", s, again)
+		if again := compose(p, ms, [10]byte(raw)); again != s {
+			t.Fatalf("compose(refDecode(%q)) = %q", s, again)
 		}
 	})
 }

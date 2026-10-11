@@ -195,21 +195,3 @@ func compose(p Prefix, ms uint64, entropy [10]byte) string {
 	}
 	return string(p) + "_" + string(out[:])
 }
-
-// split is the inverse of compose for an identifier that Parse accepts. It
-// serves tests; the time it returns is not meaning anything may read.
-func split(id string) (p Prefix, ms uint64, entropy [10]byte) {
-	pfx, ulid, _ := strings.Cut(id, "_")
-	var hi, lo uint64
-	for i := 0; i < len(ulid); i++ {
-		hi = hi<<5 | lo>>59
-		lo = lo<<5 | uint64(decodeChar(ulid[i]))
-	}
-	ms = hi >> 16
-	entropy[0], entropy[1] = byte(hi>>8), byte(hi)
-	for i := 9; i >= 2; i-- {
-		entropy[i] = byte(lo)
-		lo >>= 8
-	}
-	return Prefix(pfx), ms, entropy
-}
