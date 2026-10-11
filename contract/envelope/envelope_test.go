@@ -3,8 +3,10 @@ package envelope
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -727,7 +729,13 @@ func TestCapabilitiesRoundTrip(t *testing.T) {
 	// The specification version a command reports is not the schema version of
 	// the envelope: a declaration of this build's specification, or an older
 	// one, is read, a newer one is not, and every envelope carries 1.0.
-	for version, ok := range map[string]bool{ContractVersion: true, "1.0": true, "1.4": false, "2.0": false} {
+	next := strings.Split(ContractVersion, ".")
+	minor, err := strconv.Atoi(next[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	newer := fmt.Sprintf("%s.%d", next[0], minor+1)
+	for version, ok := range map[string]bool{ContractVersion: true, "1.0": true, newer: false, "2.0": false} {
 		m := tree(t, data)
 		m["contract_version"] = version
 		_, err := DecodeCapabilities(m)
