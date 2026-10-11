@@ -1,0 +1,34 @@
+{
+  "schema": "hive.capabilities",
+  "schema_version": "1.1",
+  "command": "hive-fleet",
+  "package": "dispatch",
+  "executable": "hive-dispatch",
+  "contract_version": "1.0",
+  "implementation_version": "0.1.0",
+  "limits": {
+    "max_argument_bytes": 1,
+    "max_request_bytes": 1,
+    "max_response_bytes": 1
+  },
+  "operations": [
+    {
+      "name": "enrol",
+      "state": "supported",
+      "mode": "unary",
+      "mutates": false,
+      "versions": [
+        "1.0"
+      ],
+      "request_schema": "urn:hive:schema:ops:hive-fleet.enrol.request:v1",
+      "response_schema": "urn:hive:schema:ops:hive-fleet.enrol.response:v1",
+      "receipt_kinds": [],
+      "executes": [],
+      "calls": [],
+      "platform": [
+        "Security"
+      ]
+    }
+  ],
+  "source_revision": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+}

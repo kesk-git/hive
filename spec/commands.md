@@ -22,10 +22,10 @@ hive-<command> --version
 - `--home` names the private home. It is required for every operation except `capabilities`. There is no default home, no home taken from the environment and no search for one.
 - **The request is never an argument.** It is read from the file `--request-file` names, or from standard input when that option is absent.
 - The response is written to the file `--response-file` names, or to standard output when that option is absent.
-- A command reads no environment variable as an input to the contract. It uses the environment only as any process does: to find the external executables it runs, and for those executables' own configuration.
+- A command reads no environment variable as an input to the contract. It uses the environment only as any process does: to find the external executables it runs, and for those executables' own configuration. A command sets a child's environment only through Tendril, the launch primitive of the [one process-execution path](distribution.md#what-a-hive-executable-may-run), and a value it resolved appears in no argument, response, receipt or log, under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section.
 - No argument is longer than 4,096 bytes. A longer one exits 2 before anything is read.
 - `--version` prints the implementation version as one line of text and exits 0. It is the only invocation that answers without a response document.
-- Standard error carries diagnostics for a person. It is never parsed, and nothing in it is part of the contract.
+- Standard error carries diagnostics for a person. It is never parsed, and nothing in it is part of the contract. Like every log, it carries no value.
 
 A command may accept flags or positional arguments as a convenience for a person at a terminal, such as the design's `hive-assimilate <task-id> <harvest-url>`. Such a form builds the same request, which is then validated and handled exactly as a request read from a file. Calls between packages always send the request document.
 
@@ -64,7 +64,7 @@ One JSON document, following `response.v1`, for every invocation that gets as fa
 | `replayed` | True when this repeats the recorded outcome of an earlier invocation. |
 | `receipts` | Every [receipt](receipts.md) the invocation wrote, in full. |
 | `body` | The operation's own response. Present only with `ok`. |
-| `error` | Present with every other status: a `code`, a `message` for a person, `retryable`, and the fields the status requires. |
+| `error` | Present with every other status: a `code`, a `message` for a person, `retryable`, and the fields the status requires. `message` and `detail` hold no value and never the text of a request: a refusal names what it refused by field and shape only. |
 
 **A response is complete or it is not a response.** It is one document followed by a line feed. A caller accepts it only if the whole document parses, follows the schema, echoes the caller's `request_id` and agrees with the process's exit code. A `request_id` that is not null is the caller's in every case. A null `request_id` is accepted for a request only with a status the callee reaches before it can read the request's identity: `usage`; `invalid` with code `malformed_request`; and `too_large` that names the request as what exceeded the limit, with code `record_too_large`, `detail.record` of `request` and `actual_bytes` above `limit_bytes`. Any other response with a null `request_id`, a `too_large` about the response included, is `unknown`. The `capabilities` invocation takes no request, and its response is accepted only with a null `request_id` and the operation `capabilities`; no other response is accepted against a request's identity as a capabilities response. Empty output, output that does not parse, or a status that disagrees with the exit code is treated as `unknown`, never as success and never as an empty result. With any status but `ok` there is no `body`: no partial result is ever returned.
 
@@ -75,12 +75,12 @@ One JSON document, following `response.v1`, for every invocation that gets as fa
 | 0 | `ok` | The operation did what it defines. Every change is durable. | What the operation defines |
 | 1 | `failed` | The command failed for a reason of its own. | Nothing |
 | 2 | `usage` | The invocation itself was wrong: an unknown command name or operation, a missing option, an argument too long. | Nothing |
-| 3 | `invalid` | The request was read and rejected: it does not parse, breaks a schema, or names a version the command does not accept. | Nothing |
+| 3 | `invalid` | The request was read and rejected: it does not parse, breaks a schema, names a version the command does not accept, or carries a string of a credential shape on the fixed list. | Nothing |
 | 4 | `refused` | The request is well formed and the contract forbids it: missing or insufficient authority, a scope or home that does not match, an operation that is unsupported or parked. | Nothing, or a record of the refusal |
 | 5 | `conflict` | The request lost to current state: an expected revision differs, a lock is held, the identifier exists with other content. | Nothing |
 | 6 | `not_found` | The thing named does not exist in this home. | Nothing |
 | 7 | `too_large` | The request, the response or a record in it exceeds a declared limit. | Nothing |
-| 8 | `unavailable` | Something the operation needs cannot be used: a core executable is missing or refuses, a source cannot be read, an authoritative record is unreadable or malformed. | Nothing |
+| 8 | `unavailable` | Something the operation needs cannot be used: a core executable is missing or refuses, a source cannot be read, an authoritative record is unreadable or malformed, a platform utility is missing or unusable, or the recorded secret store is locked, lacks the item or has no adapter. | Nothing |
 | 9 | `unknown` | The outcome cannot be established. An intent is recorded and something outside Hive may or may not have happened. | Unknown; reconcile before any retry |
 | 10 | `held` | The operation is valid and waits on a recorded hold, which `error.hold` names. | A record of the hold, where the operation writes one |
 
@@ -98,16 +98,16 @@ A package's own codes are written `<package>.<code>`. These common ones are writ
 | --- | --- |
 | `failed` | `internal`, `io_failure` |
 | `usage` | `usage`, `unknown_operation`, `argument_too_large` |
-| `invalid` | `malformed_request`, `schema_violation`, `unsupported_version`, `envelope_mismatch` |
+| `invalid` | `malformed_request`, `schema_violation`, `unsupported_version`, `envelope_mismatch`, `secret_shape_recognized` |
 | `refused` | `unsupported_operation`, `operation_parked`, `authority_missing`, `authority_insufficient`, `home_mismatch`, `home_inside_repository`, `scope_mismatch`, `clone_identity_mismatch` |
 | `conflict` | `revision_conflict`, `lock_held`, `already_exists`, `replay_mismatch` |
 | `not_found` | `not_found`, `home_not_found` |
 | `too_large` | `record_too_large` |
-| `unavailable` | `dependency_missing`, `dependency_unusable`, `authentication_refused`, `source_unreadable`, `record_malformed` |
+| `unavailable` | `dependency_missing`, `dependency_unusable`, `authentication_refused`, `source_unreadable`, `record_malformed`, `secret_store_locked`, `secret_missing`, `platform_utility_missing`, `platform_utility_unusable`, `secret_store_unsupported` |
 | `unknown` | `outcome_unknown` |
 | `held` | `held` |
 
-Adding a code is a minor change. A code is never reused for another meaning.
+Adding a code is a minor change. A code is never reused for another meaning. `secret_shape_recognized` is the code of the shape recognizer of the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section; the five codes from `secret_store_locked` to `secret_store_unsupported` are the conditions of the platform's secret store and its utility that the same section lists, and an error carrying one names the Spoor, or for a tool's own login the tool, the store and the condition, and never the value.
 
 ## Size
 
@@ -137,7 +137,8 @@ It declares the command's package and executable, the contract and implementatio
 - its `state`: `supported`, `unsupported` or `parked`, with a reason for the last two;
 - its `mode`: `unary` for one request and one response, or `resident` for an operation that writes its response once it has durably started and then runs until stopped, as the Shadow and the UI server do;
 - whether it mutates, the body versions it accepts and the schemas of its request and response bodies;
-- the receipt kinds it writes, the external executables it may run and the commands of other packages it may call.
+- the receipt kinds it writes, the external executables it may run and the commands of other packages it may call;
+- the platform utilities it may run, carried in the operation's own `platform` member, each a name from the package's declared `platform` list. The member exists from `schema_version` 1.1 of the declaration; a declaration at 1.0 holds none and is still read. `test-contract` compares that member with the package's `platform` list as it already compares `executes`.
 
 An operation the design names and the build has not reached is declared `unsupported`; calling it is `refused` with `unsupported_operation`. An operation that is built and held closed by a recorded decision is `parked`; calling it is `refused` with `operation_parked`. Neither ever falls back to another route.
 

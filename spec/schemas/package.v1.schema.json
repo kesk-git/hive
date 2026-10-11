@@ -205,7 +205,7 @@
       }
     },
     "platform": {
-      "description": "Platform utilities the package runs as separate processes, each with its reason. Expected to stay empty.",
+      "description": "Platform utilities the package runs as separate processes, each with its reason.",
       "type": "array",
       "items": {
         "type": "object",

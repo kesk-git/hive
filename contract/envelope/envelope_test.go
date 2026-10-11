@@ -3,8 +3,10 @@ package envelope
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -695,14 +697,70 @@ func TestCapabilitiesRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, _ := canon.Line(data)
+	if m := tree(t, data); m["schema_version"] != "1.0" {
+		t.Fatalf("the fixture is at %v, not the version an older build wrote", m["schema_version"])
+	}
+	current := tree(t, data)
+	current["schema_version"] = CapabilitiesSchemaVersion
+	want, err := canon.Encode(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = append(want, '\n')
 	if !bytes.Equal(out, want) {
-		t.Errorf("Encode is not the canonical form:\n%s\n%s", out, want)
+		t.Errorf("Encode is not the canonical form at %s:\n%s\n%s", CapabilitiesSchemaVersion, out, want)
+	}
+	for version, ok := range map[string]bool{"1.0": true, "1.1": true, "1.2": false, "2.0": false} {
+		m := tree(t, data)
+		m["schema_version"] = version
+		if _, err := DecodeCapabilities(m); (err == nil) != ok {
+			t.Errorf("capabilities at schema_version %s: %v", version, err)
+		}
+	}
+	older := tree(t, data)
+	older["operations"].([]any)[0].(map[string]any)["platform"] = []any{"security"}
+	if _, err := DecodeCapabilities(older); err == nil {
+		t.Error("a platform member was read from a declaration at 1.0")
+	}
+	older["schema_version"] = CapabilitiesSchemaVersion
+	if _, err := DecodeCapabilities(older); err != nil {
+		t.Errorf("a platform member was refused at %s: %v", CapabilitiesSchemaVersion, err)
+	}
+	withPlatform := tree(t, data)
+	withPlatform["schema_version"] = CapabilitiesSchemaVersion
+	ops := withPlatform["operations"].([]any)
+	ops[0].(map[string]any)["platform"] = []any{"security"}
+	ops[1].(map[string]any)["platform"] = []any{}
+	got, err := DecodeCapabilities(withPlatform)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := got.Operations[0].Platform; len(p) != 1 || p[0] != "security" {
+		t.Errorf("the platform member was read as %v", p)
+	}
+	if p := got.Operations[1].Platform; p == nil || len(p) != 0 {
+		t.Errorf("an empty platform member was read as %#v", p)
+	}
+	if c.Operations[0].Platform != nil || c.Operations[1].Platform != nil {
+		t.Errorf("an absent platform member was read as present: %#v %#v", c.Operations[0].Platform, c.Operations[1].Platform)
+	}
+	wantPlatform, err := canon.Encode(withPlatform)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out, err := got.Encode(); err != nil || !bytes.Equal(out, append(wantPlatform, '\n')) {
+		t.Errorf("a declaration with platform members does not read and write back unchanged (%v):\n%s\n%s", err, out, wantPlatform)
 	}
 	// The specification version a command reports is not the schema version of
 	// the envelope: a declaration of this build's specification, or an older
 	// one, is read, a newer one is not, and every envelope carries 1.0.
-	for version, ok := range map[string]bool{ContractVersion: true, "1.0": true, "1.4": false, "2.0": false} {
+	next := strings.Split(ContractVersion, ".")
+	minor, err := strconv.Atoi(next[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	newer := fmt.Sprintf("%s.%d", next[0], minor+1)
+	for version, ok := range map[string]bool{ContractVersion: true, "1.0": true, newer: false, "2.0": false} {
 		m := tree(t, data)
 		m["contract_version"] = version
 		_, err := DecodeCapabilities(m)
@@ -710,7 +768,7 @@ func TestCapabilitiesRoundTrip(t *testing.T) {
 			t.Errorf("contract_version %s: %v", version, err)
 		}
 	}
-	if m := c.Tree(); m["schema_version"] != SchemaVersion || m["contract_version"] != c.ContractVersion {
+	if m := c.Tree(); m["schema_version"] != CapabilitiesSchemaVersion || m["contract_version"] != c.ContractVersion {
 		t.Errorf("%v %v", m["schema_version"], m["contract_version"])
 	}
 	// A declaration with no operations is valid; one with a supported

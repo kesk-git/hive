@@ -60,7 +60,7 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 ## 6. Every object closed, newer versions refused, unknown fields kept apart
 
-**Decision.** Every object schema rejects a field it does not list. A reader refuses a record of a newer version than it knows. A migration carries what it does not recognize into the record's `unknown` member, which every later writer preserves.
+**Decision.** Every object schema rejects a field it does not list. A reader refuses a record of a newer version than it knows. A migration carries what it does not recognize, after the owner's no-value check of the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section, into the record's `unknown` member, which every later writer preserves, as [records.md](records.md#versioning) states.
 
 **Reason.** The design says malformed input fails closed and that unknown fields survive migrations unchanged. Closed schemas give the first. A designated `unknown` member gives the second without leaving every record open to a mistyped field passing as valid.
 
@@ -216,3 +216,4 @@ These are not decided here, deliberately. Each is cheap to add later and would b
 | Where instructions and skills sit in the artefact | The stage that first delivers one |
 | Retention periods and segment sizes | The stage that owns each store, as configuration |
 | Which package declares the optional browser stack | The stage that first selects a browser task |
+| The adapter for a secret store a user chooses on Linux, under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section | When a user chooses one |

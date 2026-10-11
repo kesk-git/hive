@@ -88,6 +88,10 @@ type OperationDecl struct {
 	ReceiptKinds   []string
 	Executes       []string
 	Calls          []string
+	// Platform are the platform utilities the operation may run. Nil is an
+	// absent member, as in a declaration at schema_version 1.0; an empty
+	// list is a member that declares none.
+	Platform []string
 }
 
 // Capabilities is the body of every command's capabilities response
@@ -124,11 +128,14 @@ func (c *Capabilities) Tree() map[string]any {
 		put(m, "reason", op.Reason)
 		put(m, "request_schema", op.RequestSchema)
 		put(m, "response_schema", op.ResponseSchema)
+		if op.Platform != nil {
+			m["platform"] = stringsTree(op.Platform)
+		}
 		ops = append(ops, m)
 	}
 	m := map[string]any{
 		"schema":                 CapabilitiesSchema,
-		"schema_version":         SchemaVersion,
+		"schema_version":         CapabilitiesSchemaVersion,
 		"command":                c.Command,
 		"package":                c.Package,
 		"executable":             c.Executable,
@@ -249,6 +256,11 @@ func DecodeCapabilities(body map[string]any) (*Capabilities, error) {
 		}
 		if op.Calls, err = o.strings("calls"); err != nil {
 			return nil, err
+		}
+		if o.has("platform") {
+			if op.Platform, err = o.strings("platform"); err != nil {
+				return nil, err
+			}
 		}
 		c.Operations = append(c.Operations, op)
 	}
