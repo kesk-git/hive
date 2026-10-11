@@ -14,7 +14,7 @@ Owner: `word`, through `hive-word`. Schemas: the operation bodies under [`schema
 
 ## No secret value
 
-No question, option, consequence, amount, answer, source, receipt or recorded outcome the decision intake defines holds a secret value. Where one must name a secret, it holds a `secret_ref` of [`records/pool.item.v1`](schemas/records/pool.item.v1.schema.json), the name of the platform's secret store and the entry's name in it, and nothing else; no field of the question, round or answer bodies is a place for a value, so the only place a value could appear is free text. Free text is kept exactly as written, and the intake neither inspects, redacts nor alters it: a secret typed into a question or an answer is a defect of the input, not of the record. It is answered by a superseding question or answer that carries the reference instead, under the Hive Mind's word; the original stays as the record it is, in the home it never leaves, and the secret itself is rotated in its store outside Hive. `test-word` proves that the intake passes free text through unchanged and that a request putting a value where a reference belongs is `invalid`.
+No question, option, consequence, amount, answer, source, receipt or recorded outcome the decision intake defines holds a secret value. Where one must name a secret, it holds a `secret_ref` of [`records/pool.item.v1`](schemas/records/pool.item.v1.schema.json), the secret's store, its host, the account identity and its purpose, all four and nothing else, which is neither the value nor a transferable authorization and grants nothing to whoever holds it; no field of the question, round or answer bodies is a place for a value, so the only place a value could appear is free text. Free text is kept exactly as written, and the intake neither inspects, redacts nor alters it: a secret typed into a question or an answer is a defect of the input, not of the record. It is answered by a superseding question or answer that carries the reference instead, under the Hive Mind's word; the original stays as the record it is, in the home it never leaves, and the secret itself is rotated in its store outside Hive. `test-word` proves that the intake passes free text through unchanged and that a request putting a value where a reference belongs is `invalid`.
 
 ## Operations
 
@@ -25,7 +25,7 @@ Raises a question and holds the item it gates. The request names the held item, 
 - A question prefers to hold the work it gates; a separate decision item is for a question with its own scope.
 - A round that is not `complete` is recorded with its `incomplete_reason` and its cards are not presented as answerable until a later `hold` or the owner marks it complete through a new round; nothing in an incomplete round is ruled on.
 - A spend ask is an ordinary question with `amount` stated; there is no separate spend path.
-- A legacy `word` hold without a question is bound to the question `hold` raises for it: the request names the held item, the Pool finds the active questionless `word` hold and binds it instead of placing a second.
+- A legacy `word` hold without a question is bound to the question `hold` raises for it: the request names the held item, the Pool finds the active questionless `word` hold and binds it instead of placing a second. How such a hold is shown before that is left to the stage that builds the UI, below.
 
 ### `answer`
 
@@ -91,11 +91,13 @@ With a fake `hive-pool` built from the declared schemas: a round of several card
 
 ## Decisions taken here
 
-1. The decision records are Pool records with `pool.` kinds; `word` mints their identities and writes nothing. The alternative, `word.` kinds written by `pool`, breaks the rule that a package never writes a name that begins with another package's, and `word` has no part of the home to write a receipt in.
-2. `word`'s replay is the Pool's, by the shared `request_id`, with a read of the recorded outcome before any identity is minted.
-3. A card is an entry of the decision round, with its own revision, not a record of its own.
-4. Answers are deduplicated by their source, the evidence that carries the Hive Mind's words, and not only by request identity.
-5. An answer to a changed question is recorded and returned as `held`, so that no word of the Hive Mind is lost and none is applied to a question it was not given to.
+Each decision is followed by the alternative it rejected.
+
+1. The decision records are Pool records with `pool.` kinds; `word` mints their identities and writes nothing; the alternative, `word.` kinds written by `pool`, breaks the rule that a package never writes a name that begins with another package's, and `word` has no part of the home to write a receipt in.
+2. `word`'s replay is the Pool's, by the shared `request_id`, with a read of the recorded outcome before any identity is minted; a replay store in `word` would be the store the design says it does not keep.
+3. A card is an entry of the decision round, with its own revision, not a record of its own; a `pool.card` record would be one more file per question with no reader that needs it apart from the round.
+4. Answers are deduplicated by their source, the evidence that carries the Hive Mind's words, and not only by request identity; deduplication by request identity alone would record a resent review submission twice.
+5. An answer to a changed question is recorded and returned as `held`, so that no word of the Hive Mind is lost and none is applied to a question it was not given to; refusing it would lose the words, and applying it would answer a question it was not given to.
 
 ## Left undecided
 
@@ -103,3 +105,4 @@ With a fake `hive-pool` built from the declared schemas: a round of several card
 | --- | --- |
 | Which `source` kinds the UI's Waiting on you submits under, beyond a review submission | Stage 6, when the card component is built; `operator` serves the CLI now |
 | Whether a supervisor may supersede an answer under a recorded posture | Stage 4, which defines postures; the operator and the Hive Mind's word suffice now |
+| How an imported `word` hold with no question is shown | The stage that builds the UI, in its review; the default it starts from is that it is shown as a hold on its item and becomes a card only when a question is raised for it |
