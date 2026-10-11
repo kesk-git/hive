@@ -1,0 +1,169 @@
+{
+  "schema": "hive.review-final",
+  "schema_version": "1.0",
+  "review_id": "rev_01j9xk3m2nq4r5s6t7v8w9xyzr",
+  "scope_level": "project",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze",
+  "generation": 1,
+  "done": {
+    "round_id": 2,
+    "event_id": "fev_01j9xk3m2nq4r5s6t7v8w9xyz7",
+    "sequence": 4
+  },
+  "operator": {
+    "login": "private-network",
+    "ref": "hive-mind@mesh"
+  },
+  "completed_at": "2026-10-11T10:00:00.000Z",
+  "final_revision": {
+    "revision": 2,
+    "path": "revision-0002.html",
+    "digest": "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  },
+  "rounds": [
+    {
+      "round_id": 1,
+      "feedback": {
+        "path": "round-0001.feedback.json",
+        "digest": "sha256:a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
+        "last_sequence": 6
+      },
+      "reply": {
+        "path": "round-0001.reply.json",
+        "digest": "sha256:5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5",
+        "bytes": 2311,
+        "media_type": "application/json"
+      }
+    },
+    {
+      "round_id": 2,
+      "feedback": {
+        "path": "round-0002.feedback.json",
+        "digest": "sha256:f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+        "last_sequence": 4
+      }
+    }
+  ],
+  "decisions": [
+    {
+      "card": {
+        "card_id": "card_01j9xk3m2nq4r5s6t7v8w9xyzd",
+        "card_revision": 2,
+        "question_id": "q_01j9xk3m2nq4r5s6t7v8w9xyzs",
+        "question_revision": 1,
+        "held_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzm",
+        "held_task_revision": 3,
+        "decision_round_id": "dr_01j9xk3m2nq4r5s6t7v8w9xyzt",
+        "decision_round_revision": 1,
+        "owner_home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+        "owner_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze"
+      },
+      "state": "accepted",
+      "receipt": {
+        "schema": "word.answer.accepted",
+        "id": "rcpt_01j9xk3m2nq4r5s6t7v8w9xyz1",
+        "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza"
+      }
+    },
+    {
+      "card": {
+        "card_id": "card_01j9xk3m2nq4r5s6t7v8w9xyzj",
+        "card_revision": 2,
+        "question_id": "q_01j9xk3m2nq4r5s6t7v8w9xyzs",
+        "question_revision": 1,
+        "held_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzm",
+        "held_task_revision": 3,
+        "decision_round_id": "dr_01j9xk3m2nq4r5s6t7v8w9xyzt",
+        "decision_round_revision": 1,
+        "owner_home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+        "owner_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze"
+      },
+      "state": "pending"
+    },
+    {
+      "card": {
+        "card_id": "card_01j9xk3m2nq4r5s6t7v8w9xyz2",
+        "card_revision": 2,
+        "question_id": "q_01j9xk3m2nq4r5s6t7v8w9xyzs",
+        "question_revision": 1,
+        "held_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzm",
+        "held_task_revision": 3,
+        "decision_round_id": "dr_01j9xk3m2nq4r5s6t7v8w9xyzt",
+        "decision_round_revision": 1,
+        "owner_home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+        "owner_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze"
+      },
+      "state": "released",
+      "receipt": {
+        "schema": "word.answer.accepted",
+        "id": "rcpt_01j9xk3m2nq4r5s6t7v8w9xyz2",
+        "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza"
+      }
+    },
+    {
+      "card": {
+        "card_id": "card_01j9xk3m2nq4r5s6t7v8w9xyz3",
+        "card_revision": 2,
+        "question_id": "q_01j9xk3m2nq4r5s6t7v8w9xyzs",
+        "question_revision": 1,
+        "held_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzm",
+        "held_task_revision": 3,
+        "decision_round_id": "dr_01j9xk3m2nq4r5s6t7v8w9xyzt",
+        "decision_round_revision": 1,
+        "owner_home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+        "owner_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze"
+      },
+      "state": "completed",
+      "receipt": {
+        "schema": "word.answer.accepted",
+        "id": "rcpt_01j9xk3m2nq4r5s6t7v8w9xyz3",
+        "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza"
+      }
+    },
+    {
+      "card": {
+        "card_id": "card_01j9xk3m2nq4r5s6t7v8w9xyz4",
+        "card_revision": 2,
+        "question_id": "q_01j9xk3m2nq4r5s6t7v8w9xyzs",
+        "question_revision": 1,
+        "held_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzm",
+        "held_task_revision": 3,
+        "decision_round_id": "dr_01j9xk3m2nq4r5s6t7v8w9xyzt",
+        "decision_round_revision": 1,
+        "owner_home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+        "owner_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze"
+      },
+      "state": "superseded",
+      "receipt": {
+        "schema": "word.answer.accepted",
+        "id": "rcpt_01j9xk3m2nq4r5s6t7v8w9xyz4",
+        "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza"
+      }
+    }
+  ],
+  "unsubmitted_drafts": [
+    {
+      "round_id": 2,
+      "sequence": 1
+    },
+    {
+      "round_id": 2,
+      "sequence": 2,
+      "kind": "note"
+    },
+    {
+      "round_id": 2,
+      "sequence": 3,
+      "kind": "card-draft"
+    }
+  ],
+  "writer": {
+    "package": "ui",
+    "command": "hive-ui",
+    "operation": "complete-review",
+    "implementation_version": "0.1.0"
+  },
+  "workspace_id": "ws_01j9xk3m2nq4r5s6t7v8w9xyzb",
+  "project_id": "proj_01j9xk3m2nq4r5s6t7v8w9xyzc"
+}

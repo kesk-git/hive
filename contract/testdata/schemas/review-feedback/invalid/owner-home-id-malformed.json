@@ -1,0 +1,273 @@
+{
+  "schema": "hive.review-feedback",
+  "schema_version": "1.0",
+  "record_revision": 7,
+  "review_id": "rev_01j9xk3m2nq4r5s6t7v8w9xyzr",
+  "round_id": 1,
+  "scope_level": "hive",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze",
+  "generation": 1,
+  "owner": {
+    "role": "hive",
+    "home_id": "ws_01j9xk3m2nq4r5s6t7v8w9xyzb"
+  },
+  "lictor": {
+    "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzk",
+    "generation": 1
+  },
+  "reviewed_revision": {
+    "revision": 1,
+    "path": "revision-0001.html",
+    "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+  },
+  "events": [
+    {
+      "event_id": "fev_01j9xk3m2nq4r5s6t7v8w9xyz1",
+      "sequence": 1,
+      "captured_at": "2026-10-11T08:01:00.000Z",
+      "received_at": "2026-10-11T08:01:00.250Z",
+      "operator": {
+        "login": "local-session",
+        "ref": "ui-session-0001"
+      },
+      "kind": "target",
+      "target": {
+        "revision": {
+          "revision": 1,
+          "path": "revision-0001.html",
+          "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        },
+        "locator": "main > section:nth-of-type(2) > h2",
+        "element_text": "Pricing"
+      }
+    },
+    {
+      "event_id": "fev_01j9xk3m2nq4r5s6t7v8w9xyz2",
+      "sequence": 2,
+      "captured_at": "2026-10-11T08:02:00.000Z",
+      "received_at": "2026-10-11T08:02:00.250Z",
+      "operator": {
+        "login": "local-session",
+        "ref": "ui-session-0001"
+      },
+      "kind": "target",
+      "target": {
+        "revision": {
+          "revision": 1,
+          "path": "revision-0001.html",
+          "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        },
+        "locator": "main > section:nth-of-type(2) > p:nth-of-type(1)",
+        "element_text": "Plans start at a flat monthly rate with no setup fee.",
+        "selection": {
+          "quote": "no setup fee",
+          "start": {
+            "path": "main > section:nth-of-type(2) > p:nth-of-type(1) > #text",
+            "offset": 42
+          },
+          "end": {
+            "path": "main > section:nth-of-type(2) > p:nth-of-type(1) > #text",
+            "offset": 54
+          }
+        }
+      }
+    },
+    {
+      "event_id": "fev_01j9xk3m2nq4r5s6t7v8w9xyz3",
+      "sequence": 3,
+      "captured_at": "2026-10-11T08:03:00.000Z",
+      "received_at": "2026-10-11T08:03:00.250Z",
+      "operator": {
+        "login": "local-session",
+        "ref": "ui-session-0001"
+      },
+      "kind": "note",
+      "note": {
+        "note_id": "note_01j9xk3m2nq4r5s6t7v8w9xyzn",
+        "note_kind": "annotation",
+        "text": "Say what the fee is instead.  Two spaces kept.",
+        "target": {
+          "revision": {
+            "revision": 1,
+            "path": "revision-0001.html",
+            "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          },
+          "locator": "main > section:nth-of-type(2) > p:nth-of-type(1)",
+          "element_text": "Plans start at a flat monthly rate with no setup fee.",
+          "selection": {
+            "quote": "no setup fee",
+            "start": {
+              "path": "main > section:nth-of-type(2) > p:nth-of-type(1) > #text",
+              "offset": 42
+            },
+            "end": {
+              "path": "main > section:nth-of-type(2) > p:nth-of-type(1) > #text",
+              "offset": 54
+            }
+          }
+        }
+      }
+    },
+    {
+      "event_id": "fev_01j9xk3m2nq4r5s6t7v8w9xyz4",
+      "sequence": 4,
+      "captured_at": "2026-10-11T08:04:00.000Z",
+      "received_at": "2026-10-11T08:04:00.250Z",
+      "operator": {
+        "login": "local-session",
+        "ref": "ui-session-0001"
+      },
+      "kind": "note",
+      "note": {
+        "note_id": "note_01j9xk3m2nq4r5s6t7v8w9xyzq",
+        "note_kind": "instruction",
+        "text": "Move the pricing section above the gallery.\n"
+      }
+    },
+    {
+      "event_id": "fev_01j9xk3m2nq4r5s6t7v8w9xyz5",
+      "sequence": 5,
+      "captured_at": "2026-10-11T08:05:00.000Z",
+      "received_at": "2026-10-11T08:05:00.250Z",
+      "operator": {
+        "login": "local-session",
+        "ref": "ui-session-0001"
+      },
+      "kind": "card-draft",
+      "card_draft": {
+        "card": {
+          "card_id": "card_01j9xk3m2nq4r5s6t7v8w9xyzd",
+          "card_revision": 2,
+          "question_id": "q_01j9xk3m2nq4r5s6t7v8w9xyzs",
+          "question_revision": 1,
+          "held_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzm",
+          "held_task_revision": 3,
+          "decision_round_id": "dr_01j9xk3m2nq4r5s6t7v8w9xyzt",
+          "decision_round_revision": 1,
+          "owner_home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+          "owner_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze"
+        },
+        "option_id": "approve-layout",
+        "option_label": "Approve the layout",
+        "answer_text": "Approved, with the pricing moved up."
+      }
+    },
+    {
+      "event_id": "fev_01j9xk3m2nq4r5s6t7v8w9xyz6",
+      "sequence": 6,
+      "captured_at": "2026-10-11T08:06:00.000Z",
+      "received_at": "2026-10-11T08:06:00.250Z",
+      "operator": {
+        "login": "local-session",
+        "ref": "ui-session-0001"
+      },
+      "kind": "submit",
+      "control_label": "Submit feedback",
+      "submission": {
+        "request_id": "req_01j9xk3m2nq4r5s6t7v8w9xyzf",
+        "expected_round_revision": 5,
+        "last_draft_sequence": 5,
+        "answers": [
+          {
+            "card": {
+              "card_id": "card_01j9xk3m2nq4r5s6t7v8w9xyzd",
+              "card_revision": 2,
+              "question_id": "q_01j9xk3m2nq4r5s6t7v8w9xyzs",
+              "question_revision": 1,
+              "held_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzm",
+              "held_task_revision": 3,
+              "decision_round_id": "dr_01j9xk3m2nq4r5s6t7v8w9xyzt",
+              "decision_round_revision": 1,
+              "owner_home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+              "owner_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze"
+            },
+            "option_id": "approve-layout",
+            "option_label": "Approve the layout",
+            "answer_text": "Approved, with the pricing moved up."
+          },
+          {
+            "card": {
+              "card_id": "card_01j9xk3m2nq4r5s6t7v8w9xyzj",
+              "card_revision": 2,
+              "question_id": "q_01j9xk3m2nq4r5s6t7v8w9xyzs",
+              "question_revision": 1,
+              "held_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzm",
+              "held_task_revision": 3,
+              "decision_round_id": "dr_01j9xk3m2nq4r5s6t7v8w9xyzt",
+              "decision_round_revision": 1,
+              "owner_home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+              "owner_task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze"
+            },
+            "answer_text": "Not yet; I need the final copy first."
+          }
+        ],
+        "notes": [
+          {
+            "note_id": "note_01j9xk3m2nq4r5s6t7v8w9xyzn",
+            "note_kind": "annotation",
+            "text": "Say what the fee is instead.  Two spaces kept.",
+            "target": {
+              "revision": {
+                "revision": 1,
+                "path": "revision-0001.html",
+                "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+              },
+              "locator": "main > section:nth-of-type(2) > p:nth-of-type(1)",
+              "element_text": "Plans start at a flat monthly rate with no setup fee.",
+              "selection": {
+                "quote": "no setup fee",
+                "start": {
+                  "path": "main > section:nth-of-type(2) > p:nth-of-type(1) > #text",
+                  "offset": 42
+                },
+                "end": {
+                  "path": "main > section:nth-of-type(2) > p:nth-of-type(1) > #text",
+                  "offset": 54
+                }
+              }
+            }
+          },
+          {
+            "note_id": "note_01j9xk3m2nq4r5s6t7v8w9xyzq",
+            "note_kind": "instruction",
+            "text": "Move the pricing section above the gallery.\n"
+          }
+        ],
+        "attachments": [
+          {
+            "path": "attachments/0001/reference.png",
+            "digest": "sha256:f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+            "bytes": 73421,
+            "media_type": "image/png"
+          }
+        ]
+      }
+    },
+    {
+      "event_id": "fev_01j9xk3m2nq4r5s6t7v8w9xyz7",
+      "sequence": 7,
+      "captured_at": "2026-10-11T08:07:00.000Z",
+      "received_at": "2026-10-11T08:07:00.250Z",
+      "operator": {
+        "login": "local-session",
+        "ref": "ui-session-0001"
+      },
+      "kind": "done",
+      "control_label": "Done",
+      "completion": {
+        "displayed_revision": {
+          "revision": 1,
+          "path": "revision-0001.html",
+          "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        },
+        "last_feedback_sequence": 7,
+        "submitted_sequences": [
+          6
+        ],
+        "unsubmitted_draft_sequences": []
+      }
+    }
+  ],
+  "updated_at": "2026-10-11T08:07:00.250Z"
+}

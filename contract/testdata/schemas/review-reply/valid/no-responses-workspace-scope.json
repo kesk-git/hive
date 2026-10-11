@@ -1,0 +1,28 @@
+{
+  "schema": "hive.review-reply",
+  "schema_version": "1.0",
+  "review_id": "rev_01j9xk3m2nq4r5s6t7v8w9xyzr",
+  "round_id": 1,
+  "scope_level": "workspace",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze",
+  "generation": 1,
+  "lictor": {
+    "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzk",
+    "generation": 1
+  },
+  "feedback": {
+    "path": "round-0001.feedback.json",
+    "digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "last_sequence": 1
+  },
+  "responses": [],
+  "written_at": "2026-10-11T09:00:00.000Z",
+  "writer": {
+    "package": "ui",
+    "command": "hive-ui",
+    "operation": "reply",
+    "implementation_version": "0.1.0"
+  },
+  "workspace_id": "ws_01j9xk3m2nq4r5s6t7v8w9xyzb"
+}
