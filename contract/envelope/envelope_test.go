@@ -1,0 +1,638 @@
+package envelope
+
+import (
+	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/kesk-git/hive/contract/canon"
+	"github.com/kesk-git/hive/contract/schema"
+)
+
+func fixture(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// tree decodes a document into its JSON tree.
+func tree(t *testing.T, data []byte) map[string]any {
+	t.Helper()
+	v, err := schema.Decode(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v.(map[string]any)
+}
+
+// encode writes a tree as a document.
+func encode(t *testing.T, v any) []byte {
+	t.Helper()
+	out, err := canon.Encode(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(out, '\n')
+}
+
+// failure asserts that err is a Failure of the status and code.
+func failure(t *testing.T, err error, status Status, code string) {
+	t.Helper()
+	f := AsFailure(err)
+	if f == nil {
+		t.Fatalf("got %v, want a failure %s/%s", err, status, code)
+	}
+	if f.Status != status || f.Err.Code != code {
+		t.Fatalf("got %s/%s (%s), want %s/%s", f.Status, f.Err.Code, f.Err.Message, status, code)
+	}
+	if got, _ := StatusOfCode(code); got != f.Status {
+		t.Fatalf("code %s belongs to %s, the failure says %s", code, got, f.Status)
+	}
+}
+
+// The eleven exit states: each status one exit code, each exit code one
+// status, in the order of the table of spec/commands.md.
+func TestElevenExitStates(t *testing.T) {
+	want := []Status{"ok", "failed", "usage", "invalid", "refused", "conflict", "not_found", "too_large", "unavailable", "unknown", "held"}
+	got := Statuses()
+	if len(got) != len(want) || len(got) != MaxExitCode+1 {
+		t.Fatalf("%d statuses, want %d", len(got), len(want))
+	}
+	for i, s := range want {
+		if got[i] != s || s.ExitCode() != i || !s.Valid() {
+			t.Errorf("%s: exit code %d, want %d", s, got[i].ExitCode(), i)
+		}
+		back, ok := StatusOf(i)
+		if !ok || back != s {
+			t.Errorf("exit code %d maps to %s, want %s", i, back, s)
+		}
+	}
+	for _, code := range []int{-1, 11, 63, 64, 255} {
+		if _, ok := StatusOf(code); ok {
+			t.Errorf("exit code %d names a status", code)
+		}
+	}
+	if Status("done").Valid() {
+		t.Error("an unknown word is a status")
+	}
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("ExitCode of a non-status did not panic")
+			}
+		}()
+		Status("done").ExitCode()
+	}()
+	changed := map[Status]bool{Ok: true, Refused: true, Held: true, Unknown: true}
+	for _, s := range got {
+		if s.Changed() != changed[s] {
+			t.Errorf("%s: Changed %v", s, s.Changed())
+		}
+	}
+}
+
+// Every common code belongs to the status its table row gives, and the
+// table holds every code of spec/commands.md once.
+func TestCommonCodesMapToTheirStatus(t *testing.T) {
+	table := map[Status][]string{
+		Failed:      {"internal", "io_failure"},
+		Usage:       {"usage", "unknown_operation", "argument_too_large"},
+		Invalid:     {"malformed_request", "schema_violation", "unsupported_version", "envelope_mismatch"},
+		Refused:     {"unsupported_operation", "operation_parked", "authority_missing", "authority_insufficient", "home_mismatch", "home_inside_repository", "scope_mismatch", "clone_identity_mismatch"},
+		Conflict:    {"revision_conflict", "lock_held", "already_exists", "replay_mismatch"},
+		NotFound:    {"not_found", "home_not_found"},
+		TooLarge:    {"record_too_large"},
+		Unavailable: {"dependency_missing", "dependency_unusable", "authentication_refused", "source_unreadable", "record_malformed"},
+		Unknown:     {"outcome_unknown"},
+		Held:        {"held"},
+	}
+	count := 0
+	for status, codes := range table {
+		for _, code := range codes {
+			count++
+			got, ok := StatusOfCode(code)
+			if !ok || got != status {
+				t.Errorf("%s: status %s, want %s", code, got, status)
+			}
+			if !ValidCode(code) {
+				t.Errorf("%s: not a valid code", code)
+			}
+			if f := Common(code, "x"); f.Status != status || f.Err.Code != code {
+				t.Errorf("Common(%s): %s/%s", code, f.Status, f.Err.Code)
+			}
+		}
+	}
+	all := CommonCodes()
+	if len(all) != count {
+		t.Errorf("%d common codes, the table has %d", len(all), count)
+	}
+	seen := map[string]bool{}
+	for _, c := range all {
+		if seen[c] {
+			t.Errorf("%s is listed twice", c)
+		}
+		seen[c] = true
+	}
+	if _, ok := StatusOfCode("pool.full"); ok {
+		t.Error("a package code is a common code")
+	}
+	for _, code := range []string{"pool.full", "internal", "a.b_c"} {
+		if !ValidCode(code) {
+			t.Errorf("%q should be a valid code", code)
+		}
+	}
+	for _, code := range []string{"", "Internal", "pool.", ".x", "a.b.c", "a-b"} {
+		if ValidCode(code) {
+			t.Errorf("%q should not be a valid code", code)
+		}
+	}
+}
+
+func TestFailureRules(t *testing.T) {
+	if f := Oversize("request", 10, 11); f.Status != TooLarge || *f.Err.LimitBytes != 10 || *f.Err.ActualBytes != 11 || f.Err.Detail["record"] != "request" {
+		t.Errorf("Oversize: %+v", f)
+	}
+	if err := (&Failure{Status: TooLarge, Err: Error{Code: CodeRecordTooLarge, Message: "x"}}).Check(); err == nil {
+		t.Error("too_large without sizes passed")
+	}
+	if err := (&Failure{Status: Held, Err: Error{Code: CodeHeld, Message: "x"}}).Check(); err == nil {
+		t.Error("held without a hold passed")
+	}
+	if err := Hold(RecordRef{Schema: "word.question", ID: "q_1"}, "waiting").Check(); err != nil {
+		t.Error(err)
+	}
+	if f := Common(CodeOutcomeUnknown, "x").Retry(); f.Err.Retryable {
+		t.Error("an unknown outcome became retryable")
+	}
+	if f := Common(CodeLockHeld, "x").Retry(); !f.Err.Retryable {
+		t.Error("lock_held did not become retryable")
+	}
+	if err := (&Failure{Status: Unknown, Err: Error{Code: CodeOutcomeUnknown, Message: "x", Retryable: true}}).Check(); err == nil {
+		t.Error("a retryable unknown passed")
+	}
+	if err := (&Failure{Status: Ok, Err: Error{Code: "internal", Message: "x"}}).Check(); err == nil {
+		t.Error("ok as a failure passed")
+	}
+	if err := (&Failure{Status: Failed, Err: Error{Code: "internal"}}).Check(); err == nil {
+		t.Error("an empty message passed")
+	}
+	for _, bad := range []func(){
+		func() { Fail(Ok, "internal", "x") },
+		func() { Fail("done", "internal", "x") },
+		func() { Fail(Failed, "Internal", "x") },
+		func() { Common("pool.full", "x") },
+	} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Error("no panic")
+				}
+			}()
+			bad()
+		}()
+	}
+	f := Common(CodeInternal, "boom").With("where", "here")
+	if f.Err.Detail["where"] != "here" || f.Error() != "failed (internal): boom" {
+		t.Errorf("With or Error: %v", f)
+	}
+	var err error = f
+	if AsFailure(errors.Join(errors.New("outer"), err)) != f {
+		t.Error("AsFailure did not unwrap")
+	}
+	if AsFailure(errors.New("plain")) != nil {
+		t.Error("AsFailure found a failure in a plain error")
+	}
+}
+
+func TestVersions(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want int
+	}{{"1.0", "1.0", 0}, {"1.1", "1.0", 1}, {"1.0", "1.1", -1}, {"2.0", "1.9", 1}, {"1.10", "1.9", 1}, {"10.0", "9.0", 1}} {
+		got, err := CompareVersions(c.a, c.b)
+		if err != nil || (got > 0) != (c.want > 0) || (got < 0) != (c.want < 0) {
+			t.Errorf("CompareVersions(%s, %s) = %d, %v; want %d", c.a, c.b, got, err, c.want)
+		}
+	}
+	for _, bad := range []string{"", "1", "01.0", "1.01", "v1.0", "1.0.0", "1.0 "} {
+		if _, err := CompareVersions(bad, "1.0"); !errors.Is(err, ErrVersionForm) {
+			t.Errorf("%q: %v", bad, err)
+		}
+		if Newer(bad, "1.0") {
+			t.Errorf("%q counts as newer", bad)
+		}
+	}
+	if !Newer("1.1", "1.0") || !Newer("2.0", "1.0") || Newer("1.0", "1.0") || Newer("0.9", "1.0") {
+		t.Error("Newer is wrong")
+	}
+}
+
+// A request round-trips: decode, encode canonically, decode again to the
+// same value; the body keeps its text and its whole numbers as written.
+func TestRequestRoundTrip(t *testing.T) {
+	data := fixture(t, "request.json")
+	r, err := DecodeRequest(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Command != "hive-fleet" || r.Operation != "provision" || r.OperationVersion != "1.0" ||
+		r.RequestID != "req_01arz3ndektsv4rrffq69g5fav" || r.Causation == nil || r.Causation.ID != "req_01arz3ndektsv4rrffq69g5fa0" ||
+		r.Caller.Kind != CallerTest || r.Level != ScopeProject || r.CloneID != "clone_01arz3ndektsv4rrffq69g5fav" ||
+		r.Generation != 2 || r.SourceRevision == "" || len(r.ExpectedRevisions) != 1 || r.ExpectedRevisions[0].RecordRevision != 3 ||
+		r.Authority.Kind != AuthorityWord || r.Authority.Ref == nil || r.Authority.Ref.RecordRevision != 1 {
+		t.Fatalf("decoded wrongly: %+v", r)
+	}
+	if r.Body["note"] != "kept é as written" || r.Body["count"] != int64(9007199254740991) {
+		t.Errorf("body not kept as written: %v", r.Body)
+	}
+	out, err := r.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := canon.Line(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(out, want) {
+		t.Errorf("Encode is not the canonical form:\n%s\n%s", out, want)
+	}
+	d1, _ := r.Digest()
+	d2, _ := Digest(data)
+	if d1 != d2 || !canon.ValidDigest(d1) {
+		t.Errorf("digests differ: %s %s", d1, d2)
+	}
+	again, err := DecodeRequest(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(encode(t, again.Tree()), out) {
+		t.Error("a second round changed the document")
+	}
+	if err := r.Addressed("hive-fleet", "provision"); err != nil {
+		t.Error(err)
+	}
+	failure(t, r.Addressed("hive-fleet", "route"), Invalid, CodeEnvelopeMismatch)
+	failure(t, r.Addressed("hive-pool", "provision"), Invalid, CodeEnvelopeMismatch)
+
+	// A minimal request: every optional field absent.
+	min := &Request{Command: "hive-pool", Operation: "list", OperationVersion: "1.0", RequestID: r.RequestID, CorrelationID: r.CorrelationID,
+		IssuedAt: r.IssuedAt, Caller: Caller{Kind: CallerOperator}, Scope: Scope{Level: ScopeHive, HomeID: r.HomeID}, Authority: Authority{Kind: AuthorityNone}}
+	out, err = min.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := DecodeRequest(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.ExpectedRevisions != nil || back.Causation != nil || len(back.Body) != 0 || back.Body == nil {
+		t.Errorf("minimal request decoded wrongly: %+v", back)
+	}
+	// An empty expected_revisions is present and empty, not absent.
+	min.ExpectedRevisions = []ExpectedRevision{}
+	out, _ = min.Encode()
+	if !strings.Contains(string(out), `"expected_revisions":[]`) {
+		t.Error("an empty list was dropped")
+	}
+	back, _ = DecodeRequest(out)
+	if back.ExpectedRevisions == nil {
+		t.Error("an empty list was read as absent")
+	}
+}
+
+// Every way a request is rejected carries the code of spec/commands.md.
+func TestRequestRejections(t *testing.T) {
+	data := fixture(t, "request.json")
+	mutate := func(f func(m map[string]any)) []byte {
+		m := tree(t, data)
+		f(m)
+		return encode(t, m)
+	}
+	cases := []struct {
+		name string
+		data []byte
+		code string
+	}{
+		{"empty", nil, CodeMalformedRequest},
+		{"not json", []byte("hello\n"), CodeMalformedRequest},
+		{"byte-order mark", append([]byte("\xef\xbb\xbf"), data...), CodeMalformedRequest},
+		{"truncated", data[:len(data)/2], CodeMalformedRequest},
+		{"fractional number", bytes.Replace(data, []byte(`"generation": 2`), []byte(`"generation": 2.0`), 1), CodeMalformedRequest},
+		{"duplicate member", bytes.Replace(data, []byte(`"schema": "hive.request",`), []byte(`"schema": "hive.request", "schema": "hive.request",`), 1), CodeMalformedRequest},
+		{"an array", []byte("[]\n"), CodeSchemaViolation},
+		{"newer minor", mutate(func(m map[string]any) { m["schema_version"] = "1.1" }), CodeUnsupportedVersion},
+		{"newer major", mutate(func(m map[string]any) { m["schema_version"] = "2.0" }), CodeUnsupportedVersion},
+		{"wrong schema name", mutate(func(m map[string]any) { m["schema"] = "hive.response" }), CodeSchemaViolation},
+		{"unknown field", mutate(func(m map[string]any) { m["extra"] = true }), CodeSchemaViolation},
+		{"missing scope", mutate(func(m map[string]any) { delete(m, "scope_level") }), CodeSchemaViolation},
+		{"hive scope with workspace", mutate(func(m map[string]any) { m["scope_level"] = "hive" }), CodeSchemaViolation},
+		{"generation without task", mutate(func(m map[string]any) { delete(m, "task_id") }), CodeSchemaViolation},
+		{"authority ref missing", mutate(func(m map[string]any) { m["authority"] = map[string]any{"kind": "word"} }), CodeSchemaViolation},
+		{"uppercase id", mutate(func(m map[string]any) { m["request_id"] = "req_01ARZ3NDEKTSV4RRFFQ69G5FAV" }), CodeSchemaViolation},
+		{"timestamp with offset", mutate(func(m map[string]any) { m["issued_at"] = "2026-10-11T08:00:00.000+00:00" }), CodeSchemaViolation},
+		{"body not an object", mutate(func(m map[string]any) { m["body"] = []any{} }), CodeSchemaViolation},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := DecodeRequest(c.data)
+			failure(t, err, Invalid, c.code)
+		})
+	}
+	// An older minor version is not refused as newer; the schema decides.
+	_, err := DecodeRequest(mutate(func(m map[string]any) { m["schema_version"] = "0.9" }))
+	failure(t, err, Invalid, CodeSchemaViolation)
+}
+
+func TestLooseRequestID(t *testing.T) {
+	if id, err := LooseRequestID([]byte(`{"request_id": "req_01arz3ndektsv4rrffq69g5fav", "junk": 1}`)); err != nil || id != "req_01arz3ndektsv4rrffq69g5fav" {
+		t.Errorf("got %q, %v", id, err)
+	}
+	for _, bad := range []string{``, `[]`, `{}`, `{"request_id": 1}`, `{"request_id": "REQ_X"}`, `{"request_id": "ws_01arz3ndektsv4rrffq69g5fav"}`, `{"request_id": "req_01arz3ndektsv4rrffq69g5fav"`} {
+		if id, err := LooseRequestID([]byte(bad)); err == nil || id != "" {
+			t.Errorf("%s: got %q, %v", bad, id, err)
+		}
+	}
+}
+
+func TestResponseRoundTrip(t *testing.T) {
+	for _, name := range []string{"response-ok.json", "response-held.json", "response-too-large.json"} {
+		t.Run(name, func(t *testing.T) {
+			data := fixture(t, name)
+			r, err := DecodeResponse(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out, err := r.Encode()
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, _ := canon.Line(data)
+			if !bytes.Equal(out, want) {
+				t.Errorf("Encode is not the canonical form:\n%s\n%s", out, want)
+			}
+			if _, err := Accept(out, r.ExitCode(), r.RequestID); err != nil {
+				t.Errorf("the command's own response is not accepted: %v", err)
+			}
+		})
+	}
+	ok, _ := DecodeResponse(fixture(t, "response-ok.json"))
+	if ok.Status != Ok || ok.ExitCode() != 0 || len(ok.Receipts) != 1 || ok.Receipts[0].Kind != "dispatch.home.created" || ok.Receipts[0].Subject == nil || ok.Body["home"] == nil || ok.Error != nil {
+		t.Errorf("ok decoded wrongly: %+v", ok)
+	}
+	held, _ := DecodeResponse(fixture(t, "response-held.json"))
+	if held.Status != Held || held.ExitCode() != 10 || !held.Replayed || held.Error == nil || held.Error.Hold == nil || held.Error.Hold.ID != "q_01arz3ndektsv4rrffq69g5fav" || held.Body != nil {
+		t.Errorf("held decoded wrongly: %+v", held)
+	}
+	large, _ := DecodeResponse(fixture(t, "response-too-large.json"))
+	if large.RequestID != "" || large.Operation != "" || large.ExitCode() != 7 || *large.Error.LimitBytes != 67108864 || *large.Error.ActualBytes != 67108865 || large.Error.Detail["record"] != "request" {
+		t.Errorf("too_large decoded wrongly: %+v", large)
+	}
+	if out, _ := large.Encode(); !strings.Contains(string(out), `"request_id":null`) || !strings.Contains(string(out), `"operation":null`) {
+		t.Errorf("null fields not written: %s", out)
+	}
+}
+
+func TestResponseRules(t *testing.T) {
+	data := fixture(t, "response-ok.json")
+	mutate := func(f func(m map[string]any)) []byte {
+		m := tree(t, data)
+		f(m)
+		return encode(t, m)
+	}
+	cases := []struct {
+		name string
+		data []byte
+		code string
+	}{
+		{"status disagrees with exit code", mutate(func(m map[string]any) { m["exit_code"] = int64(1) }), CodeSchemaViolation},
+		{"exit code beyond the table", mutate(func(m map[string]any) { m["status"] = "failed"; m["exit_code"] = int64(11); delete(m, "body") }), CodeSchemaViolation},
+		{"ok without body", mutate(func(m map[string]any) { delete(m, "body") }), CodeSchemaViolation},
+		{"ok with error", mutate(func(m map[string]any) { m["error"] = map[string]any{"code": "x", "message": "y", "retryable": false} }), CodeSchemaViolation},
+		{"failed with body", mutate(func(m map[string]any) {
+			m["status"] = "failed"
+			m["exit_code"] = int64(1)
+			m["error"] = map[string]any{"code": "internal", "message": "y", "retryable": false}
+		}), CodeSchemaViolation},
+		{"failed without error", mutate(func(m map[string]any) { m["status"] = "failed"; m["exit_code"] = int64(1); delete(m, "body") }), CodeSchemaViolation},
+		{"too_large without sizes", mutate(func(m map[string]any) {
+			m["status"] = "too_large"
+			m["exit_code"] = int64(7)
+			delete(m, "body")
+			m["error"] = map[string]any{"code": "record_too_large", "message": "y", "retryable": false}
+		}), CodeSchemaViolation},
+		{"held without hold", mutate(func(m map[string]any) {
+			m["status"] = "held"
+			m["exit_code"] = int64(10)
+			delete(m, "body")
+			m["error"] = map[string]any{"code": "held", "message": "y", "retryable": false}
+		}), CodeSchemaViolation},
+		{"receipt breaks its envelope", mutate(func(m map[string]any) { m["receipts"].([]any)[0].(map[string]any)["kind"] = "Home" }), CodeSchemaViolation},
+		{"newer version", mutate(func(m map[string]any) { m["schema_version"] = "1.2" }), CodeUnsupportedVersion},
+		{"not a record", []byte("{\n"), CodeMalformedRequest},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := DecodeResponse(c.data)
+			failure(t, err, Invalid, c.code)
+		})
+	}
+	// Encode refuses what the schema would: a response is complete or it
+	// is not a response.
+	r := &Response{RequestID: "req_01arz3ndektsv4rrffq69g5fav", Command: "hive-pool", Operation: "list", Status: Ok, Responder: Responder{"pool", "hive-pool", "test", "1.0"}, CompletedAt: "2026-10-11T08:00:00.000Z"}
+	if _, err := r.Encode(); err == nil {
+		t.Error("ok without a body was encoded")
+	}
+	r.Body = map[string]any{}
+	r.Error = &Error{Code: "x", Message: "y"}
+	if _, err := r.Encode(); err == nil {
+		t.Error("ok with an error was encoded")
+	}
+	r.Error = nil
+	if _, err := r.Encode(); err != nil {
+		t.Error(err)
+	}
+	r.Status, r.Body = Failed, nil
+	if _, err := r.Encode(); err == nil {
+		t.Error("failed without an error was encoded")
+	}
+	r.Error = &Error{Code: "internal", Message: "y"}
+	if _, err := r.Encode(); err != nil {
+		t.Error(err)
+	}
+	r.Status = "done"
+	if _, err := r.Encode(); err == nil {
+		t.Error("a non-status was encoded")
+	}
+	r.Status, r.Responder.Package = Failed, "nobody"
+	if _, err := r.Encode(); err == nil {
+		t.Error("a responder of no package was encoded")
+	}
+}
+
+// The caller's rule: a response is accepted only if the whole document
+// parses, follows the schema, echoes the request_id and agrees with the exit
+// code. Anything else is unknown.
+func TestAccept(t *testing.T) {
+	data := fixture(t, "response-ok.json")
+	good, _ := canon.Line(data)
+	if r, err := Accept(good, 0, "req_01arz3ndektsv4rrffq69g5fav"); err != nil || r.Status != Ok {
+		t.Fatalf("not accepted: %v", err)
+	}
+	cases := []struct {
+		name string
+		out  []byte
+		exit int
+		id   string
+	}{
+		{"empty output", nil, 0, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"empty output with failing exit", nil, 1, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"no final line feed", good[:len(good)-1], 0, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"truncated", good[:len(good)/2], 0, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"two documents", append(append([]byte{}, good...), good...), 0, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"exit code disagrees", good, 1, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"signal exit", good, 137, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"another request", good, 0, "req_01arz3ndektsv4rrffq69g5fa0"},
+		{"null where one was expected", fixture(t, "response-too-large.json"), 7, "req_01arz3ndektsv4rrffq69g5fav"},
+		{"not a response", []byte("ok\n"), 0, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r, err := Accept(c.out, c.exit, c.id)
+			if r != nil {
+				t.Fatal("a response was returned")
+			}
+			failure(t, err, Unknown, CodeOutcomeUnknown)
+			if AsFailure(err).Err.Retryable {
+				t.Error("unknown is retryable")
+			}
+		})
+	}
+	// A null request_id is echoed as "" and is accepted for a capabilities
+	// answer.
+	large := fixture(t, "response-too-large.json")
+	if _, err := Accept(large, 7, ""); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestReceiptRoundTrip(t *testing.T) {
+	m := tree(t, fixture(t, "response-ok.json"))["receipts"].([]any)[0].(map[string]any)
+	data := encode(t, m)
+	r, err := DecodeReceipt(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := r.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(out, data) {
+		t.Errorf("Encode is not the canonical form:\n%s\n%s", out, data)
+	}
+	if r.Writer.Operation != "provision" || len(r.Evidence) != 1 || r.Evidence[0].Role != "request" || r.Subject.RecordRevision != 1 || r.Level != ScopeHive {
+		t.Errorf("decoded wrongly: %+v", r)
+	}
+	// A receipt with nothing optional and nil lists.
+	min := Receipt{ReceiptID: r.ReceiptID, Kind: "pool.item.filed", KindVersion: "1.0", WrittenAt: r.WrittenAt, Writer: r.Writer, RequestID: r.RequestID, CorrelationID: r.CorrelationID,
+		Scope: Scope{Level: ScopeHive, HomeID: r.HomeID}, Authority: Authority{Kind: AuthorityNone}}
+	out, err = min.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(out), `"evidence":[]`) || !strings.Contains(string(out), `"body":{}`) {
+		t.Errorf("nil lists not written empty: %s", out)
+	}
+	m["evidence"] = []any{map[string]any{"role": "Bad", "ref": map[string]any{"schema": "x.y", "id": "1"}}}
+	_, err = DecodeReceipt(encode(t, m))
+	failure(t, err, Invalid, CodeSchemaViolation)
+	_, err = DecodeReceipt([]byte("nope"))
+	failure(t, err, Invalid, CodeMalformedRequest)
+}
+
+func TestCapabilitiesRoundTrip(t *testing.T) {
+	data := fixture(t, "capabilities.json")
+	c, err := DecodeCapabilities(tree(t, data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Command != "hive-fleet" || c.Executable != "hive-dispatch" || c.Limits != DefaultLimits() || len(c.Operations) != 2 ||
+		c.Operation("provision") == nil || c.Operation("provision").State != Supported || c.Operation("route").Reason != "built at stage 4" || c.Operation("nothing") != nil {
+		t.Fatalf("decoded wrongly: %+v", c)
+	}
+	out, err := c.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := canon.Line(data)
+	if !bytes.Equal(out, want) {
+		t.Errorf("Encode is not the canonical form:\n%s\n%s", out, want)
+	}
+	// A declaration with no operations is valid; one with a supported
+	// operation that names no schemas or versions is not.
+	none := &Capabilities{Command: "hive-park", Package: "dispatch", Executable: "hive-dispatch", ContractVersion: "1.0", ImplementationVersion: "test"}
+	if err := none.Check(); err != nil {
+		t.Error(err)
+	}
+	if out, _ := none.Encode(); !strings.Contains(string(out), `"operations":[]`) || !strings.Contains(string(out), `"max_argument_bytes":4096`) {
+		t.Errorf("defaults not written: %s", out)
+	}
+	bad := *none
+	bad.Operations = []OperationDecl{{Name: "x", State: Supported, Mode: Unary}}
+	if err := bad.Check(); err == nil {
+		t.Error("a supported operation without schemas passed")
+	}
+	bad.Operations = []OperationDecl{{Name: "x", State: Unsupported, Mode: Unary}}
+	if err := bad.Check(); err == nil {
+		t.Error("an unsupported operation without a reason passed")
+	}
+	bad.Operations = []OperationDecl{{Name: "x", State: Parked, Reason: "r", Mode: Unary, Executes: []string{"make"}}}
+	if err := bad.Check(); err == nil {
+		t.Error("an undeclared executable passed")
+	}
+	bad.Limits = Limits{MaxArgumentBytes: 8192}
+	bad.Operations = nil
+	if err := bad.Check(); err == nil {
+		t.Error("an argument limit above 4096 passed")
+	}
+	m := tree(t, data)
+	m["contract_version"] = "2.0"
+	if _, err := DecodeCapabilities(m); err == nil {
+		t.Error("a newer contract version was read")
+	}
+	m["contract_version"] = "1.0"
+	m["extra"] = 1
+	if _, err := DecodeCapabilities(m); err == nil {
+		t.Error("an unknown field was read")
+	}
+}
+
+func TestValidateBody(t *testing.T) {
+	body := map[string]any{"home": map[string]any{"role": "hive", "name": "A home"}}
+	if err := ValidateBody(body, "urn:hive:schema:ops:hive-fleet.provision.request:v1"); err != nil {
+		t.Error(err)
+	}
+	body["home"].(map[string]any)["role"] = "nest"
+	failure(t, ValidateBody(body, "urn:hive:schema:ops:hive-fleet.provision.request:v1"), Invalid, CodeSchemaViolation)
+	failure(t, ValidateBody(body, "urn:hive:schema:nothing:v1"), Failed, CodeInternal)
+	if err := Validate(RequestSchemaID, fixture(t, "request.json")); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestLimits(t *testing.T) {
+	if DefaultLimits() != (Limits{4096, 67108864, 67108864}) {
+		t.Errorf("defaults: %+v", DefaultLimits())
+	}
+	if got := (Limits{MaxRequestBytes: 10}).Resolved(); got != (Limits{4096, 10, 67108864}) {
+		t.Errorf("Resolved: %+v", got)
+	}
+	if got := (Limits{-1, -1, -1}).Resolved(); got != DefaultLimits() {
+		t.Errorf("Resolved negative: %+v", got)
+	}
+}
