@@ -1,0 +1,26 @@
+{
+  "schema": "hive.review-feedback",
+  "schema_version": "1.0",
+  "record_revision": 1,
+  "review_id": "rev_01j9xk3m2nq4r5s6t7v8w9xyzr",
+  "round_id": 1,
+  "scope_level": "hive",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyze",
+  "generation": 1,
+  "owner": {
+    "role": "hive",
+    "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza"
+  },
+  "lictor": {
+    "task_id": "task_01j9xk3m2nq4r5s6t7v8w9xyzk",
+    "generation": 1
+  },
+  "reviewed_revision": {
+    "revision": 1,
+    "path": "revision-0001.html",
+    "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+  },
+  "events": [],
+  "updated_at": "2026-10-11T08:00:00.000Z"
+}
