@@ -127,8 +127,8 @@ func TestCommitWritesEverythingInOrder(t *testing.T) {
 	if data, err := s.Read(OutcomePath("pool", req9)); err != nil || parsed(t, data)["status"] != "ok" {
 		t.Errorf("outcome = %q, %v", data, err)
 	}
-	if !slices.Equal(j.order, []string{evt1, evt2}) || j.appends != 1 {
-		t.Errorf("journal = %v after %d appends", j.order, j.appends)
+	if !slices.Equal(j.order, []string{evt1, evt2}) || j.appends != 1 || j.recovers != 0 {
+		t.Errorf("journal = %v after %d appends, %d of them recoveries", j.order, j.appends, j.recovers)
 	}
 	if !bytes.Equal(j.lines[evt1], []byte(`{"event_id":"`+evt1+`","kind":"pool.item.created"}`)) {
 		t.Errorf("event content %q is not canonical", j.lines[evt1])
@@ -311,6 +311,11 @@ func TestCommitInterruptedAtEachStep(t *testing.T) {
 			}
 			if _, err := os.Stat(s.abs(IntentPath("pool", req9))); !errNotExist(err) {
 				t.Error("the intent remains after recovery")
+			}
+			// Recovery rolls the events forward through Recover, once, and
+			// only where an intent was left.
+			if wantRecovers := map[bool]int{true: 1, false: 0}[i >= durable]; j.recovers != wantRecovers {
+				t.Errorf("recovery called Recover %d times, want %d", j.recovers, wantRecovers)
 			}
 
 			// Rolling forward again changes nothing.

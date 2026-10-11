@@ -30,12 +30,13 @@ const (
 
 var versionForm = regexp.MustCompile(`^([1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 
-// decodeLine reads one line of the journal, without its line feed: it is
-// canonical, it is an envelope of a version this build reads, it satisfies
-// the envelope schema and the schema of its kind, and its members agree with
-// one another. A line that fails is store.ErrRecordMalformed, and one of a
-// newer version is store.ErrUnsupportedVersion.
-func (j *Journal) decodeLine(line []byte) (map[string]any, error) {
+// decodeLine reads one line of the journal, without its line feed, from the
+// segment named segment: it is canonical, it is an envelope of a version this
+// build reads, it satisfies the envelope schema and the schema of its kind,
+// and its members agree with one another and with the segment. A line that
+// fails is store.ErrRecordMalformed, and one of a newer version is
+// store.ErrUnsupportedVersion.
+func (j *Journal) decodeLine(line []byte, segment string) (map[string]any, error) {
 	v, err := canon.Parse(line)
 	if err != nil {
 		return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
@@ -48,7 +49,7 @@ func (j *Journal) decodeLine(line []byte) (map[string]any, error) {
 	if err != nil || string(out) != string(line) {
 		return nil, fmt.Errorf("%w: journal: a line is not in canonical form", store.ErrRecordMalformed)
 	}
-	if err := j.checkEvent(obj, line); err != nil {
+	if err := j.checkEvent(obj, line, segment); err != nil {
 		if errors.Is(err, store.ErrUnsupportedVersion) {
 			return nil, err
 		}
@@ -57,13 +58,16 @@ func (j *Journal) decodeLine(line []byte) (map[string]any, error) {
 	return obj, nil
 }
 
-// checkEvent checks a whole event, obj with its canonical form data: the
-// envelope's version and schema, that source.package is the first segment of
-// kind except for the repair event whose source_id is "journal", that the
-// body satisfies the schema its kind registers or is empty when it registers
-// none, and that its three times are timestamps with an unknown occurred_at
+// checkEvent checks a whole event, obj with its canonical form data and the
+// segment named segment that holds or will hold it: the envelope's version and
+// schema, that source.source_id begins with source.package and that
+// source.package is the first segment of kind, except for the repair event
+// whose source_id is "journal", that the body satisfies the schema its kind
+// registers or is empty when it registers none, that a repair event is of the
+// version registered and based on the journal's record of the segment it is
+// in, and that its three times are timestamps with an unknown occurred_at
 // repeating observed_at.
-func (j *Journal) checkEvent(obj map[string]any, data []byte) error {
+func (j *Journal) checkEvent(obj map[string]any, data []byte, segment string) error {
 	if obj["schema"] != eventRecord {
 		return fmt.Errorf("schema is not %s", eventRecord)
 	}
@@ -82,8 +86,16 @@ func (j *Journal) checkEvent(obj map[string]any, data []byte) error {
 		if sourceID != RepairSourceID {
 			return fmt.Errorf("the source_id of %s is %q", RepairKind, RepairSourceID)
 		}
-	} else if owner, _, _ := strings.Cut(kind, "."); owner != pkg {
-		return fmt.Errorf("kind %s is not of source.package %s", kind, pkg)
+		if err := checkRepairEvent(obj, segment); err != nil {
+			return err
+		}
+	} else {
+		if owner, _, _ := strings.Cut(kind, "."); owner != pkg {
+			return fmt.Errorf("kind %s is not of source.package %s", kind, pkg)
+		}
+		if owner, _, _ := strings.Cut(sourceID, ":"); owner != pkg {
+			return fmt.Errorf("source_id %s is not a source of source.package %s", sourceID, pkg)
+		}
 	}
 	if err := j.checkBody(obj); err != nil {
 		return err
@@ -95,6 +107,28 @@ func (j *Journal) checkEvent(obj map[string]any, data []byte) error {
 	}
 	if known, ok := obj["occurred_at_known"].(bool); ok && !known && obj["occurred_at"] != obj["observed_at"] {
 		return errors.New("occurred_at is unknown, so it must repeat observed_at")
+	}
+	return nil
+}
+
+// checkRepairEvent checks what makes a repair event the journal's own: the one
+// version of its kind this build knows, and a basis that is the journal's
+// record of the segment the line is in, which its body names too.
+func checkRepairEvent(obj map[string]any, segment string) error {
+	if kindVersion, _ := obj["kind_version"].(string); kindVersion != repairKindVersion {
+		if newer(kindVersion, repairKindVersion) {
+			return fmt.Errorf("%w: %s is at version %s, this build reads %s", store.ErrUnsupportedVersion, RepairKind, kindVersion, repairKindVersion)
+		}
+		return fmt.Errorf("%s is at version %s, not %s", RepairKind, kindVersion, repairKindVersion)
+	}
+	body, _ := obj["body"].(map[string]any)
+	if body["segment"] != segment {
+		return fmt.Errorf("the repair names segment %v and is in %q", body["segment"], segment)
+	}
+	basis, _ := obj["basis"].(map[string]any)
+	ref, _ := basis["ref"].(map[string]any)
+	if basis["kind"] != "record" || ref["schema"] != RecordSchema || ref["id"] != segment {
+		return fmt.Errorf("the basis of a repair is the %s record of %s", RecordSchema, segment)
 	}
 	return nil
 }

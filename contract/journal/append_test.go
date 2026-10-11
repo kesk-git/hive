@@ -149,15 +149,15 @@ func TestSegments(t *testing.T) {
 	}
 }
 
-// Append writes every event once: an event whose event_id is already in the
-// journal is skipped, as recovery that hands the same events again needs,
-// and the rest are appended in order.
-func TestAppendOnce(t *testing.T) {
+// Recovery appends an event only if no line with its event_id is present: an
+// event already in the journal, in any retained segment, is skipped, and the
+// rest are appended in order.
+func TestRecoverAppendsOnce(t *testing.T) {
 	home := newHome(t, false)
 	j, _ := open(t, home, "pool", 0)
 	append_(t, j, events(t, "pool", 1, 2)...)
-	append_(t, j, events(t, "pool", 1, 3)...)
-	append_(t, j, event(t, "pool", 2))
+	recover_(t, j, events(t, "pool", 1, 3)...)
+	recover_(t, j, event(t, "pool", 2))
 	if seqs := sequences(t, segmentBytes(t, home, SegmentName(1))); !slices.Equal(seqs, []int64{1, 2, 3}) {
 		t.Fatalf("lines %v", seqs)
 	}
@@ -169,17 +169,65 @@ func TestAppendOnce(t *testing.T) {
 		t.Errorf("events %v", got)
 	}
 	// Twice in one append is a caller's mistake, not a duplicate to skip.
-	err := j.Append([]store.Event{event(t, "pool", 4), event(t, "pool", 4)})
-	wantErr(t, "the same event twice in one append", err, ErrEvent)
+	for _, f := range []func([]store.Event) error{j.Append, j.Recover} {
+		err := f([]store.Event{event(t, "pool", 4), event(t, "pool", 4)})
+		wantErr(t, "the same event twice in one append", err, ErrEvent)
+	}
 	if head, _ := j.Head(); head != 3 {
 		t.Errorf("Head = %d after a refused append", head)
 	}
 	// Presence is found across segments too.
 	small, _ := open(t, home, "pool", 1)
 	append_(t, small, events(t, "pool", 4, 6)...)
-	append_(t, small, events(t, "pool", 1, 7)...)
+	recover_(t, small, events(t, "pool", 1, 7)...)
 	if head, _ := small.Head(); head != 7 {
 		t.Errorf("Head = %d, want 7", head)
+	}
+	if seqs := sequences(t, segmentBytes(t, home, SegmentName(7))); !slices.Equal(seqs, []int64{7}) {
+		t.Errorf("the last segment holds %v", seqs)
+	}
+}
+
+// closeSegments makes the segments but the newest unreadable, as a segment
+// the journal must not read, and skips the test where the file system does
+// not enforce it.
+func closeSegments(t *testing.T, home string) {
+	t.Helper()
+	files := segmentFiles(t, home)
+	for _, name := range files[:len(files)-1] {
+		path := filepath.Join(home, journalDir, name)
+		if err := os.Chmod(path, 0); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.Chmod(path, fileMode) })
+		if f, err := os.Open(path); err == nil {
+			f.Close()
+			t.Skip("the file system does not keep the owner from reading a file with no access")
+		}
+	}
+}
+
+// The first attempt of a transaction does no presence scan: it reads the tail
+// of the newest segment and writes, however much history is kept. Only
+// recovery reads the closed segments.
+func TestAppendReadsNoClosedSegment(t *testing.T) {
+	home := newHome(t, false)
+	j, _ := open(t, home, "pool", 1) // one line per segment
+	append_(t, j, events(t, "pool", 1, 3)...)
+	closeSegments(t, home)
+
+	append_(t, j, events(t, "pool", 4, 5)...)
+	if head, err := j.Head(); err != nil || head != 5 {
+		t.Fatalf("Head = %d, %v", head, err)
+	}
+	// Recovery of the events it holds must read them to find them.
+	if err := j.Recover(events(t, "pool", 1, 1)); err == nil {
+		t.Error("recovery found an event in a segment it cannot read")
+	}
+	// An event of the newest segment is found without reading the closed ones.
+	recover_(t, j, event(t, "pool", 5))
+	if head, _ := j.Head(); head != 5 {
+		t.Errorf("Head = %d after recovering an event that was there", head)
 	}
 }
 
@@ -311,6 +359,11 @@ func TestAppendRefusals(t *testing.T) {
 		{"no basis", alter(func(m map[string]any) { delete(m, "basis") }), ErrEvent},
 		{"a member the envelope does not have", alter(func(m map[string]any) { m["note"] = "x" }), ErrEvent},
 		{"source.package is another package", alter(func(m map[string]any) { m["source"] = map[string]any{"package": "shadow", "source_id": "shadow"} }), ErrEvent},
+		{"a source of another package", alter(func(m map[string]any) { m["source"] = map[string]any{"package": "pool", "source_id": "shadow"} }), ErrEvent},
+		{"a source of another package with parts", alter(func(m map[string]any) {
+			m["source"] = map[string]any{"package": "pool", "source_id": "shadow:github:o/r"}
+		}), ErrEvent},
+		{"the journal's own source", alter(func(m map[string]any) { m["source"] = map[string]any{"package": "pool", "source_id": "journal"} }), ErrEvent},
 		{"a body for a kind that registers none", alter(func(m map[string]any) { m["body"] = map[string]any{"x": int64(1)} }), ErrEvent},
 		{"a hive scope with a workspace", alter(func(m map[string]any) { m["workspace_id"] = id(ids.Workspace, 1) }), ErrEvent},
 		{"a generation without a task", alter(func(m map[string]any) { m["generation"] = int64(1) }), ErrEvent},
@@ -329,6 +382,13 @@ func TestAppendRefusals(t *testing.T) {
 			}
 		})
 	}
+	// A source the package observes is its own.
+	append_(t, j, encoded(t, func() map[string]any {
+		m := envelope("pool", 4)
+		m["source"] = map[string]any{"package": "pool", "source_id": "pool:feed:x/y", "source_sequence": int64(1)}
+		return m
+	}()))
+	before = segmentBytes(t, home, SegmentName(1))
 	// A journal opened to read only cannot append.
 	reader, err := Open(home, Options{})
 	if err != nil {
@@ -441,5 +501,47 @@ func TestSegmentNames(t *testing.T) {
 	n, isSeg, err := parseSegment(SegmentName(canon.MaxNumber))
 	if !isSeg || err != nil || n != canon.MaxNumber {
 		t.Errorf("the largest sequence: %d %v %v", n, isSeg, err)
+	}
+}
+
+// Nothing is recorded under an identity the journal was handed: an append
+// reads the home record as it begins, and is refused, writing nothing, while
+// the home has none. A journal may be opened before the record exists, and
+// appends under it once it does.
+func TestAppendNeedsTheHomeRecord(t *testing.T) {
+	bare := newHome(t, true)
+	j, _ := open(t, bare, "pool", 0)
+	if j.HomeID != "" {
+		t.Fatalf("HomeID = %q before the home record", j.HomeID)
+	}
+	for _, f := range []func([]store.Event) error{j.Append, j.Recover} {
+		wantErr(t, "no home record", f(events(t, "pool", 1, 1)), ErrNoHome)
+	}
+	if head, err := j.Head(); err != nil || head != 0 {
+		t.Errorf("Head = %d, %v", head, err)
+	}
+	if files := segmentFiles(t, bare); len(files) != 0 {
+		t.Errorf("a refused append wrote %v", files)
+	}
+	if got := readAll(t, j, 0); len(got) != 0 {
+		t.Errorf("read %d entries", len(got))
+	}
+
+	// The record arrives after the journal was opened: the journal appends
+	// under it, and refuses an event of any other home.
+	data, err := os.ReadFile("testdata/home/home.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bare, "home.json"), data, fileMode); err != nil {
+		t.Fatal(err)
+	}
+	other := envelope("pool", 2)
+	other["home_id"] = id(ids.Home, 9)
+	wantErr(t, "another home", j.Append([]store.Event{encoded(t, other)}), ErrEvent)
+	append_(t, j, event(t, "pool", 1))
+	got := readAll(t, j, 0)
+	if len(got) != 1 || got[0].Event["home_id"] != testHomeID {
+		t.Fatalf("read %d entries", len(got))
 	}
 }

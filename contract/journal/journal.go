@@ -45,10 +45,9 @@ const (
 	eventVersion = "1.0"
 )
 
-// Packages are the seven packages, the only values of source.package and the
-// only openers of a journal that append. The list is the package_name
-// enumeration of the common schema.
-var Packages = []string{"pool", "spawning-pool", "dispatch", "shadow", "synapse", "word", "ui"}
+// packageName is the definition of the common schema that lists the seven
+// packages, the only openers of a journal that append.
+const packageName = "urn:hive:schema:common:v1#/$defs/package_name"
 
 // The errors of the journal, besides those it shares with the store: a line
 // or a segment it cannot read is store.ErrRecordMalformed, a line of a newer
@@ -68,6 +67,10 @@ var (
 	// ErrNoPackage reports an Append through a journal opened without the
 	// package that appends.
 	ErrNoPackage = errors.New("journal: opened without the package that appends")
+	// ErrNoHome reports an Append in a home that has no home record yet: an
+	// event is recorded under the home's identity, which only that record
+	// gives.
+	ErrNoHome = errors.New("journal: the home has no home record to append under")
 )
 
 // Options configure a Journal.
@@ -98,16 +101,24 @@ type Journal struct {
 }
 
 // Open checks the home at dir and returns its journal, creating journal/ if
-// it is not there. Options.Package, when given, is one of Packages.
+// it is not there. Options.Package, when given, is one of the seven packages
+// of the common schema. A home without its home record may be opened, to
+// read; Append refuses until the record is there.
 func Open(dir string, opts Options) (*Journal, error) {
-	if opts.Package != "" && !slices.Contains(Packages, opts.Package) {
-		return nil, fmt.Errorf("journal: %q is not a package", opts.Package)
-	}
-	h, err := store.CheckHome(dir)
+	reg, err := schema.Embedded()
 	if err != nil {
 		return nil, err
 	}
-	reg, err := schema.Embedded()
+	if opts.Package != "" {
+		name, err := canon.Encode(opts.Package)
+		if err != nil {
+			return nil, fmt.Errorf("journal: %q is not a package", opts.Package)
+		}
+		if err := reg.Validate(packageName, name); err != nil {
+			return nil, fmt.Errorf("journal: %q is not a package", opts.Package)
+		}
+	}
+	h, err := store.CheckHome(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +147,21 @@ func Open(dir string, opts Options) (*Journal, error) {
 func (j *Journal) Package() string { return j.pkg }
 
 // Head returns the home_sequence of the last durable line, or 0 while the
-// journal holds none. A torn tail does not count.
+// journal holds none. A torn tail does not count. Head takes no lock, so a
+// writer repairing the tail may change what it reads under it; it reads again
+// until a fault is the one it met the time before.
 func (j *Journal) Head() (int64, error) {
-	st, err := j.state()
-	if err != nil {
-		return 0, err
+	var last string
+	for {
+		st, err := j.state()
+		if err == nil {
+			return st.next - 1, nil
+		}
+		if err.Error() == last {
+			return 0, err
+		}
+		last = err.Error()
 	}
-	return st.next - 1, nil
 }
 
 // segment is one segment file: its name and the home_sequence of its first
@@ -283,8 +302,6 @@ type state struct {
 	tail *tail
 	// next is the home_sequence the next line takes.
 	next int64
-	// homeID is the home_id of the last intact line, or "".
-	homeID string
 }
 
 // state reads the segments and the tail of the newest. The next
@@ -306,14 +323,14 @@ func (j *Journal) state() (*state, error) {
 		return nil, err
 	}
 	if st.tail.last != nil {
-		seq, homeID, err := j.lastLine(st.cur.name, st.tail.last)
+		seq, err := j.lastLine(st.cur.name, st.tail.last)
 		if err != nil {
 			return nil, err
 		}
 		if seq < st.cur.first {
 			return nil, fmt.Errorf("%w: journal: the last line of %s has home_sequence %d, before the segment's first", store.ErrRecordMalformed, st.cur.name, seq)
 		}
-		st.next, st.homeID = seq+1, homeID
+		st.next = seq + 1
 		return st, nil
 	}
 	st.next = st.cur.first
@@ -326,32 +343,53 @@ func (j *Journal) state() (*state, error) {
 		if t.last == nil || len(t.torn) > 0 {
 			return nil, fmt.Errorf("%w: journal: closed segment %s does not end in a whole line", store.ErrRecordMalformed, prev.name)
 		}
-		seq, homeID, err := j.lastLine(prev.name, t.last)
+		seq, err := j.lastLine(prev.name, t.last)
 		if err != nil {
 			return nil, err
 		}
 		if seq+1 != st.cur.first {
 			return nil, fmt.Errorf("%w: journal: %s ends at home_sequence %d but %s begins at %d", store.ErrRecordMalformed, prev.name, seq, st.cur.name, st.cur.first)
 		}
-		st.homeID = homeID
 	}
 	return st, nil
 }
 
 // lastLine reads a segment's last line as an event and returns its
-// home_sequence and home_id.
-func (j *Journal) lastLine(name string, line []byte) (int64, string, error) {
-	obj, err := j.decodeLine(line)
+// home_sequence.
+func (j *Journal) lastLine(name string, line []byte) (int64, error) {
+	obj, err := j.decodeLine(line, name)
 	if err != nil {
-		return 0, "", fmt.Errorf("%w: the last line of %s", err, name)
+		return 0, fmt.Errorf("%w: the last line of %s", err, name)
 	}
 	seq, _ := obj["home_sequence"].(int64)
-	homeID, _ := obj["home_id"].(string)
-	return seq, homeID, nil
+	return seq, nil
 }
 
 // errNotExist reports whether err says a file is missing.
 func errNotExist(err error) bool { return errors.Is(err, fs.ErrNotExist) }
+
+// syncDirs flushes the journal's directory and the home's above it, so that
+// every segment and journal/ itself are durable, whenever and by whomever they
+// were created.
+func (j *Journal) syncDirs() error {
+	if err := syncDir(j.dir); err != nil {
+		return err
+	}
+	return syncDir(j.Home.Dir)
+}
+
+// syncFile flushes a file as it is, so that lines read from it are durable.
+func syncFile(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("journal: %w", err)
+	}
+	defer f.Close()
+	if err := f.Sync(); err != nil {
+		return fmt.Errorf("journal: flushing %s: %w", filepath.Base(path), err)
+	}
+	return nil
+}
 
 // syncDir flushes a directory, so that a file created in it is durable.
 func syncDir(dir string) error {

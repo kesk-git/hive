@@ -2,6 +2,7 @@ package journal
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/ids"
 	"github.com/kesk-git/hive/contract/schema"
+	"github.com/kesk-git/hive/contract/store"
 )
 
 // tear cuts the last n bytes of a segment's last line, leaving a final line
@@ -244,10 +246,10 @@ func TestRepairAtSegmentEdges(t *testing.T) {
 	}
 }
 
-// A journal whose first line was torn, in a home without its identity record
-// yet, takes the repair's home_id from the event being appended.
+// A journal whose first line was torn is repaired at home_sequence 1, under
+// the home record's identity.
 func TestRepairOfTheFirstLine(t *testing.T) {
-	home := newHome(t, true)
+	home := newHome(t, false)
 	j, _ := open(t, home, "pool", 0)
 	append_(t, j, event(t, "pool", 1))
 	torn := tear(t, home, SegmentName(1), 4)
@@ -317,34 +319,14 @@ func TestRepairBodyFixtures(t *testing.T) {
 			}
 		}
 	}
-	// A repair event with a body that fails is never written: checkEvent
-	// holds the journal's own line to the body schema.
 	home := newHome(t, false)
 	j, _ := open(t, home, "pool", 0)
-	m := envelope("pool", 1)
-	m["kind"], m["source"] = RepairKind, map[string]any{"package": "pool", "source_id": RepairSourceID}
-	m["home_sequence"], m["recorded_at"] = int64(1), m["observed_at"]
-	m["body"] = map[string]any{"segment": SegmentName(1), "removed_bytes": int64(0), "removed_digest": canon.FileDigest(nil)}
-	data, _ := canon.Encode(m)
-	if err := j.checkEvent(m, data); err == nil {
-		t.Error("a repair of zero bytes passed")
-	}
-	m["body"].(map[string]any)["removed_bytes"] = int64(1)
-	data, _ = canon.Encode(m)
-	if err := j.checkEvent(m, data); err != nil {
-		t.Errorf("a well-formed repair failed: %v", err)
-	}
-	m["source"].(map[string]any)["source_id"] = "pool"
-	data, _ = canon.Encode(m)
-	if err := j.checkEvent(m, data); err == nil {
-		t.Error("a repair from a source other than the journal passed")
-	}
 	// The store's recovery can hand the journal the same batch after a
 	// repair, and nothing is written twice.
 	append_(t, j, events(t, "pool", 1, 2)...)
 	tear(t, home, SegmentName(1), 3)
-	append_(t, j, events(t, "pool", 1, 2)...)
-	append_(t, j, events(t, "pool", 1, 2)...)
+	recover_(t, j, events(t, "pool", 1, 2)...)
+	recover_(t, j, events(t, "pool", 1, 2)...)
 	var got []int64
 	var kinds []string
 	for _, e := range readAll(t, j, 0) {
@@ -353,5 +335,106 @@ func TestRepairBodyFixtures(t *testing.T) {
 	}
 	if !slices.Equal(got, []int64{1, 2, 3}) || kinds[1] != RepairKind || kinds[2] != "pool.thing.happened" {
 		t.Errorf("read %v %v", got, kinds)
+	}
+}
+
+// repairEvent is a well-formed repair event of segment 1, as a map a test
+// may alter.
+func repairEvent() map[string]any {
+	m := envelope("pool", 1)
+	m["kind"], m["source"] = RepairKind, map[string]any{"package": "pool", "source_id": RepairSourceID}
+	m["home_sequence"], m["recorded_at"] = int64(1), m["observed_at"]
+	m["basis"] = map[string]any{"kind": "record", "ref": map[string]any{"schema": RecordSchema, "id": SegmentName(1)}}
+	m["body"] = map[string]any{"segment": SegmentName(1), "removed_bytes": int64(1), "removed_digest": canon.FileDigest([]byte("x"))}
+	return m
+}
+
+// The journal's own line is held to what makes it the journal's: the one
+// version of its kind, a basis that is the journal's record of the segment
+// the line is in, a body that names that segment, and the body's schema. The
+// same check holds a line read, a line appended and the last line of a
+// segment.
+func TestRepairEventIsChecked(t *testing.T) {
+	home := newHome(t, false)
+	j, _ := open(t, home, "pool", 0)
+	check := func(m map[string]any, segment string) error {
+		data, err := canon.Encode(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return j.checkEvent(m, data, segment)
+	}
+	if err := check(repairEvent(), SegmentName(1)); err != nil {
+		t.Fatalf("a well-formed repair failed: %v", err)
+	}
+	for _, c := range []struct {
+		name    string
+		alter   func(m map[string]any)
+		segment string
+		want    error
+	}{
+		{"a repair of zero bytes", func(m map[string]any) { m["body"].(map[string]any)["removed_bytes"] = int64(0) }, SegmentName(1), nil},
+		{"a source other than the journal", func(m map[string]any) { m["source"].(map[string]any)["source_id"] = "pool" }, SegmentName(1), nil},
+		{"a newer minor version of the kind", func(m map[string]any) { m["kind_version"] = "1.1" }, SegmentName(1), store.ErrUnsupportedVersion},
+		{"a newer major version of the kind", func(m map[string]any) { m["kind_version"] = "2.0" }, SegmentName(1), store.ErrUnsupportedVersion},
+		{"a basis that is not a record", func(m map[string]any) { m["basis"].(map[string]any)["kind"] = "receipt" }, SegmentName(1), nil},
+		{"a basis of another schema", func(m map[string]any) {
+			m["basis"].(map[string]any)["ref"].(map[string]any)["schema"] = "pool.thing"
+		}, SegmentName(1), nil},
+		{"a basis of another segment", func(m map[string]any) {
+			m["basis"].(map[string]any)["ref"].(map[string]any)["id"] = SegmentName(2)
+		}, SegmentName(1), nil},
+		{"a body that names another segment than the basis", func(m map[string]any) { m["body"].(map[string]any)["segment"] = SegmentName(2) }, SegmentName(1), nil},
+		{"a line in a segment it does not name", func(m map[string]any) {}, SegmentName(2), nil},
+		{"a line checked with no segment", func(m map[string]any) {}, "", nil},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			m := repairEvent()
+			c.alter(m)
+			err := check(m, c.segment)
+			if err == nil {
+				t.Fatal("passed")
+			}
+			if c.want != nil && !errors.Is(err, c.want) {
+				t.Errorf("error %v, want %v", err, c.want)
+			}
+			if c.want == nil && errors.Is(err, store.ErrUnsupportedVersion) {
+				t.Errorf("a malformed repair reported as unsupported: %v", err)
+			}
+		})
+	}
+
+	// A line read is held to the same: a repair in the wrong segment, or of
+	// a version this build does not read, stops the reader as the fault it is.
+	for _, c := range []struct {
+		name  string
+		alter func(m map[string]any)
+		want  error
+	}{
+		{"another segment", func(m map[string]any) {
+			m["basis"].(map[string]any)["ref"].(map[string]any)["id"] = SegmentName(2)
+			m["body"].(map[string]any)["segment"] = SegmentName(2)
+		}, store.ErrRecordMalformed},
+		{"a newer kind version", func(m map[string]any) { m["kind_version"] = "1.1" }, store.ErrUnsupportedVersion},
+	} {
+		t.Run("read "+c.name, func(t *testing.T) {
+			home := newHome(t, false)
+			j, _ := open(t, home, "pool", 0)
+			m := repairEvent()
+			c.alter(m)
+			data, err := canon.Encode(m)
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeSegment(t, home, SegmentName(1), append(data, '\n'))
+			r, err := j.Reader(0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = r.Next()
+			wantErr(t, "reading the line", err, c.want)
+			_, err = j.Head()
+			wantErr(t, "the head", err, c.want)
+		})
 	}
 }

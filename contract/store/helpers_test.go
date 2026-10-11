@@ -44,15 +44,22 @@ func newHome(t testing.TB) string {
 }
 
 // fakeJournal stands in for the home journal: it keeps each event once, by
-// event_id, in the order appended.
+// event_id, in the order appended. appends counts the calls of either
+// method, recovers those of Recover alone.
 type fakeJournal struct {
-	order   []string
-	lines   map[string][]byte
-	appends int
-	fail    error
+	order    []string
+	lines    map[string][]byte
+	appends  int
+	recovers int
+	fail     error
 }
 
 func newJournal() *fakeJournal { return &fakeJournal{lines: map[string][]byte{}} }
+
+func (j *fakeJournal) Recover(events []Event) error {
+	j.recovers++
+	return j.Append(events)
+}
 
 func (j *fakeJournal) Append(events []Event) error {
 	j.appends++

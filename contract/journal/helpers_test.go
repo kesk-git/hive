@@ -137,6 +137,15 @@ func append_(t testing.TB, j *Journal, evs ...store.Event) {
 	}
 }
 
+// recover_ appends events as recovery does, failing the test if the journal
+// refuses.
+func recover_(t testing.TB, j *Journal, evs ...store.Event) {
+	t.Helper()
+	if err := j.Recover(evs); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // segmentFiles lists the segment files of the journal of home, in name
 // order.
 func segmentFiles(t testing.TB, home string) []string {

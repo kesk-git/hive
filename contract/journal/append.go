@@ -21,26 +21,41 @@ type line struct {
 	data []byte
 }
 
-// Append appends events to the journal, in order, each once (spec/events.md,
-// The journal). Each event's content is its envelope as a JSON object,
-// without home_sequence and recorded_at, which the journal sets; its kind
-// begins with the name of the package that opened the journal, its event_id
-// is the one given beside it and its home_id is the home's. Append takes the
-// journal's lock, repairs a torn tail first, skips an event whose event_id is
-// already in the journal, and writes every other event as one line with its
-// line feed in one write, flushed before the next. An event that fails its
-// checks is refused before anything is written.
-func (j *Journal) Append(events []store.Event) error {
+// Append appends events to the journal, in order, as the first attempt of a
+// transaction (spec/events.md, The journal). Each event's content is its
+// envelope as a JSON object, without home_sequence and recorded_at, which the
+// journal sets; its kind begins with the name of the package that opened the
+// journal, its event_id is the one given beside it and its home_id is the
+// one of the home's record, which the home must have. Append takes the
+// journal's lock, repairs a torn tail first, and writes every event as one
+// line with its line feed in one write, flushed before the next, and the
+// directories that hold the segments before it returns. It looks for no
+// earlier line of the event: an event is new until recovery says otherwise.
+// An event that fails its checks is refused before anything is written.
+func (j *Journal) Append(events []store.Event) error { return j.append(events, false) }
+
+// Recover appends events as recovery rolling an intent forward: as Append
+// does, except that an event whose event_id is already in a retained segment
+// is skipped, and the segments that hold such events are flushed, with the
+// directories, before it returns, for the line may have been visible and not
+// yet durable when the process stopped.
+func (j *Journal) Recover(events []store.Event) error { return j.append(events, true) }
+
+func (j *Journal) append(events []store.Event, recovering bool) error {
 	if len(events) == 0 {
 		return nil
 	}
 	if j.pkg == "" {
 		return ErrNoPackage
 	}
+	homeID, err := j.homeID()
+	if err != nil {
+		return err
+	}
 	objs := make([]map[string]any, len(events))
 	seen := map[string]bool{}
 	for i, e := range events {
-		obj, err := j.prepare(e)
+		obj, err := j.prepare(e, homeID)
 		if err != nil {
 			return err
 		}
@@ -67,13 +82,6 @@ func (j *Journal) Append(events []store.Event) error {
 	}
 	var repair *line
 	if st.tail != nil && len(st.tail.torn) > 0 {
-		homeID := st.homeID
-		if j.HomeID != "" {
-			homeID = j.HomeID
-		}
-		if homeID == "" {
-			homeID, _ = objs[0]["home_id"].(string)
-		}
 		corr, _ := objs[0]["correlation_id"].(string)
 		repair, err = j.repairLine(st, stamp, homeID, corr)
 		if err != nil {
@@ -81,9 +89,12 @@ func (j *Journal) Append(events []store.Event) error {
 		}
 		st.next++
 	}
-	present, err := j.present(st, events)
-	if err != nil {
-		return err
+	var present map[string]bool
+	if recovering {
+		present, err = j.present(st, events)
+		if err != nil {
+			return err
+		}
 	}
 	var lines []*line
 	for i, e := range events {
@@ -97,7 +108,7 @@ func (j *Journal) Append(events []store.Event) error {
 		if err != nil {
 			return fmt.Errorf("%w: %s: %v", ErrEvent, e.ID, err)
 		}
-		if err := j.checkEvent(obj, data); err != nil {
+		if err := j.checkEvent(obj, data, ""); err != nil {
 			return fmt.Errorf("%w: %s: %v", ErrEvent, e.ID, err)
 		}
 		lines = append(lines, &line{e.ID, st.next, append(data, '\n')})
@@ -124,14 +135,28 @@ func (j *Journal) Append(events []store.Event) error {
 		}
 		st.tail.intact += int64(len(ln.data))
 	}
-	return nil
+	return j.syncDirs()
+}
+
+// homeID reads the home's identity from its home record as the append begins:
+// nothing is recorded under an identity the journal was handed, or cached
+// before the record was there.
+func (j *Journal) homeID() (string, error) {
+	h, err := store.CheckHome(j.Home.Dir)
+	if err != nil {
+		return "", err
+	}
+	if h.HomeID == "" {
+		return "", ErrNoHome
+	}
+	return h.HomeID, nil
 }
 
 // prepare checks what can be checked of an event before the lock is held,
 // and returns its content as an object: it is a JSON object with the given
 // event_id, it carries neither member the journal sets, its kind begins with
-// the package's name and its home_id is the home's.
-func (j *Journal) prepare(e store.Event) (map[string]any, error) {
+// the package's name and its home_id is homeID.
+func (j *Journal) prepare(e store.Event, homeID string) (map[string]any, error) {
 	if err := ids.Check(e.ID, ids.Event); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrEvent, err)
 	}
@@ -155,8 +180,8 @@ func (j *Journal) prepare(e store.Event) (map[string]any, error) {
 	if owner, _, _ := strings.Cut(kind, "."); owner != j.pkg {
 		return nil, fmt.Errorf("%w: %s: kind %q is not %s's", ErrNotOwner, e.ID, kind, j.pkg)
 	}
-	if homeID, _ := obj["home_id"].(string); j.HomeID != "" && homeID != j.HomeID {
-		return nil, fmt.Errorf("%w: %s: home_id %q is not this home's", ErrEvent, e.ID, homeID)
+	if id, _ := obj["home_id"].(string); id != homeID {
+		return nil, fmt.Errorf("%w: %s: home_id %q is not this home's", ErrEvent, e.ID, id)
 	}
 	return obj, nil
 }
@@ -198,28 +223,36 @@ func (j *Journal) repairLine(st *state, stamp, homeID, correlation string) (*lin
 	if err != nil {
 		return nil, fmt.Errorf("journal: repair event: %w", err)
 	}
-	if err := j.checkEvent(obj, data); err != nil {
+	if err := j.checkEvent(obj, data, st.cur.name); err != nil {
 		return nil, fmt.Errorf("journal: repair event: %w", err)
 	}
 	return &line{id, st.next, append(data, '\n')}, nil
 }
 
 // present finds which of the events are already in the journal, by event_id,
-// reading the segments from the newest back. A line is counted only when the
-// event_id is its own, not one its body mentions.
+// reading the segments from the newest back, and flushes each segment in which
+// it finds one. A line is counted only when the event_id is its own, not one
+// its body mentions.
 func (j *Journal) present(st *state, events []store.Event) (map[string]bool, error) {
 	found := map[string]bool{}
 	for i := len(st.segs) - 1; i >= 0 && len(found) < len(events); i-- {
-		data, err := os.ReadFile(filepath.Join(j.dir, st.segs[i].name))
+		path := filepath.Join(j.dir, st.segs[i].name)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
 		}
 		if i == len(st.segs)-1 && st.tail != nil {
 			data = data[:min(st.tail.intact, int64(len(data)))]
 		}
+		hit := false
 		for _, e := range events {
 			if !found[e.ID] && holds(data, e.ID) {
-				found[e.ID] = true
+				found[e.ID], hit = true, true
+			}
+		}
+		if hit {
+			if err := syncFile(path); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -257,17 +290,15 @@ func holds(data []byte, id string) bool {
 // writeLine writes data, one line with its line feed, at offset off of the
 // segment named name, in one write, and flushes it. With cut set the file is
 // cut to end with the line, which removes a torn tail longer than it. A
-// segment that is not there yet is created and its directory flushed, so
-// the segment is durable with its first line.
+// segment that is not there yet is created; the directories that hold it are
+// flushed once, by the append, after its last line.
 func (j *Journal) writeLine(name string, off int64, data []byte, cut bool) error {
 	path := filepath.Join(j.dir, name)
-	created := false
 	f, err := os.OpenFile(path, os.O_RDWR, fileMode)
 	if errNotExist(err) {
 		if off != 0 {
 			return fmt.Errorf("journal: %s is missing", name)
 		}
-		created = true
 		f, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, fileMode)
 	}
 	if err != nil {
@@ -289,9 +320,6 @@ func (j *Journal) writeLine(name string, off int64, data []byte, cut bool) error
 	}
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("journal: closing %s: %w", name, err)
-	}
-	if created {
-		return syncDir(j.dir)
 	}
 	return nil
 }

@@ -6,10 +6,15 @@
 // takes locks/journal.lock through the store package's lock code, learns the
 // next home_sequence from the last intact line, sets home_sequence and
 // recorded_at on each event, writes each line with its line feed in one
-// write, flushes it and releases the lock. It implements store.Journal, so a
-// store opened with it appends the events of a transaction through it, and
-// it skips an event whose event_id is already in the journal, so recovery may
-// hand it the same events again.
+// write, flushes it, flushes the directories that hold the segments and
+// releases the lock. The home_id of every line is the one of the home's
+// record, read as the append begins; a home without the record refuses the
+// append, though its journal may be opened to read. It implements
+// store.Journal, so a store opened with it appends the events of a
+// transaction through it: Append for the first attempt, which looks for no
+// earlier line, and Recover for recovery, which skips an event whose event_id
+// is already in a retained segment and flushes the segments that hold such
+// events, so recovery may hand it the same events again.
 //
 // A segment is named events-<first home_sequence>.jsonl, the number written
 // as twenty digits. A segment is closed when the next line would take it
@@ -36,5 +41,11 @@
 // embedded schemas, requires the sequence to rise by exactly one across
 // segments, and reports a line it cannot read as store.ErrRecordMalformed
 // and a line of a newer envelope version as store.ErrUnsupportedVersion;
-// neither is ever repaired by guessing.
+// neither is ever repaired by guessing. A fault is reported only when a
+// second read of the segment finds the same bytes, for a writer repairing the
+// tail may change what the first read took in part. A Reader marks an entry
+// Late when a later event of its source, by source_sequence or else by
+// occurred_at, was recorded before it; on resuming it reads the retained
+// lines up to the cursor for what they say of each source, so that the mark is
+// relative to the journal as kept.
 package journal
