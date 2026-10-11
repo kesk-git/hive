@@ -86,7 +86,7 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 **Rejected.** *Arguments for small requests and a file for large ones* is two paths to test and one threshold to get wrong. *A default home from the environment* is the ambient input the design rules out.
 
-**Cost.** A person at a terminal types more. A command may offer a short form that builds the same request.
+**Cost.** A person at a terminal types more, and no command offers a short form: the request document is the one form, as contract version 1.8 states.
 
 **To undo.** Cheap to add a convenience; the canonical form would stay.
 
