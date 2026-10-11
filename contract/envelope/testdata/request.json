@@ -1,0 +1,25 @@
+{
+  "schema": "hive.request",
+  "schema_version": "1.0",
+  "command": "hive-fleet",
+  "operation": "provision",
+  "operation_version": "1.0",
+  "request_id": "req_01arz3ndektsv4rrffq69g5fav",
+  "correlation_id": "corr_01arz3ndektsv4rrffq69g5fav",
+  "causation": {"schema": "hive.request", "id": "req_01arz3ndektsv4rrffq69g5fa0"},
+  "issued_at": "2026-10-11T08:00:00.000Z",
+  "caller": {"kind": "test"},
+  "scope_level": "project",
+  "home_id": "home_01arz3ndektsv4rrffq69g5fav",
+  "workspace_id": "ws_01arz3ndektsv4rrffq69g5fav",
+  "project_id": "proj_01arz3ndektsv4rrffq69g5fav",
+  "clone_id": "clone_01arz3ndektsv4rrffq69g5fav",
+  "task_id": "task_01arz3ndektsv4rrffq69g5fav",
+  "generation": 2,
+  "source_revision": "0123456789abcdef0123456789abcdef01234567",
+  "expected_revisions": [
+    {"schema": "pool.item", "id": "task_01arz3ndektsv4rrffq69g5fav", "record_revision": 3}
+  ],
+  "authority": {"kind": "word", "ref": {"schema": "word.answer", "id": "q_01arz3ndektsv4rrffq69g5fav", "record_revision": 1, "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"}},
+  "body": {"home": {"role": "hive", "name": "A home"}, "note": "kept é as written", "count": 9007199254740991}
+}

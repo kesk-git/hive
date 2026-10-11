@@ -1,0 +1,14 @@
+{
+  "schema": "hive.response",
+  "schema_version": "1.0",
+  "request_id": null,
+  "command": "hive-pool",
+  "operation": null,
+  "status": "too_large",
+  "exit_code": 7,
+  "responder": {"package": "pool", "command": "hive-pool", "implementation_version": "test", "contract_version": "1.0"},
+  "completed_at": "2026-10-11T08:00:01.000Z",
+  "replayed": false,
+  "receipts": [],
+  "error": {"code": "record_too_large", "message": "the request is too large", "retryable": false, "limit_bytes": 67108864, "actual_bytes": 67108865, "detail": {"record": "request"}}
+}
