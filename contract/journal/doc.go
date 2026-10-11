@@ -41,9 +41,10 @@
 // embedded schemas, requires the sequence to rise by exactly one across
 // segments, and reports a line it cannot read as store.ErrRecordMalformed
 // and a line of a newer envelope version as store.ErrUnsupportedVersion;
-// neither is ever repaired by guessing. A fault is reported only when a
-// second read of the segment finds the same bytes, for a writer repairing the
-// tail may change what the first read took in part. A Reader marks an entry
+// neither is ever repaired by guessing. A closed segment never changes and is
+// read once; in the last one, which a writer repairing the tail may change
+// under a read, a line is returned only after its bytes have been read a
+// second time and found identical, and Head counts the last line the same way. A Reader marks an entry
 // Late when a later event of its source, by source_sequence or else by
 // occurred_at, was recorded before it; on resuming it reads the retained
 // lines up to the cursor for what they say of each source, so that the mark is

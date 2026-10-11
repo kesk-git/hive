@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -161,21 +162,16 @@ func Open(dir string, opts Options) (*Journal, error) {
 func (j *Journal) Package() string { return j.pkg }
 
 // Head returns the home_sequence of the last durable line, or 0 while the
-// journal holds none. A torn tail does not count. Head takes no lock, so a
-// writer repairing the tail may change what it reads under it; it reads again
-// until a fault is the one it met the time before.
+// journal holds none. A torn tail does not count. Head takes no lock, and
+// reads the last line of the last segment by the rule of the Reader: it counts
+// the line only once its byte range has been read a second time and found
+// identical.
 func (j *Journal) Head() (int64, error) {
-	var last string
-	for {
-		st, err := j.state()
-		if err == nil {
-			return st.next - 1, nil
-		}
-		if err.Error() == last {
-			return 0, err
-		}
-		last = err.Error()
+	st, err := j.state()
+	if err != nil {
+		return 0, err
 	}
+	return st.next - 1, nil
 }
 
 // segment is one segment file: its name and the home_sequence of its first
@@ -258,20 +254,51 @@ type tail struct {
 	torn []byte
 }
 
+// errChanged reports that a file was cut while it was being read.
+var errChanged = errors.New("journal: the file changed while it was read")
+
 // readTail reads the end of the segment file at path, from the end back to
-// the start of its last complete line.
-func (j *Journal) readTail(path string) (*tail, error) {
+// the start of its last complete line. The last line of the newest segment,
+// the one a writer changes, is returned only once its byte range has been read
+// a second time and found identical; a file cut or changed meanwhile is read
+// again.
+func (j *Journal) readTail(path string, newest bool) (*tail, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
 	}
 	defer f.Close()
+	for {
+		t, err := j.scanTail(f, filepath.Base(path))
+		if errors.Is(err, errChanged) && newest {
+			continue
+		}
+		if err != nil || !newest || t.last == nil {
+			return t, err
+		}
+		start := t.intact - int64(len(t.last)) - 1
+		if err := j.step("verify tail " + filepath.Base(path)); err != nil {
+			return nil, err
+		}
+		again := make([]byte, len(t.last)+1)
+		n, err := f.ReadAt(again, start)
+		if err != nil && err != io.EOF {
+			return nil, fmt.Errorf("journal: reading %s: %w", filepath.Base(path), err)
+		}
+		if n == len(again) && bytes.Equal(again[:len(t.last)], t.last) && again[len(t.last)] == '\n' {
+			return t, nil
+		}
+	}
+}
+
+// scanTail reads the end of the open file once.
+func (j *Journal) scanTail(f *os.File, name string) (*tail, error) {
 	info, err := f.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("journal: %w", err)
 	}
 	size := info.Size()
-	if err := j.step("tail " + filepath.Base(path)); err != nil {
+	if err := j.step("tail " + name); err != nil {
 		return nil, err
 	}
 	const chunk = 64 << 10
@@ -298,7 +325,10 @@ func (j *Journal) readTail(path string) (*tail, error) {
 		n := min(int64(chunk), pos)
 		more := make([]byte, int(n)+len(buf))
 		if _, err := f.ReadAt(more[:n], pos-n); err != nil {
-			return nil, fmt.Errorf("journal: reading %s: %w", filepath.Base(path), err)
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				return nil, errChanged
+			}
+			return nil, fmt.Errorf("journal: reading %s: %w", name, err)
 		}
 		copy(more[n:], buf)
 		buf = more
@@ -335,7 +365,7 @@ func (j *Journal) state() (*state, error) {
 		return st, nil
 	}
 	st.cur = &segs[len(segs)-1]
-	st.tail, err = j.readTail(filepath.Join(j.dir, st.cur.name))
+	st.tail, err = j.readTail(filepath.Join(j.dir, st.cur.name), true)
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +383,7 @@ func (j *Journal) state() (*state, error) {
 	st.next = st.cur.first
 	if len(segs) >= 2 {
 		prev := segs[len(segs)-2]
-		t, err := j.readTail(filepath.Join(j.dir, prev.name))
+		t, err := j.readTail(filepath.Join(j.dir, prev.name), false)
 		if err != nil {
 			return nil, err
 		}

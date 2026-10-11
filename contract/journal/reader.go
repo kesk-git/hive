@@ -105,8 +105,9 @@ func (r *Reader) Next() (*Entry, error) {
 // load reads more whole lines into pending and reports whether it may be
 // called again: false when the journal has no further whole line now. It
 // reconciles the position with the segments kept every time: a segment read
-// to its end and since removed is left behind, and one with lines unread that
-// is gone is ErrGone.
+// to its end and since removed is left behind, and so is one removed before
+// the cursor, whose lines are history no longer kept; ErrGone is the line
+// after the cursor, or one the consumer has yet to reach, no longer kept.
 func (r *Reader) load() (bool, error) {
 	segs, err := r.j.segments()
 	if err != nil {
@@ -122,16 +123,21 @@ func (r *Reader) load() (bool, error) {
 		}
 		r.seg, r.off, r.expect = &segs[0], 0, segs[0].first
 	case !slices.ContainsFunc(segs, func(s segment) bool { return s.name == r.seg.name }):
-		k := slices.IndexFunc(segs, func(s segment) bool { return s.first == r.expect })
-		if k < 0 {
+		k := slices.IndexFunc(segs, func(s segment) bool { return s.first >= r.expect })
+		if k < 0 || segs[k].first != r.expect && (r.expect > r.cursor || segs[k].first > r.cursor+1) {
 			return false, fmt.Errorf("%w: %s, which held home_sequence %d, is gone", ErrGone, r.seg.name, r.expect)
 		}
-		r.seg, r.off = &segs[k], 0
+		r.seg, r.off, r.expect = &segs[k], 0, segs[k].first
 	}
-	entries, torn, err := r.lines()
+	closed := slices.ContainsFunc(segs, func(s segment) bool { return s.first > r.seg.first })
+	data, torn, err := r.read(closed)
 	if errNotExist(err) {
 		return true, nil
 	}
+	if err != nil {
+		return false, err
+	}
+	entries, err := r.decode(data)
 	if err != nil {
 		return false, err
 	}
@@ -167,28 +173,13 @@ func (r *Reader) load() (bool, error) {
 	return true, nil
 }
 
-// lines reads the whole lines of the segment from the offset reached and
-// decodes them, and reports whether a torn tail follows them. A writer that
-// repairs the tail overwrites bytes the reader may have read part of, so a
-// fault is reported only once the bytes read are those of the read before it.
-func (r *Reader) lines() ([]*Entry, bool, error) {
-	var prev []byte
-	for {
-		data, torn, err := r.read()
-		if err != nil {
-			return nil, false, err
-		}
-		entries, err := r.decode(data)
-		if err == nil || bytes.Equal(data, prev) {
-			return entries, torn, err
-		}
-		prev = data
-	}
-}
-
 // read reads the segment from the offset reached: the whole lines, ending
-// in a line feed, and whether a torn tail follows them.
-func (r *Reader) read() ([]byte, bool, error) {
+// in a line feed, and whether a torn tail follows them. A closed segment never
+// changes and is read once. The last segment is the one a writer changes, by
+// overwriting a torn tail: its whole lines are returned only once the same
+// byte range has been read a second time and found identical, and a range
+// that has changed is read again from the offset reached.
+func (r *Reader) read(closed bool) ([]byte, bool, error) {
 	f, err := os.Open(filepath.Join(r.j.dir, r.seg.name))
 	if errNotExist(err) {
 		return nil, false, err
@@ -197,8 +188,32 @@ func (r *Reader) read() ([]byte, bool, error) {
 		return nil, false, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
 	}
 	defer f.Close()
+	for {
+		data, err := r.readFrom(f)
+		if err != nil {
+			return nil, false, err
+		}
+		end := bytes.LastIndexByte(data, '\n') + 1
+		if closed || end == 0 {
+			return data[:end], end < len(data), nil
+		}
+		if err := r.j.step("verify " + r.seg.name); err != nil {
+			return nil, false, err
+		}
+		again := make([]byte, end)
+		if n, err := f.ReadAt(again, r.off); n == end && bytes.Equal(again, data[:end]) {
+			return data[:end], end < len(data), nil
+		} else if err != nil && err != io.EOF {
+			return nil, false, fmt.Errorf("journal: reading %s: %w", r.seg.name, err)
+		}
+	}
+}
+
+// readFrom reads the file from the offset reached to its end, a chunk at a
+// time.
+func (r *Reader) readFrom(f *os.File) ([]byte, error) {
 	if _, err := f.Seek(r.off, io.SeekStart); err != nil {
-		return nil, false, fmt.Errorf("journal: %w", err)
+		return nil, fmt.Errorf("journal: %w", err)
 	}
 	var data []byte
 	chunk := make([]byte, readChunk)
@@ -206,17 +221,15 @@ func (r *Reader) read() ([]byte, bool, error) {
 		n, err := f.Read(chunk)
 		data = append(data, chunk[:n]...)
 		if err == io.EOF {
-			break
+			return data, nil
 		}
 		if err != nil {
-			return nil, false, fmt.Errorf("journal: reading %s: %w", r.seg.name, err)
+			return nil, fmt.Errorf("journal: reading %s: %w", r.seg.name, err)
 		}
 		if err := r.j.step("read " + r.seg.name); err != nil {
-			return nil, false, err
+			return nil, err
 		}
 	}
-	end := bytes.LastIndexByte(data, '\n') + 1
-	return data[:end], end < len(data), nil
 }
 
 // decode reads whole lines, each ending in a line feed, as the entries that

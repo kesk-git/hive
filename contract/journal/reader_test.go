@@ -458,6 +458,164 @@ func TestHeadReadingWithASizeTakenBeforeTheRepair(t *testing.T) {
 	}
 }
 
+// repairedSegment is the segment a journal leaves when the line after a first
+// line of line1 bytes is torn, event victim, and the next append repairs it
+// and adds event 9: the first line, the repair, and the line of event 9.
+func repairedSegment(t testing.TB, victim, line1 int) []byte {
+	t.Helper()
+	home := newHome(t, false)
+	w, _ := open(t, home, "pool", 0)
+	append_(t, w, paddedEvent(t, 1, line1), event(t, "pool", victim))
+	tear(t, home, SegmentName(1), 5)
+	append_(t, w, event(t, "pool", 9))
+	return segmentBytes(t, home, SegmentName(1))
+}
+
+// A line is returned as the bytes that were recorded, never as an assembly
+// that merely decodes. A repair was interrupted, and the reader holds the front
+// of it when a second repair, of fields of equal widths, takes its place: the
+// reader's two readings differ, so it reads again, and what it returns is the
+// second repair, the line it did not read before. The reader is stopped
+// between the chunks of its first reading, and again before the second reading
+// that checks it.
+func TestReaderReturnsTheRecordedLine(t *testing.T) {
+	name := SegmentName(1)
+	probe, _ := lines(repairedSegment(t, 2, 1000))
+	idx := bytes.Index(probe[1], []byte(`"event_id"`))
+	size := readChunk - idx
+	a, b := repairedSegment(t, 2, size), repairedSegment(t, 3, size)
+	wa, _ := lines(a)
+	wb, _ := lines(b)
+	if len(wa[1]) != len(wb[1]) || bytes.Equal(wa[1], wb[1]) || len(wa[0])+1+idx != readChunk {
+		t.Fatalf("the two repairs are %d and %d bytes, the first line %d", len(wa[1]), len(wb[1]), len(wa[0]))
+	}
+	for _, step := range []string{"read " + name, "verify " + name} {
+		t.Run(step, func(t *testing.T) {
+			home := newHome(t, false)
+			writeSegment(t, home, name, a)
+			reader, _ := open(t, home, "pool", 0)
+			stopped := 0
+			reader.fault = func(s string) error {
+				if s == step && stopped == 0 {
+					stopped++
+					writeSegment(t, home, name, b)
+				}
+				return nil
+			}
+			r, err := reader.Reader(0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []*Entry
+			for {
+				e, err := r.Next()
+				if err != nil {
+					t.Fatalf("Next: %v", err)
+				}
+				if e == nil {
+					break
+				}
+				got = append(got, e)
+				if e.HomeSequence == 2 && r.Cursor() != 2 {
+					t.Errorf("Cursor = %d", r.Cursor())
+				}
+			}
+			if stopped != 1 || len(got) != 3 {
+				t.Fatalf("stopped %d times, read %d entries", stopped, len(got))
+			}
+			if !bytes.Equal(got[1].Line, wb[1]) || got[1].Kind != RepairKind || got[2].EventID != id(ids.Event, 9) {
+				t.Errorf("the reader returned %s", got[1].Line)
+			}
+		})
+	}
+}
+
+// Head reads the last line of the last segment by the same rule: it counts the
+// line once it has read the range again and found it as it was, and reads the
+// end of the file again when the line changed in between.
+func TestHeadConfirmsTheLastLine(t *testing.T) {
+	name := SegmentName(1)
+	segment := func(n int) []byte {
+		home := newHome(t, false)
+		w, _ := open(t, home, "pool", 0)
+		append_(t, w, events(t, "pool", 1, 1)...)
+		append_(t, w, event(t, "pool", n))
+		return segmentBytes(t, home, name)
+	}
+	a, b := segment(2), segment(3)
+	home := newHome(t, false)
+	writeSegment(t, home, name, a)
+	reader, _ := open(t, home, "pool", 0)
+	tails, swapped := 0, false
+	reader.fault = func(s string) error {
+		switch s {
+		case "tail " + name:
+			tails++
+		case "verify tail " + name:
+			if !swapped {
+				swapped = true
+				writeSegment(t, home, name, b)
+			}
+		}
+		return nil
+	}
+	if head, err := reader.Head(); err != nil || head != 2 {
+		t.Fatalf("Head = %d, %v", head, err)
+	}
+	if tails != 2 {
+		t.Errorf("the end of the file was read %d times, want 2: the last line changed under the first reading", tails)
+	}
+}
+
+// Retention removes the oldest segments, and a reader that is rebuilding what
+// it knows of lateness from the lines before its cursor finds them gone: that
+// history is no longer kept, and the reader goes on with the line after its
+// cursor, which is. It is told so only when that line is the one gone.
+func TestReaderRebuildingWhileRetentionRemoves(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		cursor int64
+		want   int64
+	}{
+		{"the next line is kept", 2, 3},
+		{"the next line is gone", 1, 0},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			home := newHome(t, false)
+			j, _ := open(t, home, "pool", 1) // one line per segment
+			append_(t, j, events(t, "pool", 1, 3)...)
+			reader, _ := open(t, home, "pool", 1)
+			stopped := 0
+			reader.fault = func(step string) error {
+				if step == "read "+SegmentName(1) && stopped == 0 {
+					stopped++
+					for _, n := range []int64{1, 2} {
+						if err := os.Remove(filepath.Join(home, journalDir, SegmentName(n))); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				return nil
+			}
+			r, err := reader.Reader(c.cursor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			e, err := r.Next()
+			if c.want == 0 {
+				wantErr(t, "the line after the cursor is gone", err, ErrGone)
+				return
+			}
+			if err != nil || e == nil || e.HomeSequence != c.want {
+				t.Fatalf("Next = %+v, %v; want %d", e, err, c.want)
+			}
+			if e, err := r.Next(); e != nil || err != nil {
+				t.Fatalf("at the end: %+v, %v", e, err)
+			}
+		})
+	}
+}
+
 // The reader validates every line and never guesses: a line it cannot read,
 // a gap in the sequence, a closed segment that ends in a torn line and a
 // line of a newer envelope version each stop it, naming the fault.
