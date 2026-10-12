@@ -77,3 +77,20 @@ func TestResidentOutlivesItsStarter(t *testing.T) {
 		t.Error("Stop ended a resident")
 	}
 }
+
+// Closing a run that is still going releases what Hive holds without losing
+// its result: the run is stopped afterwards, or ended by the close, and
+// either way it reads stopped_by_hive.
+func TestCloseDoesNotLoseTheResult(t *testing.T) {
+	fakeDir(t, "fakeprog")
+	run := fake(t, Spec{Stdout: Pipe()}, "hold")
+	readLine(t, run.Stdout())
+	run.Close()
+	res, err := run.Stop(Grace{}, nil)
+	if err != nil || res.Outcome != StoppedByHive {
+		t.Errorf("%+v %v", res, err)
+	}
+	if again := run.Wait(); again.Outcome != StoppedByHive {
+		t.Errorf("%+v", again)
+	}
+}

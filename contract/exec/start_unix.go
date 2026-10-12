@@ -59,7 +59,9 @@ func startPlatform(p plan) (*started, *StartError) {
 	fail := func(err error) (*started, *StartError) {
 		var errno syscall.Errno
 		if errors.As(err, &errno) && errno == syscall.E2BIG {
-			return nil, &StartError{Reason: TooLarge, Err: err}
+			total, _ := limits()
+			size := unixSize(append([]string{p.path}, p.args...), p.env)
+			return nil, &StartError{Reason: TooLarge, Limit: min(total, size-1), Actual: size, Err: err}
 		}
 		return nil, &StartError{Reason: StartFailed, Err: err}
 	}
@@ -132,11 +134,11 @@ func startPlatform(p plan) (*started, *StartError) {
 		}
 		return fail(err)
 	}
-	st.tree = &unixTree{proc: proc, pgid: proc.Pid, term: master}
+	st.id, _ = identify(proc.Pid)
+	st.tree = &unixTree{proc: proc, pgid: proc.Pid, id: st.id, resident: p.spec.Start == ResidentStart, term: master}
 	if master != nil {
 		st.term = &pty{master: master}
 	}
-	st.id, _ = identify(proc.Pid)
 	return st, nil
 }
 

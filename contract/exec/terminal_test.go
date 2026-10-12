@@ -2,6 +2,7 @@ package exec
 
 import (
 	"io"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -120,7 +121,11 @@ func TestStopInterruptsATerminalStart(t *testing.T) {
 	run = fake(t, Spec{Start: TerminalStart}, "hold")
 	readUntil(t, run.Terminal(), "ready")
 	res, err = run.Stop(Grace{Interrupt: 10 * time.Second}, nil)
-	if err != nil || res.Outcome != Ended || res.Signal != "interrupt" {
+	wantSignal := "interrupt"
+	if runtime.GOOS == "windows" {
+		wantSignal = ""
+	}
+	if err != nil || res.Outcome != Ended || res.Signal != wantSignal {
 		t.Errorf("%+v %v", res, err)
 	}
 	// With no grace at all the request and the end follow at once.

@@ -167,6 +167,21 @@ func TestStatusAfterAnIntentIsNeverNothingHappened(t *testing.T) {
 	}
 }
 
+// An intent with no receipts is still committed: the effect after it may have
+// happened, so an ordinary error is answered as unknown, with no receipts.
+func TestRecordOnlyIntentIsStillCommitted(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	resp := h.invoke(t, home, "effect", effectRequest(t, 7, "record only"))
+	expect(t, resp, envelope.Unknown, "outcome_unknown")
+	if len(resp.Receipts) != 0 || resp.Error.Retryable || h.calls["effected"] != 1 {
+		t.Fatalf("%+v, effected %d", resp, h.calls["effected"])
+	}
+	if outcomeOf(home, 7) {
+		t.Error("an outcome was recorded for an unknown result")
+	}
+}
+
 // An intent the store refuses writes nothing and runs no effect: the
 // operation's failure says why, as the store's refusals do.
 func TestIntentRefusedBeforeTheEffect(t *testing.T) {

@@ -121,8 +121,10 @@ type Call struct {
 	// writer holds the store's lock for a mutating operation.
 	writer *store.Writer
 	// intent are the receipts of the intents CommitIntent made durable, in
-	// order.
-	intent []envelope.Receipt
+	// order, and intended says that one was made durable, whether or not it
+	// had receipts.
+	intent   []envelope.Receipt
+	intended bool
 }
 
 // Intent is what an operation makes durable before an effect outside Hive:
@@ -181,6 +183,7 @@ func (c *Call) CommitIntent(in Intent) ([]store.Written, error) {
 		return nil, storeFailure(err)
 	}
 	c.intent = append(c.intent, in.Receipts...)
+	c.intended = true
 	return done.Records, nil
 }
 

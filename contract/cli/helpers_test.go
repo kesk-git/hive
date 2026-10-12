@@ -295,6 +295,13 @@ func newHarness(t testing.TB) *harness {
 			if err != nil {
 				return nil, err
 			}
+			if mode == "record only" {
+				if _, err := c.CommitIntent(Intent{Records: []store.RecordWrite{{Path: path, Content: []byte(`{"schema":"dispatch.thing","schema_version":"1.0","name":"intended"}`)}}}); err != nil {
+					return nil, err
+				}
+				h.calls["effected"]++
+				return nil, errors.New("something of its own")
+			}
 			expected := int64(0)
 			if mode == "conflict" {
 				expected = 4

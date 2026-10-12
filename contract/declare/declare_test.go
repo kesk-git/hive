@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -251,23 +253,51 @@ func TestNamingRules(t *testing.T) {
 	})
 }
 
-// A build file selects nothing by the suffix pool (spec/naming.md, rule 5).
-func TestBuildFilesNeverSelectByThePoolSuffix(t *testing.T) {
-	for _, file := range []string{"Makefile", ".no-mistakes.yaml", "go.mod", ".gitignore", ".gitattributes"} {
-		data, err := fs.ReadFile(repo(t), file)
-		if err != nil {
-			continue
-		}
-		if ps := CheckBuildFile(file, data); len(ps) != 0 {
-			t.Errorf("%v", ps)
+// makeEnv is the environment make is read under: the host's variables would
+// appear in its database.
+func makeEnv() []string { return []string{"PATH=" + os.Getenv("PATH")} }
+
+// makeDryRun runs make in the repository root without running any recipe,
+// and returns what it prints: the build as its real consumer reads it, with
+// the comments gone and the functions expanded.
+func makeDryRun(t testing.TB, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("make", append([]string{"-f", "Makefile", "-n", "-R", "-r"}, args...)...)
+	cmd.Dir, cmd.Env = filepath.Join("..", ".."), makeEnv()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("make %v: %v\n%s", args, err, out)
+	}
+	return string(out)
+}
+
+// makeDatabase is make's database of the Makefile: its targets with their
+// prerequisites and recipes, and its variables, as make read them.
+func makeDatabase(t testing.TB) string {
+	t.Helper()
+	cmd := exec.Command("make", "-f", "Makefile", "-p", "-n", "-q", "-R", "-r", "--", "no-such-goal-in-this-build")
+	cmd.Dir, cmd.Env = filepath.Join("..", ".."), makeEnv()
+	out, _ := cmd.CombinedOutput() // a goal that is not there ends it, after the database
+	var kept []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if !strings.HasPrefix(line, "#") {
+			kept = append(kept, line)
 		}
 	}
-	workflows, _ := fs.Glob(repo(t), ".github/workflows/*")
-	for _, file := range workflows {
-		data, _ := fs.ReadFile(repo(t), file)
-		if ps := CheckBuildFile(file, data); len(ps) != 0 {
-			t.Errorf("%v", ps)
-		}
+	return strings.Join(kept, "\n")
+}
+
+// A build file selects nothing by the suffix pool (spec/naming.md, rule 5).
+// The Makefile is read through make: its database and the commands it would
+// run for every declared target and for the build.
+func TestBuildFilesNeverSelectByThePoolSuffix(t *testing.T) {
+	set := read(t, repo(t))
+	text := makeDatabase(t) + makeDryRun(t, "build")
+	for _, p := range set.All() {
+		text += makeDryRun(t, p.TestTarget)
+	}
+	if ps := CheckBuildFile("Makefile", []byte(text)); len(ps) != 0 {
+		t.Errorf("%v", ps)
 	}
 	bad := []string{
 		"test-%pool: ;",
@@ -297,23 +327,25 @@ func TestBuildFilesNeverSelectByThePoolSuffix(t *testing.T) {
 	}
 }
 
-// The Makefile names every declared test target and executable in full.
-func TestTheMakefileNamesEveryTargetInFull(t *testing.T) {
+// buildsExecutable matches the command make runs to build an executable into
+// dist/.
+var buildsExecutable = regexp.MustCompile(`go build [^;\n]*-o dist/([A-Za-z0-9._-]+) \./packages/[A-Za-z0-9._-]+/cmd/([A-Za-z0-9._-]+)`)
+
+// The Makefile has every declared test target, and its build builds every
+// declared executable, as make itself reads them.
+func TestTheMakefileHasEveryTargetAndExecutable(t *testing.T) {
 	set := read(t, repo(t))
-	data, err := fs.ReadFile(repo(t), "Makefile")
-	if err != nil {
-		t.Fatal(err)
-	}
-	words := map[string]bool{}
-	for _, w := range regexp.MustCompile(`[A-Za-z0-9_./-]+`).FindAllString(string(data), -1) {
-		words[w] = true
+	built := map[string]bool{}
+	for _, m := range buildsExecutable.FindAllStringSubmatch(makeDryRun(t, "build"), -1) {
+		if m[1] != m[2] {
+			t.Errorf("the build writes dist/%s from cmd/%s", m[1], m[2])
+		}
+		built[m[1]] = true
 	}
 	for _, p := range set.All() {
-		if !words[p.TestTarget] {
-			t.Errorf("the Makefile does not name %s of %s", p.TestTarget, p.Name)
-		}
-		if p.Kind == KindPackage && !words[p.Executable] {
-			t.Errorf("the Makefile does not name %s of %s", p.Executable, p.Name)
+		makeDryRun(t, p.TestTarget) // fails where make has no such target
+		if p.Kind == KindPackage && !built[p.Executable] {
+			t.Errorf("the build does not build %s of %s", p.Executable, p.Name)
 		}
 	}
 }

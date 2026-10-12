@@ -141,7 +141,7 @@ func TestWindowsLimit(t *testing.T) {
 		t.Errorf("32766 units: %v", err)
 	}
 	err := checkWindowsLimit(line(32767))
-	if err == nil || err.Reason != TooLarge || err.Limit != 32766 || err.Actual != 32767 {
+	if err == nil || err.Reason != TooLarge || err.Limit != 2*32766 || err.Actual != 2*32767 {
 		t.Errorf("32767 units: %+v", err)
 	}
 	// Quoting counts: 16,400 quotes become 32,800 units once escaped.
@@ -156,7 +156,7 @@ func TestWindowsLimit(t *testing.T) {
 	if got, want := utf16Units("a🎉é"), len(utf16.Encode([]rune("a🎉é"))); got != want {
 		t.Errorf("units = %d, want %d", got, want)
 	}
-	if f := err.Failure(); f.Status != "too_large" || f.Err.Code != "record_too_large" || *f.Err.LimitBytes != 32766 || *f.Err.ActualBytes != 32767 {
+	if f := err.Failure(); f.Status != "too_large" || f.Err.Code != "record_too_large" || *f.Err.LimitBytes != 2*32766 || *f.Err.ActualBytes != 2*32767 {
 		t.Errorf("%+v", f)
 	}
 }
@@ -172,6 +172,12 @@ func TestUnixLimits(t *testing.T) {
 	}
 	if err := checkUnixLimits([]string{"/bin/x"}, []string{strings.Repeat("a", 50)}, 100, 40); err == nil || err.Limit != 40 {
 		t.Errorf("one string over its limit: %+v", err)
+	}
+	// The program's pathname is copied once more than its first word: a path
+	// that fills the total alone is over it.
+	long := "/" + strings.Repeat("p", 300)
+	if err := checkUnixLimits([]string{long}, nil, 2*(int64(len(long))+1+8), 0); err == nil || err.Actual <= err.Limit {
+		t.Errorf("the pathname was not counted twice: %+v", err)
 	}
 	// The environment counts toward the total.
 	if err := checkUnixLimits([]string{"/bin/x"}, []string{strings.Repeat("a", 990)}, 1000, 0); err == nil {

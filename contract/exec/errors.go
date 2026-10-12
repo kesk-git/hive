@@ -41,8 +41,7 @@ type StartError struct {
 	// File is the file found, for NotExecutable and BatchFile.
 	File string
 	// Limit and Actual are the limit and the size of an argument list, for
-	// TooLarge, in the unit of the platform: bytes, or UTF-16 code units on
-	// Windows.
+	// TooLarge, in bytes.
 	Limit, Actual int64
 	// Err is the platform's error, for StartFailed and BreakawayRefused, and
 	// the rule broken for Refused.

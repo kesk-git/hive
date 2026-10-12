@@ -197,3 +197,45 @@ func TestResidentIsInASessionOfItsOwn(t *testing.T) {
 		t.Errorf("the resident's session is %d; its id is %d and Hive's session is %d", sid, pid, mine)
 	}
 }
+
+// A group's number is the tree's only while a process of the group lives. A
+// tree whose number has been taken by another process is not signaled and
+// reads as gone, and so is one whose group was seen gone.
+func TestAGroupNumberTakenByAnotherProcessIsNotSignaled(t *testing.T) {
+	fakeDir(t, "fakeprog")
+	run := fake(t, Spec{Stdout: Pipe()}, "hold")
+	readLine(t, run.Stdout())
+	defer kill(run.ID)
+	real := run.tree.(*unixTree)
+	stale := &unixTree{pgid: real.pgid, id: ProcessID{PID: real.id.PID, Start: real.id.Start + 1}}
+	if !stale.empty() {
+		t.Error("a group whose number another process holds is not gone")
+	}
+	if err := stale.end(); err != nil || !alive(run.ID) {
+		t.Errorf("the other process was signaled: %v", err)
+	}
+	if err := stale.request(); err != nil || !alive(run.ID) {
+		t.Errorf("the other process was asked to end: %v", err)
+	}
+	if real.empty() {
+		t.Error("the group of a running process is gone")
+	}
+
+	// Once the group has been seen gone it is never signaled again, whoever
+	// takes its number.
+	res, err := run.Stop(Grace{}, nil)
+	if err != nil || res.Outcome != StoppedByHive {
+		t.Fatalf("%+v %v", res, err)
+	}
+	if !real.empty() || !real.over.Load() {
+		t.Error("a stopped group is not gone")
+	}
+	other := fake(t, Spec{Stdout: Pipe()}, "hold")
+	readLine(t, other.Stdout())
+	defer kill(other.ID)
+	reused := &unixTree{pgid: other.tree.(*unixTree).pgid, id: other.ID}
+	reused.over.Store(true)
+	if err := reused.end(); err != nil || !alive(other.ID) {
+		t.Errorf("a group seen gone was signaled: %v", err)
+	}
+}

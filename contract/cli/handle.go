@@ -268,14 +268,14 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	// every path of a mutating operation that runs after the store is
 	// touched answers through it.
 	settle := func(resp *envelope.Response, err error) *envelope.Response {
-		return e.settle(c, op, req.RequestID, resp, err, inv.Stderr, call.intent)
+		return e.settle(c, op, req.RequestID, resp, err, inv.Stderr, call)
 	}
 	// bail is the answer to a failure of the harness's own after the
 	// operation ran: failed, when nothing of the request is durable, and
 	// otherwise unknown with the receipts of the intents committed, since the
 	// effect after them may have happened.
 	bail := func(f *envelope.Failure) *envelope.Response {
-		if len(call.intent) == 0 {
+		if !call.intended {
 			return fail(req.RequestID, f)
 		}
 		return e.unknownAfterIntent(c, op, req.RequestID, f.Err.Message, call.intent)
@@ -325,14 +325,14 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		if errors.As(err, &interrupted) && interrupted.RequestID == req.RequestID {
 			return settle(nil, err), nil, nil
 		}
-		f, own, record := e.afterIntent(envelope.AsFailure(err), call.intent, inv.Stderr, c, op)
+		f, own, record := e.afterIntent(envelope.AsFailure(err), call, inv.Stderr, c, op)
 		resp, whole := failed(f)
 		// A refusal or a hold that leaves a record: the receipts and the
 		// outcome, in one transaction, once the response is known to be
 		// whole. A failure that leaves nothing, and an unknown outcome,
 		// which is never recorded as complete, write nothing.
 		if !whole || !record {
-			if !whole && len(call.intent) > 0 {
+			if !whole && call.intended {
 				return bail(f), nil, nil
 			}
 			return resp, nil, nil
@@ -353,7 +353,7 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	// response too large to return leaves nothing behind. After an intent
 	// something is behind, and the answer is unknown.
 	if bad := e.preflight(c, resp); bad != nil {
-		if len(call.intent) > 0 {
+		if call.intended {
 			return bail(envelope.Common(envelope.CodeInternal, bad.Error.Message)), nil, nil
 		}
 		return bad, nil, nil
@@ -554,8 +554,9 @@ func (e *Executable) unknownAfterIntent(c *Command, op *Operation, requestID, wh
 // own and the outcome; any other status is answered as unknown, since the
 // effect after the intent may have happened. own are the receipts to write,
 // and record says whether a transaction records the outcome.
-func (e *Executable) afterIntent(f *envelope.Failure, committed []envelope.Receipt, stderr io.Writer, c *Command, op *Operation) (resp *envelope.Failure, own []envelope.Receipt, record bool) {
-	if len(committed) == 0 {
+func (e *Executable) afterIntent(f *envelope.Failure, call *Call, stderr io.Writer, c *Command, op *Operation) (resp *envelope.Failure, own []envelope.Receipt, record bool) {
+	committed := call.intent
+	if !call.intended {
 		return f, f.Receipts, len(f.Receipts) > 0
 	}
 	out := *f
@@ -585,7 +586,7 @@ func (e *Executable) afterIntent(f *envelope.Failure, committed []envelope.Recei
 // changed. An error that left nothing of the request behind is answered by
 // the code it carries, and too_large replaces that answer where it does not
 // fit. Sizing is done here, so that no entry can replace a durable answer.
-func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *envelope.Response, err error, stderr io.Writer, committed []envelope.Receipt) *envelope.Response {
+func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *envelope.Response, err error, stderr io.Writer, call *Call) *envelope.Response {
 	durable := true
 	if err != nil {
 		var interrupted *store.InterruptedError
@@ -594,12 +595,12 @@ func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *e
 		case durable:
 			fmt.Fprintln(stderr, err)
 			resp = e.unknownAnswer(c, op.Name, requestID, interruptedMessage)
-			resp.Receipts = slices.Clone(committed)
-		case len(committed) > 0:
+			resp.Receipts = slices.Clone(call.intent)
+		case call.intended:
 			// Nothing more of the request is durable, but its intent is, and
 			// an effect may have followed it.
 			fmt.Fprintln(stderr, err)
-			return e.unknownAfterIntent(c, op, requestID, "", committed)
+			return e.unknownAfterIntent(c, op, requestID, "", call.intent)
 		default:
 			resp = e.failure(requestID, c.Name, op.Name, storeFailure(err))
 		}

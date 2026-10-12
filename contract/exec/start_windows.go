@@ -28,6 +28,7 @@ type winTree struct {
 }
 
 func (t *winTree) wait() Result {
+	defer syscall.CloseHandle(t.process)
 	ev, err := syscall.WaitForSingleObject(t.process, infinite)
 	if err != nil || ev != syscall.WAIT_OBJECT_0 {
 		if err == nil {
@@ -84,13 +85,17 @@ func (t *winTree) empty() bool {
 	return err == nil && n == 0
 }
 
+func (t *winTree) closeEnds() bool { return t.job != 0 }
+
 // close releases Hive's handles. Closing the job ends what is still in it.
+// The handle of the process is the reaper's while it waits on it, and closed
+// there; a resident's is closed here, as nothing waits for it.
 func (t *winTree) close() {
 	t.once.Do(func() {
 		if t.console != nil {
 			t.console.close()
 		}
-		if t.process != 0 {
+		if t.job == 0 && t.process != 0 {
 			syscall.CloseHandle(t.process)
 		}
 		if t.job != 0 {
@@ -99,9 +104,9 @@ func (t *winTree) close() {
 	})
 }
 
-// maxPending is how much unread output of a terminal Hive keeps: what a
-// terminal shows is its rendering and never a record, and a holder that does
-// not read must not stop the pseudoconsole from closing.
+// maxPending is how much unread output of a terminal Hive holds: the pump
+// stops reading while that much stands unread, so a program that writes more
+// waits on a full pipe, as it does on a full terminal on macOS and Linux.
 const maxPending = 1 << 20
 
 // winConsole is the controller side of a pseudoconsole: Hive keeps the
@@ -117,6 +122,10 @@ type winConsole struct {
 	cond    *sync.Cond
 	pending []byte
 	eof     bool
+	// shut is set when closing begins: the pump reads and discards from then
+	// on, so that what the holder has read is the output up to that point,
+	// in order and without a gap.
+	shut    bool
 	closing sync.Once
 	closed  error
 }
@@ -131,11 +140,19 @@ func newWinConsole(hpc syscall.Handle, in, out *os.File) *winConsole {
 func (c *winConsole) pump() {
 	buf := make([]byte, 32*1024)
 	for {
-		n, err := c.out.Read(buf)
 		c.mu.Lock()
-		c.pending = append(c.pending, buf[:n]...)
-		if over := len(c.pending) - maxPending; over > 0 {
-			c.pending = c.pending[over:]
+		for !c.shut && len(c.pending) >= maxPending {
+			c.cond.Wait()
+		}
+		b := buf
+		if !c.shut {
+			b = buf[:min(len(buf), maxPending-len(c.pending))]
+		}
+		c.mu.Unlock()
+		n, err := c.out.Read(b)
+		c.mu.Lock()
+		if !c.shut {
+			c.pending = append(c.pending, b[:n]...)
 		}
 		if err != nil {
 			c.eof = true
@@ -159,6 +176,7 @@ func (c *winConsole) Read(b []byte) (int, error) {
 	}
 	n := copy(b, c.pending)
 	c.pending = c.pending[n:]
+	c.cond.Broadcast()
 	return n, nil
 }
 
@@ -176,6 +194,10 @@ func (c *winConsole) Resize(w Window) error {
 // drained, and sends CTRL_CLOSE_EVENT to its processes.
 func (c *winConsole) closeConsole() error {
 	c.closing.Do(func() {
+		c.mu.Lock()
+		c.shut = true
+		c.cond.Broadcast()
+		c.mu.Unlock()
 		procClosePseudoConsole.Call(uintptr(c.hpc))
 	})
 	return c.closed

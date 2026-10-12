@@ -42,30 +42,45 @@ func (f fakeFS) stat(path string) (fs.FileInfo, error) {
 	return nil, fs.ErrNotExist
 }
 
+// at is an absolute path of the host under a root of the fake file system,
+// made by the host's own rules: the lookup splits, joins and tests paths by
+// them, so the fixtures are written by them.
+func at(parts ...string) string {
+	root, err := filepath.Abs(string(filepath.Separator) + "search")
+	if err != nil {
+		panic(err)
+	}
+	return filepath.Join(append([]string{root}, parts...)...)
+}
+
+// searchPath joins entries by the host's list separator.
+func searchPath(entries ...string) string {
+	return strings.Join(entries, string(filepath.ListSeparator))
+}
+
 // The program is found on the search path by the rules of macOS and Linux:
 // the first regular file of the name with an execute bit, in the order of the
 // directories, and never by an empty or relative entry.
 func TestLookupOnUnix(t *testing.T) {
-	root := "/search"
 	files := fakeFS{files: map[string]fs.FileMode{
-		root + "/a/git":       0o644,              // regular, not executable
-		root + "/b/git":       0o755,              // the program
-		root + "/c/git":       0o755,              // later
-		root + "/b/gh":        fs.ModeDir | 0o755, // a directory is no program
-		root + "/c/gh":        0o755,
-		root + "/a/only-data": 0o644,
-		"git":                 0o755, // relative: in the current directory
-		"./gh":                0o755,
+		at("a", "git"):           0o644,              // regular, not executable
+		at("b", "git"):           0o755,              // the program
+		at("c", "git"):           0o755,              // later
+		at("b", "gh"):            fs.ModeDir | 0o755, // a directory is no program
+		at("c", "gh"):            0o755,
+		at("a", "only-data"):     0o644,
+		"git":                    0o755, // relative: in the current directory
+		filepath.Join(".", "gh"): 0o755,
 	}}
-	path := strings.Join([]string{"", ".", "git", "relative/bin", root + "/a", root + "/b", root + "/c"}, ":")
+	path := searchPath("", ".", "git", filepath.Join("relative", "bin"), at("a"), at("b"), at("c"))
 	for _, tc := range []struct {
 		name, want string
 		reason     Reason
 		file       string
 	}{
-		{"git", root + "/b/git", "", ""},
-		{"gh", root + "/c/gh", "", ""},
-		{"only-data", "", NotExecutable, root + "/a/only-data"},
+		{"git", at("b", "git"), "", ""},
+		{"gh", at("c", "gh"), "", ""},
+		{"only-data", "", NotExecutable, at("a", "only-data")},
 		{"absent", "", Missing, ""},
 	} {
 		got, err := find("linux", path, tc.name, files.stat)
@@ -81,7 +96,7 @@ func TestLookupOnUnix(t *testing.T) {
 	}
 	// A search path with nothing usable in it finds nothing, even where the
 	// current directory holds the program.
-	if got, err := find("linux", ":.:relative", "git", files.stat); err == nil {
+	if got, err := find("linux", searchPath("", ".", "relative"), "git", files.stat); err == nil {
 		t.Errorf("found %q on a search path of empty and relative entries", got)
 	}
 }
@@ -91,30 +106,30 @@ func TestLookupOnUnix(t *testing.T) {
 // named, and only where no <name>.exe is on the search path.
 func TestLookupOnWindows(t *testing.T) {
 	files := fakeFS{nocase: true, files: map[string]fs.FileMode{
-		"/w/a/tool.cmd":   0o644,
-		"/w/a/tool.com":   0o644,
-		"/w/a/both.bat":   0o644,
-		"/w/b/BOTH.EXE":   0o644,
-		"/w/b/tool.BAT":   0o644,
-		"/w/b/dir.exe":    fs.ModeDir | 0o755,
-		"/w/c/Git.exe":    0o644,
-		"/w/c/cmd.exe":    0o644,
-		"/w/c/script.ps1": 0o644,
-		"/w/c/x.vbs":      0o644,
-		"/w/c/y.js":       0o644,
-		"/w/c/plain":      0o644,
-		"/w/c/git.cmd":    0o644,
+		at("a", "tool.cmd"):   0o644,
+		at("a", "tool.com"):   0o644,
+		at("a", "both.bat"):   0o644,
+		at("b", "BOTH.EXE"):   0o644,
+		at("b", "tool.BAT"):   0o644,
+		at("b", "dir.exe"):    fs.ModeDir | 0o755,
+		at("c", "Git.exe"):    0o644,
+		at("c", "cmd.exe"):    0o644,
+		at("c", "script.ps1"): 0o644,
+		at("c", "x.vbs"):      0o644,
+		at("c", "y.js"):       0o644,
+		at("c", "plain"):      0o644,
+		at("c", "git.cmd"):    0o644,
 	}}
-	path := "/w/a:/w/b:/w/c:rel:"
+	path := searchPath(at("a"), at("b"), at("c"), "rel", "")
 	win := func(name string) (string, *StartError) { return find("windows", path, name, files.stat) }
 
-	if got, err := win("git"); err != nil || got != "/w/c/git.exe" && got != "/w/c/Git.exe" {
+	if got, err := win("git"); err != nil || got != at("c", "git.exe") && got != at("c", "Git.exe") {
 		t.Errorf("git: %q, %v", got, err)
 	}
-	if got, err := win("both"); err != nil || !strings.EqualFold(got, "/w/b/both.exe") {
+	if got, err := win("both"); err != nil || !strings.EqualFold(got, at("b", "both.exe")) {
 		t.Errorf("an executable and a batch file of one name: %q, %v", got, err)
 	}
-	if got, err := win("cmd"); err != nil || got != "/w/c/cmd.exe" {
+	if got, err := win("cmd"); err != nil || got != at("c", "cmd.exe") {
 		t.Errorf("cmd: %q, %v", got, err)
 	}
 	// A name is looked for as <name>.exe and never as given.
@@ -130,14 +145,14 @@ func TestLookupOnWindows(t *testing.T) {
 		want := Missing
 		file := ""
 		if name == "tool" {
-			want, file = BatchFile, "/w/a/tool.cmd"
+			want, file = BatchFile, at("a", "tool.cmd")
 		}
 		if err.Reason != want || err.File != file {
 			t.Errorf("%s: %+v; want %s %s", name, err, want, file)
 		}
 	}
 	// The batch file is named whichever of the two suffixes it has.
-	if _, err := find("windows", path, "git", fakeFS{nocase: true, files: map[string]fs.FileMode{"/w/c/git.cmd": 0o644}}.stat); err == nil || err.Reason != BatchFile || err.File != "/w/c/git.cmd" {
+	if _, err := find("windows", path, "git", fakeFS{nocase: true, files: map[string]fs.FileMode{at("c", "git.cmd"): 0o644}}.stat); err == nil || err.Reason != BatchFile || err.File != at("c", "git.cmd") {
 		t.Errorf("%+v", err)
 	}
 	// The failure of a batch file is dependency_unusable, naming the file.
@@ -175,7 +190,7 @@ func TestLookupOnThisPlatform(t *testing.T) {
 		}
 	}
 	// With the program only in the current directory, nothing is found.
-	if got, err := find(runtime.GOOS, ".:", name, os.Stat); err == nil {
+	if got, err := find(runtime.GOOS, searchPath(".", ""), name, os.Stat); err == nil {
 		t.Errorf("found %q through the current directory", got)
 	}
 	// lookup uses the search path Hive's process started with and no other.

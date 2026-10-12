@@ -109,9 +109,11 @@ func startsAProcess(name string, src []byte) ([]string, error) {
 	return found, nil
 }
 
-// The scan finds every way of starting a process, and passes code that
-// starts none.
-func TestTheScanFindsEveryWayOfStartingAProcess(t *testing.T) {
+// Architecture check, not behavioral evidence: the scan below finds every way
+// of starting a process in the source it is given, and passes code that
+// starts none. That the path starts processes as specified is proved by
+// running it, in the tests of this package.
+func TestArchitectureScanFindsEveryWayOfStartingAProcess(t *testing.T) {
 	bad := map[string]string{
 		"os/exec":            `package p; import "os/exec"; var _ = exec.Command`,
 		"os/exec renamed":    `package p; import run "os/exec"; var _ = run.Command`,
@@ -152,12 +154,13 @@ func TestTheScanFindsEveryWayOfStartingAProcess(t *testing.T) {
 	}
 }
 
-// No other package starts a process: no Go file of the repository outside
-// contract/exec that is part of a delivered executable imports os/exec, calls
-// os.StartProcess or a process-creation function of syscall, or reaches a
-// platform's process-creation call by name. Test files are not part of an
-// executable and are not read.
-func TestNoOtherPackageStartsAProcess(t *testing.T) {
+// Architecture check, not behavioral evidence (spec/test-targets.md,
+// test-contract): no other package starts a process. No Go file of the
+// repository outside contract/exec that is part of a delivered executable
+// imports os/exec, calls os.StartProcess or a process-creation function of
+// syscall, or reaches a platform's process-creation call by name. Test files
+// are not part of an executable and are not read.
+func TestArchitectureNoOtherPackageStartsAProcess(t *testing.T) {
 	root := filepath.Join("..", "..")
 	var violations []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -194,15 +197,5 @@ func TestNoOtherPackageStartsAProcess(t *testing.T) {
 	}
 	for _, v := range violations {
 		t.Errorf("%s", v)
-	}
-	// The package that does start them is where the scan expects to find them.
-	for _, name := range []string{"start_unix.go", "start_windows.go"} {
-		src, err := os.ReadFile(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if found, _ := startsAProcess(name, src); len(found) == 0 {
-			t.Errorf("%s starts no process, by the scan's reading", name)
-		}
 	}
 }

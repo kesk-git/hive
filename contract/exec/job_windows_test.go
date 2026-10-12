@@ -133,6 +133,9 @@ func TestTheJobOfARun(t *testing.T) {
 	tree.Close()
 	waitGone(t, child)
 	waitGone(t, tree.ID)
+	if res := tree.Wait(); res.Outcome != StoppedByHive {
+		t.Errorf("a tree the close ended reads %+v", res)
+	}
 }
 
 // A descendant that asks to leave the job leaves the tree, and is not ended

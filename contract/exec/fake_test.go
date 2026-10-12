@@ -142,7 +142,7 @@ func fakeStarter(args []string) {
 		waitForFile(args[1])
 	}
 	run, err := Start(Spec{
-		Program: Program{Kind: Project, Name: filepath.Base(os.Args[0])},
+		Program: Program{Kind: Project, Name: strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")},
 		Args:    []string{fakeFlag, "hold"},
 		Dir:     filepath.Dir(os.Args[0]),
 		Start:   ResidentStart,

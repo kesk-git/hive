@@ -25,8 +25,11 @@ type tree interface {
 	end() error
 	// empty says whether no process of the tree is left.
 	empty() bool
-	// close releases what Hive holds: on Windows the job, which ends what is
-	// in it.
+	// closeEnds says whether close ends what is still in the tree.
+	closeEnds() bool
+	// close releases what Hive holds, except what the reaper of a run
+	// waited for still uses, which the reaper releases itself: on Windows
+	// the job, which ends what is in it.
 	close()
 }
 
@@ -193,18 +196,24 @@ func (r *Run) Stop(g Grace, ending func() error) (Result, error) {
 			return Result{}, err
 		}
 	}
-	r.mu.Lock()
-	r.ending = true
-	if r.result.Outcome != "" {
-		r.result = Result{Outcome: StoppedByHive, Code: r.result.Code, Signal: r.result.Signal}
-	}
-	r.mu.Unlock()
+	r.markEnding()
 	if err := r.tree.end(); err != nil {
 		return Result{}, err
 	}
 	r.goneWithin(stopWait)
 	res := r.Wait()
 	return res, nil
+}
+
+// markEnding records that Hive is ending the tree, so that the result is read
+// from the record: a result already read becomes StoppedByHive too.
+func (r *Run) markEnding() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.ending = true
+	if r.result.Outcome != "" {
+		r.result = Result{Outcome: StoppedByHive, Code: r.result.Code, Signal: r.result.Signal}
+	}
 }
 
 // gone says whether the run's process has ended and no process of its tree
@@ -229,13 +238,7 @@ func (r *Run) goneWithin(d time.Duration) bool {
 		if left <= 0 {
 			return false
 		}
-		select {
-		case <-r.done:
-		case <-time.After(min(left, pollEvery)):
-		}
-		if time.Now().After(deadline) {
-			return r.gone()
-		}
+		time.Sleep(min(left, pollEvery))
 	}
 }
 
@@ -250,6 +253,9 @@ func (r *Run) Close() error {
 	}
 	r.closed = true
 	r.mu.Unlock()
+	if r.kind != ResidentStart && r.tree.closeEnds() && !r.tree.empty() {
+		r.markEnding()
+	}
 	for _, c := range []io.Closer{r.stdin, r.stdout, r.stderr} {
 		if c != nil {
 			c.Close()

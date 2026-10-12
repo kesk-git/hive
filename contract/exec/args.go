@@ -109,31 +109,46 @@ func utf16Units(s string) int {
 }
 
 // checkWindowsLimit refuses a command line over the platform's limit, which is
-// far less than the other two platforms allow.
+// far less than the other two platforms allow. The sizes it reports are in
+// bytes, two to a UTF-16 code unit, as every StartError's are.
 func checkWindowsLimit(commandLine string) *StartError {
 	if n := utf16Units(commandLine); n > windowsCommandLineUnits {
-		return &StartError{Reason: TooLarge, Limit: windowsCommandLineUnits, Actual: int64(n)}
+		return &StartError{Reason: TooLarge, Limit: windowsCommandLineUnits * 2, Actual: int64(n) * 2}
 	}
 	return nil
 }
 
-// checkUnixLimits refuses an argument list over the limits of macOS and
-// Linux: the total of arguments and environment, and on Linux also 32 memory
-// pages for one string, 131,072 bytes at the usual page size. Each string is
-// counted with its terminating NUL and each with its pointer.
-func checkUnixLimits(argv, env []string, total, perString int64) *StartError {
+// unixSize is what an argument list and an environment take of the
+// platform's total: each string counted with its terminating NUL and with its
+// pointer, and the pathname of the program once more, since the kernel
+// copies it besides as the first word, which is that pathname.
+func unixSize(argv, env []string) int64 {
 	const pointer = 8
 	var sum int64 = 2 * pointer
+	if len(argv) > 0 {
+		sum += int64(len(argv[0])) + 1
+	}
 	for _, group := range [][]string{argv, env} {
 		for _, s := range group {
-			n := int64(len(s)) + 1
-			if perString > 0 && n > perString {
-				return &StartError{Reason: TooLarge, Limit: perString, Actual: n}
-			}
-			sum += n + pointer
+			sum += int64(len(s)) + 1 + pointer
 		}
 	}
-	if total > 0 && sum > total {
+	return sum
+}
+
+// checkUnixLimits refuses an argument list over the limits of macOS and
+// Linux: the total of arguments and environment, and on Linux also 32 memory
+// pages for one string, 131,072 bytes at the usual page size. The first word
+// of argv is the program's pathname.
+func checkUnixLimits(argv, env []string, total, perString int64) *StartError {
+	for _, group := range [][]string{argv, env} {
+		for _, s := range group {
+			if n := int64(len(s)) + 1; perString > 0 && n > perString {
+				return &StartError{Reason: TooLarge, Limit: perString, Actual: n}
+			}
+		}
+	}
+	if sum := unixSize(argv, env); total > 0 && sum > total {
 		return &StartError{Reason: TooLarge, Limit: total, Actual: sum}
 	}
 	return nil

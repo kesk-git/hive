@@ -5,6 +5,7 @@ package exec
 import (
 	"errors"
 	"os"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -12,14 +13,34 @@ import (
 // the process's own id. A descendant that leaves it on purpose, as a daemon
 // does by starting a session of its own, leaves the tree, and Hive never
 // relies on ending such a process through its starter's tree.
+//
+// The group's number belongs to the tree only while a process of the group
+// lives: once none does, the number may name any group. So the tree is
+// signaled only until it has once been seen gone, and never when the process
+// of that number is now another one.
 type unixTree struct {
 	proc *os.Process
 	pgid int
+	// id is the identity of the group's leader as started.
+	id ProcessID
+	// over is set once the group has been seen gone, or its number has been
+	// seen taken by another process.
+	over atomic.Bool
+	// resident is a start no reaper waits for.
+	resident bool
 	// term is the controller side of a terminal start.
 	term *os.File
 }
 
 func (t *unixTree) wait() Result {
+	res := t.status()
+	// The leader is reaped, and its number is the group's only while a
+	// process of the group lives: look at once, while that is least doubtful.
+	t.empty()
+	return res
+}
+
+func (t *unixTree) status() Result {
 	state, err := t.proc.Wait()
 	if err != nil {
 		return Result{Outcome: Lost, Err: err}
@@ -49,20 +70,29 @@ func (t *unixTree) interrupt() error {
 // request sends SIGTERM to the group, and for a terminal start also closes
 // the controller side, which hangs the terminal up (SIGHUP).
 func (t *unixTree) request() error {
-	err := syscall.Kill(-t.pgid, syscall.SIGTERM)
+	err := t.signal(syscall.SIGTERM)
 	if t.term != nil {
 		t.term.Close()
-	}
-	if gone(err) {
-		return nil
 	}
 	return err
 }
 
 // end sends SIGKILL to the group.
-func (t *unixTree) end() error {
-	err := syscall.Kill(-t.pgid, syscall.SIGKILL)
+func (t *unixTree) end() error { return t.signal(syscall.SIGKILL) }
+
+// signal sends the signal to the group, unless it is gone: signal 0 asks only
+// whether a process is left in it.
+func (t *unixTree) signal(sig syscall.Signal) error {
+	if t.over.Load() {
+		return nil
+	}
+	if cur, err := identify(t.pgid); err == nil && t.id.Start != 0 && cur != t.id {
+		t.over.Store(true)
+		return nil
+	}
+	err := syscall.Kill(-t.pgid, sig)
 	if gone(err) {
+		t.over.Store(true)
 		return nil
 	}
 	return err
@@ -70,7 +100,13 @@ func (t *unixTree) end() error {
 
 // empty says whether the group has no process left.
 func (t *unixTree) empty() bool {
-	return gone(syscall.Kill(-t.pgid, 0))
+	if t.over.Load() {
+		return true
+	}
+	if t.signal(0) != nil {
+		return false
+	}
+	return t.over.Load()
 }
 
 // gone says whether the error of a signal to the group says that no process
@@ -82,8 +118,12 @@ func gone(err error) bool {
 	return errors.Is(err, syscall.ESRCH) || errors.Is(err, syscall.EPERM)
 }
 
+func (t *unixTree) closeEnds() bool { return false }
+
+// close releases the process of a resident start. The process of any other
+// start is released when the reaper has waited for it.
 func (t *unixTree) close() {
-	if t.proc != nil {
+	if t.resident && t.proc != nil {
 		t.proc.Release()
 	}
 }
