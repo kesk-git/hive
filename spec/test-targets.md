@@ -63,13 +63,13 @@ Hive's own test contract holds these rows, and by rule 1 a change to a build fil
 
 | `name` | `command` | `class` | `reads` | `bound_seconds` | `status` |
 | --- | --- | --- | --- | --- | --- |
-| `check` | `make check` | `check` | `**/*.go` | 60 | `built` |
-| `test-contract` | `make test-contract` | `check` | `contract/**`, `spec/**` | 300 | `built` |
+| `check` | `make check` | `check` | `**/*.go`, `spec/schemas/**` | 60 | `built` |
+| `test-contract` | `make test-contract` | `check` | `contract/**`, `spec/**`, `**/*.go`, `packages/*/hive-package.json` | 300 | `built` |
 | `test-pool` to `test-ui`, seven rows | `make test-<package>` | `check` | `packages/<package>/**`, `contract/**`, `spec/**` | 300 each | `not-built` |
-| `build` | `make build` | `check` | `**/*.go` | 120 | `built` |
+| `build` | `make build` | `check` | `**/*.go`, `spec/schemas/**` | 120 | `built` |
 | `test-integration` | `make test-integration` | `check` until measured | `**` | 300 | `not-built` |
 | `test-distribution` | `make test-distribution` | `long`, needing the whole machine, on all three platforms | `**` | 900 | `not-built` |
-| `check-imports` | `make check-imports` | `check` | `imports/**`, `go.mod`, `go.sum`, `LICENSE`, `NOTICE` | 60 | `not-built` |
+| `check-imports` | `make check-imports` | `check` | `**` | 60 | `not-built` |
 | `windows`, `linux` | the workflow's `make test` on each | `long`, on that platform | `**` | 900 | `not-built` |
 
 The scheduled full run runs every row with every cache defeated, `go test -count=1` for Hive, each test alone in this file's order, and records each test's measured time and last result in the run's receipt, writing the time into `measured_seconds`.
