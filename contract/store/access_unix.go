@@ -28,10 +28,22 @@ func SecureDir(dir string) error {
 	return nil
 }
 
-// SecureFile makes the open file f open to its owner only, mode 0600.
-func SecureFile(f *os.File) error {
-	if err := f.Chmod(fileMode); err != nil {
-		return fmt.Errorf("store: %w", err)
+// OpenPrivate opens the file at path for writing, creating it when it is not
+// there, open to its owner only, mode 0600. The mode is set through the opened
+// file, never a second lookup of the name, before anything is written; a file
+// that was there keeps its own mode only until then.
+func OpenPrivate(path string) (*os.File, error) {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, fileMode)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	if err := f.Chmod(fileMode); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("store: %w", err)
+	}
+	return f, nil
 }
+
+// checkHomeDir has nothing to refuse on macOS and Linux: the mode of the home
+// is all its access.
+func checkHomeDir(path string) error { return nil }

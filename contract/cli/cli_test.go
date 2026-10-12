@@ -1345,3 +1345,25 @@ func TestStorelessExecutable(t *testing.T) {
 		t.Errorf("Main: exit %d, stdout %q", code, stdout.String())
 	}
 }
+
+// A program started under a Windows name acts as the command of that name
+// without its .exe suffix and without regard to case; elsewhere the base name
+// is the name.
+func TestCommandName(t *testing.T) {
+	for _, c := range []struct {
+		argv0   string
+		windows bool
+		want    string
+	}{
+		{"bin/hive-pool", false, "hive-pool"},
+		{"bin/hive-pool.exe", false, "hive-pool.exe"},
+		{"bin/Hive-Pool.EXE", false, "Hive-Pool.EXE"},
+		{"C:/Hive/hive-pool.exe", true, "hive-pool"},
+		{"C:/Hive/HIVE-Pool.EXE", true, "hive-pool"},
+		{"hive-pool", true, "hive-pool"},
+	} {
+		if got := commandName(c.argv0, c.windows); got != c.want {
+			t.Errorf("commandName(%q, %v) = %q, want %q", c.argv0, c.windows, got, c.want)
+		}
+	}
+}

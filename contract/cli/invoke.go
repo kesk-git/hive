@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/kesk-git/hive/contract/envelope"
@@ -17,6 +18,18 @@ import (
 // A package's main function is one line: os.Exit(cli.Run(exe)).
 func Run(e *Executable) int {
 	return e.Main(os.Args, os.Stdin, os.Stdout, os.Stderr)
+}
+
+// commandName is the command name a program started as argv0 acts as: its
+// base name, and on Windows that name without its .exe suffix and in lower
+// case, as Windows compares names (spec/commands.md, Executables and command
+// names).
+func commandName(argv0 string, windows bool) string {
+	name := filepath.Base(argv0)
+	if windows {
+		name = strings.TrimSuffix(strings.ToLower(name), ".exe")
+	}
+	return name
 }
 
 // Main runs one invocation of the executable as the command named by argv[0]
@@ -34,7 +47,7 @@ func (e *Executable) Main(argv []string, stdin io.Reader, stdout, stderr io.Writ
 		fmt.Fprintln(stderr, "cli: no command name")
 		return envelope.Failed.ExitCode()
 	}
-	name := filepath.Base(argv[0])
+	name := commandName(argv[0], runtime.GOOS == "windows")
 	args := argv[1:]
 	c := e.command(name)
 	if c == nil {
@@ -233,14 +246,11 @@ func (e *Executable) write(c *Command, resp *envelope.Response, data []byte, res
 // writeFile writes the response file whole, for its owner only, and flushes
 // it: a caller that reads it after the process ends sees all of it.
 func writeFile(path string, data []byte) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0o600)
+	f, err := store.OpenPrivate(path)
 	if err != nil {
 		return err
 	}
-	// The mode applies only to a file this call creates; a file that was
-	// there keeps its own until it is set, and nothing is written before.
-	// On Windows the access is an access-control list, which SecureFile sets.
-	if err := errors.Join(store.SecureFile(f), f.Truncate(0)); err != nil {
+	if err := f.Truncate(0); err != nil {
 		return errors.Join(err, f.Close())
 	}
 	_, werr := f.Write(data)

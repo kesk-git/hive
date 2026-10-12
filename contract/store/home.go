@@ -85,10 +85,10 @@ type Home struct {
 	Unknown []string
 }
 
-// CheckHome checks the layout of the home at dir: it is a directory, it is
-// not inside a Git working tree, it and every known entry are open to their
-// owner only, every known entry is of the kind the table fixes, and home.json,
-// when present, is a valid home record. An entry the table does not name is
+// CheckHome checks the layout of the home at dir: it is a directory, on
+// Windows on a local NTFS volume, it is not inside a Git working tree, it and
+// every known entry are open to their owner only, every known entry is of the
+// kind the table fixes, and home.json, when present, is a valid home record. An entry the table does not name is
 // listed, not refused. A directory with nothing in it yet is a valid home.
 func CheckHome(dir string) (*Home, error) {
 	abs, err := filepath.Abs(dir)
@@ -105,6 +105,9 @@ func CheckHome(dir string) (*Home, error) {
 	}
 	if !info.IsDir() {
 		return nil, fmt.Errorf("%w: %s is not a directory", ErrLayout, dir)
+	}
+	if err := checkHomeDir(real); err != nil {
+		return nil, err
 	}
 	if err := ownerOnly(real, info, "the home"); err != nil {
 		return nil, err

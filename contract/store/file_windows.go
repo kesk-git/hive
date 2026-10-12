@@ -60,13 +60,14 @@ func extendedPath(path string) string {
 }
 
 // openHandle opens the file at path with the access and creation disposition
-// given, sharing it with every other handle.
-func openHandle(path string, access, create uint32) (*os.File, error) {
+// given, sharing it with every other handle. A file it creates has the
+// security attributes sa, or the access it inherits when sa is nil.
+func openHandle(path string, access, create uint32, sa *syscall.SecurityAttributes) (*os.File, error) {
 	name, err := syscall.UTF16PtrFromString(extendedPath(path))
 	if err != nil {
 		return nil, &os.PathError{Op: "open", Path: path, Err: err}
 	}
-	h, err := syscall.CreateFile(name, access, shareAll, nil, create, syscall.FILE_ATTRIBUTE_NORMAL, 0)
+	h, err := syscall.CreateFile(name, access, shareAll, sa, create, syscall.FILE_ATTRIBUTE_NORMAL, 0)
 	if err != nil {
 		return nil, &os.PathError{Op: "open", Path: path, Err: err}
 	}
@@ -78,7 +79,7 @@ func openHandle(path string, access, create uint32) (*os.File, error) {
 // handle never blocks the replacement of the file (spec/records.md, Writing
 // one record).
 func OpenRead(path string) (*os.File, error) {
-	return openHandle(path, syscall.GENERIC_READ, syscall.OPEN_EXISTING)
+	return openHandle(path, syscall.GENERIC_READ, syscall.OPEN_EXISTING, nil)
 }
 
 // ReadFile reads the whole file at path, as OpenRead opens it.
@@ -95,7 +96,7 @@ func ReadFile(path string) ([]byte, error) {
 // truncating a file a failed attempt left under that name. Deleting is the
 // right a rename through the file's own handle needs.
 func createTemp(tmp string) (*os.File, error) {
-	return openHandle(tmp, syscall.GENERIC_WRITE|deleteAccess, syscall.CREATE_ALWAYS)
+	return openHandle(tmp, syscall.GENERIC_WRITE|deleteAccess, syscall.CREATE_ALWAYS, nil)
 }
 
 // publish renames the flushed temporary file f at tmp over the record at full
@@ -177,7 +178,7 @@ func syncDir(dir string) error { return nil }
 // syncFile flushes the file at path through a handle opened with write
 // access.
 func syncFile(path string) error {
-	f, err := openHandle(path, syscall.GENERIC_WRITE, syscall.OPEN_EXISTING)
+	f, err := openHandle(path, syscall.GENERIC_WRITE, syscall.OPEN_EXISTING, nil)
 	if err != nil {
 		return fmt.Errorf("store: %w", err)
 	}
