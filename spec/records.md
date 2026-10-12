@@ -104,7 +104,7 @@ A mutation that changes more than one record of a store is one transaction.
 3. Check every expected revision, and that every record to be created is absent.
 4. Write the **intent** to `tx/<request_id>.json`, a record of schema [`hive.tx-intent`](schemas/tx-intent.v1.schema.json): every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. The entry of a record being created has no revision to expect and instead states that the record is expected to be absent. Flush it.
 5. Write the records, then the receipts, then append the events.
-6. Write the outcome to `requests/<request_id>.json`.
+6. When the transaction carries an outcome, write it to `requests/<request_id>.json`. A transaction committed before an effect outside Hive carries none: it writes its records and receipts, leaves the request without an outcome, and the request stays open.
 7. Remove the intent and release the lock.
 
 Recovery **rolls forward**. The next command to take the store's lock that finds an intent completes it: a record already at the intended digest is left, a record at the expected revision is written, a record expected to be absent and still absent is written, and anything else stops the store with `record_malformed` for that transaction, naming the intent. An intent is never discarded to make recovery convenient. A receipt or event the intent names is written at most once, because each is keyed by an identifier the intent already holds.

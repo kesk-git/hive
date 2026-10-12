@@ -118,7 +118,74 @@ type Call struct {
 	// recordedAt is the one time at which the records of a mutating
 	// invocation are written.
 	recordedAt time.Time
+	// writer holds the store's lock for a mutating operation.
+	writer *store.Writer
+	// intent are the receipts of the intents CommitIntent made durable, in
+	// order.
+	intent []envelope.Receipt
 }
+
+// Intent is what an operation makes durable before an effect outside Hive:
+// the records, receipts and events of its intent (spec/commands.md, What a
+// command guarantees, 4).
+type Intent struct {
+	Records  []store.RecordWrite
+	Receipts []envelope.Receipt
+	Events   []store.Event
+}
+
+// CommitIntent makes the intent durable, as one transaction of the store,
+// and returns when it is. The request has no recorded outcome then and
+// stays open: the operation goes on to its effect, and ends with ok, with a
+// refusal or a hold, or with an unknown outcome, which returns exactly the
+// receipts of the intents committed here and records no outcome. A record of
+// the intent is written at the revision it expects plus one; an operation
+// that replaces it later expects the revision returned here.
+//
+// Nothing outside Hive may happen before CommitIntent has returned without
+// an error. A failure it returns says why nothing was written, as the
+// store's refusals do, and the operation returns it. An error that is an
+// *store.InterruptedError means the transaction is durable and not complete:
+// the operation returns it unchanged, makes no effect, and the harness
+// answers unknown; the next command to lock the store completes it.
+//
+// Once an intent is committed, the operation may end only with ok, refused,
+// held or unknown. Any other status it returns is answered as unknown, with
+// the receipts committed, since the effect may have happened and the status
+// would promise that nothing did.
+func (c *Call) CommitIntent(in Intent) ([]store.Written, error) {
+	if c.Store == nil || c.writer == nil {
+		return nil, errors.New("cli: a read-only operation commits no intent")
+	}
+	if len(in.Records)+len(in.Receipts)+len(in.Events) == 0 {
+		return nil, errors.New("cli: an intent records something")
+	}
+	records := make([]store.RecordWrite, len(in.Records))
+	for i, r := range in.Records {
+		rec, _, err := c.Finalize(r)
+		if err != nil {
+			return nil, err
+		}
+		records[i] = rec
+	}
+	receipts, err := encodeReceipts(in.Receipts)
+	if err != nil {
+		return nil, err
+	}
+	done, err := c.writer.Commit(store.Tx{RequestID: c.Request.RequestID, Records: records, Receipts: receipts, Events: in.Events})
+	if err != nil {
+		var interrupted *store.InterruptedError
+		if errors.As(err, &interrupted) {
+			return nil, err
+		}
+		return nil, storeFailure(err)
+	}
+	c.intent = append(c.intent, in.Receipts...)
+	return done.Records, nil
+}
+
+// Committed returns the receipts of the intents this call has made durable.
+func (c *Call) Committed() []envelope.Receipt { return slices.Clone(c.intent) }
 
 // Result is what a handler returns for ok.
 type Result struct {

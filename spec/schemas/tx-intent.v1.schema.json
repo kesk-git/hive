@@ -12,8 +12,7 @@
     "package",
     "records",
     "receipts",
-    "events",
-    "outcome"
+    "events"
   ],
   "properties": {
     "schema": {
@@ -60,7 +59,7 @@
       }
     },
     "outcome": {
-      "description": "The recorded outcome of the request, written once.",
+      "description": "The recorded outcome of the request, written once. A transaction committed before an outside effect carries none, and then writes none.",
       "$ref": "urn:hive:schema:tx-intent:v1#/$defs/once_file"
     }
   },

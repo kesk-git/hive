@@ -268,7 +268,17 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	// every path of a mutating operation that runs after the store is
 	// touched answers through it.
 	settle := func(resp *envelope.Response, err error) *envelope.Response {
-		return e.settle(c, op, req.RequestID, resp, err, inv.Stderr)
+		return e.settle(c, op, req.RequestID, resp, err, inv.Stderr, call.intent)
+	}
+	// bail is the answer to a failure of the harness's own after the
+	// operation ran: failed, when nothing of the request is durable, and
+	// otherwise unknown with the receipts of the intents committed, since the
+	// effect after them may have happened.
+	bail := func(f *envelope.Failure) *envelope.Response {
+		if len(call.intent) == 0 {
+			return fail(req.RequestID, f)
+		}
+		return e.unknownAfterIntent(c, op, req.RequestID, f.Err.Message, call.intent)
 	}
 
 	// A mutating operation. The floor first: the limit holds every answer a
@@ -304,33 +314,48 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		return settle(resp, nil), nil, nil
 	}
 	at.at = e.clock().Now()
-	call.Store, call.recordedAt = st, at.at
+	call.Store, call.recordedAt, call.writer = st, at.at, w
 
 	res, err := e.run(call)
 	if err != nil {
-		f := envelope.AsFailure(err)
+		// A transaction of this request that is durable and not complete: the
+		// intent an operation committed, interrupted. The operation made no
+		// effect after it, and the next lock completes it.
+		var interrupted *store.InterruptedError
+		if errors.As(err, &interrupted) && interrupted.RequestID == req.RequestID {
+			return settle(nil, err), nil, nil
+		}
+		f, own, record := e.afterIntent(envelope.AsFailure(err), call.intent, inv.Stderr, c, op)
 		resp, whole := failed(f)
 		// A refusal or a hold that leaves a record: the receipts and the
 		// outcome, in one transaction, once the response is known to be
 		// whole. A failure that leaves nothing, and an unknown outcome,
 		// which is never recorded as complete, write nothing.
-		if !whole || len(f.Receipts) == 0 {
+		if !whole || !record {
+			if !whole && len(call.intent) > 0 {
+				return bail(f), nil, nil
+			}
 			return resp, nil, nil
 		}
-		return settle(resp, e.commit(w, req.RequestID, digest, resp, nil, f.Receipts, nil)), nil, nil
+		return settle(resp, e.commit(w, req.RequestID, digest, resp, nil, own, nil)), nil, nil
 	}
 	// The records are final before anything is sealed.
 	for i := range res.Records {
 		rec, _, err := call.Finalize(res.Records[i])
 		if err != nil {
-			return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the operation returned a record that cannot be written: "+err.Error())), nil, nil
+			return bail(envelope.Common(envelope.CodeInternal, "the operation returned a record that cannot be written: "+err.Error())), nil, nil
 		}
 		res.Records[i] = rec
 	}
-	resp = ok(res.Body, res.Receipts)
+	// Every receipt of the request is returned: those of the intents first.
+	resp = ok(res.Body, append(slices.Clone(call.intent), res.Receipts...))
 	// The response is checked and sized before anything is written, so that a
-	// response too large to return leaves nothing behind.
+	// response too large to return leaves nothing behind. After an intent
+	// something is behind, and the answer is unknown.
 	if bad := e.preflight(c, resp); bad != nil {
+		if len(call.intent) > 0 {
+			return bail(envelope.Common(envelope.CodeInternal, bad.Error.Message)), nil, nil
+		}
 		return bad, nil, nil
 	}
 	if err := e.commit(w, req.RequestID, digest, resp, res.Records, res.Receipts, res.Events); err != nil {
@@ -397,14 +422,19 @@ func (e *Executable) run(c *Call) (res *Result, err error) {
 	}
 	res, err = c.Operation.Handle(c)
 	if err != nil {
+		// The intent of this request, durable and not complete: handle answers it.
+		var interrupted *store.InterruptedError
+		if errors.As(err, &interrupted) {
+			return nil, err
+		}
 		if f := envelope.AsFailure(err); f != nil {
 			f.Err.Message = clip(f.Err.Message, string(f.Status))
 			if cerr := f.Check(); cerr != nil {
 				return nil, envelope.Common(envelope.CodeInternal, "the operation returned a failure the contract does not admit: "+cerr.Error())
 			}
 			// Only a refusal or a hold of a mutating operation leaves receipts.
-			// An unknown outcome returns only receipts already durable, and
-			// none is made durable here before an outside effect.
+			// An unknown outcome returns the receipts of the intents the call
+			// committed, which the harness attaches, and none of its own.
 			if len(f.Receipts) > 0 && (!c.Operation.Mutates || (f.Status != envelope.Refused && f.Status != envelope.Held)) {
 				return nil, envelope.Common(envelope.CodeInternal, "the operation returned receipts with a status that leaves none")
 			}
@@ -497,6 +527,52 @@ func (e *Executable) unknownAnswer(c *Command, operation, requestID, message str
 	return e.failure(requestID, c.Name, operation, envelope.Common(envelope.CodeOutcomeUnknown, message))
 }
 
+// unknownAfterIntent is the answer of a request whose intent is committed and
+// whose outcome is not established: outcome_unknown with exactly the receipts
+// of the committed intents, which are on disk, and no outcome recorded. Where
+// the answer with them would not fit the response limit it is given without
+// them, as the floor holds.
+func (e *Executable) unknownAfterIntent(c *Command, op *Operation, requestID, why string, committed []envelope.Receipt) *envelope.Response {
+	message := "the intent of this request is committed and its outcome is not established; reconcile before any retry"
+	if why != "" {
+		message += ": " + why
+	}
+	f := envelope.Common(envelope.CodeOutcomeUnknown, clip(message, string(envelope.Unknown)))
+	f.Receipts = slices.Clone(committed)
+	resp := e.failure(requestID, c.Name, op.Name, f)
+	if e.preflight(c, resp) != nil {
+		resp = e.unknownAnswer(c, op.Name, requestID, interruptedMessage)
+	}
+	return resp
+}
+
+// afterIntent shapes the failure an operation returned for what it committed
+// before. Without a committed intent the failure stands, and a refusal or a
+// hold records its own receipts. With one, the response carries the receipts
+// of the intents: an unknown outcome returns exactly them and records
+// nothing; a refusal or a hold returns them with its own and records its
+// own and the outcome; any other status is answered as unknown, since the
+// effect after the intent may have happened. own are the receipts to write,
+// and record says whether a transaction records the outcome.
+func (e *Executable) afterIntent(f *envelope.Failure, committed []envelope.Receipt, stderr io.Writer, c *Command, op *Operation) (resp *envelope.Failure, own []envelope.Receipt, record bool) {
+	if len(committed) == 0 {
+		return f, f.Receipts, len(f.Receipts) > 0
+	}
+	out := *f
+	switch f.Status {
+	case envelope.Unknown:
+		out.Receipts = slices.Clone(committed)
+		return &out, nil, false
+	case envelope.Refused, envelope.Held:
+		out.Receipts = append(slices.Clone(committed), f.Receipts...)
+		return &out, f.Receipts, true
+	}
+	fmt.Fprintf(stderr, "%s %s: %s after its intent was committed; answered unknown: %s\n", c.Name, op.Name, f.Status, f.Err.Message)
+	u := envelope.Common(envelope.CodeOutcomeUnknown, clip("the operation ended "+string(f.Status)+" after its intent was committed, and its effect is not established; reconcile before any retry", string(envelope.Unknown)))
+	u.Receipts = slices.Clone(committed)
+	return u, nil, false
+}
+
 // settle is the one function that turns what the store reports of a mutating
 // request into its response, and every entry answers through it: err is what
 // taking the lock with recovery, or committing, reported, and resp is, with
@@ -509,21 +585,36 @@ func (e *Executable) unknownAnswer(c *Command, operation, requestID, message str
 // changed. An error that left nothing of the request behind is answered by
 // the code it carries, and too_large replaces that answer where it does not
 // fit. Sizing is done here, so that no entry can replace a durable answer.
-func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *envelope.Response, err error, stderr io.Writer) *envelope.Response {
+func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *envelope.Response, err error, stderr io.Writer, committed []envelope.Receipt) *envelope.Response {
 	durable := true
 	if err != nil {
 		var interrupted *store.InterruptedError
 		durable = errors.As(err, &interrupted) && interrupted.RequestID == requestID
-		if durable {
+		switch {
+		case durable:
 			fmt.Fprintln(stderr, err)
 			resp = e.unknownAnswer(c, op.Name, requestID, interruptedMessage)
-		} else {
+			resp.Receipts = slices.Clone(committed)
+		case len(committed) > 0:
+			// Nothing more of the request is durable, but its intent is, and
+			// an effect may have followed it.
+			fmt.Fprintln(stderr, err)
+			return e.unknownAfterIntent(c, op, requestID, "", committed)
+		default:
 			resp = e.failure(requestID, c.Name, op.Name, storeFailure(err))
 		}
 	}
 	if bad := e.preflight(c, resp); bad != nil {
 		if !durable {
 			return bad
+		}
+		if len(resp.Receipts) > 0 && resp.Status == envelope.Unknown {
+			// The receipts of the intents made the interrupted answer too
+			// large: it is given without them.
+			resp.Receipts = nil
+			if e.preflight(c, resp) == nil {
+				return resp
+			}
 		}
 		fmt.Fprintf(stderr, "%s %s: the recorded response of %s is %s\n", c.Name, op.Name, requestID, bad.Error.Message)
 		return e.unknownAnswer(c, op.Name, requestID, oversizeReplayMessage)
@@ -563,12 +654,9 @@ func storeFailure(err error) *envelope.Failure {
 // with its recorded outcome, in one transaction.
 func (e *Executable) commit(w *store.Writer, requestID, digest string, resp *envelope.Response, records []store.RecordWrite, receipts []envelope.Receipt, events []store.Event) error {
 	tx := store.Tx{RequestID: requestID, Records: records, Events: events}
-	for i := range receipts {
-		data, err := receipts[i].Encode()
-		if err != nil {
-			return envelope.Common(envelope.CodeInternal, "a receipt is not valid: "+err.Error())
-		}
-		tx.Receipts = append(tx.Receipts, store.Receipt{ID: receipts[i].ReceiptID, Content: data})
+	var err error
+	if tx.Receipts, err = encodeReceipts(receipts); err != nil {
+		return envelope.Common(envelope.CodeInternal, err.Error())
 	}
 	outcome, err := encodeOutcome(requestID, digest, resp)
 	if err != nil {
@@ -577,4 +665,17 @@ func (e *Executable) commit(w *store.Writer, requestID, digest string, resp *env
 	tx.Outcome = outcome
 	_, err = w.Commit(tx)
 	return err
+}
+
+// encodeReceipts makes the receipts of a transaction.
+func encodeReceipts(receipts []envelope.Receipt) ([]store.Receipt, error) {
+	var out []store.Receipt
+	for i := range receipts {
+		data, err := receipts[i].Encode()
+		if err != nil {
+			return nil, fmt.Errorf("a receipt is not valid: %w", err)
+		}
+		out = append(out, store.Receipt{ID: receipts[i].ReceiptID, Content: data})
+	}
+	return out, nil
 }

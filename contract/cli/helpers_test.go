@@ -285,6 +285,68 @@ func newHarness(t testing.TB) *harness {
 			f.Receipts = []envelope.Receipt{rc}
 			return nil, f
 		})},
+		// effect commits its intent, a record and a receipt, then counts an
+		// effect outside Hive in h.calls["effected"], then ends as the body's
+		// name says.
+		{OperationDecl: decl("effect", true), Handle: count("effect", func(c *Call) (*Result, error) {
+			mode, _ := c.Request.Body["home"].(map[string]any)["name"].(string)
+			path := store.RecordPath("dispatch", "thing", "intended")
+			intended, err := c.NewReceipt("dispatch.thing.intended", "1.0", nil, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+			expected := int64(0)
+			if mode == "conflict" {
+				expected = 4
+			}
+			written, err := c.CommitIntent(Intent{
+				Records:  []store.RecordWrite{{Path: path, Content: []byte(`{"schema":"dispatch.thing","schema_version":"1.0","name":"intended"}`), Expected: expected}},
+				Receipts: []envelope.Receipt{intended},
+			})
+			if err != nil {
+				return nil, err
+			}
+			h.calls["effected"]++
+			switch mode {
+			case "unknown":
+				return nil, envelope.Common(envelope.CodeOutcomeUnknown, "the adapter did not answer")
+			case "unknown with a receipt":
+				rc, err := c.NewReceipt("dispatch.thing.refused", "1.0", nil, nil, nil)
+				if err != nil {
+					return nil, err
+				}
+				f := envelope.Common(envelope.CodeOutcomeUnknown, "the adapter did not answer")
+				f.Receipts = []envelope.Receipt{rc}
+				return nil, f
+			case "refused":
+				return nil, envelope.Common(envelope.CodeAuthorityMissing, "no word was given")
+			case "refused with a receipt":
+				rc, err := c.NewReceipt("dispatch.thing.refused", "1.0", nil, nil, nil)
+				if err != nil {
+					return nil, err
+				}
+				f := envelope.Common(envelope.CodeAuthorityMissing, "no word was given")
+				f.Receipts = []envelope.Receipt{rc}
+				return nil, f
+			case "unavailable":
+				return nil, envelope.Common(envelope.CodeDependencyMissing, "the program is gone")
+			case "plain error":
+				return nil, errors.New("something of its own")
+			case "huge":
+				return &Result{Body: map[string]any{"filler": strings.Repeat("x", 4096)}}, nil
+			case "wrong revision":
+				return &Result{Body: map[string]any{}, Records: []store.RecordWrite{{Path: path, Content: []byte(`{"schema":"dispatch.thing","schema_version":"1.0","name":"intended"}`), Expected: written[0].Revision + 1}}}, nil
+			}
+			done, err := c.NewReceipt("dispatch.thing.done", "1.0", nil, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+			return &Result{
+				Body:     map[string]any{"revision": written[0].Revision},
+				Records:  []store.RecordWrite{{Path: path, Content: []byte(`{"schema":"dispatch.thing","schema_version":"1.0","name":"done"}`), Expected: written[0].Revision}},
+				Receipts: []envelope.Receipt{done},
+			}, nil
+		})},
 		// stamp writes one record stamped with the time Finalize gives it, and
 		// answers with the digest Finalize gives, which is the digest of the
 		// record as stored though the clock moves between every reading.

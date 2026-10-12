@@ -28,7 +28,10 @@ type Tx struct {
 	// Events are the events to append to the journal, each once.
 	Events []Event
 	// Outcome is the recorded outcome of the request, a JSON object, written
-	// to requests/<request_id>.json.
+	// to requests/<request_id>.json. A transaction with none writes no
+	// outcome: it commits its records, receipts and events and removes its
+	// intent, and the request stays open, as an intent committed before an
+	// outside effect does.
 	Outcome []byte
 }
 
@@ -90,8 +93,8 @@ type intentFile struct {
 }
 
 // Commit runs the transaction: it checks every expected state, writes the
-// intent, writes the records, the receipts, the events and the outcome, and
-// removes the intent. Nothing is written when a check fails. An
+// intent, writes the records, the receipts, the events and the outcome, when
+// the transaction carries one, and removes the intent. Nothing is written when a check fails. An
 // interruption after the intent is written is completed by the next Lock, and
 // its error is an *InterruptedError naming the request, from whichever step
 // stopped it; an error of any other kind left nothing of the transaction
@@ -127,7 +130,7 @@ func (w *Writer) Commit(tx Tx) (*Committed, error) {
 // plan checks a transaction against the store and prepares every file,
 // writing nothing: every identifier and path is well formed and named once,
 // every record is at its expected revision or absent as expected, and every
-// receipt and the outcome are absent.
+// receipt and the outcome, where there is one, are absent.
 func (s *Store) plan(tx Tx) (*intent, error) {
 	if err := ids.Check(tx.RequestID, ids.Request); err != nil {
 		return nil, err
@@ -194,7 +197,7 @@ func (s *Store) plan(tx Tx) (*intent, error) {
 		in.events = append(in.events, Event{e.ID, out})
 	}
 	if len(tx.Outcome) == 0 {
-		return nil, fmt.Errorf("store: the transaction has no outcome to record")
+		return in, nil
 	}
 	rel := OutcomePath(s.pkg, tx.RequestID)
 	if err := s.expectAbsent(rel); err != nil {
@@ -238,8 +241,10 @@ func (s *Store) complete(in *intent, recovering bool) error {
 			return fmt.Errorf("store: appending the events of %s: %w", in.request, err)
 		}
 	}
-	if err := s.put(in.request, in.outcome); err != nil {
-		return err
+	if in.outcome != nil {
+		if err := s.put(in.request, in.outcome); err != nil {
+			return err
+		}
 	}
 	return s.removeFile(IntentPath(s.pkg, in.request))
 }
@@ -435,7 +440,11 @@ func (s *Store) classify(intentRel string, in *intent) error {
 			return fmt.Errorf("%w: intent %s: %v", ErrRecordMalformed, intentRel, err)
 		}
 	}
-	for _, r := range append(slices.Clone(in.receipts), in.outcome) {
+	once := slices.Clone(in.receipts)
+	if in.outcome != nil {
+		once = append(once, in.outcome)
+	}
+	for _, r := range once {
 		data, err := s.readFile(r.rel)
 		switch {
 		case errNotExist(err):
@@ -495,10 +504,6 @@ func (s *Store) encodeIntent(in *intent) ([]byte, error) {
 		}
 		events = append(events, map[string]any{"event_id": e.ID, "body": content})
 	}
-	outcome, err := file(in.outcome)
-	if err != nil {
-		return nil, err
-	}
 	doc := map[string]any{
 		"schema":         intentRecord,
 		"schema_version": intentVersion,
@@ -507,7 +512,13 @@ func (s *Store) encodeIntent(in *intent) ([]byte, error) {
 		"records":        records,
 		"receipts":       receipts,
 		"events":         events,
-		"outcome":        outcome,
+	}
+	if in.outcome != nil {
+		outcome, err := file(in.outcome)
+		if err != nil {
+			return nil, err
+		}
+		doc["outcome"] = outcome
 	}
 	out, err := canon.Encode(doc)
 	if err != nil {
@@ -611,11 +622,13 @@ func (s *Store) readIntent(rel string) (*intent, error) {
 		}
 		in.events = append(in.events, Event{id, out})
 	}
-	if in.outcome, err = file(doc["outcome"], false); err != nil {
-		return nil, err
-	}
-	if in.outcome.rel != OutcomePath(s.pkg, request) {
-		return nil, bad("the outcome is not that of the request")
+	if raw, ok := doc["outcome"]; ok {
+		if in.outcome, err = file(raw, false); err != nil {
+			return nil, err
+		}
+		if in.outcome.rel != OutcomePath(s.pkg, request) {
+			return nil, bad("the outcome is not that of the request")
+		}
 	}
 	return in, nil
 }
