@@ -2,11 +2,14 @@
 
 ## Model
 
-Withheld from this file. This session's environment forbids writing a model identifier into any artifact pushed to a repository, and this repository is public. The sentence of the system prompt that names the model, and `session_context.model` and `session_context.effort_level` exactly as `get_session` returns them, are given in the session's own chat reply instead, where the supervising worker can read them, or by calling `get_session` on this session.
+No model identifier is written here: this session's environment forbids one in any artifact pushed to a repository.
+
+- `get_session` returns `session_context.model` equal to the model this session was launched with: yes.
+- `get_session` returns `session_context.effort_level` equal to the effort this session was launched with: yes.
 
 ## Change
 
-In progress: reading `docs/design.md` and `spec/` to build the inventory of platform-bound assumptions.
+In progress: the inventory of platform-bound assumptions in `docs/design.md` and `spec/` is read; the design revision and the contract change 1.9 are being written.
 
 ## Questions for the operator
 
