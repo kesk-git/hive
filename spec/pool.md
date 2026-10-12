@@ -148,12 +148,12 @@ Where an item's work runs is a choice made for that item. The Pool records the r
 
 | Value | Meaning |
 | --- | --- |
-| `mac` | On the Mac. |
+| `mac` | On the operator's machine, the one the Hive runs on, whether it runs macOS, Windows or Linux. The value keeps its name on every platform: renaming it would be a major change, and none is made. |
 | `claude-cloud-session` | In a Claude cloud session. |
 | `policy` | Left to the policy resolver. |
 | `codex-cloud` | Codex in the Void: a named value that admission refuses with `pool.placement_parked`, unconditionally at stage 2. It is never substituted and never silently changed. |
 
-The UI labels the four values Mac, Claude cloud session, By policy and Codex Cloud (parked).
+The UI labels `claude-cloud-session`, `policy` and `codex-cloud` Claude cloud session, By policy and Codex Cloud (parked). The label of `mac` is shown to the operator and is the design's open choice [Q4](../docs/design.md#open-choices); until it is answered the label is Mac, and the value means the operator's machine on all three platforms whatever its label.
 
 **How parked is known.** At stage 2 the refusal of `codex-cloud` is written into `hive-admit check` itself: no rule record, policy request, configuration value, environment value, authority reference or `approve` can admit it, and `test-pool` proves that a check with each of those present still refuses. The design fixes what un-parks it, in [Codex: three backends and a migration boundary](../docs/design.md#codex-three-backends-and-a-migration-boundary) and [Enabling and retiring a Codex backend](../docs/design.md#enabling-and-retiring-a-codex-backend): a supported command-line route that honors model selection, a controlled replay of the full readiness contract, and the Hive Mind's recorded, authorized configuration change, with "an accepted default-model task" unable to release the parked state. In this specification that is one change, made by the stage that builds the Codex Cloud backend behind the adapter contract, which is stage 4's or later: a minor change of this file and of the check that replaces the unconditional refusal with a read of that backend's capability record, which stage 4 defines, in state ready, and the Hive Mind's ruling by reference as that record names it. Until that change is accepted and built, every `codex-cloud` request is refused, whatever else a home holds.
 

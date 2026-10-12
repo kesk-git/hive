@@ -6,7 +6,7 @@ Owner: the contract library implements the harness; each package owns its comman
 
 ## Executables and command names
 
-Each package builds **one executable**, named in its declaration: `hive-pool`, `hive-spawning-pool`, `hive-dispatch`, `hive-shadow`, `hive-synapse`, `hive-word` and `hive-ui`. Every other command name of a package is a link to that package's executable, and the executable acts as the command whose name it was started under. The delivered `bin/` directory therefore holds seven executables and twenty-one links, and all twenty-eight names behave as separate commands.
+Each package builds **one executable**, named in its declaration: `hive-pool`, `hive-spawning-pool`, `hive-dispatch`, `hive-shadow`, `hive-synapse`, `hive-word` and `hive-ui`, each with the `.exe` suffix on Windows. Every other command name of a package is a link to that package's executable, and the executable acts as the command whose name it was started under: the base name of the program as started, without its `.exe` suffix on Windows, where it is compared without regard to case as Windows compares names. The delivered `bin/` directory therefore holds seven executables and twenty-one links, and all twenty-eight names behave as separate commands on all three platforms; [distribution.md](distribution.md#the-artefact) says what a link is on each.
 
 A name the executable does not own exits 2.
 
@@ -80,12 +80,12 @@ One JSON document, following `response.v1`, for every invocation that gets as fa
 | 5 | `conflict` | The request lost to current state: an expected revision differs, a lock is held, the identifier exists with other content. | Nothing |
 | 6 | `not_found` | The thing named does not exist in this home. | Nothing |
 | 7 | `too_large` | The request, the response or a record in it exceeds a declared limit. | Nothing |
-| 8 | `unavailable` | Something the operation needs cannot be used: a core executable is missing or refuses, a source cannot be read, an authoritative record is unreadable or malformed, a platform utility is missing or unusable, or the recorded secret store is locked, lacks the item or has no adapter. | Nothing |
+| 8 | `unavailable` | Something the operation needs cannot be used: a core executable is missing or refuses, a source cannot be read, an authoritative record is unreadable or malformed, a platform utility is missing or unusable, or the secret store in use is locked or closed to the process, lacks the item or has no adapter. | Nothing |
 | 9 | `unknown` | The outcome cannot be established. An intent is recorded and something outside Hive may or may not have happened. | Unknown; reconcile before any retry |
 | 10 | `held` | The operation is valid and waits on a recorded hold, which `error.hold` names. | A record of the hold, where the operation writes one |
 
-- Exit codes 11 to 63 are reserved for this contract. Hive never exits with 64 or above, so a shell's or a signal's code is never mistaken for one of Hive's.
-- A process ended by a signal, or by a caller's timeout, has given no response. The caller treats the outcome as `unknown`.
+- Exit codes 11 to 63 are reserved for this contract. Hive never exits with 64 or above, so no code a platform gives a process that something else ended is mistaken for one of Hive's: on macOS and Linux a shell reports a signal as 128 plus its number, and on Windows a process ended by an exception or by Control-C exits with a status of `0xC0000000` or above.
+- An outcome is read from a complete response that agrees with the exit code, never from an exit code alone. A process that ends without a complete response has given no response, whatever its exit code, and the caller treats the outcome as `unknown`: one ended by a signal on macOS or Linux; one ended on Windows by `TerminateProcess` or `TerminateJobObject`, whose exit code is whatever the terminator chose, and is 1, Hive's `failed`, when Go's own `Kill` chose it; and one ended by a caller's timeout. How the [one process-execution path](distribution.md#what-a-run-reports) reports every way a run can end is stated there.
 - `ok` means what the operation defines and no more. An operation that records a launch and receives the adapter's acceptance returns `ok` for exactly that; it says nothing of the worker running, finishing or delivering.
 - `refused`, `held` and `unknown` may leave a record: the refusal, the hold or the intent. Every such record is a receipt returned in `receipts`. No other non-`ok` status leaves anything.
 - `retryable` is true only when repeating the same request unchanged can succeed without anyone acting first, as with `lock_held`. It is false for `unknown`: an unknown outcome is reconciled, not retried.
@@ -107,7 +107,7 @@ A package's own codes are written `<package>.<code>`. These common ones are writ
 | `unknown` | `outcome_unknown` |
 | `held` | `held` |
 
-Adding a code is a minor change. A code is never reused for another meaning. `secret_shape_recognized` is the code of the shape recognizer of the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section; the five codes from `secret_store_locked` to `secret_store_unsupported` are the conditions of the platform's secret store and its utility that the same section lists, and an error carrying one names the Spoor, or for a tool's own login the tool, the store and the condition, and never the value.
+Adding a code is a minor change. A code is never reused for another meaning. `secret_shape_recognized` is the code of the shape recognizer of the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section; the five codes from `secret_store_locked` to `secret_store_unsupported` are the conditions of the platform's secret store and, on macOS, its utility that the same section lists, for each of the three platforms, and an error carrying one names the Spoor, or for a tool's own login the tool, the store and the condition, and never the value.
 
 ## Size
 

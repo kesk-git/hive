@@ -8,7 +8,7 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 **Decision.** Hive is written in Go, pinned to release line 1.27. The standard library is the only library at stage 1.
 
-**Reason.** The design forbids a seventh runtime prerequisite. Go builds each executable as one self-contained file that needs nothing installed, on the Mac and on Linux alike, and its standard library covers what stage 1 needs: JSON, files and locks, processes, an HTTP server and embedded files. Treehouse, the larger of the two adaptations, is written in Go and can be adapted directly.
+**Reason.** The design forbids a seventh runtime prerequisite. Go builds each executable as one self-contained file that needs nothing installed, on macOS, Windows and Linux alike, from any one of them, and its standard library covers what stage 1 needs: JSON, files and locks, processes, an HTTP server and embedded files, and through its `syscall` package each platform's own pseudo-terminal, job objects, access-control lists and credential store. Treehouse, the larger of the two adaptations, is written in Go and can be adapted directly.
 
 **Cost.** tasks-axi is written in TypeScript. The Pool's adaptation therefore becomes a translation, and its tests are carried over by re-expression rather than kept as files. The import record says so file by file; see [imports.md](imports.md#the-two-planned-imports).
 
@@ -164,11 +164,15 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 ## 16. Platforms
 
-**Decision.** Delivered for macOS on Apple silicon and on Intel. Built and tested on Linux. Not supported on Windows.
+**Decision, as contract version 1.9 amends it.** Delivered, built and tested natively on macOS, on Windows and on Linux, each on x86-64 and on ARM64, and never through WSL2 or another compatibility layer. GitHub's hosted Windows and Linux runners, for this public repository, are Hive's declared test environment for those two platforms, by the operator's decision; the macOS runs take place on the operator's own Mac. [distribution.md](distribution.md#platforms) states it.
 
-**Reason.** The design places every supervisor on the Mac. Linux is where a Void session and a hosted check run Hive's own tests. tmux, one of the six, does not exist on Windows.
+**What it replaces.** The decision accepted on 2026-10-11 delivered Hive for macOS only, built and tested it on Linux, and did not support Windows, because the design placed every supervisor on the Mac and tmux, one of the six, does not exist on Windows. The later decision that Hive runs natively on all three overrules it. Its reason about tmux no longer rules a platform out: it makes the terminal runtime, and how the operator watches and attaches to a running agent, the design's open choice [Q1](../docs/design.md#open-choices).
 
-**To undo.** Cheap to add a platform.
+**Cost.** Every contract that touches the platform states its mechanism for all three: [the one process-execution path](distribution.md#the-one-process-execution-path), the [record format's](records.md) access, atomic replacement and locks, and the design's credential store on each platform. Code already landed for stage 1 assumes macOS and Linux in its locks, access checks and flushes, and is corrected by the lane that owns it.
+
+**Rejected.** *Windows through WSL2*, which runs the Linux build inside a Linux virtual machine: that is the compatibility layer the later decision rules out, and it would leave Windows's own credential store, terminals and file system out of reach. *Windows deferred to a later stage*: every stage from 2 on builds on the process path, the record format and the store adapters, so a platform added later would reopen each of them.
+
+**To undo.** Expensive once a stage builds on the three: dropping a platform would leave its mechanisms in every contract that states them.
 
 ## 17. Target names beyond the seven
 
@@ -204,7 +208,7 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 ## Left to the stage that needs it
 
-These are not decided here, deliberately. Each is cheap to add later and would be a guess now.
+These are not decided here, deliberately. Each is cheap to add later and would be a guess now. The choices that change what the operator sees or does are not among them: the design lists those under its [open choices](../docs/design.md#open-choices), for the operator to answer.
 
 | Open point | First needed |
 | --- | --- |
@@ -216,4 +220,4 @@ These are not decided here, deliberately. Each is cheap to add later and would b
 | Where instructions and skills sit in the artefact | The stage that first delivers one |
 | Retention periods and segment sizes | The stage that owns each store, as configuration |
 | Which package declares the optional browser stack | The stage that first selects a browser task |
-| The adapter for a secret store a user chooses on Linux, under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section | When a user chooses one |
+| The adapter for a secret store a user chooses beyond the platform's own, under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section | When a user chooses one |

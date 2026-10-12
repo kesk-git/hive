@@ -1,10 +1,10 @@
 # Hive specification
 
-This directory holds the contracts of the first two stages of the [ordered implementation plan](../docs/design.md#ordered-implementation-plan). The first stage's are a definition, accepted on 2026-10-11 with all twenty of its decisions; the second stage's, the Pool, are defined on top of them and extend them without reopening them. The build of each follows as separate work. Nothing of stage 2 is implemented: no executable, no test and no imported source of the Pool exists yet.
+This directory holds the contracts of the first two stages of the [ordered implementation plan](../docs/design.md#ordered-implementation-plan). The first stage's are a definition, accepted on 2026-10-11 with all twenty of its decisions, of which version 1.9 amends one, decision 16 on platforms; the second stage's, the Pool, are defined on top of them and extend them without reopening them. The build of each follows as separate work. Nothing of stage 2 is implemented: no executable, no test and no imported source of the Pool exists yet.
 
 [The design](../docs/design.md) says what Hive is and why. This specification says where each thing lives, who owns it and what proves it. Where the two differ, the design governs and the difference is a defect in this specification.
 
-Contract version: **1.8**. What each version changed is recorded under [versions/](versions/), one file per version.
+Contract version: **1.9**. What each version changed is recorded under [versions/](versions/), one file per version.
 
 ## What is defined
 
@@ -22,7 +22,7 @@ Contract version: **1.8**. What each version changed is recorded under [versions
 | [session-messages.md](session-messages.md) | The session message and the input receipt of the one supervisor conversation. |
 | [review.md](review.md) | The four files of a review directory. |
 | [test-targets.md](test-targets.md) | The test targets, what each runs and what each must prove. |
-| [distribution.md](distribution.md) | The six-dependency distribution contract. |
+| [distribution.md](distribution.md) | The six-dependency distribution contract: the three platforms, macOS, Windows and Linux, the artefact of each, and the one process-execution path. |
 | [imports.md](imports.md) | The import record that precedes any upstream source. |
 | [pool.md](pool.md) | Stage 2: the Pool's store, records, operations, the execution place, admission, the Imperative, specifications, rules, generated knowledge, legacy import and export, receipts, events and error codes. |
 | [import-plan-tasks-axi.md](import-plan-tasks-axi.md) | Stage 2: the plan for the translation of tasks-axi into the Pool, field by field of the import record the build writes. |

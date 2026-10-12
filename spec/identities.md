@@ -13,7 +13,7 @@ Every identifier Hive mints is a registered prefix, an underscore and a ULID in 
 ```
 
 - The ULID is the standard one: 48 bits of millisecond time and 80 bits from the operating system's random source, written in Crockford base 32.
-- It is written in **lowercase only**. An identifier becomes a file name, and the Mac's file system does not tell upper case from lower.
+- It is written in **lowercase only**. An identifier becomes a file name, and the default file systems of macOS and Windows do not tell upper case from lower, while Linux's do: lowercase keeps every identifier one name on all three.
 - An identifier is opaque. Nothing reads meaning from its time part, and nothing sorts by it where order matters; order comes from sequences and revisions.
 - An identifier is minted once, by the party the table below names, and is never reused, shortened or derived from a name.
 - An identifier is unique across homes, and it still never selects an owner on its own: a request that names a task also names the task's home, and a mismatch is refused.
@@ -63,7 +63,7 @@ Each record follows the [record format](records.md) and is replaced atomically w
 
 **A project** keeps its `project_id` if its repository is renamed or moved; the repository binding is an attribute that changes under a new `record_revision`. Validation and publication defaults and authority references are not identity. They belong to the workspace charter, which stage 4 defines, and refer to the project by `project_id`.
 
-**A clone** is one physical copy. Two clones of the same origin are two clones with two identities, and the recorded origin is evidence, never the key. The identity is bound to the physical path of the clone's Git common directory, with every symbolic link resolved. Before any operation that acts on a clone, the acting package resolves the common directory of the path it was given and compares it with the record; a difference is refused with `clone_identity_mismatch`. A linked worktree of a clone resolves to that clone's common directory and so to that clone. A clone that has been moved is re-bound by an explicit `hive-fleet` operation of a later stage, never by resemblance.
+**A clone** is one physical copy. Two clones of the same origin are two clones with two identities, and the recorded origin is evidence, never the key. The identity is bound to the physical path of the clone's Git common directory, with every symbolic link and, on Windows, every junction resolved, recorded in the form the platform's file system reports for it, as [records.md](records.md#encoding) states for an absolute path. Before any operation that acts on a clone, the acting package resolves the common directory of the path it was given and compares it with the record by file identity, the device and inode on macOS and Linux and the volume and file index on Windows, never by the spelling of the path: on the default file systems of macOS and Windows two spellings that differ only in case name one directory, and a link or a junction gives a directory a second name on all three. A difference is refused with `clone_identity_mismatch`. A linked worktree of a clone resolves to that clone's common directory and so to that clone. A clone that has been moved is re-bound by an explicit `hive-fleet` operation of a later stage, never by resemblance.
 
 Identity records are retired by `state`, never deleted, so that an old receipt always resolves.
 
