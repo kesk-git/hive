@@ -1,18 +1,17 @@
 # Distribution contract
 
-A delivered Hive needs six other programs and nothing else: **Git, gh, tmux, Claude Code, Codex CLI and no-mistakes**. This file fixes what "delivered" means, on which platforms, what a Hive executable may run and how it runs it, and how the limit of six is proved rather than promised.
+A delivered Hive needs five other programs and nothing else: **Git, gh, Claude Code, Codex CLI and no-mistakes**. This file fixes what "delivered" means, on which platforms, what a Hive executable may run and how it runs it, and how the limit of five is proved rather than promised.
 
-Hive is delivered natively for macOS, Windows and Linux. It never runs through WSL2, Cygwin, MSYS2 or any other compatibility layer: each platform has its own executables, built from the same revision, which use that platform's own facilities through the Go standard library. tmux, the terminal runtime the tooling ruling named, has no native Windows build; which terminal runtime serves all three platforms, and how the operator watches and attaches to a running agent, is the design's open choice [Q1](../docs/design.md#open-choices). Until that choice is answered and built, `tmux` stays one of the six as the declarations name it, and on Windows every operation that needs the terminal runtime is `unavailable` with `dependency_missing`.
+Hive is delivered natively for macOS, Windows and Linux. It never runs through WSL2, Cygwin, MSYS2 or any other compatibility layer: each platform has its own executables, built from the same revision, which use that platform's own facilities through the Go standard library and the two named exceptions of [the toolchain](#the-toolchain). An interactive session runs in Hive's own [terminal host](../docs/design.md#the-terminal-host), in a session host of `dispatch`'s, started by [the resident start](#a-resident-start), that holds the session on the platform's own pseudo-terminal through [the terminal start](#a-terminal-start). No terminal program is a dependency: tmux, which the tooling ruling named and which has no native Windows build, left the dependencies by the operator's decision, and nothing replaces it.
 
 Owner: the repository. Proved by `test-distribution`, and for [the one process-execution path](#the-one-process-execution-path) by `test-contract`.
 
-## The six
+## The five
 
 | Dependency | Program run | Declared by |
 | --- | --- | --- |
 | Git | `git` | `spawning-pool`, `dispatch`, `synapse` |
 | gh | `gh` | `dispatch`, `shadow`, `synapse` |
-| tmux | `tmux` | `dispatch`, `shadow` |
 | Claude Code | `claude` | `dispatch`, `synapse` |
 | Codex CLI | `codex` | `dispatch`, `synapse` |
 | no-mistakes | `no-mistakes` | `synapse` |
@@ -21,9 +20,9 @@ Owner: the repository. Proved by `test-distribution`, and for [the one process-e
 - On Windows a program is found only as a native executable, `<program>.exe`. A dependency present there only as a batch file, such as the `.cmd` shim a package manager like npm installs, is `unavailable` with `dependency_unusable`, naming the file found: running it would run `cmd.exe`, a shell. The remedy is a native executable of that dependency on the search path under its program name; Hive installs nothing.
 - Hive records the version it observed where a record depends on it, as the design's execution and capability records require. This specification sets no minimum version: the stage that first uses a program states what it needs of it and probes for that.
 - A program that is missing or refuses to run makes the operation that needs it `unavailable`, with `dependency_missing` or `dependency_unusable`. It never makes another operation fail, and never causes a fallback to another program.
-- no-mistakes is the long-lived plugin point behind Synapse, by the Hive Mind's ruling of 2026-10-11 on the shape of the gate's stage; it is one of the six, not an exception. A package declaration lists it under the key named `transitional`, which [`package.v1`](schemas/package.v1.schema.json) keeps as that field's name: the word there names the field, not the plugin's status, and renaming the field is a major change of this specification left for a later revision.
+- no-mistakes is the long-lived plugin point behind Synapse, by the Hive Mind's ruling of 2026-10-11 on the shape of the gate's stage; it is one of the five, not an exception. A package declaration lists it under the key named `transitional`, which [`package.v1`](schemas/package.v1.schema.json) keeps as that field's name: the word there names the field, not the plugin's status, and renaming the field is a major change of this specification left for a later revision.
 
-One exception exists, named, selected and outside the six:
+One exception exists, named, selected and outside the five:
 
 | Exception | Program | When it is run | Declared by |
 | --- | --- | --- | --- |
@@ -50,7 +49,8 @@ hive-<version>-<os>-<arch>/
 
 - **Names on Windows.** Every name in `bin/` of a Windows artefact carries the `.exe` suffix: `hive-pool.exe`, and `hive-admit.exe` beside it. A program on Windows is found by that name and no other.
 - **Seven executables, twenty-one links.** Each link points at its package's executable in the same directory. See [commands.md](commands.md#executables-and-command-names). On macOS and Linux each link is a relative symbolic link. On Windows, where creating a symbolic link needs Developer Mode or administrator rights, each is a hard link named `<name>.exe`; a copy of the directory that does not keep hard links turns each into a whole copy of its executable, which is larger and behaves the same, and `test-distribution` accepts either.
-- **Self-contained.** Each executable is built without the C toolchain's involvement and with file-system paths trimmed, so it links nothing but what the platform itself always provides: the system library on macOS, nothing on Linux, and on Windows the system libraries such as `kernel32.dll` and `advapi32.dll`, reached through the standard library's `syscall` package. The schemas, and for `hive-ui` the browser files, are embedded. Nothing is read from the repository at run time.
+- **Self-contained.** Each executable is built without the C toolchain's involvement and with file-system paths trimmed, so it links nothing but what the platform itself always provides: the system library on macOS, nothing on Linux, and on Windows the system libraries such as `kernel32.dll` and `advapi32.dll`, reached through the standard library's `syscall` package. `hive-ui`, Hive's own app, also loads at run time the platform's own window system and web engine, through purego on macOS and Linux and through `syscall` on Windows: the system's own frameworks, WebKit among them, on macOS; the system C library, GTK and WebKitGTK on Linux; and on Windows Microsoft's WebView2 loader, with the WebView2 engine it loads. The WebKitGTK package on Linux and the WebView2 loader on Windows are accepted as system parts, like the platform's own libraries, and are not dependencies. The schemas, and for `hive-ui` the app's page files, are embedded. Nothing is read from the repository at run time.
+- **The app's platform parts.** What a platform needs beside `hive-ui` for the app to carry its icon, menus and notifications, such as an application bundle on macOS, enters this artefact with stage 6, in the change that builds the app, as a change to this contract. It registers nothing with the platform at install.
 - **`manifest.json`** records the Hive version, the contract version, the source revision, the Go release used, the platform, and for every file its size and digest, and for every link its target.
 - **`NOTICE`** carries the notices of everything the [import records](imports.md) cover.
 - **One archive per platform.** Each platform's directory is delivered as one gzipped tar archive, which the `tar` each of the three platforms carries extracts; its extraction keeps the links where the extracting tool can and makes whole copies where it cannot.
@@ -74,25 +74,29 @@ Behaviour that depends on a platform is proved on that platform. A passing run o
 ## The toolchain
 
 - Hive is written in **Go**, at the one release line `go.mod` pins: **1.27**. The Go toolchain is needed to build and to test, and is not needed to run. It builds every platform's executables from any one platform, without the C toolchain.
-- The **Go standard library** is the only library at stage 1. It reaches each platform's own facilities through its `syscall` package, and through `syscall.NewLazyDLL` for a function of a Windows system library; that is the standard library, not a third-party module. A third-party module enters by a package's declaration and an [import record](imports.md), in the change that first uses it.
+- The **Go standard library** is the only library at stage 1. It reaches each platform's own facilities through its `syscall` package, and through `syscall.NewLazyDLL` for a function of a Windows system library; that is the standard library, not a third-party module.
+- Hive uses the standard library only, with **two named exceptions**. Each is pinned to one version, used for its one purpose and nothing else, and enters by the declaration of the package that links it, with an [import record](imports.md) for it and for every module it brings, in the change that first uses it:
+  1. **zalando/go-keyring**, the first, linked by the contract library inside Tendril's package, the one place that resolves secrets, from stage 4: through it the store adapters reach Credential Manager on Windows and the Secret Service on Linux. It is built into the Windows and Linux executables only. macOS keeps its keychain route through `security`, and the module's own macOS code, which starts `security` itself, is in no executable.
+  2. **ebitengine/purego**, the second, linked by `ui` from stage 6: through it one build of Hive's own app reaches the macOS and Linux system libraries without a C compiler.
+- A module of either exception never starts a process. Where one holds a way to start one, its import record names it and the condition Hive keeps so that it is never reached: the session bus client that go-keyring brings on Linux starts `dbus-launch` when it finds no session bus, so the Linux adapter calls into it only where the session bus's address is already known, and otherwise answers as a host with no Secret Service. A further third-party module is a change to this contract.
 - `make` drives the targets. It is a development tool and is not needed to run. Each target's recipe runs the Go toolchain and nothing that needs a shell's syntax or a POSIX utility, so the same target runs from the repository root on all three platforms; a check a recipe needs beyond the Go toolchain's own commands is a Go program of the repository, run by `go run`.
 - **No other toolchain exists in the repository**: no Node, no Python, no shell-script layer, no bundler, no generator whose output is committed. A change that needs one is a change to this contract.
 
-So the delivered core has exactly six runtime prerequisites, and a seventh cannot arrive by accident: there is nothing in the repository that could need one.
+So the delivered core has exactly five runtime prerequisites, and a sixth cannot arrive by accident: there is nothing in the repository that could need one.
 
 ## What a Hive executable may run
 
 A Hive executable starts another program only through `contract/exec`, and only one of:
 
-1. one of the six, where its package declares it;
+1. one of the five, where its package declares it;
 2. the exception above, where its package declares it and the operation selected it;
 3. a project's declared validation command, where its package declares `project`;
 4. another Hive command, where its package declares the call;
 5. a platform utility the package declares under `platform`, with its reason.
 
 - `contract/exec` takes the program as one of those named kinds and its arguments as a list. It never passes a command line through a shell, and never builds one from text. It builds the child's environment itself, from nothing. The only way a resolved value enters a child is the one declared variable that Tendril, the launch primitive of the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section, which sits in this path, sets there, never an argument; and a program that needs a value is started directly, never through the terminal runtime.
-- A package that needs a platform utility as a separate process lists it in its declaration under `platform` with its reason. No package runs a platform utility at stage 1. A list stays empty except for a utility the design names. The first is `security`, macOS's own keychain tool, declared by `dispatch` and `synapse`, which first run it in the stages that build them, and run it only on macOS: on Windows and Linux the design's store adapters reach the platform's own credential store in process, through the standard library, and run no utility for it. What the earlier shell implementation asked of `ps`, `stat`, `shasum` and the like, the standard library does in process on all three platforms. A platform utility is part of the platform and is not a seventh dependency.
-- A harness the terminal runtime holds is started from an argument list Hive gives it, by the runtime that [Q1](../docs/design.md#open-choices) selects. The Imperative reaches the harness by argument vector or a supported input channel, as the design requires, and is never interpolated into shell code.
+- A package that needs a platform utility as a separate process lists it in its declaration under `platform` with its reason. No package runs a platform utility at stage 1. A list stays empty except for a utility the design names. The first is `security`, macOS's own keychain tool, declared by `dispatch` and `synapse`, which first run it in the stages that build them, and run it only on macOS: on Windows and Linux the design's store adapters reach the platform's own credential store in process, through the first named exception of [the toolchain](#the-toolchain), and run no utility for it. What the earlier shell implementation asked of `ps`, `stat`, `shasum` and the like, the standard library does in process on all three platforms. A platform utility is part of the platform and is not a sixth dependency.
+- An interactive harness is started from an argument list Hive gives it, by the terminal start of its session host. The Imperative reaches the harness by argument vector or a supported input channel, as the design requires, and is never interpolated into shell code.
 - For the third kind, the program is the one the project declares, found by the same lookup rules. A project whose check is itself a shell script or a batch file declares its interpreter, `sh` or `cmd.exe`, as the program, with its own fixed arguments: that is the project's command, run as declared, and Hive adds to it no argument built from text.
 
 ## The one process-execution path
@@ -156,7 +160,7 @@ Before it ends a tree, the run records that it is ending it, so that its result 
 
 ### A resident start
 
-The Shadow's observer, the UI server and any other operation the contract declares `resident` are started so that they outlive the command that starts them:
+The Shadow's observer, Hive's own app, each session host and any other operation the contract declares `resident` are started so that they outlive the command that starts them:
 
 - **macOS and Linux.** In a new session (`setsid`), with standard streams on the null device or files the operation names, and not waited for.
 - **Windows.** With `DETACHED_PROCESS`, `CREATE_BREAKAWAY_FROM_JOB` and `CREATE_SUSPENDED`, standard handles likewise, and in no job of its own. Hive's own jobs allow that breakaway. An outer job of a runner or a service may not, and when jobs nest a breakaway can leave the inner job and keep the outer one without the call failing, so the call's success proves nothing. Before it resumes the process, `contract/exec` checks with `IsProcessInJob`, naming no job, that the process is in no job at all. If it is in one, or the check fails, `contract/exec` ends the process without resuming it, so that none of the resident's work has run, and the start is `unavailable` with `dependency_unusable`, naming the refused breakaway. A resident is reported as started only after it was resumed outside every job, and never as detached otherwise, since it would end with the job.
@@ -170,7 +174,7 @@ A program that needs an interactive terminal, an interactive harness session or 
 - **macOS and Linux.** `contract/exec` opens the pseudo-terminal controller, `/dev/ptmx`, read-write and without making it a controlling terminal; grants and unlocks it and reads the name of its terminal side through the platform's own `ioctl` requests, `TIOCSPTLCK` and `TIOCGPTN` on Linux, `TIOCPTYGRANT`, `TIOCPTYUNLK` and `TIOCPTYGNAME` on macOS; sets its window size with `TIOCSWINSZ`; and starts the program with the terminal side as its standard input, output and error, in a new session with that terminal as its controlling terminal (`Setsid` and `Setctty`). Hive keeps the controller side and closes its own copy of the terminal side.
 - **Windows.** `contract/exec` creates two pipes and a pseudoconsole over them with `CreatePseudoConsole`, a function of `kernel32.dll` reached through `syscall.NewLazyDLL`, and starts the program with the pseudoconsole in its attribute list (`PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE`) and no standard handle of Hive's. Hive keeps the writing end of the input pipe and the reading end of the output pipe, resizes with `ResizePseudoConsole`, and closes with `ClosePseudoConsole` while it goes on draining the output, which that call needs in order to return.
 - The holder writes input and reads output as bytes. What a terminal shows is its rendering, never a record: the Windows pseudoconsole re-renders what a program writes, so one program's output differs in bytes between platforms, and nothing Hive decides is read from it.
-- Where the terminal runtime [Q1](../docs/design.md#open-choices) selects is Hive's own, this is how an interactive agent is given its terminal. A third-party runtime is instead started by a plain or resident start from an argument list, and gives its sessions their terminals itself.
+- This is how Hive's own terminal host gives an interactive agent its terminal. The session host holds the controller side and the session's recent output in memory, and when a terminal joins it through the join operation it resizes the session, with `TIOCSWINSZ` or `ResizePseudoConsole`, so that the agent redraws itself: no screen is emulated, and the agent's tree is the session host's run, ended by its process group or job object.
 
 ### What a run reports
 
@@ -196,21 +200,21 @@ The operation that made the run maps its result to the [command contract's exit 
 
 ## Resident processes and listeners
 
-- The only operations that keep running are the Shadow's bounded observer and, when selected, the UI server. Both are declared `resident` and started by the resident start above, from the session start of the home they serve. A resident is started only where its lifetime can hold, outside every job around the command, and otherwise not started. Nothing else of Hive's stays behind after a command returns, and no new always-on service is added. A terminal runtime holds its sessions for as long as they run; what that process is, Hive's own or a dependency's, is part of the choice [Q1](../docs/design.md#open-choices) leaves open.
-- No resident is started by the platform at login or after a reboot. Until a Hive session starts again, nothing of Hive runs, and the design's rules for what was missed while nothing ran apply.
-- The only listener Hive opens is the UI server's, bound to loopback, or to the operator's existing private-network interface when that is selected. There is never a public listener.
-- Hive makes no network connection of its own. Every connection is made by one of the six, under that program's own configuration and credentials, or, for a program run under the identity a Spoor names, under the one value Tendril resolved from the platform's store into that process. The Linux store adapter's connection to the user's session bus is a local socket, not a network connection.
+- The only operations that keep running are the Shadow's bounded observer; Hive's own app, when selected, which keeps running after its window closes until the operator chooses Quit; and the session host of each interactive session, for as long as that session runs. Each is declared `resident` and started by the resident start above: the observer and the app from the session start of the home they serve, and a session host by the launch of its session. A resident is started only where its lifetime can hold, outside every job around the command, and otherwise not started. Nothing else of Hive's stays behind after a command returns, and no new always-on service is added.
+- No resident is started by the platform at login or after a reboot, with no exception. An install registers nothing. Until a Hive session starts again, nothing else of Hive runs, and the design's rules for what was missed while nothing ran apply.
+- Hive opens no network listener, on loopback, on a private network or anywhere else, and the app opens no listener of any kind: it serves its pages from inside the program, through a URL scheme of its own. A session host is reached by its join operation and by `dispatch` through a channel local to the machine and open to the operator's own user alone, never through a network address.
+- Hive makes no network connection of its own. Every connection is made by one of the five, under that program's own configuration and credentials, or, for a program run under the identity a Spoor names, under the one value Tendril resolved from the platform's store into that process. The Linux store adapter's connection to the user's session bus is made to a local socket only, never to a network address.
 
 ## How it is proved
 
 `test-distribution` runs against the built artefact of each platform, on that platform, and fails on any of the following.
 
 1. The directory's contents differ from the artefact above; a link on macOS or Linux is absolute or dangling; a link on Windows is neither a hard link to nor a byte-identical copy of its package's executable; a name on Windows lacks its `.exe` suffix; or `manifest.json` disagrees with the files.
-2. An executable needs a shared library beyond the platform's own, or was built with the C toolchain involved.
-3. Any Go package other than `contract/exec` starts a process by any means: imports the standard library's `os/exec`, calls `os.StartProcess`, calls a process-creation function of `syscall`, or reaches a platform's process-creation call through a system library.
+2. An executable needs a shared library beyond the platform's own, which for `hive-ui` include the system parts [the artefact](#the-artefact) accepts, or was built with the C toolchain involved.
+3. Any Go package other than `contract/exec` starts a process by any means: imports the standard library's `os/exec`, calls `os.StartProcess`, calls a process-creation function of `syscall`, or reaches a platform's process-creation call through a system library. A module of the two named exceptions of [the toolchain](#the-toolchain) passes only where its import record names each such start and the condition that keeps Hive from reaching it; and a macOS executable that holds go-keyring fails.
 4. A package starts a program its declaration does not list, found by the kinds passed to `contract/exec`.
-5. Any `platform` list is non-empty without a reason, or names a program that is one of the six.
-6. The integration tests fail when run with a search path that holds only the artefact's `bin/`, recorded fakes of `gh`, `tmux`, `claude`, `codex` and `no-mistakes`, on macOS a recorded fake of `security`, which stands for the declared platform utility and not for a seventh dependency, and the real `git`: that is, with no seventh program reachable. On Windows and Linux the store adapters run against their recorded fakes in process. Every fake is an executable the test builds, never a script, so that the lookup rules find it on all three platforms.
+5. Any `platform` list is non-empty without a reason, or names a program that is one of the five.
+6. The integration tests fail when run with a search path that holds only the artefact's `bin/`, recorded fakes of `gh`, `claude`, `codex` and `no-mistakes`, on macOS a recorded fake of `security`, which stands for the declared platform utility and not for a sixth dependency, and the real `git`: that is, with no sixth program reachable. On Windows and Linux the store adapters run against their recorded fakes in process. Every fake is an executable the test builds, never a script, so that the lookup rules find it on all three platforms.
 7. The repository holds a build file of another toolchain.
 
 A passing run is evidence about the artefact and the platform it ran against. It is not a claim that any installation already runs it.

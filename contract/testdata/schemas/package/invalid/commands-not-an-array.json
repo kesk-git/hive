@@ -48,7 +48,6 @@
     "core": [
       "git",
       "gh",
-      "tmux",
       "claude",
       "codex"
     ],

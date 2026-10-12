@@ -44,7 +44,7 @@ A declaration lists, for each command, the operations the design names. Every co
 4. **One test target.** A package's target runs that package's tests and nothing else's, and passes or fails without any other package being built. See [test-targets.md](test-targets.md).
 5. **Declared calls only.** A package calls the commands of the packages its declaration lists under `calls`, and no others.
 6. **Declared executables only.** A package runs the external executables its declaration lists under `executes`, or the platform utilities it lists under `platform`, each with its reason, and no others. See [distribution.md](distribution.md).
-7. **Declared libraries only.** A package links the Go standard library, `contract/` and the third-party modules its declaration lists under `libraries`, each with an [import record](imports.md). At stage 1 every list is empty.
+7. **Declared libraries only.** A package links the Go standard library, `contract/` and the third-party modules its declaration lists under `libraries`, each with an [import record](imports.md). At stage 1 every list is empty; the only modules a list may name are the two named exceptions of [the toolchain](distribution.md#the-toolchain) and the modules they bring, go-keyring in the contract library's and purego in `ui`'s, each from the stage that first uses it.
 
 ## Calls between packages
 
@@ -74,7 +74,7 @@ Two rules hold for every amendment.
 - atomic record files, the home event journal and transaction locks ([records.md](records.md));
 - the validated reader through which any package reads the journal, the identity records and the files of a review directory ([what ownership means](#what-ownership-means));
 - the request and response envelopes, the command-line harness and the exit states ([commands.md](commands.md));
-- the one process-execution path, with Tendril, the launch primitive of the same section, and the value type it defines ([distribution.md](distribution.md)).
+- the one process-execution path, with Tendril, the launch primitive of the same section, the value type it defines and the store adapters beside it, the only code that links go-keyring ([distribution.md](distribution.md)).
 
 Its test target is `test-contract`. A change to it is a change to every package and is reviewed as a contract change.
 

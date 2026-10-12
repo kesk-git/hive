@@ -491,7 +491,7 @@
       ]
     },
     "operator": {
-      "description": "The authenticated operator, as the serving login established it. Never a value the browser supplied.",
+      "description": "The operator, as Hive's own app knows them: the user it runs as, whose login is local-session. The app serves no other device, so no writer sets private-network. Never a value a page supplied.",
       "type": "object",
       "additionalProperties": false,
       "required": [

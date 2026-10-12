@@ -176,7 +176,6 @@
             "enum": [
               "git",
               "gh",
-              "tmux",
               "claude",
               "codex"
             ]

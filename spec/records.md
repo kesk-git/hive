@@ -28,7 +28,7 @@ Every record has a schema in **JSON Schema, draft 2020-12**, restricted to a pro
 - A schema that uses any other keyword fails `test-contract`. In particular there is no `format` assertion, no `patternProperties`, no `unevaluatedProperties` and no dynamic reference.
 - `additionalProperties` is only ever a boolean.
 - A `$ref` names another schema by its `$id`, with a JSON pointer where it selects a part: `urn:hive:schema:common:v1#/$defs/home_id`. There is no relative reference and no network fetch; every `$id` resolves to a file under `spec/schemas/`.
-- A `pattern` is written in the syntax common to RE2 and ECMAScript, so the same schema gives the same answer in Go and in a browser.
+- A `pattern` is written in the syntax common to RE2 and ECMAScript, so the same schema gives the same answer in Go and in the web engine that draws Hive's own app.
 - **Every object is closed.** Each object schema lists its properties and sets `additionalProperties` to `false`. The exceptions are the designated open members: `body` in an envelope, `detail` in an error and `unknown` in a record. A designated open member is declared as a bare object.
 
 ## Versioning
