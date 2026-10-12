@@ -7,6 +7,8 @@ README.md
 LICENSE                              added by its own change, before any import
 NOTICE                               third-party notices, generated from imports/
 .gitattributes                       line feeds kept in every checkout, on every platform
+.github/
+  workflows/                         the one workflow that runs make test on GitHub's hosted Windows and Linux runners, for every Harvest head and every night
 .claude/
   settings.json                      repository configuration for Claude Code: includeCoAuthoredBy and attribution.sessionUrl, both false, keep AI co-author and session trailers off
 go.mod                               the one module and the pinned Go release
