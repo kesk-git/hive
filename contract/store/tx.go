@@ -115,7 +115,7 @@ func (w *Writer) Commit(tx Tx) (*Committed, error) {
 		return nil, err
 	}
 	if err := w.s.writeFile(IntentPath(w.s.pkg, in.request), in.request, data); err != nil {
-		return nil, w.s.report(in.request, err)
+		return nil, w.s.report(in.request, false, err)
 	}
 	if err := w.s.complete(in, false); err != nil {
 		return nil, &InterruptedError{in.request, err}
@@ -276,7 +276,7 @@ func (s *Store) LockFor(requestID string) (*Writer, error) {
 	}
 	l, err := Acquire(s.Dir, s.pkg, false, s.waiting)
 	if err != nil {
-		return nil, s.report(requestID, err)
+		return nil, s.report(requestID, false, err)
 	}
 	if err := s.recoverFor(requestID); err != nil {
 		l.Release()
@@ -300,40 +300,47 @@ func (s *Store) recover() error { return s.recoverFor("") }
 // intent forward and empties tmp/. Intents are completed in name order, each
 // in full before the next. Every error leaves the store as recovery found it
 // or further along, and says, through report, whether the request's own
-// transaction had become durable.
+// transaction had become durable. An intent of the request found on disk
+// made it durable, and it stays so for every later error of the recovery,
+// though a transaction that carries no outcome leaves nothing of the request
+// to find once its intent is removed.
 func (s *Store) recoverFor(request string) error {
+	found := false
+	report := func(err error) error { return s.report(request, found, err) }
 	if err := s.step("readdir " + s.relDir(filepath.Join(s.dir, txDir))); err != nil {
-		return s.report(request, err)
+		return report(err)
 	}
 	names, err := s.intents()
 	if err != nil {
-		return s.report(request, err)
+		return report(err)
 	}
+	found = slices.Contains(names, request+".json")
 	if err := s.syncTx(); err != nil {
-		return s.report(request, err)
+		return report(err)
 	}
 	for _, name := range names {
 		rel := s.pkg + "/" + txDir + "/" + name
 		if err := s.rollForward(rel); err != nil {
-			return s.report(request, &InterruptedError{strings.TrimSuffix(name, ".json"), err})
+			return report(&InterruptedError{strings.TrimSuffix(name, ".json"), err})
 		}
 	}
 	if err := s.step("clear " + s.relDir(filepath.Join(s.dir, tmpDir))); err != nil {
-		return s.report(request, err)
+		return report(err)
 	}
 	if err := s.clearTmp(); err != nil {
-		return s.report(request, err)
+		return report(err)
 	}
 	return nil
 }
 
 // report classifies an error of a write or a recovery for the request in
-// hand: when the request's transaction is durable, the error is an
-// *InterruptedError naming the request, wrapping err where err is not that
-// already; otherwise err is returned as it is. With no request in hand,
-// nothing is classified.
-func (s *Store) report(request string, err error) error {
-	if request == "" || !s.durable(request) {
+// hand: when the request's transaction is durable, because found says its
+// intent was found on disk or because its intent or outcome is there, the
+// error is an *InterruptedError naming the request, wrapping err where err is
+// not that already; otherwise err is returned as it is. With no request in
+// hand, nothing is classified.
+func (s *Store) report(request string, found bool, err error) error {
+	if request == "" || !found && !s.durable(request) {
 		return err
 	}
 	var interrupted *InterruptedError

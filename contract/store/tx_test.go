@@ -1252,3 +1252,71 @@ func TestIntentWithoutOutcomeRoundTrip(t *testing.T) {
 		t.Errorf("read back %+v", back)
 	}
 }
+
+// The lock taken for a request whose transaction carries no outcome reports
+// it interrupted at every step of the recovery that completes it, those after
+// its intent is removed included, when nothing of the request is left on disk
+// to show it; and so when an intent after it stops the recovery.
+func TestLockForReportsATransactionWithoutOutcome(t *testing.T) {
+	interrupted := func(t *testing.T) *Store {
+		t.Helper()
+		s, _ := seeded(t)
+		w := lock(t, s)
+		tx := fullTx()
+		tx.Outcome = nil
+		faultAt(s, "create "+task2, 1)
+		if _, err := w.Commit(tx); !errors.Is(err, errCrash) {
+			t.Fatal(err)
+		}
+		w.Release()
+		s.fault = nil
+		return s
+	}
+	reportsReq9 := func(t *testing.T, err error) {
+		t.Helper()
+		var ie *InterruptedError
+		if !errors.As(err, &ie) || ie.RequestID != req9 {
+			t.Errorf("%s, whose transaction is durable, is not reported interrupted: %v", req9, err)
+		}
+	}
+	s := interrupted(t)
+	steps := trace(t, s, func() {
+		w, err := s.LockFor(req9)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Release()
+	})
+	removed := slices.Index(steps, "remove "+IntentPath("pool", req9))
+	if removed < 0 || removed == len(steps)-1 {
+		t.Fatalf("recovery steps %v remove no intent before their last step", steps)
+	}
+	for _, step := range steps {
+		t.Run(step, func(t *testing.T) {
+			s := interrupted(t)
+			hit := faultAt(s, step, 1)
+			_, err := s.LockFor(req9)
+			if !*hit || !errors.Is(err, errCrash) {
+				t.Fatalf("the interruption did not happen: hit %v, %v", *hit, err)
+			}
+			reportsReq9(t, err)
+		})
+	}
+
+	t.Run("an intent after it stops the recovery", func(t *testing.T) {
+		s := interrupted(t)
+		later := id("req", 10)
+		task6 := RecordPath("pool", "item", id("task", 6))
+		data, _ := s.encodeIntent(plan(t, s, Tx{RequestID: later, Records: []RecordWrite{{task6, []byte(`{"n":6}`), 0}}}))
+		write(t, s, IntentPath("pool", later), data)
+		write(t, s, task6, record(t, map[string]any{"n": int64(7)}, 1, "2026-10-11T08:00:00.000Z"))
+		_, err := s.LockFor(req9)
+		if !errors.Is(err, ErrRecordMalformed) {
+			t.Fatalf("the later intent did not stop the recovery: %v", err)
+		}
+		if _, statErr := os.Stat(s.abs(IntentPath("pool", req9))); !errNotExist(statErr) {
+			t.Fatal("the intent of the request was not completed first")
+		}
+		reportsReq9(t, err)
+	})
+}
