@@ -719,9 +719,7 @@ func TestUnavailable(t *testing.T) {
 	record(t, broken, "home.json", func() map[string]any { m := homeRecord(homeID); m["schema_version"] = "1.1"; return m }())
 	expect(t, h.invoke(t, broken, "echo", request(t, "echo", 1, nil)), envelope.Invalid, "unsupported_version")
 	record(t, broken, "home.json", homeRecord(homeID))
-	if err := os.Chmod(filepath.Join(broken, "home.json"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	grantOthers(t, filepath.Join(broken, "home.json"), 0o644)
 	expect(t, h.invoke(t, broken, "echo", request(t, "echo", 1, nil)), envelope.Unavailable, "record_malformed")
 
 	home := newHome(t)
@@ -836,7 +834,7 @@ func TestTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 	expect(t, resp, envelope.Ok, "")
-	if info, _ := os.Stat(respFile); info.Mode().Perm() != 0o600 {
+	if info, _ := os.Stat(respFile); !hasMode(info, respFile, 0o600) {
 		t.Errorf("response file mode %o", info.Mode().Perm())
 	}
 	if bytes.Count(written, []byte("\n")) != 1 || written[len(written)-1] != '\n' {
@@ -1345,5 +1343,27 @@ func TestStorelessExecutable(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	if code := word.Main([]string{"hive-word", "look", HomeOption, home}, bytes.NewReader(request(t, "look", 1, nil)), &stdout, &stderr); code != 1 || stdout.Len() != 0 {
 		t.Errorf("Main: exit %d, stdout %q", code, stdout.String())
+	}
+}
+
+// A program started under a Windows name acts as the command of that name
+// without its .exe suffix and without regard to case; elsewhere the base name
+// is the name.
+func TestCommandName(t *testing.T) {
+	for _, c := range []struct {
+		argv0   string
+		windows bool
+		want    string
+	}{
+		{"bin/hive-pool", false, "hive-pool"},
+		{"bin/hive-pool.exe", false, "hive-pool.exe"},
+		{"bin/Hive-Pool.EXE", false, "Hive-Pool.EXE"},
+		{"C:/Hive/hive-pool.exe", true, "hive-pool"},
+		{"C:/Hive/HIVE-Pool.EXE", true, "hive-pool"},
+		{"hive-pool", true, "hive-pool"},
+	} {
+		if got := commandName(c.argv0, c.windows); got != c.want {
+			t.Errorf("commandName(%q, %v) = %q, want %q", c.argv0, c.windows, got, c.want)
+		}
 	}
 }

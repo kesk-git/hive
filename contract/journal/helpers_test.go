@@ -15,6 +15,13 @@ import (
 	"github.com/kesk-git/hive/contract/store"
 )
 
+// dirMode and fileMode are the modes a test gives what it makes in a home by
+// hand, those the library gives on macOS and Linux.
+const (
+	dirMode  = 0o700
+	fileMode = 0o600
+)
+
 var epoch = time.Date(2026, 10, 11, 8, 0, 0, 0, time.UTC)
 
 // testHomeID is the home_id of testdata/home/home.json.
@@ -41,6 +48,7 @@ func newHome(t testing.TB, bare bool) string {
 	if err := os.Mkdir(dir, dirMode); err != nil {
 		t.Fatal(err)
 	}
+	secureHome(t, dir)
 	if bare {
 		return dir
 	}

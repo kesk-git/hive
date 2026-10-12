@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"syscall"
 	"time"
 
 	"github.com/kesk-git/hive/contract/clock"
@@ -52,8 +51,9 @@ func (w Waiting) pause(d time.Duration) {
 	w.Pause(d)
 }
 
-// Lock is a held transaction lock (spec/records.md, Locks): an advisory lock
-// on locks/<name>.lock, which the operating system releases when the process
+// Lock is a held transaction lock (spec/records.md, Locks): an operating-system
+// lock on the whole of locks/<name>.lock, flock on macOS and Linux and
+// LockFileEx on Windows, which the operating system releases when the process
 // ends. A crash therefore leaves nothing to clean, and a lock file left on
 // disk is never stale: the next command locks it afresh. The file is never
 // removed, because a lock on a removed file would guard nothing.
@@ -71,26 +71,25 @@ func Acquire(dir, name string, shared bool, w Waiting) (*Lock, error) {
 	if name != journalLock && !slices.Contains(storePackages, name) {
 		return nil, fmt.Errorf("store: %q is not a lock name", name)
 	}
-	locks := filepath.Join(dir, locksDir)
-	if err := os.MkdirAll(locks, dirMode); err != nil {
+	path, err := homePath(dir, locksDir+"/"+name+".lock")
+	if err != nil {
+		return nil, err
+	}
+	if err := MakeDir(filepath.Dir(path)); err != nil {
 		return nil, fmt.Errorf("store: %w", err)
 	}
-	f, err := os.OpenFile(filepath.Join(locks, name+".lock"), os.O_RDWR|os.O_CREATE, fileMode)
+	f, err := CreateFile(path, os.O_RDWR|os.O_CREATE)
 	if err != nil {
 		return nil, fmt.Errorf("store: %w", err)
-	}
-	how := syscall.LOCK_EX | syscall.LOCK_NB
-	if shared {
-		how = syscall.LOCK_SH | syscall.LOCK_NB
 	}
 	clk := w.clock()
 	deadline := clk.Now().Add(w.limit())
 	for {
-		err := syscall.Flock(int(f.Fd()), how)
+		err := tryLock(f, shared)
 		if err == nil {
 			return &Lock{f, name, shared}, nil
 		}
-		if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN {
+		if !lockBusy(err) {
 			f.Close()
 			return nil, fmt.Errorf("store: locking %s: %w", name, err)
 		}
@@ -115,6 +114,6 @@ func (l *Lock) Release() error {
 	}
 	f := l.f
 	l.f = nil
-	syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	unlock(f)
 	return f.Close()
 }

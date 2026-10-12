@@ -65,7 +65,9 @@ func cmpNumbers(a, b string) int {
 	return strings.Compare(a, b)
 }
 
-// ownerOnly is the access of every directory and file of a home.
+// dirMode and fileMode are the access of every directory and file of a home
+// on macOS and Linux. On Windows the access-control list of the home gives
+// the same access, and the modes mean nothing.
 const (
 	dirMode  = 0o700
 	fileMode = 0o600
@@ -83,11 +85,12 @@ type Home struct {
 	Unknown []string
 }
 
-// CheckHome checks the layout of the home at dir: it is a directory, it is
-// not inside a Git working tree, it and every known entry are open to their
-// owner only, every known entry is of the kind the table fixes, and home.json,
-// when present, is a valid home record. An entry the table does not name is
-// listed, not refused. A directory with nothing in it yet is a valid home.
+// CheckHome checks the layout of the home at dir: it is a directory, on
+// Windows on a local NTFS volume, it is not inside a Git working tree, it and
+// every known entry are open to their owner only, every known entry is of the
+// kind the table fixes, and home.json, when present, is a valid home record.
+// An entry the table does not name is listed, not refused. A directory with
+// nothing in it yet is a valid home.
 func CheckHome(dir string) (*Home, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -104,7 +107,10 @@ func CheckHome(dir string) (*Home, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("%w: %s is not a directory", ErrLayout, dir)
 	}
-	if err := ownerOnly(info, "the home"); err != nil {
+	if err := checkHomeDir(real); err != nil {
+		return nil, err
+	}
+	if err := ownerOnly(real, info, "the home"); err != nil {
 		return nil, err
 	}
 	if err := insideRepository(real); err != nil {
@@ -117,7 +123,11 @@ func CheckHome(dir string) (*Home, error) {
 	h := &Home{Dir: real}
 	for _, e := range entries {
 		name := e.Name()
-		info, err := os.Lstat(filepath.Join(real, name))
+		path, err := homePath(real, name)
+		if err != nil {
+			return nil, err
+		}
+		info, err := os.Lstat(path)
 		if err != nil {
 			return nil, fmt.Errorf("store: home: %w", err)
 		}
@@ -126,10 +136,10 @@ func CheckHome(dir string) (*Home, error) {
 			if !info.Mode().IsRegular() {
 				return nil, fmt.Errorf("%w: %s is not a regular file", ErrLayout, name)
 			}
-			if err := ownerOnly(info, name); err != nil {
+			if err := ownerOnly(path, info, name); err != nil {
 				return nil, err
 			}
-			id, err := readHomeRecord(filepath.Join(real, name))
+			id, err := readHomeRecord(path)
 			if err != nil {
 				return nil, err
 			}
@@ -138,7 +148,7 @@ func CheckHome(dir string) (*Home, error) {
 			if !info.IsDir() {
 				return nil, fmt.Errorf("%w: %s is not a directory", ErrLayout, name)
 			}
-			if err := ownerOnly(info, name); err != nil {
+			if err := ownerOnly(path, info, name); err != nil {
 				return nil, err
 			}
 		default:
@@ -149,20 +159,40 @@ func CheckHome(dir string) (*Home, error) {
 	return h, nil
 }
 
-// ownerOnly refuses an entry that grants access to anyone but its owner.
-func ownerOnly(info fs.FileInfo, what string) error {
-	if perm := info.Mode().Perm(); perm&0o077 != 0 {
-		return fmt.Errorf("%w: %s is open beyond its owner (mode %04o)", ErrLayout, what, perm)
+// Path is the absolute path of rel, a slash path below the home, once every
+// component of it that is there has been checked, from the home down: none
+// is a symbolic link, a Windows junction or any other reparse point
+// (spec/records.md, The home). The check ends below the last directory, where
+// nothing more is there to follow. Every path the library reads, writes,
+// creates, lists or removes in a home is resolved here first.
+func (h *Home) Path(rel string) (string, error) { return homePath(h.Dir, rel) }
+
+// homePath is Path for the home at dir.
+func homePath(dir, rel string) (string, error) {
+	p := dir
+	for _, seg := range strings.Split(rel, "/") {
+		p = filepath.Join(p, seg)
+		isDir, err := checkEntry(p)
+		if err != nil {
+			return "", err
+		}
+		if !isDir {
+			break
+		}
 	}
-	return nil
+	return filepath.Join(dir, filepath.FromSlash(rel)), nil
 }
 
 // insideRepository refuses a directory that is, or is under, a Git working
 // tree: one with a .git entry, a directory in a main working tree and a file
-// in a linked one.
+// in a linked one. The home's own .git is looked for through its Path.
 func insideRepository(dir string) error {
+	git, err := homePath(dir, ".git")
+	if err != nil {
+		return err
+	}
 	for p := dir; ; {
-		if _, err := os.Lstat(filepath.Join(p, ".git")); err == nil {
+		if _, err := os.Lstat(git); err == nil {
 			return fmt.Errorf("%w: %s is under %s", ErrInsideRepository, dir, p)
 		}
 		parent := filepath.Dir(p)
@@ -170,6 +200,7 @@ func insideRepository(dir string) error {
 			return nil
 		}
 		p = parent
+		git = filepath.Join(p, ".git")
 	}
 }
 
@@ -178,7 +209,7 @@ func insideRepository(dir string) error {
 // or guessed identity never stands in for it. A home record of a newer
 // version is refused as unsupported.
 func readHomeRecord(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("%w: %s: %v", ErrRecordMalformed, homeFile, err)
 	}

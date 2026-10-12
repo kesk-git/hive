@@ -1,0 +1,77 @@
+//go:build unix
+
+package store
+
+import (
+	"fmt"
+	"io/fs"
+	"os"
+)
+
+// ownerOnly refuses an entry that grants access to anyone but its owner: one
+// whose mode gives its group or others anything. what names the entry in the
+// error; path is where it is.
+func ownerOnly(path string, info fs.FileInfo, what string) error {
+	if perm := info.Mode().Perm(); perm&0o077 != 0 {
+		return fmt.Errorf("%w: %s is open beyond its owner (mode %04o)", ErrLayout, what, perm)
+	}
+	return nil
+}
+
+// SecureDir makes the directory at dir open to its owner only, mode 0700,
+// which is the access spec/records.md gives a home on macOS and Linux. Every
+// file and directory made in it is made with its own mode, 0600 and 0700.
+func SecureDir(dir string) error {
+	if err := os.Chmod(dir, dirMode); err != nil {
+		return fmt.Errorf("store: %w", err)
+	}
+	return nil
+}
+
+// OpenPrivate opens the file at path for writing, creating it when it is not
+// there, open to its owner only, mode 0600. The mode is set through the opened
+// file, never a second lookup of the name, before anything is written; a file
+// that was there keeps its own mode only until then.
+func OpenPrivate(path string) (*os.File, error) {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, fileMode)
+	if err != nil {
+		return nil, err
+	}
+	if err := f.Chmod(fileMode); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("store: %w", err)
+	}
+	return f, nil
+}
+
+// checkEntry refuses the entry at path, one component of a path in a home,
+// when it is a symbolic link, which a home never holds (spec/records.md, The
+// home), and reports whether it is a directory, below which the path goes on.
+// An entry that is not there is not a directory.
+func checkEntry(path string) (bool, error) {
+	info, err := os.Lstat(path)
+	if errNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("store: %w", err)
+	}
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return false, fmt.Errorf("%w: %s is a symbolic link, which a home does not hold", ErrLayout, path)
+	}
+	return info.IsDir(), nil
+}
+
+// MakeDir creates the directory at path in a home, and every directory above
+// it that is not there, mode 0700.
+func MakeDir(path string) error { return os.MkdirAll(path, dirMode) }
+
+// CreateFile creates the file at path in a home, or opens it when flag lets a
+// file that is there be opened, mode 0600. flag is os.O_CREATE with the
+// access, os.O_RDONLY, os.O_WRONLY or os.O_RDWR, and os.O_EXCL to refuse a
+// file that is there or os.O_TRUNC to empty it.
+func CreateFile(path string, flag int) (*os.File, error) { return os.OpenFile(path, flag, fileMode) }
+
+// checkHomeDir has nothing to refuse on macOS and Linux: the mode of the home
+// is all its access.
+func checkHomeDir(path string) error { return nil }

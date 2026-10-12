@@ -250,7 +250,7 @@ func (s *Store) complete(in *intent, recovering bool) error {
 // is removed only once it is.
 func (s *Store) put(request string, f *intentFile) error {
 	if f.skip {
-		return s.syncChain(f.rel)
+		return s.syncFound(f.rel)
 	}
 	return s.writeFile(f.rel, request, f.data)
 }
@@ -345,7 +345,11 @@ func (s *Store) report(request string, err error) error {
 // established, and that is what the caller is told.
 func (s *Store) durable(request string) bool {
 	for _, rel := range []string{IntentPath(s.pkg, request), OutcomePath(s.pkg, request)} {
-		if _, err := os.Lstat(s.abs(rel)); !errNotExist(err) {
+		full, err := s.Path(rel)
+		if err != nil {
+			return true
+		}
+		if _, err := os.Lstat(full); !errNotExist(err) {
 			return true
 		}
 	}
@@ -358,7 +362,7 @@ func (s *Store) rollForward(rel string) error {
 	if err != nil {
 		return err
 	}
-	if err := s.syncChain(rel); err != nil {
+	if err := s.syncFound(rel); err != nil {
 		return err
 	}
 	if err := s.classify(rel, in); err != nil {
@@ -370,7 +374,10 @@ func (s *Store) rollForward(rel string) error {
 // syncTx flushes the store's tx/ directory, when it is there, so that an
 // intent a crash removed stays removed before any later write is admitted.
 func (s *Store) syncTx() error {
-	dir := filepath.Join(s.dir, txDir)
+	dir, err := s.Path(s.pkg + "/" + txDir)
+	if err != nil {
+		return err
+	}
 	if err := s.step("syncdir " + s.relDir(dir)); err != nil {
 		return err
 	}
@@ -382,13 +389,24 @@ func (s *Store) syncTx() error {
 
 // intents lists the names of the intents in the store, in name order.
 func (s *Store) intents() ([]string, error) {
-	entries, err := os.ReadDir(filepath.Join(s.dir, txDir))
+	dir, err := s.Path(s.pkg + "/" + txDir)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
 	if err != nil && !errNotExist(err) {
 		return nil, fmt.Errorf("store: %w", err)
 	}
 	var names []string
 	for _, e := range entries {
-		if e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".json") {
+		if !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		rel := s.pkg + "/" + txDir + "/" + e.Name()
+		if _, err := s.Path(rel); err != nil {
+			return nil, fmt.Errorf("%w: intent %s: %v", ErrRecordMalformed, rel, err)
+		}
+		if e.Type().IsRegular() {
 			names = append(names, e.Name())
 		}
 	}

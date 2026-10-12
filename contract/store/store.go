@@ -76,8 +76,12 @@ func Open(dir, pkg string, opts Options) (*Store, error) {
 	if s.clock == nil {
 		s.clock = clock.System{}
 	}
-	for _, d := range []string{s.dir, filepath.Join(h.Dir, locksDir)} {
-		if err := os.MkdirAll(d, dirMode); err != nil {
+	for _, rel := range []string{pkg, locksDir} {
+		d, err := h.Path(rel)
+		if err != nil {
+			return nil, err
+		}
+		if err := MakeDir(d); err != nil {
 			return nil, fmt.Errorf("store: %w", err)
 		}
 	}
@@ -262,7 +266,11 @@ func (s *Store) expectRevision(rel string, expected int64) error {
 
 // expectAbsent checks that no file is at rel.
 func (s *Store) expectAbsent(rel string) error {
-	_, err := os.Lstat(s.abs(rel))
+	full, err := s.Path(rel)
+	if err != nil {
+		return err
+	}
+	_, err = os.Lstat(full)
 	switch {
 	case err == nil:
 		return fmt.Errorf("%w: %s", ErrAlreadyExists, rel)

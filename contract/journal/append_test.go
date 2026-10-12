@@ -79,7 +79,7 @@ func TestAppendSequence(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if info.Mode().Perm()&0o077 != 0 {
+		if !isOwnerOnly(info, p) {
 			t.Errorf("%s is open beyond its owner: %v", p, info.Mode())
 		}
 	}
@@ -185,25 +185,6 @@ func TestRecoverAppendsOnce(t *testing.T) {
 	}
 	if seqs := sequences(t, segmentBytes(t, home, SegmentName(7))); !slices.Equal(seqs, []int64{7}) {
 		t.Errorf("the last segment holds %v", seqs)
-	}
-}
-
-// closeSegments makes the segments but the newest unreadable, as a segment
-// the journal must not read, and skips the test where the file system does
-// not enforce it.
-func closeSegments(t *testing.T, home string) {
-	t.Helper()
-	files := segmentFiles(t, home)
-	for _, name := range files[:len(files)-1] {
-		path := filepath.Join(home, journalDir, name)
-		if err := os.Chmod(path, 0); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { os.Chmod(path, fileMode) })
-		if f, err := os.Open(path); err == nil {
-			f.Close()
-			t.Skip("the file system does not keep the owner from reading a file with no access")
-		}
 	}
 }
 
