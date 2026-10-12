@@ -3,6 +3,7 @@
 package exec
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -271,5 +272,33 @@ func TestAGroupLetGoIsNeverSignaledAgain(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	if !alive(other.ID) {
 		t.Error("the group of a run let go was signaled")
+	}
+}
+
+// A terminal program that reads nothing does not hold Stop behind the
+// interrupt: the holder's input fills the terminal and its write blocks, so
+// the interrupt cannot be written, and Stop still goes on to the request and
+// the end once the interrupt's grace is over.
+func TestAnInterruptThatCannotBeWrittenDoesNotHoldStop(t *testing.T) {
+	fakeDir(t, "fakeprog")
+	run := fake(t, Spec{Start: TerminalStart}, "holdterm")
+	readUntil(t, run.Terminal(), "ready")
+	go run.Terminal().Write(bytes.Repeat([]byte("input the program never reads\n"), 1<<17))
+	time.Sleep(200 * time.Millisecond)
+	stopped := make(chan error, 1)
+	go func() {
+		res, err := run.Stop(Grace{Interrupt: 100 * time.Millisecond, Request: 100 * time.Millisecond}, nil)
+		if err == nil && res.Outcome == "" {
+			err = fmt.Errorf("Stop returned no result")
+		}
+		stopped <- err
+	}()
+	select {
+	case err := <-stopped:
+		if err != nil {
+			t.Error(err)
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("Stop is held behind an interrupt that cannot be written")
 	}
 }

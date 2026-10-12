@@ -139,6 +139,9 @@ type winConsole struct {
 	in  *os.File // writing end of the input pipe
 	out *os.File // reading end of the output pipe
 
+	// hpcMu keeps the pseudoconsole from being closed while it is resized.
+	hpcMu sync.Mutex
+
 	mu      sync.Mutex
 	cond    *sync.Cond
 	pending []byte
@@ -203,7 +206,16 @@ func (c *winConsole) Read(b []byte) (int, error) {
 
 func (c *winConsole) Write(b []byte) (int, error) { return c.in.Write(b) }
 
+// Resize resizes the pseudoconsole, and is refused once closing has begun.
 func (c *winConsole) Resize(w Window) error {
+	c.hpcMu.Lock()
+	defer c.hpcMu.Unlock()
+	c.mu.Lock()
+	shut := c.shut
+	c.mu.Unlock()
+	if shut {
+		return errors.New("exec: the terminal is closed")
+	}
 	r, _, _ := procResizePseudoConsole.Call(uintptr(c.hpc), coord(w))
 	if r != 0 {
 		return fmt.Errorf("exec: ResizePseudoConsole: HRESULT %#x", uint32(r))
@@ -219,7 +231,9 @@ func (c *winConsole) closeConsole() error {
 		c.shut = true
 		c.cond.Broadcast()
 		c.mu.Unlock()
+		c.hpcMu.Lock()
 		procClosePseudoConsole.Call(uintptr(c.hpc))
+		c.hpcMu.Unlock()
 	})
 	return c.closed
 }

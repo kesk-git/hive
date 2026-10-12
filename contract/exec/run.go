@@ -175,7 +175,10 @@ const pollEvery = 10 * time.Millisecond
 // and the end, which ends the whole tree. A step is not taken once the tree
 // is gone, which on macOS and Linux is once the run's own process has ended.
 // Stop then lets the run go: on macOS and Linux one last SIGKILL to the
-// group ends what is left of it.
+// group ends what is left of it. The interrupt is written while its grace
+// runs, so that a terminal whose input is full, as when its program reads
+// nothing, does not hold Stop: the request follows once the grace is over,
+// whether or not the interrupt could be written.
 //
 // Before it ends the tree, Stop calls ending, which records that Hive is
 // ending it, so that the result is read from that record and never inferred
@@ -193,7 +196,7 @@ func (r *Run) Stop(g Grace, ending func() error) (Result, error) {
 	defer r.stopMu.Unlock()
 	gone := r.gone()
 	if !gone && r.term != nil {
-		_ = r.tree.interrupt()
+		go r.tree.interrupt()
 		gone = r.goneWithin(g.Interrupt)
 	}
 	if !gone {
