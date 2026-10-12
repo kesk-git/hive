@@ -54,7 +54,7 @@ A declaration lists, for each command, the operations the design names. Every co
 | `spawning-pool` | none | It receives the identities it binds in each request. |
 | `word` | `pool` | `word` uses `pool` for persistence. |
 | `dispatch` | `pool`, `spawning-pool`, `word` | The dispatcher reads accepted admission and specification revisions and acquires an isolated worktree. It calls `word`, from stage 4, for the one Mind's word that asks which secret store a host uses. The graph stays acyclic: `word` calls only `pool`. |
-| `synapse` | `word`, `dispatch` | Assimilation refuses an unresolved Mind's word hold. Synapse calls `dispatch`, from stage 5, for the lookup of its publisher's Spoor at each use, a reference and never a value. |
+| `synapse` | `word`, `dispatch` | Assimilation refuses an unresolved Mind's word hold. Synapse calls `dispatch`, from stage 5, for the dispatch matrix's gate entry, which the policy resolver reads at the launch of every fix round's fixer. It looks up no Spoor: its publisher runs `gh` under the operator's own login, and the lookup of a publication identity's Spoor, a reference and never a value, enters only if the Hive Mind later asks for one. |
 | `shadow` | `pool`, `dispatch`, `synapse`, `word` | The Shadow reads schedule records, dated holds, rule expiries and the attributed Synapse run. |
 | `ui` | `pool`, `dispatch`, `shadow`, `synapse`, `word` | The UI reads scoped projections, sends answers to `word` and submits session input and policy requests to `dispatch`. |
 

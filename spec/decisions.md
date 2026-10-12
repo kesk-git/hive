@@ -219,12 +219,18 @@ These are not decided here, deliberately. Each is cheap to add later and would b
 | The Pool's own records and the layout inside `pool/` | Stage 2; settled in [pool.md](pool.md), with that stage's own decisions listed there |
 | Where the Spawning Pool keeps its worktrees on disk, in Hive's root or the platform's own place for an application's caches and never in a folder of the operator's own, and its lease record | Stage 3 |
 | A streamed form of response | Stage 4 |
+| The record name and the schema of the dispatch matrix, the one plain-JSON record of `dispatch` in the home that the design's [Eight dispatch classes](../docs/design.md#eight-dispatch-classes) states, with its gate entry | Stage 4, whose definition names it |
+| The schema of the schedule record | Stage 4, as a minor change |
+| The Shadow's cadence record, a configuration record of `shadow` seeded with the design's table | Stage 4 |
+| The read-only operation of `dispatch` by which the Hive Mind watches an agent's terminal, and the form of the local channel to a session host | Stage 4, whose definition names the operation |
+| The receipt a red scheduled run of a project's main writes on that project, and the receipts that hold each test's measured time, last result and re-runs | Stage 4 for the first, with the schedule record; stage 5 for the others, with the schema of the test contract |
 | The record and transport of a pending approval in the session, which the design shows in the dock and notifies like a decision, and how a reader is told of a new message | Stage 4 |
 | The minimum version of each of the five, by probe | The stage that first runs each |
 | The version each named exception of [the toolchain](distribution.md#the-toolchain) is pinned to | Stage 4 for go-keyring, stage 6 for purego |
 | What each platform needs beside `hive-ui` for the app's icon, menus and notifications, but for Windows's notifications, which come from the app's own icon in the notification area and need nothing registered | Stage 6 |
 | How the app keeps a folder the Hive Mind named as Hive's root in place of the platform's own, and what each repair of its setup check runs on each platform | Stage 6, with the app |
-| Where instructions and skills sit in the artefact | The stage that first delivers one |
+| Where instructions and skills sit in the artefact, of which they are read-only parts that no session writes at run time | The stage that first delivers one |
+| The operations of `hive-ui` and their schemas | Stage 6, as a minor change |
 | Retention periods and segment sizes | The stage that owns each store, as configuration |
 | Which package declares the optional browser stack | The stage that first selects a browser task |
 | The adapter for a secret store a user chooses beyond the platform's own, under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section | When a user chooses one |

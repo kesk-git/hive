@@ -60,7 +60,7 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/generation"
     },
     "subject": {
-      "description": "What the rule governs, as a fixed key such as hunt-limit, model-default or delivery-posture. Two rules in force on one subject at one scope are a conflict unless one of them names the other in changes.",
+      "description": "What the rule governs, as a fixed key such as hunt-limit, model-default or assimilation.posture. Two rules in force on one subject at one scope are a conflict unless one of them names the other in changes.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z][a-z0-9-]{0,62}){0,3}$"
     },
