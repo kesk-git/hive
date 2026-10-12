@@ -8,7 +8,7 @@ LICENSE                              added by its own change, before any import
 NOTICE                               third-party notices, generated from imports/
 .gitattributes                       line feeds kept in every checkout, on every platform
 .claude/
-  settings.json                      repository configuration for Claude Code: one setting, includeCoAuthoredBy, keeps AI co-author trailers off
+  settings.json                      repository configuration for Claude Code: includeCoAuthoredBy and attribution.sessionUrl, both false, keep AI co-author and session trailers off
 go.mod                               the one module and the pinned Go release
 Makefile                             the test, check and build targets
 docs/
@@ -67,7 +67,7 @@ Of these, this definition creates `spec/`, the eight `hive-package.json` files a
 
     A path that fails the first or second question does not land: it moves to its owner in the private home, in the same lane. A line that fails the third is rewritten first. What never enters: notes, Imperatives, proof, captures, logs, scan results, progress or review records, transcripts and anyone's own words. Fixtures are written for the purpose and use invented identities. The same test governs the repositories of the projects Hive runs; a record already committed there moves out in one cleanup lane for that project, and git history keeps it, with nothing rewritten.
 12. **The same bytes in every checkout.** Every committed text file keeps its line feeds in a checkout on every platform, so that the schemas embedded into an executable and the fixtures a test reads are the same bytes on macOS, Windows and Linux; the repository's own attributes say so, and no checkout setting of a platform may translate them. No two committed paths differ only in case, and no committed name holds a character or a device name that one of the three platforms refuses, under the rules [records.md](records.md#encoding) states for a path.
-13. **No AI watermark.** No AI co-author or session trailer appears in a commit or a merge commit, and no generated-by line in a pull request, a comment or a file. The repository's `.claude/settings.json` keeps Claude Code's co-author trailer off.
+13. **No AI watermark.** No AI co-author or session trailer appears in a commit or a merge commit, and no generated-by line in a pull request, a comment or a file. The repository's `.claude/settings.json` keeps Claude Code's co-author trailer and session trailer off.
 
 ## File naming
 

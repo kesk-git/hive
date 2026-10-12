@@ -1,3 +1,6 @@
 {
-  "includeCoAuthoredBy": false
+  "includeCoAuthoredBy": false,
+  "attribution": {
+    "sessionUrl": false
+  }
 }
