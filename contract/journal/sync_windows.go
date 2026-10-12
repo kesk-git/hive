@@ -5,7 +5,6 @@ package journal
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 // syncSegment flushes a segment as it is, so that the lines in it, whoever
@@ -15,7 +14,11 @@ func (j *Journal) syncSegment(name string) error {
 	if err := j.step("sync " + name); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filepath.Join(j.dir, name), os.O_WRONLY, 0)
+	path, err := j.path(name)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err != nil {
 		return fmt.Errorf("journal: %w", err)
 	}

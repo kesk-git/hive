@@ -178,6 +178,12 @@ func temps(t testing.TB, dir string) []string {
 	return out
 }
 
+// abs is the absolute path of rel, a path relative to the home, unchecked, for
+// a test that looks at the disk or changes it by hand.
+func (s *Store) abs(rel string) string {
+	return filepath.Join(s.Dir, filepath.FromSlash(rel))
+}
+
 // write puts a file in a store by hand, as a crash or a stranger would leave
 // it, making the directories it needs.
 func write(t testing.TB, s *Store, rel string, data []byte) {

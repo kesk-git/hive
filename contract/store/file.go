@@ -29,11 +29,6 @@ const (
 // spec/records.md.
 const HomeFilePath = homeFile
 
-// abs returns the absolute path of rel, a path relative to the home.
-func (s *Store) abs(rel string) string {
-	return filepath.Join(s.Dir, filepath.FromSlash(rel))
-}
-
 // inner returns rel without the directory of the package, or rel itself for
 // home.json.
 func (s *Store) inner(rel string) string {
@@ -126,18 +121,24 @@ func (s *Store) step(name string) error {
 // When it returns, the file and every directory on its way down from the home
 // are durable.
 func (s *Store) writeFile(rel, requestID string, data []byte) error {
-	full := s.abs(rel)
-	tmpDirPath := filepath.Join(s.dir, tmpDir)
+	full, err := s.Path(rel)
+	if err != nil {
+		return err
+	}
+	tmp, err := s.Path(s.pkg + "/" + tmpDir + "/" + requestID + tempSuffix)
+	if err != nil {
+		return err
+	}
+	tmpDirPath := filepath.Dir(tmp)
 	for _, d := range []string{tmpDirPath, filepath.Dir(full)} {
-		if err := os.MkdirAll(d, dirMode); err != nil {
+		if err := MakeDir(d); err != nil {
 			return fmt.Errorf("store: %w", err)
 		}
 	}
-	tmp := filepath.Join(tmpDirPath, requestID+tempSuffix)
 	if err := s.step("create " + rel); err != nil {
 		return err
 	}
-	f, err := createTemp(tmp)
+	f, err := CreateFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
 		return fmt.Errorf("store: %w", err)
 	}
@@ -175,7 +176,11 @@ func (s *Store) writeFile(rel, requestID string, data []byte) error {
 // a crash may have left visible but not flushed, and then the directories
 // above it, as syncChain does.
 func (s *Store) syncFound(rel string) error {
-	if err := syncFile(s.abs(rel)); err != nil {
+	full, err := s.Path(rel)
+	if err != nil {
+		return err
+	}
+	if err := syncFile(full); err != nil {
 		return err
 	}
 	return s.syncChain(rel)
@@ -188,7 +193,11 @@ func (s *Store) syncChain(rel string) error {
 	if err := s.step("syncdir " + rel); err != nil {
 		return err
 	}
-	for dir := filepath.Dir(s.abs(rel)); ; dir = filepath.Dir(dir) {
+	full, err := s.Path(rel)
+	if err != nil {
+		return err
+	}
+	for dir := filepath.Dir(full); ; dir = filepath.Dir(dir) {
 		if err := syncDir(dir); err != nil {
 			return err
 		}
@@ -216,7 +225,10 @@ func (s *Store) removeFile(rel string) error {
 	if err := s.step("remove " + rel); err != nil {
 		return err
 	}
-	full := s.abs(rel)
+	full, err := s.Path(rel)
+	if err != nil {
+		return err
+	}
 	if err := os.Remove(full); err != nil && !errNotExist(err) {
 		return fmt.Errorf("store: %w", err)
 	}
@@ -227,7 +239,11 @@ func (s *Store) removeFile(rel string) error {
 // writer holding the lock calls it, so nothing in it is still being written.
 // Nothing outside tmp/ is ever removed for being a temporary file.
 func (s *Store) clearTmp() error {
-	dir := filepath.Join(s.dir, tmpDir)
+	rel := s.pkg + "/" + tmpDir
+	dir, err := s.Path(rel)
+	if err != nil {
+		return err
+	}
 	entries, err := os.ReadDir(dir)
 	if errNotExist(err) || err == nil && len(entries) == 0 {
 		return nil
@@ -236,7 +252,11 @@ func (s *Store) clearTmp() error {
 		return fmt.Errorf("store: emptying %s: %w", tmpDir, err)
 	}
 	for _, e := range entries {
-		if err := os.RemoveAll(filepath.Join(dir, e.Name())); err != nil {
+		p, err := s.Path(rel + "/" + e.Name())
+		if err != nil {
+			return err
+		}
+		if err := os.RemoveAll(p); err != nil {
 			return fmt.Errorf("store: emptying %s: %w", tmpDir, err)
 		}
 	}
@@ -247,7 +267,11 @@ func (s *Store) clearTmp() error {
 // UTF-8, no byte-order mark, one final line feed. A missing file is reported
 // with fs.ErrNotExist; any other fault is ErrRecordMalformed.
 func (s *Store) readFile(rel string) ([]byte, error) {
-	data, err := ReadFile(s.abs(rel))
+	full, err := s.Path(rel)
+	if err != nil {
+		return nil, err
+	}
+	data, err := ReadFile(full)
 	if err != nil {
 		if errNotExist(err) {
 			return nil, fmt.Errorf("store: %s: %w", rel, fs.ErrNotExist)

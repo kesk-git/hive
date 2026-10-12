@@ -92,13 +92,6 @@ func ReadFile(path string) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
-// createTemp creates the temporary file at tmp for writing and deleting,
-// truncating a file a failed attempt left under that name. Deleting is the
-// right a rename through the file's own handle needs.
-func createTemp(tmp string) (*os.File, error) {
-	return openHandle(tmp, syscall.GENERIC_WRITE|deleteAccess, shareAll, syscall.CREATE_ALWAYS, nil)
-}
-
 // publish renames the flushed temporary file f at tmp over the record at full
 // through f's own handle, with POSIX semantics and replacement, which replaces
 // the record while a reader holds the old one open, and then flushes f through

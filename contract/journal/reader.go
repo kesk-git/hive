@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 
 	"github.com/kesk-git/hive/contract/store"
@@ -181,7 +180,11 @@ func (r *Reader) load() (bool, error) {
 // byte range has been read a second time and found identical, and a range
 // that has changed is read again from the offset reached.
 func (r *Reader) read(closed bool) ([]byte, bool, error) {
-	f, err := store.OpenRead(filepath.Join(r.j.dir, r.seg.name))
+	path, err := r.j.path(r.seg.name)
+	if err != nil {
+		return nil, false, err
+	}
+	f, err := store.OpenRead(path)
 	if errNotExist(err) {
 		return nil, false, err
 	}

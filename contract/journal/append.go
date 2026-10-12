@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/kesk-git/hive/contract/canon"
@@ -241,7 +240,10 @@ func (j *Journal) repairLine(st *state, stamp, homeID, correlation string) (*lin
 func (j *Journal) present(st *state, events []store.Event) (map[string]bool, error) {
 	found := map[string]bool{}
 	for i := len(st.segs) - 1; i >= 0 && len(found) < len(events); i-- {
-		path := filepath.Join(j.dir, st.segs[i].name)
+		path, err := j.path(st.segs[i].name)
+		if err != nil {
+			return nil, err
+		}
 		data, err := store.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
@@ -298,13 +300,16 @@ func holds(data []byte, id string) bool {
 // segment that is not there yet is created; the directories that hold it are
 // flushed once, by the append, after its last line.
 func (j *Journal) writeLine(name string, off int64, data []byte, cut bool) error {
-	path := filepath.Join(j.dir, name)
-	f, err := os.OpenFile(path, os.O_RDWR, fileMode)
+	path, err := j.path(name)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_RDWR, 0)
 	if errNotExist(err) {
 		if off != 0 {
 			return fmt.Errorf("journal: %s is missing", name)
 		}
-		f, err = os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL, fileMode)
+		f, err = store.CreateFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL)
 	}
 	if err != nil {
 		return fmt.Errorf("journal: %w", err)

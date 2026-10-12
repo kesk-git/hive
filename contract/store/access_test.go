@@ -64,7 +64,9 @@ func TestOpenPrivate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 	if err := CheckOwnerOnly(path); err != nil {
 		t.Fatalf("a file opened private again: %v", err)
 	}
@@ -93,5 +95,28 @@ func TestReadFile(t *testing.T) {
 	}
 	if _, err := OpenRead(path + ".missing"); !errors.Is(err, fs.ErrNotExist) {
 		t.Errorf("OpenRead of a missing file: %v", err)
+	}
+}
+
+// A link inside a package's own directory is refused before anything is read,
+// written or removed through it, and what it leads to is left alone: here
+// tmp/, which a writer empties of what a crash left, leads out of the home.
+func TestLinkInAPackageIsRefused(t *testing.T) {
+	home := newHome(t)
+	s, _, _ := open(t, home, "pool")
+	outside := t.TempDir()
+	kept := filepath.Join(outside, "kept.txt")
+	if err := os.WriteFile(kept, []byte("kept\n"), fileMode); err != nil {
+		t.Fatal(err)
+	}
+	symlink(t, outside, filepath.Join(home, "pool", tmpDir))
+	if w, err := s.Lock(); !errors.Is(err, ErrLayout) {
+		if err == nil {
+			w.Release()
+		}
+		t.Fatalf("Lock through a linked tmp/: %v", err)
+	}
+	if _, err := os.Stat(kept); err != nil {
+		t.Errorf("what the link leads to was not left alone: %v", err)
 	}
 }

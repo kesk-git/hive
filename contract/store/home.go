@@ -155,6 +155,30 @@ func CheckHome(dir string) (*Home, error) {
 	return h, nil
 }
 
+// Path is the absolute path of rel, a slash path below the home, once every
+// component of it that is there has been checked, from the home down: none
+// is a symbolic link, a Windows junction or any other reparse point
+// (spec/records.md, The home). The check ends below the last directory, where
+// nothing more is there to follow. Every path the library reads, writes,
+// creates, lists or removes in a home is resolved here first.
+func (h *Home) Path(rel string) (string, error) { return homePath(h.Dir, rel) }
+
+// homePath is Path for the home at dir.
+func homePath(dir, rel string) (string, error) {
+	p := dir
+	for _, seg := range strings.Split(rel, "/") {
+		p = filepath.Join(p, seg)
+		isDir, err := checkEntry(p)
+		if err != nil {
+			return "", err
+		}
+		if !isDir {
+			break
+		}
+	}
+	return filepath.Join(dir, filepath.FromSlash(rel)), nil
+}
+
 // insideRepository refuses a directory that is, or is under, a Git working
 // tree: one with a .git entry, a directory in a main working tree and a file
 // in a linked one.

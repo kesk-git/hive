@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,14 +29,6 @@ const (
 	segmentPrefix = "events-"
 	segmentSuffix = ".jsonl"
 	segmentDigits = 20
-)
-
-// dirMode and fileMode are the access of every directory and file of a home
-// on macOS and Linux. On Windows the access-control list of the home gives
-// the same access, and the modes mean nothing.
-const (
-	dirMode  = 0o700
-	fileMode = 0o600
 )
 
 // The event envelope: its schema, the name every line carries and the newest
@@ -95,7 +86,6 @@ type Options struct {
 // Journal is the event journal of one home.
 type Journal struct {
 	*store.Home
-	dir         string
 	pkg         string
 	clock       clock.Clock
 	segmentSize int64
@@ -141,7 +131,6 @@ func Open(dir string, opts Options) (*Journal, error) {
 	}
 	j := &Journal{
 		Home:        h,
-		dir:         filepath.Join(h.Dir, journalDir),
 		pkg:         opts.Package,
 		clock:       opts.Clock,
 		segmentSize: opts.SegmentSize,
@@ -154,10 +143,23 @@ func Open(dir string, opts Options) (*Journal, error) {
 	if j.segmentSize <= 0 {
 		j.segmentSize = DefaultSegmentSize
 	}
-	if err := os.MkdirAll(j.dir, dirMode); err != nil {
+	jdir, err := j.path("")
+	if err != nil {
+		return nil, err
+	}
+	if err := store.MakeDir(jdir); err != nil {
 		return nil, fmt.Errorf("journal: %w", err)
 	}
 	return j, nil
+}
+
+// path is the path of name in the journal's directory, or of the directory
+// itself for "", resolved through the home's Path.
+func (j *Journal) path(name string) (string, error) {
+	if name == "" {
+		return j.Path(journalDir)
+	}
+	return j.Path(journalDir + "/" + name)
 }
 
 // Package is the package the journal was opened by, or "".
@@ -219,7 +221,11 @@ func parseSegment(name string) (int64, bool, error) {
 // segments lists the segments of the journal in order of their first
 // home_sequence. An entry that is not a segment is left alone.
 func (j *Journal) segments() ([]segment, error) {
-	entries, err := os.ReadDir(j.dir)
+	dir, err := j.path("")
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("journal: %w", err)
 	}
@@ -259,19 +265,23 @@ type tail struct {
 // errChanged reports that a file was cut while it was being read.
 var errChanged = errors.New("journal: the file changed while it was read")
 
-// readTail reads the end of the segment file at path, from the end back to
+// readTail reads the end of the segment named name, from the end back to
 // the start of its last complete line. The last line of the newest segment,
 // the one a writer changes, is returned only once its byte range has been read
 // a second time and found identical; a file cut or changed meanwhile is read
 // again.
-func (j *Journal) readTail(path string, newest bool) (*tail, error) {
+func (j *Journal) readTail(name string, newest bool) (*tail, error) {
+	path, err := j.path(name)
+	if err != nil {
+		return nil, err
+	}
 	f, err := store.OpenRead(path)
 	if err != nil {
 		return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
 	}
 	defer f.Close()
 	for {
-		t, err := j.scanTail(f, filepath.Base(path))
+		t, err := j.scanTail(f, name)
 		if errors.Is(err, errChanged) && newest {
 			continue
 		}
@@ -279,13 +289,13 @@ func (j *Journal) readTail(path string, newest bool) (*tail, error) {
 			return t, err
 		}
 		start := t.intact - int64(len(t.last)) - 1
-		if err := j.step("verify tail " + filepath.Base(path)); err != nil {
+		if err := j.step("verify tail " + name); err != nil {
 			return nil, err
 		}
 		again := make([]byte, len(t.last)+1)
 		n, err := f.ReadAt(again, start)
 		if err != nil && err != io.EOF {
-			return nil, fmt.Errorf("journal: reading %s: %w", filepath.Base(path), err)
+			return nil, fmt.Errorf("journal: reading %s: %w", name, err)
 		}
 		if n == len(again) && bytes.Equal(again[:len(t.last)], t.last) && again[len(t.last)] == '\n' {
 			return t, nil
@@ -367,7 +377,7 @@ func (j *Journal) state() (*state, error) {
 		return st, nil
 	}
 	st.cur = &segs[len(segs)-1]
-	st.tail, err = j.readTail(filepath.Join(j.dir, st.cur.name), true)
+	st.tail, err = j.readTail(st.cur.name, true)
 	if err != nil {
 		return nil, err
 	}
@@ -385,7 +395,7 @@ func (j *Journal) state() (*state, error) {
 	st.next = st.cur.first
 	if len(segs) >= 2 {
 		prev := segs[len(segs)-2]
-		t, err := j.readTail(filepath.Join(j.dir, prev.name), false)
+		t, err := j.readTail(prev.name, false)
 		if err != nil {
 			return nil, err
 		}
@@ -421,7 +431,11 @@ func errNotExist(err error) bool { return errors.Is(err, fs.ErrNotExist) }
 // every segment and journal/ itself are durable, whenever and by whomever they
 // were created.
 func (j *Journal) syncDirs() error {
-	if err := syncDir(j.dir); err != nil {
+	dir, err := j.path("")
+	if err != nil {
+		return err
+	}
+	if err := syncDir(dir); err != nil {
 		return err
 	}
 	return syncDir(j.Home.Dir)

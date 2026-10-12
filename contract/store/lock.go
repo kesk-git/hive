@@ -71,11 +71,14 @@ func Acquire(dir, name string, shared bool, w Waiting) (*Lock, error) {
 	if name != journalLock && !slices.Contains(storePackages, name) {
 		return nil, fmt.Errorf("store: %q is not a lock name", name)
 	}
-	locks := filepath.Join(dir, locksDir)
-	if err := os.MkdirAll(locks, dirMode); err != nil {
+	path, err := homePath(dir, locksDir+"/"+name+".lock")
+	if err != nil {
+		return nil, err
+	}
+	if err := MakeDir(filepath.Dir(path)); err != nil {
 		return nil, fmt.Errorf("store: %w", err)
 	}
-	f, err := os.OpenFile(filepath.Join(locks, name+".lock"), os.O_RDWR|os.O_CREATE, fileMode)
+	f, err := CreateFile(path, os.O_RDWR|os.O_CREATE)
 	if err != nil {
 		return nil, fmt.Errorf("store: %w", err)
 	}

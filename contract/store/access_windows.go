@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"syscall"
 	"unsafe"
 )
@@ -80,15 +81,27 @@ func userSID() (*syscall.SID, error) {
 	return user.User.Sid, nil
 }
 
-// private is the security descriptor of an entry open to the user alone:
-// owned by the user, with a protected access-control list that allows the
-// user's own security identifier every right, and for a directory lets the
-// files and directories made in it inherit that.
-type private struct {
+// The security descriptors Hive gives what it makes, in the descriptor
+// language, %[1]s standing for the user's own security identifier. Each is
+// owned by the user Hive runs as. An entry made in a home has no
+// access-control list of its own, so it carries only the owner-only list it
+// inherits from the home; a private directory, the home itself, and a private
+// file, the response file, have a protected list that allows the user alone,
+// the directory's inheritable by every file and directory made in it
+// (spec/records.md, The home).
+const (
+	sddlEntry       = "O:%[1]s"
+	sddlPrivateDir  = "O:%[1]sD:P(A;OICI;FA;;;%[1]s)"
+	sddlPrivateFile = "O:%[1]sD:P(A;;FA;;;%[1]s)"
+)
+
+// descriptor is one of the security descriptors above, with its owner and
+// its access-control list, which is nil for an entry's.
+type descriptor struct {
 	descriptor, owner, dacl unsafe.Pointer
 }
 
-func newPrivate(dir bool) (*private, error) {
+func newDescriptor(form string) (*descriptor, error) {
 	user, err := userSID()
 	if err != nil {
 		return nil, err
@@ -97,15 +110,11 @@ func newPrivate(dir bool) (*private, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: %w", err)
 	}
-	inherit := ""
-	if dir {
-		inherit = "OICI"
-	}
-	sddl, err := syscall.UTF16PtrFromString("O:" + sid + "D:P(A;" + inherit + ";FA;;;" + sid + ")")
+	sddl, err := syscall.UTF16PtrFromString(fmt.Sprintf(form, sid))
 	if err != nil {
 		return nil, fmt.Errorf("store: %w", err)
 	}
-	p := &private{}
+	p := &descriptor{}
 	if r, _, err := procConvertStringSecurityDescr.Call(uintptr(unsafe.Pointer(sddl)), sddlRevision1, uintptr(unsafe.Pointer(&p.descriptor)), 0); r == 0 {
 		return nil, fmt.Errorf("store: building the security descriptor: %w", err)
 	}
@@ -121,11 +130,11 @@ func newPrivate(dir bool) (*private, error) {
 	return p, nil
 }
 
-func (p *private) free() { syscall.LocalFree(syscall.Handle(uintptr(p.descriptor))) }
+func (p *descriptor) free() { syscall.LocalFree(syscall.Handle(uintptr(p.descriptor))) }
 
 // attributes are the security attributes that create a file or directory
 // with the descriptor already applied.
-func (p *private) attributes() *syscall.SecurityAttributes {
+func (p *descriptor) attributes() *syscall.SecurityAttributes {
 	return &syscall.SecurityAttributes{Length: uint32(unsafe.Sizeof(syscall.SecurityAttributes{})), SecurityDescriptor: uintptr(p.descriptor)}
 }
 
@@ -152,16 +161,8 @@ type access struct {
 // the files and directories made in it. what names the entry in the error;
 // path is where it is.
 func ownerOnly(path string, info fs.FileInfo, what string) error {
-	name, err := syscall.UTF16PtrFromString(extendedPath(path))
-	if err != nil {
-		return fmt.Errorf("store: %w", err)
-	}
-	attrs, err := syscall.GetFileAttributes(name)
-	if err != nil {
-		return fmt.Errorf("store: reading the attributes of %s: %w", what, err)
-	}
-	if attrs&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
-		return fmt.Errorf("%w: %s is a reparse point, which a home does not hold", ErrLayout, what)
+	if _, err := attributes(path, what); err != nil {
+		return err
 	}
 	user, err := userSID()
 	if err != nil {
@@ -187,6 +188,112 @@ func ownerOnly(path string, info fs.FileInfo, what string) error {
 		}
 	}
 	return nil
+}
+
+// attributes reads the attributes of the entry at path itself, never of what a
+// reparse point there leads to, and refuses, as ErrLayout, a reparse point:
+// a symbolic link, a junction or any other, which a home never holds
+// (spec/records.md, The home). what names the entry in the error.
+func attributes(path, what string) (uint32, error) {
+	name, err := syscall.UTF16PtrFromString(extendedPath(path))
+	if err != nil {
+		return 0, fmt.Errorf("store: %w", err)
+	}
+	attrs, err := syscall.GetFileAttributes(name)
+	if err != nil {
+		return 0, fmt.Errorf("store: reading the attributes of %s: %w", what, err)
+	}
+	if attrs&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		return 0, fmt.Errorf("%w: %s is a reparse point, which a home does not hold", ErrLayout, what)
+	}
+	return attrs, nil
+}
+
+// checkEntry refuses the entry at path, one component of a path in a home,
+// when it is a reparse point, and reports whether it is a directory, below
+// which the path goes on. An entry that is not there is not a directory.
+func checkEntry(path string) (bool, error) {
+	attrs, err := attributes(path, path)
+	if errNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return attrs&syscall.FILE_ATTRIBUTE_DIRECTORY != 0, nil
+}
+
+// MakeDir creates the directory at path in a home, and every directory above
+// it that is not there, each owned by the user Hive runs as and carrying only
+// the owner-only access it inherits from the home.
+func MakeDir(path string) error {
+	var missing []string
+	for p := path; ; {
+		info, err := os.Stat(p)
+		if err == nil {
+			if !info.IsDir() {
+				return &os.PathError{Op: "mkdir", Path: p, Err: syscall.ENOTDIR}
+			}
+			break
+		}
+		if !errNotExist(err) {
+			return err
+		}
+		missing = append(missing, p)
+		parent := filepath.Dir(p)
+		if parent == p {
+			break
+		}
+		p = parent
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	d, err := newDescriptor(sddlEntry)
+	if err != nil {
+		return err
+	}
+	defer d.free()
+	for i := len(missing) - 1; i >= 0; i-- {
+		name, err := syscall.UTF16PtrFromString(extendedPath(missing[i]))
+		if err != nil {
+			return &os.PathError{Op: "mkdir", Path: missing[i], Err: err}
+		}
+		if err := syscall.CreateDirectory(name, d.attributes()); err != nil && err != syscall.ERROR_ALREADY_EXISTS {
+			return &os.PathError{Op: "mkdir", Path: missing[i], Err: err}
+		}
+	}
+	return nil
+}
+
+// CreateFile creates the file at path in a home, or opens it when flag lets a
+// file that is there be opened, owned by the user Hive runs as and carrying
+// only the owner-only access it inherits from the home. flag is os.O_CREATE
+// with the access, os.O_RDONLY, os.O_WRONLY or os.O_RDWR, and os.O_EXCL to
+// refuse a file that is there or os.O_TRUNC to empty it. The handle shares
+// the file with every other handle and may also delete it, which a rename
+// through it needs.
+func CreateFile(path string, flag int) (*os.File, error) {
+	access := uint32(syscall.GENERIC_READ)
+	switch flag & (os.O_WRONLY | os.O_RDWR) {
+	case os.O_WRONLY:
+		access = syscall.GENERIC_WRITE
+	case os.O_RDWR:
+		access = syscall.GENERIC_READ | syscall.GENERIC_WRITE
+	}
+	create := uint32(syscall.OPEN_ALWAYS)
+	switch {
+	case flag&os.O_EXCL != 0:
+		create = syscall.CREATE_NEW
+	case flag&os.O_TRUNC != 0:
+		create = syscall.CREATE_ALWAYS
+	}
+	d, err := newDescriptor(sddlEntry)
+	if err != nil {
+		return nil, err
+	}
+	defer d.free()
+	return openHandle(path, access|deleteAccess, shareAll, create, d.attributes())
 }
 
 // checkHomeDir refuses a home directory that spec/records.md does not allow
@@ -322,7 +429,7 @@ func readAccess(path string) (*access, error) {
 // user's own security identifier alone, inheritable by every file and
 // directory made in it.
 func SecureDir(dir string) error {
-	p, err := newPrivate(true)
+	p, err := newDescriptor(sddlPrivateDir)
 	if err != nil {
 		return err
 	}
@@ -348,7 +455,7 @@ func SecureDir(dir string) error {
 // sharing: a file another handle has open for reading, writing or deleting is
 // refused, and none can be opened while it is held.
 func OpenPrivate(path string) (*os.File, error) {
-	p, err := newPrivate(false)
+	p, err := newDescriptor(sddlPrivateFile)
 	if err != nil {
 		return nil, err
 	}

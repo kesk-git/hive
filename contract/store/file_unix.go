@@ -15,12 +15,6 @@ func OpenRead(path string) (*os.File, error) { return os.Open(path) }
 // ReadFile reads the whole file at path, as OpenRead opens it.
 func ReadFile(path string) ([]byte, error) { return os.ReadFile(path) }
 
-// createTemp creates the temporary file at tmp for writing, truncating a file
-// a failed attempt left under that name.
-func createTemp(tmp string) (*os.File, error) {
-	return os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, fileMode)
-}
-
 // publish closes the flushed temporary file f at tmp and renames it over the
 // record at full, which is the file system's own atomic rename. A write that
 // fails removes the temporary file; an interruption at the step leaves it for

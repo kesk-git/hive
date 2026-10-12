@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"path/filepath"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
@@ -106,12 +105,16 @@ func checkScope(home *store.Home, s envelope.Scope) error {
 // for a record that is not there.
 func readRegistry(home *store.Home, kind registryKind, id string) (map[string]any, error) {
 	rel := registryDir + "/" + kind.dir + "/" + id + ".json"
-	data, err := store.ReadFile(filepath.Join(home.Dir, filepath.FromSlash(rel)))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
 	malformed := func(what string) error {
 		return envelope.Common(envelope.CodeRecordMalformed, fmt.Sprintf("the registry record %s is malformed: %s", rel, what))
+	}
+	path, err := home.Path(rel)
+	if err != nil {
+		return nil, malformed(err.Error())
+	}
+	data, err := store.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
 	}
 	if err != nil {
 		return nil, malformed(err.Error())
