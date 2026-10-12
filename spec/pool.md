@@ -285,7 +285,7 @@ The legacy Markdown backlog is an import and export format, not a second queue. 
 | --- | --- | --- |
 | `dispatch`, stage 4 | The item it dispatches, its admission in state `admitted` and the accepted specification revision; the Imperative by `render` | `read` with kinds `item`, `admission`, `specification`; `hive-imperative render` |
 | `spawning-pool`, stage 3 | Nothing by call: the dispatcher passes `task_id`, `generation` and the requested place in each request | |
-| `shadow` | Active holds with an `until`, rules with an expiry time, each due at or before an instant | `read` with `due_before` |
+| `shadow` | Active holds with an `until`, rules with an expiry time, each due at or before an instant; from stage 4, for a Hunt's progress, which the design's [Progress in real time](../docs/design.md#progress-in-real-time) states, a Hunt with no generation and the items beneath a Target or a Prey, with their state, derived `landed` fact, closing time, edges and active holds, a `word` hold's question and answer being read from `word` | `read` with `due_before`; `read` by query |
 | `ui` | Items with their derived facts, holds, rules in force and recently expired, projections | `read` by query |
 
 ## Receipts and events
