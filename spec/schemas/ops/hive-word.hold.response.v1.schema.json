@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.hold.response:v1",
+  "title": "hive-word hold: response body",
+  "description": "Every identity the question was given, and the records hive-pool hold-question wrote.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "decision_round_id",
+    "card_id",
+    "hold_id",
+    "question",
+    "round",
+    "hold",
+    "item"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "decision_round_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/decision_round_id"
+    },
+    "card_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/card_id"
+    },
+    "hold_id": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
+    },
+    "question": {
+      "$ref": "urn:hive:schema:records:pool.question:v1"
+    },
+    "round": {
+      "$ref": "urn:hive:schema:records:pool.decision-round:v1"
+    },
+    "hold": {
+      "$ref": "urn:hive:schema:records:pool.hold:v1"
+    },
+    "item": {
+      "$ref": "urn:hive:schema:records:pool.item:v1"
+    }
+  }
+}

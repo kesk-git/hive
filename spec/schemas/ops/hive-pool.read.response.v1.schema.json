@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-pool.read.response:v1",
   "title": "hive-pool read: response body",
-  "description": "A projection: the records read, whole, with the home, the time and the journal cursor they were read at. For items, the derived blocked, held, ready and landed facts come beside each item and are never stored.",
+  "description": "A projection: the records read, whole, with the home, the time and the journal cursor they were read at. For items, the derived blocked, held, ready and landed facts come beside each item and are never stored. For kind request-outcome, the one recorded outcome, as the Pool's replay keeps it.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -23,7 +23,10 @@
         "specification",
         "rule",
         "projection",
-        "migration"
+        "migration",
+        "question",
+        "decision-round",
+        "request-outcome"
       ]
     },
     "records": {
@@ -54,6 +57,15 @@
           },
           {
             "$ref": "urn:hive:schema:records:pool.migration:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.question:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.decision-round:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:request-outcome:v1"
           }
         ]
       }

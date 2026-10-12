@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.close.request:v1",
+  "title": "hive-word close: request body",
+  "description": "Closes an open or deferred question that has become moot, by evidence and never as an answer: the held work and everything beneath it archived, or the question asked again as another question that holds the same item. word persists it through hive-pool close-question, as one handoff, passing on the envelope's expected_revisions. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "reason",
+    "evidence"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "reason": {
+      "description": "Why the question is moot, in the owner's words.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/moot_evidence"
+      }
+    }
+  }
+}

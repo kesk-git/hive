@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.answer-question.response:v1",
+  "title": "hive-pool answer-question: response body",
+  "description": "The answer recorded, with what recording it did, and the question, round and hold as they stand after it. The hold is still active: an answer never releases it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question",
+    "round",
+    "hold",
+    "answer_sequence",
+    "disposition",
+    "duplicate"
+  ],
+  "properties": {
+    "question": {
+      "$ref": "urn:hive:schema:records:pool.question:v1"
+    },
+    "round": {
+      "$ref": "urn:hive:schema:records:pool.decision-round:v1"
+    },
+    "hold": {
+      "$ref": "urn:hive:schema:records:pool.hold:v1"
+    },
+    "answer_sequence": {
+      "description": "The answer recorded, or for a duplicate the answer first recorded with the same source.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "disposition": {
+      "enum": [
+        "accepted",
+        "deferred",
+        "unreconciled"
+      ]
+    },
+    "duplicate": {
+      "description": "True when an answer to this question with the same source was already recorded: nothing was written and the receipts are the original ones.",
+      "type": "boolean"
+    }
+  }
+}

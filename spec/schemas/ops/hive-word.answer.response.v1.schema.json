@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.answer.response:v1",
+  "title": "hive-word answer: response body",
+  "description": "Present with ok: the answer was accepted, its disposition now the owner's, or a Later was applied as a deferral. An answer recorded unreconciled returns held, with no body, the hold in error.hold, code word.question_changed and the pool.answer.unreconciled receipt in receipts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question",
+    "round",
+    "hold",
+    "answer_sequence",
+    "disposition",
+    "duplicate"
+  ],
+  "properties": {
+    "question": {
+      "$ref": "urn:hive:schema:records:pool.question:v1"
+    },
+    "round": {
+      "$ref": "urn:hive:schema:records:pool.decision-round:v1"
+    },
+    "hold": {
+      "$ref": "urn:hive:schema:records:pool.hold:v1"
+    },
+    "answer_sequence": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "disposition": {
+      "enum": [
+        "accepted",
+        "deferred"
+      ]
+    },
+    "duplicate": {
+      "type": "boolean"
+    }
+  }
+}

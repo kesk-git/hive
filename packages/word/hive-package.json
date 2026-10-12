@@ -4,17 +4,20 @@
   "name": "word",
   "kind": "package",
   "title": "Mind's word",
-  "owns": "The single decision intake: held questions, exact answers and completion receipts. It keeps no store of its own and persists through the Pool.",
+  "owns": "The single decision intake: held questions, exact answers with the source each rests on, their dispositions and the close of a moot question. It keeps no store of its own and persists through the Pool: it mints the question, decision-round and card identities, checks who brings each request and the evidence a review submission rests on, and makes exactly one hive-pool request per mutating operation, as a handoff under its own request identity, so its replay is the Pool's. It writes no record, receipt or event itself.",
   "plan_stage": 2,
   "executable": "hive-word",
   "commands": [
     {
       "name": "hive-word",
-      "purpose": "Holds, exact answers, completion and verification of the Mind's word.",
+      "purpose": "Holds, revisions, exact answers, their release or completion, the close of a moot question, and verification of the Mind's word.",
       "operations": [
         "hold",
+        "revise",
         "answer",
+        "release",
         "complete",
+        "close",
         "verify"
       ]
     }
@@ -25,7 +28,7 @@
   ],
   "receipt_kinds": [],
   "test_target": "test-word",
-  "test_scope": "Complete rounds, authorized answers, deduplication and unresolved holds.",
+  "test_scope": "Complete rounds, authorized answers, deduplication and unresolved holds. From stage 2: one handoff per operation, replayed by the digest of the original request before any check and racing retries given one outcome; a worker refused; a review submission checked against its round file; an unreconciled answer returned held; verification that reads the record and never the reference, an authority standing only on the answer applied at the revision it names.",
   "calls": [
     "pool"
   ],

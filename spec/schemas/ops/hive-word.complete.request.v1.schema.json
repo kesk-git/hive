@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.complete.request:v1",
+  "title": "hive-word complete: request body",
+  "description": "The owner's disposition of an accepted answer that releases no work: the question is closed, its hold released where nothing is left for it to gate, the decision item made for it or work that is archived. word persists it through hive-pool complete-question, as one handoff, passing on the envelope's expected_revisions. Completing a report, a review or a round never completes a question. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "note"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "note": {
+      "description": "The owner's disposition note: its own words on the card, never the Hive Mind's.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "evidence": {
+      "description": "What the owner did on the answer, where it names a record.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+      }
+    }
+  }
+}

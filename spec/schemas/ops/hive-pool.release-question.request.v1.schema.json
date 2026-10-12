@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.release-question.request:v1",
+  "title": "hive-pool release-question: request body",
+  "description": "Records the owner's disposition released for the applied answer of a question that holds work, and releases its word hold in the same transaction, with the release's receipt as the hold's released_by: the work is free to proceed as the answer directs. Refused with pool.question_unanswered for a question with no applied answer, pool.question_closed for one already released, completed or moot, and pool.decision_item for a question that holds a decision item made for it, which is completed instead. The envelope's expected_revisions names the question's record revision. One of the operations the Mind's word persists through: refused with authority_insufficient unless the request is a handoff from the hive-word command of the package word. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "note",
+    "requested_by"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "note": {
+      "description": "The owner's disposition note, its own words on the card, never the Hive Mind's.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "evidence": {
+      "description": "What the owner did on the answer, where it names a record.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+      }
+    },
+    "requested_by": {
+      "description": "The caller of the hive-word request, recorded as the disposition's by.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+    }
+  }
+}

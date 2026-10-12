@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.hold-question.request:v1",
+  "title": "hive-pool hold-question: request body",
+  "description": "Persists a question for the Hive Mind at revision 1, its card in a decision round, and the word hold on the item it gates, in one transaction: the held item named, or a decision item the Pool adds for a question with its own scope. An imported word hold with no question on the held item is bound to the question instead of a second being placed. The identities of the question, the round and the card come from word, which mints them. One of the operations the Mind's word persists through: refused with authority_insufficient unless the request is a handoff from the hive-word command of the package word, as spec/commands.md, Replay, defines it. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question",
+    "round",
+    "card_id",
+    "requested_by"
+  ],
+  "properties": {
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "origin",
+        "text",
+        "consequence",
+        "options",
+        "asked_at"
+      ],
+      "properties": {
+        "question_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+        },
+        "held_task_id": {
+          "description": "The item to hold: the work the question gates. Exactly one of this and new_item.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "new_item": {
+          "description": "For a question with its own scope: the decision item the Pool adds, in the request's scope, and holds.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title"
+          ],
+          "properties": {
+            "title": {
+              "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+            },
+            "body": {
+              "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+            }
+          }
+        },
+        "origin": {
+          "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/origin"
+        },
+        "text": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "consequence": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "recommendation": {
+          "description": "The option to present first, one of options. Required when options is not empty.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/option"
+          }
+        },
+        "amount": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "asked_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "held_task_id"
+          ],
+          "properties": {
+            "new_item": false
+          }
+        },
+        {
+          "required": [
+            "new_item"
+          ],
+          "properties": {
+            "held_task_id": false
+          }
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "options": {
+                "minItems": 1
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "recommendation"
+            ]
+          },
+          "else": {
+            "properties": {
+              "recommendation": false
+            }
+          }
+        }
+      ]
+    },
+    "round": {
+      "description": "The round the card joins: a new round with this identity, or an existing round of this home that is open and complete.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_round_id",
+        "new"
+      ],
+      "properties": {
+        "decision_round_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/decision_round_id"
+        },
+        "new": {
+          "type": "boolean"
+        },
+        "origin": {
+          "description": "For a new round.",
+          "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/origin"
+        },
+        "attachments": {
+          "description": "For a new round: its attachment manifest.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "file",
+              "fetched"
+            ],
+            "properties": {
+              "file": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+              },
+              "fetched": {
+                "enum": [
+                  "complete",
+                  "missing",
+                  "truncated",
+                  "unreadable"
+                ]
+              }
+            }
+          }
+        },
+        "complete": {
+          "description": "For a new round: whether it was collected whole.",
+          "type": "boolean"
+        },
+        "incomplete_reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "new": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "origin",
+              "complete"
+            ]
+          },
+          "else": {
+            "properties": {
+              "origin": false,
+              "attachments": false,
+              "complete": false,
+              "incomplete_reason": false
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "complete"
+            ],
+            "properties": {
+              "complete": {
+                "const": false
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "incomplete_reason"
+            ]
+          },
+          "else": {
+            "properties": {
+              "incomplete_reason": false
+            }
+          }
+        }
+      ]
+    },
+    "card_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/card_id"
+    },
+    "hold_reason": {
+      "description": "The word hold's reason for a person. Absent means the question's text.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "requested_by": {
+      "description": "The caller of the hive-word request, recorded as the revision's asked_by.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+    }
+  }
+}

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-pool.read.request:v1",
   "title": "hive-pool read: request body",
-  "description": "Reads records of one kind from the Pool, by identity or by query, as a projection. Read-only: nothing is recorded and the request may be repeated freely. See spec/pool.md, Reading the Pool.",
+  "description": "Reads records of one kind from the Pool, by identity or by query, as a projection. Read-only: nothing is recorded and the request may be repeated freely. Kind request-outcome reads the recorded outcome of one earlier mutating request of the Pool by its request_id, for a caller with no store of its own. See spec/pool.md, Reading the Pool.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -20,7 +20,10 @@
         "specification",
         "rule",
         "projection",
-        "migration"
+        "migration",
+        "question",
+        "decision-round",
+        "request-outcome"
       ]
     },
     "selector": {
@@ -29,20 +32,20 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "description": "The record's own identity: a task_id for an item or an Imperative, a hold_id, an admission_id, and so on.",
+          "description": "The record's own identity: a task_id for an item or an Imperative, a hold_id, an admission_id, a question_id, a decision_round_id, and so on; for kind request-outcome, the request_id, the only selector that kind takes.",
           "type": "string",
           "minLength": 1,
           "maxLength": 200
         },
         "task_id": {
-          "description": "Records that concern one item: its holds and admissions.",
+          "description": "Records that concern one item: its holds and admissions, and the questions that hold it.",
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
         },
         "project_id": {
           "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
         },
         "states": {
-          "description": "Item, hold or rule states to include, in the kind's own vocabulary.",
+          "description": "Item, hold, rule, question or decision round states to include, in the kind's own vocabulary.",
           "type": "array",
           "items": {
             "type": "string",
@@ -58,7 +61,7 @@
           "type": "boolean"
         },
         "due_before": {
-          "description": "Holds with an until time, rules with an expiry time: those due at or before this instant.",
+          "description": "Holds with an until time, rules with an expiry time, deferred questions with a revisit date: those due at or before this instant.",
           "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
         },
         "limit": {
