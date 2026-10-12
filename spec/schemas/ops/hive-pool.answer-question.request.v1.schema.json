@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.answer-question.request:v1",
+  "title": "hive-pool answer-question: request body",
+  "description": "Records one answer exactly as given against a question, its card and its round at the revisions shown, and applies it in the same transaction: accepted, the question then standing on it with its disposition pending; deferred, for Later; or unreconciled, recorded as submitted and applied to nothing, when it was given against an earlier revision of the question, a Later included. An answer never releases a hold: the owner's release or completion does. Two answers to the same question with the same source are one answer: the second returns the first's receipts with duplicate true and writes nothing, while the same source answering another question is its own answer. A question with an applied answer takes a further answer at its current revision only when supersedes names that answer; Later never supersedes. One of the operations the Mind's word persists through: refused with authority_insufficient unless the request is a handoff from the hive-word command of the package word. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "card",
+    "text",
+    "source",
+    "answered_at",
+    "requested_by"
+  ],
+  "properties": {
+    "card": {
+      "description": "The card the answer was given on, with the card, question, held item and decision round at the revisions the Hive Mind was shown. They are recorded with the answer as what was shown. Only the question revision and the card revision are grounds to treat the answer as changed: an answer to one card of a round never makes another card of the same round stale.",
+      "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
+    },
+    "option_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+    },
+    "option_label": {
+      "description": "The option's label exactly as it was displayed.",
+      "type": "string"
+    },
+    "text": {
+      "description": "The free text exactly as given. Empty only when an option or Later was chosen; an answer holds an option, or Later, or text that is not empty, and an answer with none of the three is invalid and applies nothing.",
+      "type": "string"
+    },
+    "later": {
+      "description": "Later, with its revisit date. Applied only against the current revision while the question has no applied answer; against an earlier revision it is recorded unreconciled and sets no deferral.",
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/later"
+    },
+    "source": {
+      "description": "The evidence the answer rests on, required: a review submission, a session input or an operator request.",
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer_source"
+    },
+    "answered_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "supersedes": {
+      "description": "The sequence of the question's applied answer this one replaces. Required to answer again a question whose answer is applied and its disposition pending.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "reconciles": {
+      "description": "The sequence of an unreconciled answer this one settles at the current revision.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "requested_by": {
+      "description": "The caller of the hive-word request, recorded as the answer's recorded_by.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "option_id"
+        ]
+      },
+      "then": {
+        "required": [
+          "option_label"
+        ]
+      },
+      "else": {
+        "properties": {
+          "option_label": false
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "later"
+        ]
+      },
+      "then": {
+        "properties": {
+          "supersedes": false
+        }
+      }
+    },
+    {
+      "anyOf": [
+        {
+          "required": [
+            "option_id"
+          ]
+        },
+        {
+          "required": [
+            "later"
+          ]
+        },
+        {
+          "properties": {
+            "text": {
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.verify.request:v1",
+  "title": "hive-word verify: request body",
+  "description": "Answers, read-only, whether the Mind's word stands, from the record and never from the reference: for an authority reference of kind word, whether it names a question of this home whose applied answer was already applied at the record revision the reference names and is in the envelope's scope; for a task, whether any word hold on it or on an ancestor is still active; for a hold, whether an applied answer's disposition released it; for a question, whether it has an applied answer. A moot question and a deferral never stand. See spec/word.md, The word stands.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "subject"
+  ],
+  "properties": {
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "authority",
+            "task",
+            "hold",
+            "question"
+          ]
+        },
+        "authority": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/authority"
+        },
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "hold_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
+        },
+        "question_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "authority"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "authority"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "task"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "task_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "hold"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "hold_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "question"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "question_id"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

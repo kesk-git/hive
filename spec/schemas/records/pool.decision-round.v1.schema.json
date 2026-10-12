@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.decision-round:v1",
+  "title": "Decision round",
+  "description": "One round of questions put to the Hive Mind together, with the card that presents each, at pool/records/decision-round/<decision_round_id>.json. A card is a projection of its question at a revision and never a decision store of its own. Its own revision, the card's presentation revision, rises only when what it shows changes, which a new revision of its question does. The round's record revision rises with every change to any of its cards and is not a presentation: it is never grounds to treat a card as stale. The round is closed when no card of it is open. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "decision_round_id",
+    "scope_level",
+    "home_id",
+    "origin",
+    "cards",
+    "attachments",
+    "complete",
+    "state",
+    "opened_at",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.decision-round"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "decision_round_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/decision_round_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "origin": {
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/origin"
+    },
+    "cards": {
+      "description": "One card per question raised in the round, in the order raised.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.decision-round:v1#/$defs/card"
+      }
+    },
+    "attachments": {
+      "description": "The round's attachment manifest, fixed when the round was opened: each attachment by path relative to the home, digest and size, with its fetch outcome.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "fetched"
+        ],
+        "properties": {
+          "file": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/file_ref"
+          },
+          "fetched": {
+            "description": "complete: the content at the stated digest is in the home. missing, truncated or unreadable: the round is incomplete with this as its blocker.",
+            "enum": [
+              "complete",
+              "missing",
+              "truncated",
+              "unreadable"
+            ]
+          }
+        }
+      }
+    },
+    "complete": {
+      "description": "True when every nested text, question and attachment of the round was collected whole when it was opened. It never changes: an incomplete round is never read, nothing in it is ruled on, no card joins it, and its questions are asked again in a new, complete round.",
+      "type": "boolean"
+    },
+    "incomplete_reason": {
+      "description": "The precise fetch blocker of an incomplete round.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "state": {
+      "description": "open: at least one card is open. closed: every card is answered or moot. A closed round takes no new card and never reopens.",
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "opened_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "closed_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    },
+    {
+      "if": {
+        "properties": {
+          "complete": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "incomplete_reason"
+        ]
+      },
+      "else": {
+        "properties": {
+          "incomplete_reason": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "closed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "closed_at"
+        ]
+      },
+      "else": {
+        "properties": {
+          "closed_at": false
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "card_id",
+        "card_revision",
+        "question_id",
+        "question_revision",
+        "held_task_id",
+        "held_task_revision",
+        "presented_at",
+        "state"
+      ],
+      "properties": {
+        "card_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/card_id"
+        },
+        "card_revision": {
+          "description": "The card's presentation revision: rises by one only when what the card shows changes, which a new revision of its question does. It does not rise when another card of the round changes, with the round's record revision or with the held item's revision. An answer against an older card revision is stale.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "question_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+        },
+        "question_revision": {
+          "description": "The question revision the card now shows.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "held_task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "held_task_revision": {
+          "description": "The held item's revision when the card was presented, kept as what was shown. The item's revision changes with any other hold of the item or any other change of it, and a difference is not grounds to treat the card as stale.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "presented_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "state": {
+          "description": "open: the question is open or deferred. answered: the question has an applied answer, whatever its disposition. moot: the question was closed as moot.",
+          "enum": [
+            "open",
+            "answered",
+            "moot"
+          ]
+        },
+        "answer_sequence": {
+          "description": "The question's applied answer, in its answers. A superseding answer replaces it.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "answered"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "answer_sequence"
+            ]
+          },
+          "else": {
+            "properties": {
+              "answer_sequence": false
+            }
+          }
+        }
+      ]
+    }
+  }
+}

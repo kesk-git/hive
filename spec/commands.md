@@ -121,12 +121,22 @@ Adding a code is a minor change. A code is never reused for another meaning. `se
 
 `request_id` makes a mutating operation safe to send again.
 
-- A mutating command records the outcome of each request it completes, with the digest of the request's canonical form, under its store's `requests/`, as a record of schema [`hive.request-outcome`](schemas/request-outcome.v1.schema.json). A recorded outcome that fails its schema is `unavailable` with code `record_malformed` and is never replayed.
+- A mutating command records the outcome of each request it completes, with the digest of the request's canonical form, or for a [handoff](#a-command-with-no-store) the digest its causation names, under its store's `requests/`, as a record of schema [`hive.request-outcome`](schemas/request-outcome.v1.schema.json). A recorded outcome that fails its schema is `unavailable` with code `record_malformed` and is never replayed.
 - The same `request_id` with the same digest returns the recorded response with `replayed` true, and writes nothing.
 - The same `request_id` with a different digest is a `conflict` with code `replay_mismatch`.
 - A request that ended `unknown` is not recorded as complete. Sending it again makes the command reconcile first: it establishes what happened from its intent and from the outside system, and only then completes, refuses or reports `unknown` again. It never repeats an outside effect it cannot rule out.
 - Read-only operations record nothing and may be repeated freely.
 - Recorded outcomes are kept for at least as long as the task or session the request is bound to, and their retention beyond that is the owning package's configuration.
+
+### A command with no store
+
+A package whose declaration names no home path has no store, no lock and no `requests/`, and records nothing itself. At stage 2 `word` is the one, and it persists through `pool`, the one package its declaration calls. The harness of the contract library gives such a command its replay through that callee's store, in three steps, and the callee's harness keeps its side.
+
+1. **Read first.** For a mutating operation, after the request is validated and the home, scope and caller are checked and before the operation reads anything else or mints an identity, the harness reads the callee's recorded outcome of the request's `request_id`, through the callee's read of kind `request-outcome`, `hive-pool read` for `word`. That read recovers an interrupted transaction of the callee first. An outcome whose `request_digest` equals the digest of the request in hand is returned, adapted to the operation's own response as the operation defines, with `replayed` true and the recorded receipts, and nothing else is done; a different digest is a `conflict` with code `replay_mismatch`, and nothing is sent; no outcome lets the operation run.
+2. **One handoff.** The operation then sends exactly one mutating request to the callee, a **handoff**: the same `request_id`, `correlation_id` and scope, `caller` the package and its command, and `causation` its own request, a reference of schema `hive.request` whose `id` is that same `request_id` and whose `digest` is the digest of its canonical form. Its response carries the callee's receipts in full. A callee response of `unknown`, or none, is `unknown`: nothing is recorded, and a retry reads first again.
+3. **Keyed on the original.** The callee's harness treats a request as a handoff when its caller names a package that declares no home path and its causation is a `hive.request` of its own `request_id` with a `digest`; every other request is keyed on its own digest, as above. For a handoff, the digest it records as the outcome's `request_digest`, and compares on a repeat, is the causation's: the same `request_id` with the same causation digest returns the recorded response with `replayed` true, though the callee's own body differs by the identities the caller minted anew, and a different causation digest is `replay_mismatch`. Two identical requests of the command with no store that race past the first step therefore both receive the outcome of whichever reached the callee first.
+
+A callee operation may accept only handoffs, as the six operations of [word.md](word.md#how-word-persists-through-the-pool) do. Read-only operations of a command with no store read through its callee and record nothing, like any other read.
 
 ## Capabilities
 

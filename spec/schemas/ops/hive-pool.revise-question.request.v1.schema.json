@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.revise-question.request:v1",
+  "title": "hive-pool revise-question: request body",
+  "description": "Appends the next revision of an open or deferred question, whole, and in the same transaction raises the presentation revision of its card and sets the card's question revision to the new one. The question keeps its identity, its round, its hold and its state, a deferral with its revisit date included; nothing is released and no answer changes. Refused with pool.question_answered for a question with an applied answer and pool.question_closed for one released, completed or moot. The envelope's expected_revisions names the question's record revision. One of the operations the Mind's word persists through: refused with authority_insufficient unless the request is a handoff from the hive-word command of the package word. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "text",
+    "consequence",
+    "options",
+    "asked_at",
+    "requested_by"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "text": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "consequence": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "recommendation": {
+      "description": "The option to present first, one of options. Required when options is not empty.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+    },
+    "options": {
+      "description": "The recommendation and the alternatives, whole: the new revision replaces the options of the one before.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/option"
+      }
+    },
+    "amount": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "asked_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "requested_by": {
+      "description": "The caller of the hive-word request, recorded as the revision's asked_by.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "options": {
+            "minItems": 1
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "recommendation"
+        ]
+      },
+      "else": {
+        "properties": {
+          "recommendation": false
+        }
+      }
+    }
+  ]
+}

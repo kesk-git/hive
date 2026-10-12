@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.verify.response:v1",
+  "title": "hive-word verify: response body",
+  "description": "Whether the word stands, why not when it does not, and the holds and questions read, whole, so the reader sees the Hive Mind's exact words and judges what they authorize.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verified_at",
+    "stands",
+    "reasons",
+    "holds",
+    "questions"
+  ],
+  "properties": {
+    "verified_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "stands": {
+      "description": "For an authority: the word stands. For a task: no word hold on it or on an ancestor is active. For a hold: an applied answer's disposition released it. For a question: it has an applied answer.",
+      "type": "boolean"
+    },
+    "reasons": {
+      "description": "Empty when stands is true. Otherwise each reason once: unanswered, deferred, unreconciled, disposition-pending, superseded, moot, no-question, not-word, out-of-scope, not-found, malformed.",
+      "type": "array",
+      "items": {
+        "enum": [
+          "unanswered",
+          "deferred",
+          "unreconciled",
+          "disposition-pending",
+          "superseded",
+          "moot",
+          "no-question",
+          "not-word",
+          "out-of-scope",
+          "not-found",
+          "malformed"
+        ]
+      }
+    },
+    "holds": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.hold:v1"
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1"
+      }
+    }
+  }
+}

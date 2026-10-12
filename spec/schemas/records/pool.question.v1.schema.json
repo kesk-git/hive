@@ -1,0 +1,832 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.question:v1",
+  "title": "Question held for the Hive Mind",
+  "description": "One question the Hive Mind owes, with every revision of it, the hold it gates, every answer recorded against it and how it was settled, at pool/records/question/<question_id>.json. It is what the Mind's word persists through the Pool: word mints its identity, pool writes it. Answers are kept exactly as given and an answer entry is never changed once written. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "question_id",
+    "scope_level",
+    "home_id",
+    "held_task_id",
+    "held_item",
+    "hold_id",
+    "decision_round_id",
+    "card_id",
+    "origin",
+    "current_revision",
+    "revisions",
+    "state",
+    "answers",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.question"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "held_task_id": {
+      "description": "The item the question holds: the work it gates, or the decision item made for a question with its own scope.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+    },
+    "held_item": {
+      "description": "work: the question holds the work it gates. decision-item: the Pool added the held item for this question, as a decision item, in the transaction that raised it. Provenance only: a disposition reads the held item and every item beneath it as they stand, so a decision item since given work is work.",
+      "enum": [
+        "work",
+        "decision-item"
+      ]
+    },
+    "hold_id": {
+      "description": "The word hold on the held item that this question answers for: placed when the question was raised, or an imported word hold with no question that the question was bound to.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/hold_id"
+    },
+    "decision_round_id": {
+      "description": "The decision round that presents the question.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/decision_round_id"
+    },
+    "card_id": {
+      "description": "The question's one card in that round.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/card_id"
+    },
+    "origin": {
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/origin"
+    },
+    "current_revision": {
+      "description": "The revision of the question now asked: the last entry of revisions.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "revisions": {
+      "description": "Every revision of the question as asked, in order from 1. A changed question is a new revision; an answer given against an earlier revision is recorded unreconciled.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/revision"
+      }
+    },
+    "state": {
+      "description": "open: awaiting the Hive Mind. deferred: the Hive Mind chose Later; still awaiting. answered: an answer is applied and its disposition is pending with the owner; the hold stays. released: the owner released the hold on the applied answer. completed: the owner completed the question on the applied answer, with no work released. moot: closed without an answer, on evidence that nothing is left for it to gate. An unreconciled answer changes no state.",
+      "enum": [
+        "open",
+        "deferred",
+        "answered",
+        "released",
+        "completed",
+        "moot"
+      ]
+    },
+    "answers": {
+      "description": "Every answer recorded, in sequence, applied or not. An entry is never changed once written: whether an answer was superseded or reconciled is read from the later answer that names it.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer"
+      }
+    },
+    "applied": {
+      "description": "The answer the question now stands on, and the record revision that recorded it. Present while an answer is applied: in the states answered, released and completed. A superseding answer replaces it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "answer_sequence",
+        "record_revision"
+      ],
+      "properties": {
+        "answer_sequence": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "record_revision": {
+          "description": "The question's record revision at which that answer was recorded and applied.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        }
+      }
+    },
+    "deferral": {
+      "description": "The revisit date of the latest Later that was applied. Present only while the question is deferred. The Shadow reads it; reaching it re-presents the card and runs nothing.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revisit_at",
+        "answer_sequence"
+      ],
+      "properties": {
+        "revisit_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "answer_sequence": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        }
+      }
+    },
+    "disposition": {
+      "description": "How the owner settled the applied answer: released, the hold released and the work free to proceed as the answer directs; or completed, the question closed with no work released. Present only in the states released and completed. The note is the owner's own, written on the card, and never the Hive Mind's words.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "answer_sequence",
+        "note",
+        "at",
+        "by",
+        "request_id",
+        "receipt_id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "released",
+            "completed"
+          ]
+        },
+        "answer_sequence": {
+          "description": "The applied answer the disposition settles.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "note": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "evidence": {
+          "description": "What the owner did on the answer, where it names a record: the revised item or Imperative, the archived work, the record a decision item's answer led to.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          }
+        },
+        "at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "by": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        "receipt_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        }
+      }
+    },
+    "closure": {
+      "description": "The close of a moot question: the owner's reason and the evidence the Pool checked. Present only in the state moot. It is never an answer and never stands as the Mind's word.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reason",
+        "evidence",
+        "at",
+        "by",
+        "request_id",
+        "receipt_id"
+      ],
+      "properties": {
+        "reason": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/moot_evidence"
+          }
+        },
+        "at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "by": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        "receipt_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        }
+      }
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "answered",
+              "released",
+              "completed"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "applied"
+        ]
+      },
+      "else": {
+        "properties": {
+          "applied": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "deferred"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "deferral"
+        ]
+      },
+      "else": {
+        "properties": {
+          "deferral": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "released",
+              "completed"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "disposition"
+        ]
+      },
+      "else": {
+        "properties": {
+          "disposition": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "released"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "disposition": {
+            "properties": {
+              "kind": {
+                "const": "released"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "completed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "disposition": {
+            "properties": {
+              "kind": {
+                "const": "completed"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "moot"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "closure"
+        ]
+      },
+      "else": {
+        "properties": {
+          "closure": false
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "origin": {
+      "description": "Where the question arose, with the record that raised it: a Lictor's decision inventory, an admission hold, a specification's product gap, a review round, a session instruction, the supervisor's own reading, a spend ask, a legacy hold, a ruling that does not fit or a subject's second miss, a found copy of a secret, or a project's creation and its systems.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "lictor-report",
+            "admission",
+            "specification",
+            "review",
+            "session",
+            "supervisor",
+            "spend",
+            "legacy",
+            "rule",
+            "incident",
+            "project"
+          ]
+        },
+        "ref": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "task_id": {
+          "description": "The task whose work raised the question, where it differs from the held item.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "generation": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "generation"
+            ]
+          },
+          "then": {
+            "required": [
+              "task_id"
+            ]
+          }
+        }
+      ]
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "option_id",
+        "label",
+        "consequence"
+      ],
+      "properties": {
+        "option_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+        },
+        "label": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/label"
+        },
+        "consequence": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        }
+      }
+    },
+    "revision": {
+      "description": "The question as asked at one revision: its text, the consequence of leaving it unanswered, the recommendation first, then the alternatives. Free text is always accepted as an answer, with or without an option.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "text",
+        "consequence",
+        "options",
+        "asked_at",
+        "asked_by",
+        "request_id"
+      ],
+      "properties": {
+        "revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "text": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "consequence": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "recommendation": {
+          "description": "The recommended option, one of options, first on every card. Required when options is not empty.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+        },
+        "options": {
+          "description": "The recommendation and the alternatives, each option_id once. May be empty for a question that takes free text only.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/option"
+          }
+        },
+        "amount": {
+          "description": "For a spend ask: the amount and its unit, as text, with the reason in the question's text.",
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "asked_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "asked_by": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "options": {
+                "minItems": 1
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "recommendation"
+            ]
+          },
+          "else": {
+            "properties": {
+              "recommendation": false
+            }
+          }
+        }
+      ]
+    },
+    "answer_source": {
+      "description": "The evidence the answer rests on, required and recorded with the answer, so a reader always sees where the words came from. An answer keeps its recorded source and nothing more is asked of it. A review submission is the submit event of a review round. A session input is the input receipt of the supervisor session the words were typed into. An operator request is the request_id of the hive-word answer request typed at a terminal; it has no further evidence, and the record shows it as exactly that. Two answers to the same question with the same source are one answer; one source, a submit event or a session input, may carry answers to several questions, each its own.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "review-submission",
+            "session-input",
+            "operator-request"
+          ]
+        },
+        "task_id": {
+          "description": "For a review submission: the task of the review directory the round file lives in.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "generation": {
+          "description": "For a review submission: the generation of the review directory.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/generation"
+        },
+        "review_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/review_id"
+        },
+        "round_id": {
+          "description": "For a review submission: the review round's number.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "feedback_event_id": {
+          "description": "For a review submission: the submit event of the round's feedback file that carries the words.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/feedback_event_id"
+        },
+        "input_id": {
+          "description": "For a session input: the input the words arrived in.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/input_id"
+        },
+        "receipt_id": {
+          "description": "For a session input: the input receipt of the supervisor session that accepted it.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        },
+        "request_id": {
+          "description": "For an operator request: the request_id of the hive-word answer request, which is the key of the source.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "review-submission"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "task_id",
+              "generation",
+              "review_id",
+              "round_id",
+              "feedback_event_id"
+            ],
+            "properties": {
+              "input_id": false,
+              "receipt_id": false,
+              "request_id": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "session-input"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "input_id",
+              "receipt_id"
+            ],
+            "properties": {
+              "task_id": false,
+              "generation": false,
+              "review_id": false,
+              "round_id": false,
+              "feedback_event_id": false,
+              "request_id": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "operator-request"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "request_id"
+            ],
+            "properties": {
+              "task_id": false,
+              "generation": false,
+              "review_id": false,
+              "round_id": false,
+              "feedback_event_id": false,
+              "input_id": false,
+              "receipt_id": false
+            }
+          }
+        }
+      ]
+    },
+    "later": {
+      "description": "Later, with its revisit date. Kept on every answer that chose it; applied only by an answer against the current revision.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revisit_at"
+      ],
+      "properties": {
+        "revisit_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        }
+      }
+    },
+    "answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "record_revision",
+        "question_revision",
+        "card",
+        "text",
+        "source",
+        "answered_at",
+        "recorded_at",
+        "recorded_by",
+        "disposition",
+        "request_id",
+        "receipt_id"
+      ],
+      "properties": {
+        "sequence": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "record_revision": {
+          "description": "The question's record revision that recorded this answer.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "question_revision": {
+          "description": "The revision the answer was given against. When it is not the current revision the answer is recorded unreconciled.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        },
+        "card": {
+          "description": "The card the answer was given on, with the question, held item and decision round at the revisions the Hive Mind was shown. They are recorded as what was shown; only the question revision and the card revision are grounds to treat the answer as changed.",
+          "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
+        },
+        "option_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+        },
+        "option_label": {
+          "description": "The option's label exactly as it was displayed.",
+          "type": "string"
+        },
+        "text": {
+          "description": "The free text exactly as given, whitespace included. May be empty only when an option or Later was chosen.",
+          "type": "string"
+        },
+        "later": {
+          "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/later"
+        },
+        "source": {
+          "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer_source"
+        },
+        "answered_at": {
+          "description": "When the Hive Mind gave the answer, as the source states it.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "recorded_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "recorded_by": {
+          "description": "Who brought the answer to the intake: attribution, never authentication.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "disposition": {
+          "description": "What recording the answer did, fixed when it was recorded. accepted: applied; the question stands on it and its disposition is the owner's. deferred: Later against the current revision, applied as a deferral. unreconciled: given against an earlier revision of the question; recorded exactly as submitted, Later included, and applied to nothing.",
+          "enum": [
+            "accepted",
+            "deferred",
+            "unreconciled"
+          ]
+        },
+        "supersedes": {
+          "description": "The sequence of the applied answer this one replaces. It acts only on an accepted answer; on an unreconciled one it is kept as given and replaces nothing. Never with Later.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "reconciles": {
+          "description": "The sequence of an unreconciled answer the Hive Mind settled with this one. It acts only on an answer applied at the current revision; on an unreconciled one it is kept as given and settles nothing.",
+          "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+        },
+        "request_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        "receipt_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "option_id"
+            ]
+          },
+          "then": {
+            "required": [
+              "option_label"
+            ]
+          },
+          "else": {
+            "properties": {
+              "option_label": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "deferred"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "later"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "accepted"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "later": false
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "later"
+            ]
+          },
+          "then": {
+            "properties": {
+              "supersedes": false
+            }
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "required": [
+                "option_id"
+              ]
+            },
+            {
+              "required": [
+                "later"
+              ]
+            },
+            {
+              "properties": {
+                "text": {
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "moot_evidence": {
+      "description": "One piece of evidence that a question is moot, which the Pool checks when the question is closed. item-archived: the held item, named by the ref, and every item beneath it are archived, so nothing is left for the hold to gate. question-replaced: another question of this home, named by the ref, that is not moot holds the same item with its own word hold active, which stays.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "item-archived",
+            "question-replaced"
+          ]
+        },
+        "ref": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        }
+      }
+    }
+  }
+}

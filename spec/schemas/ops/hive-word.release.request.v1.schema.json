@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.release.request:v1",
+  "title": "hive-word release: request body",
+  "description": "The owner's disposition of an accepted answer on a question that holds work, not a decision item with no live work beneath it as it stands: the word hold is released and the work may proceed as the answer directs. word persists it through hive-pool release-question, as one handoff, passing on the envelope's expected_revisions. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "note"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "note": {
+      "description": "The owner's disposition note: its own words on the card, never the Hive Mind's.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "evidence": {
+      "description": "What the owner did on the answer, where it names a record.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+      }
+    }
+  }
+}

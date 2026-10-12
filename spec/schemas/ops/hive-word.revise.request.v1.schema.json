@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.revise.request:v1",
+  "title": "hive-word revise: request body",
+  "description": "Writes the next revision of an open or deferred question, whole: its text, consequence, options and recommendation, with the amount of a spend ask. The question keeps its identity, its round, its hold and its state, and nothing is released. An answer bound to an earlier revision is recorded unreconciled. word persists it through hive-pool revise-question, as one handoff, passing on the envelope's expected_revisions; the new revision's asked_at is this request's issued_at. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "text",
+    "consequence",
+    "options"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "text": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "consequence": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "recommendation": {
+      "description": "The option to present first, one of options. Required when options is not empty.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+    },
+    "options": {
+      "description": "The recommendation and the alternatives, whole: the new revision replaces the options of the one before.",
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/option"
+      }
+    },
+    "amount": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "options": {
+            "minItems": 1
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "recommendation"
+        ]
+      },
+      "else": {
+        "properties": {
+          "recommendation": false
+        }
+      }
+    }
+  ]
+}

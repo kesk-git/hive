@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-word.answer.request:v1",
+  "title": "hive-word answer: request body",
+  "description": "The one intake for the Hive Mind's answer: the exact words, with or without an option, or Later with a revisit date, against the card, question, held item and round at the revisions the Hive Mind saw, with the source the words arrived by. word checks who brought the answer and, for a review submission, that the round file carries these words, then persists it through hive-pool answer-question, as one handoff. An answer is accepted, deferred or recorded unreconciled; it never releases a hold. A replay of the same answer is idempotent. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "card",
+    "text",
+    "source",
+    "answered_at"
+  ],
+  "properties": {
+    "card": {
+      "description": "The card the answer was given on, with the card, question, held item and decision round at the revisions the Hive Mind was shown. They are recorded with the answer as what was shown. Only the question revision and the card revision are grounds to treat the answer as changed.",
+      "$ref": "urn:hive:schema:review:v1#/$defs/card_binding"
+    },
+    "option_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/option_id"
+    },
+    "option_label": {
+      "description": "The option's label exactly as it was displayed.",
+      "type": "string"
+    },
+    "text": {
+      "description": "The free text exactly as given. Empty only when an option or Later was chosen; an answer holds an option, or Later, or text that is not empty.",
+      "type": "string"
+    },
+    "later": {
+      "description": "Later, with its revisit date: never an approval.",
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/later"
+    },
+    "source": {
+      "description": "The evidence the answer rests on, required.",
+      "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/answer_source"
+    },
+    "answered_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "supersedes": {
+      "description": "The sequence of the question's applied answer this one replaces, while its disposition is pending.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    },
+    "reconciles": {
+      "description": "The sequence of an unreconciled answer this one settles at the current revision.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "option_id"
+        ]
+      },
+      "then": {
+        "required": [
+          "option_label"
+        ]
+      },
+      "else": {
+        "properties": {
+          "option_label": false
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "later"
+        ]
+      },
+      "then": {
+        "properties": {
+          "supersedes": false
+        }
+      }
+    },
+    {
+      "anyOf": [
+        {
+          "required": [
+            "option_id"
+          ]
+        },
+        {
+          "required": [
+            "later"
+          ]
+        },
+        {
+          "properties": {
+            "text": {
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

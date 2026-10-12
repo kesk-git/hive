@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.close-question.request:v1",
+  "title": "hive-pool close-question: request body",
+  "description": "Closes an open or deferred question as moot, on evidence the Pool checks, never as an answer: no answer is recorded or implied, and the question never stands as the Mind's word. In one transaction the question becomes moot with its reason and evidence, its card becomes moot, the round closes if no card of it is left open, and the question's word hold is released with the close's receipt as its released_by. Each piece of evidence must hold when the Pool checks it: item-archived, the held item and every item beneath it archived; question-replaced, another question of this home that is not moot holding the same item with its own word hold active. Refused with pool.question_not_moot when any does not, pool.question_answered for a question with an applied answer, whose disposition is the owner's, and pool.question_closed for one released, completed or moot. The envelope's expected_revisions names the question's record revision. One of the operations the Mind's word persists through: refused with authority_insufficient unless the request is a handoff from the hive-word command of the package word. See spec/word.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question_id",
+    "reason",
+    "evidence",
+    "requested_by"
+  ],
+  "properties": {
+    "question_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+    },
+    "reason": {
+      "description": "Why the question is moot, in the owner's words.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.question:v1#/$defs/moot_evidence"
+      }
+    },
+    "requested_by": {
+      "description": "The caller of the hive-word request, recorded as the closure's by.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+    }
+  }
+}

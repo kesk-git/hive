@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-pool.revise-question.response:v1",
+  "title": "hive-pool revise-question: response body",
+  "description": "The question with its new revision current, and its round with the card's presentation revision raised.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "question",
+    "round"
+  ],
+  "properties": {
+    "question": {
+      "$ref": "urn:hive:schema:records:pool.question:v1"
+    },
+    "round": {
+      "$ref": "urn:hive:schema:records:pool.decision-round:v1"
+    }
+  }
+}
