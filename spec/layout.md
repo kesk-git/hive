@@ -11,6 +11,7 @@ NOTICE                               third-party notices, generated from imports
   workflows/                         the one workflow that runs make test on GitHub's hosted Windows and Linux runners, for every Harvest head and every night
 .claude/
   settings.json                      repository configuration for Claude Code: includeCoAuthoredBy and attribution.sessionUrl, both false, keep AI co-author and session trailers off
+.no-mistakes.yaml                    repository configuration for the validation pipeline: declares `make test` as the one fixed test command, so no model chooses what runs
 go.mod                               the one module and the pinned Go release
 Makefile                             the test, check and build targets
 docs/
