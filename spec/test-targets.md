@@ -55,9 +55,9 @@ Each project declares its tests in one file at the root of its repository, owned
 
 Three rules follow from it, and every set the gate runs is computed from them:
 
-1. **The affected set.** A test is affected at a head when its `reads` meet a path of `git diff --name-only` between the head of its last recorded pass and that head. A changed path that no row declares affects every test, and so do this file, the build files (`Makefile`, `go.mod`, `go.sum` or a project's own), a lockfile and any test helper a row names.
+1. **The affected set.** A test is affected at a head when its `reads` meet a path of `git diff --name-only --no-renames -z` between the head of its last recorded pass and that head, which lists a rename's source and its destination as two paths, each NUL-terminated so that no filename is misread. A changed path that no row declares affects every test, and so do this file, the build files (`Makefile`, `go.mod`, `go.sum` or a project's own) and a lockfile; a test that uses a helper declares it in its `reads`.
 2. **A pass carries.** A pass is a receipt per test per head. It carries to a later head whose affected set leaves the test out, and the receipt names the head the test ran at and that the comparison found nothing.
-3. **Long by measurement.** `class` is `long` when `measured_seconds` passes the bound for one test, when `needs` names anything, or when `platforms` names a platform the operator's machine is not. A project may declare a test long by hand; nothing declares one short by hand.
+3. **Long by measurement.** `class` follows the test's invocation on the operator's machine: it is `long` when `measured_seconds` passes the bound for one test, when `needs` names anything, or when `platforms` leaves out the operator's machine, so that the test has no local invocation. A row that names the other platforms beside the operator's machine stays `check`: the Windows and Linux results are a separate obligation, required at the landing that completes a Target and in the scheduled run and informational at every other head, as rule 9 states. A project may declare a test long by hand; nothing declares one short by hand.
 
 Hive's own test contract holds these rows, and by rule 1 a change to a build file affects every one of them:
 
