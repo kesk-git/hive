@@ -33,7 +33,7 @@ The seven package targets and their scopes are the design's. What each must prov
 4. **No private home, no real clone.** Every test creates the homes, clones and worktrees it uses under a temporary directory and removes them. No test reads or writes an existing private home, an existing worktree pool, a project's clone or any state of an existing installation.
 5. **Deterministic.** A test that depends on time takes the clock as an input. A test of concurrency runs its interleavings by control, not by sleeping and hoping.
 6. **One command each.** Each target is one command from the repository root with no argument and no environment to set, the same command on each of the three platforms, exits 0 on success, and prints the name of each failing test otherwise.
-7. **Bounded.** A Hunt's check set at a head completes within ten minutes on the operator's machine and any one target within five, as the design's [How Hive tests](../docs/design.md#how-hive-tests) states. A target that outgrows its bound is split by the package's owner or declared long in Hive's [test contract](#a-projects-test-contract), and then runs at the landing that completes a Target; it is never skipped.
+7. **Bounded.** A Hunt's declared checks at a head complete within ten minutes on the operator's machine and any one target within five, each measured from the command's start with no wait for a lock counted, apart from a long run that is the Hunt's own evidence, as the design's [How Hive tests](../docs/design.md#how-hive-tests) states. A target that outgrows its bound is split by the package's owner or declared long in Hive's [test contract](#a-projects-test-contract), and then runs at the landing that completes a Target; it is never skipped.
 8. **A target that has nothing to run fails.** A target whose package holds no test exits nonzero, so an empty package cannot pass by default. Hive's test contract marks such a target not built, and the gate command runs the built targets only.
 9. **Three platforms.** Every target passes on macOS, Windows and Linux, and a pass on one establishes nothing about the others. The macOS runs take place on the operator's own Mac. GitHub's hosted Windows and Linux runners, for this public repository, are Hive's declared test environment for those two platforms, by the operator's decision: they run the targets there and report the results, which are evidence of a remote producer that the gate reads under the design's [hybrid on evidence](../docs/design.md#synapse-on-the-operators-machine-with-both-reviewers), and never the gate, whose verdict and merge stay on the operator's machine. One workflow file under `.github/workflows/` runs `make test` on both for every Harvest head and every night; its results are required at the landing that completes a Target and in the scheduled run, and are informational at every other head. A test whose behaviour depends on the platform states what it expects on each of the three, and no test passes on a platform by being skipped there.
 
@@ -47,10 +47,10 @@ Each project declares its tests in one file at the root of its repository, owned
 | `command` | One command from the repository root, with no argument and no environment to set, which exits 0 on a pass, as rule 6 asks of a target. |
 | `class` | `check` or `long`: a Hunt's check at a head runs the checks it affects, and the landing that completes a Target runs the long tests. |
 | `reads` | The paths and globs the test reads, its own files included; `**` for everything. |
-| `bound_seconds` | The time within which the test must finish on the operator's machine. |
+| `bound_seconds` | The time within which the test must finish on the operator's machine, measured from the command's start: a wait for a lock is not counted. |
 | `needs` | Any of `quiet`, a quiet machine; `display`; `whole-machine`; and `network`, which Hive's own tests never name. |
 | `platforms` | The platforms the test must pass on; every row of Hive's own names all three. |
-| `measured_seconds` | The time the last scheduled run measured, which Hive writes and a person never does. |
+| `measured_seconds` | The time the last scheduled run measured, which Hive writes and a person never does; every scheduled run records it, with the test's last result, in its receipt. |
 | `status` | `built`, or `not-built` for a target whose package holds no test yet. |
 
 Three rules follow from it, and every set the gate runs is computed from them:
@@ -72,7 +72,7 @@ Hive's own test contract holds these rows, and by rule 1 a change to a build fil
 | `check-imports` | `make check-imports` | `check` | `imports/**`, `go.mod`, `go.sum`, `LICENSE`, `NOTICE` | 60 | `not-built` |
 | `windows`, `linux` | the workflow's `make test` on each | `long`, on that platform | `**` | 900 | `not-built` |
 
-The scheduled full run runs every row with every cache defeated, `go test -count=1` for Hive, each test alone in this file's order, and writes each test's seconds into `measured_seconds` and into the run's receipt.
+The scheduled full run runs every row with every cache defeated, `go test -count=1` for Hive, each test alone in this file's order, and records each test's measured time and last result in the run's receipt, writing the time into `measured_seconds`.
 
 ## What the targets do not cover
 
