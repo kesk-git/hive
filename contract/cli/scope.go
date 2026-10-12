@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 
 	"github.com/kesk-git/hive/contract/canon"
@@ -107,7 +106,7 @@ func checkScope(home *store.Home, s envelope.Scope) error {
 // for a record that is not there.
 func readRegistry(home *store.Home, kind registryKind, id string) (map[string]any, error) {
 	rel := registryDir + "/" + kind.dir + "/" + id + ".json"
-	data, err := os.ReadFile(filepath.Join(home.Dir, filepath.FromSlash(rel)))
+	data, err := store.ReadFile(filepath.Join(home.Dir, filepath.FromSlash(rel)))
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}

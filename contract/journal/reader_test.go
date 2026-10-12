@@ -748,19 +748,17 @@ func TestReaderErrorsAreDistinct(t *testing.T) {
 // journal/ for the owner only.
 func TestOpenChecksTheHome(t *testing.T) {
 	home := newHome(t, false)
-	if err := os.Chmod(home, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	grantOthers(t, home)
 	if _, err := Open(home, Options{Package: "pool"}); !errors.Is(err, store.ErrLayout) {
 		t.Errorf("an open home: %v", err)
 	}
-	os.Chmod(home, dirMode)
+	closeToOthers(t, home)
 	j, err := Open(home, Options{Package: "pool"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(filepath.Join(home, journalDir))
-	if err != nil || !info.IsDir() || info.Mode().Perm() != dirMode {
+	if err != nil || !info.IsDir() || !hasMode(info, filepath.Join(home, journalDir), dirMode) {
 		t.Errorf("journal/: %v %v", info, err)
 	}
 	if j.Package() != "pool" || j.HomeID != testHomeID {

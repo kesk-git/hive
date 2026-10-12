@@ -250,7 +250,7 @@ func (s *Store) complete(in *intent, recovering bool) error {
 // is removed only once it is.
 func (s *Store) put(request string, f *intentFile) error {
 	if f.skip {
-		return s.syncChain(f.rel)
+		return s.syncFound(f.rel)
 	}
 	return s.writeFile(f.rel, request, f.data)
 }
@@ -358,7 +358,7 @@ func (s *Store) rollForward(rel string) error {
 	if err != nil {
 		return err
 	}
-	if err := s.syncChain(rel); err != nil {
+	if err := s.syncFound(rel); err != nil {
 		return err
 	}
 	if err := s.classify(rel, in); err != nil {

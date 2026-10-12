@@ -40,6 +40,7 @@ func newHome(t testing.TB) string {
 	if err := os.Mkdir(dir, dirMode); err != nil {
 		t.Fatal(err)
 	}
+	secureHome(t, dir)
 	return dir
 }
 

@@ -242,7 +242,7 @@ func (j *Journal) present(st *state, events []store.Event) (map[string]bool, err
 	found := map[string]bool{}
 	for i := len(st.segs) - 1; i >= 0 && len(found) < len(events); i-- {
 		path := filepath.Join(j.dir, st.segs[i].name)
-		data, err := os.ReadFile(path)
+		data, err := store.ReadFile(path)
 		if err != nil {
 			return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
 		}

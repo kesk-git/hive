@@ -159,12 +159,12 @@ func TestAcquireNamesAndModes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if info.Mode().Perm() != fileMode {
+		if !hasMode(info, filepath.Join(home, locksDir, name+".lock"), fileMode) {
 			t.Errorf("%s.lock mode %v", name, info.Mode())
 		}
 	}
 	info, err := os.Stat(filepath.Join(home, locksDir))
-	if err != nil || info.Mode().Perm() != dirMode {
+	if err != nil || !hasMode(info, filepath.Join(home, locksDir), dirMode) {
 		t.Errorf("locks/ mode %v, %v", info.Mode(), err)
 	}
 	if _, err := CheckHome(home); err != nil {

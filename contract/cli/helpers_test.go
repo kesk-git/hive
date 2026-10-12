@@ -85,6 +85,7 @@ func emptyHome(t testing.TB) string {
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	secureHome(t, dir)
 	return dir
 }
 

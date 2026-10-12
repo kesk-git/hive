@@ -6,8 +6,9 @@
 // takes locks/journal.lock through the store package's lock code, learns the
 // next home_sequence from the last intact line, sets home_sequence and
 // recorded_at on each event, writes each line with its line feed in one
-// write, flushes it, flushes the directories that hold the segments and
-// releases the lock. The home_id of every line is the one of the home's
+// write, flushes it, flushes the directories that hold the segments (on
+// Windows, which offers no directory handle that can be flushed, the flush of
+// the segment stands for it) and releases the lock. The home_id of every line is the one of the home's
 // record, read as the append begins; a home without the record refuses the
 // append, though its journal may be opened to read. It implements
 // store.Journal, so a store opened with it appends the events of a

@@ -719,9 +719,7 @@ func TestUnavailable(t *testing.T) {
 	record(t, broken, "home.json", func() map[string]any { m := homeRecord(homeID); m["schema_version"] = "1.1"; return m }())
 	expect(t, h.invoke(t, broken, "echo", request(t, "echo", 1, nil)), envelope.Invalid, "unsupported_version")
 	record(t, broken, "home.json", homeRecord(homeID))
-	if err := os.Chmod(filepath.Join(broken, "home.json"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	grantOthers(t, filepath.Join(broken, "home.json"), 0o644)
 	expect(t, h.invoke(t, broken, "echo", request(t, "echo", 1, nil)), envelope.Unavailable, "record_malformed")
 
 	home := newHome(t)
@@ -836,7 +834,7 @@ func TestTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 	expect(t, resp, envelope.Ok, "")
-	if info, _ := os.Stat(respFile); info.Mode().Perm() != 0o600 {
+	if info, _ := os.Stat(respFile); !hasMode(info, respFile, 0o600) {
 		t.Errorf("response file mode %o", info.Mode().Perm())
 	}
 	if bytes.Count(written, []byte("\n")) != 1 || written[len(written)-1] != '\n' {

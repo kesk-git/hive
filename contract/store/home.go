@@ -65,7 +65,9 @@ func cmpNumbers(a, b string) int {
 	return strings.Compare(a, b)
 }
 
-// ownerOnly is the access of every directory and file of a home.
+// dirMode and fileMode are the access of every directory and file of a home
+// on macOS and Linux. On Windows the access-control list of the home gives
+// the same access, and the modes mean nothing.
 const (
 	dirMode  = 0o700
 	fileMode = 0o600
@@ -104,7 +106,7 @@ func CheckHome(dir string) (*Home, error) {
 	if !info.IsDir() {
 		return nil, fmt.Errorf("%w: %s is not a directory", ErrLayout, dir)
 	}
-	if err := ownerOnly(info, "the home"); err != nil {
+	if err := ownerOnly(real, info, "the home"); err != nil {
 		return nil, err
 	}
 	if err := insideRepository(real); err != nil {
@@ -126,7 +128,7 @@ func CheckHome(dir string) (*Home, error) {
 			if !info.Mode().IsRegular() {
 				return nil, fmt.Errorf("%w: %s is not a regular file", ErrLayout, name)
 			}
-			if err := ownerOnly(info, name); err != nil {
+			if err := ownerOnly(filepath.Join(real, name), info, name); err != nil {
 				return nil, err
 			}
 			id, err := readHomeRecord(filepath.Join(real, name))
@@ -138,7 +140,7 @@ func CheckHome(dir string) (*Home, error) {
 			if !info.IsDir() {
 				return nil, fmt.Errorf("%w: %s is not a directory", ErrLayout, name)
 			}
-			if err := ownerOnly(info, name); err != nil {
+			if err := ownerOnly(filepath.Join(real, name), info, name); err != nil {
 				return nil, err
 			}
 		default:
@@ -147,14 +149,6 @@ func CheckHome(dir string) (*Home, error) {
 	}
 	slices.Sort(h.Unknown)
 	return h, nil
-}
-
-// ownerOnly refuses an entry that grants access to anyone but its owner.
-func ownerOnly(info fs.FileInfo, what string) error {
-	if perm := info.Mode().Perm(); perm&0o077 != 0 {
-		return fmt.Errorf("%w: %s is open beyond its owner (mode %04o)", ErrLayout, what, perm)
-	}
-	return nil
 }
 
 // insideRepository refuses a directory that is, or is under, a Git working
@@ -178,7 +172,7 @@ func insideRepository(dir string) error {
 // or guessed identity never stands in for it. A home record of a newer
 // version is refused as unsupported.
 func readHomeRecord(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("%w: %s: %v", ErrRecordMalformed, homeFile, err)
 	}

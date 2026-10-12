@@ -110,12 +110,15 @@ func TestCheckHomeListsUnknownEntries(t *testing.T) {
 	}
 }
 
+// layoutCase is a home that CheckHome refuses, and why.
+type layoutCase struct {
+	name  string
+	setup func(t *testing.T, home string) string // returns the path to check
+	want  error
+}
+
 func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
-	tests := []struct {
-		name  string
-		setup func(t *testing.T, home string) string // returns the path to check
-		want  error
-	}{
+	tests := append([]layoutCase{
 		{"a directory that is not there", func(t *testing.T, home string) string {
 			return filepath.Join(home, "missing")
 		}, fs.ErrNotExist},
@@ -125,11 +128,11 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			return p
 		}, ErrLayout},
 		{"a home open to others", func(t *testing.T, home string) string {
-			os.Chmod(home, 0o755)
+			grantOthers(t, home, 0o755)
 			return home
 		}, ErrLayout},
 		{"a home open to its group", func(t *testing.T, home string) string {
-			os.Chmod(home, 0o750)
+			grantGroup(t, home, 0o750)
 			return home
 		}, ErrLayout},
 		{"a known directory that is a file", func(t *testing.T, home string) string {
@@ -139,11 +142,11 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 		}, ErrLayout},
 		{"a known directory that is a symbolic link", func(t *testing.T, home string) string {
 			os.Remove(filepath.Join(home, "pool"))
-			os.Symlink(filepath.Join(home, "ui"), filepath.Join(home, "pool"))
+			symlink(t, filepath.Join(home, "ui"), filepath.Join(home, "pool"))
 			return home
 		}, ErrLayout},
 		{"a known directory open to others", func(t *testing.T, home string) string {
-			os.Chmod(filepath.Join(home, locksDir), 0o755)
+			grantOthers(t, filepath.Join(home, locksDir), 0o755)
 			return home
 		}, ErrLayout},
 		{"home.json that is a directory", func(t *testing.T, home string) string {
@@ -152,7 +155,7 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			return home
 		}, ErrLayout},
 		{"home.json open to others", func(t *testing.T, home string) string {
-			os.Chmod(filepath.Join(home, homeFile), 0o644)
+			grantOthers(t, filepath.Join(home, homeFile), 0o644)
 			return home
 		}, ErrLayout},
 		{"home.json without its line feed", func(t *testing.T, home string) string {
@@ -215,7 +218,7 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			os.Mkdir(filepath.Join(filepath.Dir(filepath.Dir(home)), ".git"), dirMode)
 			return home
 		}, ErrInsideRepository},
-	}
+	}, platformLayoutCases...)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			home := fullHome(t)
@@ -285,7 +288,7 @@ func TestOpenCreatesTheStoreAndTheLocks(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if !info.IsDir() || info.Mode().Perm() != dirMode {
+				if !info.IsDir() || !hasMode(info, filepath.Join(home, d), dirMode) {
 					t.Errorf("%s: mode %v", d, info.Mode())
 				}
 			}

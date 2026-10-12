@@ -50,11 +50,11 @@ func TestReplaceCreatesAndReplaces(t *testing.T) {
 		t.Fatalf("ReadRecord = %+v, %v", rec, err)
 	}
 	info, _ := os.Stat(s.abs(task1))
-	if info.Mode().Perm() != fileMode {
+	if !hasMode(info, s.abs(task1), fileMode) {
 		t.Errorf("record mode %v", info.Mode())
 	}
 	info, _ = os.Stat(filepath.Dir(s.abs(task1)))
-	if info.Mode().Perm() != dirMode {
+	if !hasMode(info, filepath.Dir(s.abs(task1)), dirMode) {
 		t.Errorf("records directory mode %v", info.Mode())
 	}
 
@@ -249,22 +249,18 @@ func TestTemporaryFilesAreNeverRecords(t *testing.T) {
 		t.Errorf("the record after the lock: %+v, %v", rec, err)
 	}
 
-	// Pressure: the temporary file cannot be created. The write is refused
-	// whole, the old record stands and nothing is left behind. Root is not
-	// refused by a directory's mode, so the case needs an ordinary user.
-	if os.Geteuid() == 0 {
-		t.Log("running as root: a closed directory does not refuse a write; the pressure case is not run")
+	// Pressure: the record cannot be replaced. The write is refused whole,
+	// the old record stands and nothing is left behind. The way the
+	// replacement is refused is the platform's: see refuseReplace.
+	before := tree(t, home)
+	restore, ok := refuseReplace(t, s, task1)
+	if !ok {
 		return
 	}
-	before := tree(t, home)
-	dir := filepath.Dir(s.abs(task1))
-	if err := os.Chmod(dir, 0o500); err != nil {
-		t.Fatal(err)
-	}
 	_, err = w.Replace(req2, task1, []byte(`{"n":2}`), 1)
-	os.Chmod(dir, dirMode)
+	restore()
 	if err == nil {
-		t.Fatal("a write into a closed directory succeeded")
+		t.Fatal("a write that the platform refuses succeeded")
 	}
 	if errors.Is(err, ErrRevisionConflict) || errors.Is(err, ErrRecordMalformed) {
 		t.Errorf("a refused write reported the wrong thing: %v", err)

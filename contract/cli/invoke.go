@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/store"
 )
 
 // Run is Main over the process: its arguments, standard streams and exit.
@@ -238,7 +239,8 @@ func writeFile(path string, data []byte) error {
 	}
 	// The mode applies only to a file this call creates; a file that was
 	// there keeps its own until it is set, and nothing is written before.
-	if err := errors.Join(f.Chmod(0o600), f.Truncate(0)); err != nil {
+	// On Windows the access is an access-control list, which SecureFile sets.
+	if err := errors.Join(store.SecureFile(f), f.Truncate(0)); err != nil {
 		return errors.Join(err, f.Close())
 	}
 	_, werr := f.Write(data)

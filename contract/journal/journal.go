@@ -32,7 +32,9 @@ const (
 	segmentDigits = 20
 )
 
-// ownerOnly is the access of every directory and file of a home.
+// dirMode and fileMode are the access of every directory and file of a home
+// on macOS and Linux. On Windows the access-control list of the home gives
+// the same access, and the modes mean nothing.
 const (
 	dirMode  = 0o700
 	fileMode = 0o600
@@ -263,7 +265,7 @@ var errChanged = errors.New("journal: the file changed while it was read")
 // a second time and found identical; a file cut or changed meanwhile is read
 // again.
 func (j *Journal) readTail(path string, newest bool) (*tail, error) {
-	f, err := os.Open(path)
+	f, err := store.OpenRead(path)
 	if err != nil {
 		return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
 	}
@@ -423,34 +425,4 @@ func (j *Journal) syncDirs() error {
 		return err
 	}
 	return syncDir(j.Home.Dir)
-}
-
-// syncSegment flushes a segment as it is, so that the lines in it, whoever
-// wrote them, are durable.
-func (j *Journal) syncSegment(name string) error {
-	if err := j.step("sync " + name); err != nil {
-		return err
-	}
-	f, err := os.Open(filepath.Join(j.dir, name))
-	if err != nil {
-		return fmt.Errorf("journal: %w", err)
-	}
-	defer f.Close()
-	if err := f.Sync(); err != nil {
-		return fmt.Errorf("journal: flushing %s: %w", name, err)
-	}
-	return nil
-}
-
-// syncDir flushes a directory, so that a file created in it is durable.
-func syncDir(dir string) error {
-	d, err := os.Open(dir)
-	if err != nil {
-		return fmt.Errorf("journal: %w", err)
-	}
-	defer d.Close()
-	if err := d.Sync(); err != nil {
-		return fmt.Errorf("journal: flushing %s: %w", dir, err)
-	}
-	return nil
 }
