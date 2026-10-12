@@ -1,2 +1,2 @@
 commands:
-  test: make test
+  test: make check test-contract
