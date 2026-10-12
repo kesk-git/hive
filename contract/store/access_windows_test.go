@@ -3,6 +3,7 @@
 package store
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -95,4 +96,35 @@ func refuseReplace(t testing.TB, s *Store, rel string) (restore func(), ok bool)
 		renameWait = wait
 		f.Close()
 	}, true
+}
+
+// OpenPrivate refuses a file another handle has open, which could read what
+// is written after its access is closed, and opens it once that handle is
+// gone.
+func TestOpenPrivateRefusesAnOpenFile(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "home")
+	if err := os.Mkdir(dir, dirMode); err != nil {
+		t.Fatal(err)
+	}
+	secureHome(t, dir)
+	path := filepath.Join(dir, "response.json")
+	if err := os.WriteFile(path, nil, fileMode); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := OpenRead(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, err := OpenPrivate(path); !errors.Is(err, errorSharingViolation) {
+		if err == nil {
+			f.Close()
+		}
+		t.Fatalf("a file open elsewhere: %v", err)
+	}
+	reader.Close()
+	f, err := OpenPrivate(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
 }

@@ -61,8 +61,6 @@ const (
 	aclHeaderSize = 8
 	aceHeaderSize = 4
 
-	tokenOwnerClass = 4
-
 	driveRemote         = 4
 	filePersistentACLs  = 0x8
 	localFileSystemName = "NTFS"
@@ -80,38 +78,6 @@ func userSID() (*syscall.SID, error) {
 		return nil, fmt.Errorf("store: the user of the process: %w", err)
 	}
 	return user.User.Sid, nil
-}
-
-// ownerSIDs are the identifiers an entry made by this process may be owned
-// by, as strings: the user's own, and the default owner of the process's
-// token, which is the Administrators group in an elevated process.
-func ownerSIDs() ([]string, error) {
-	user, err := userSID()
-	if err != nil {
-		return nil, err
-	}
-	own, err := user.String()
-	if err != nil {
-		return nil, fmt.Errorf("store: %w", err)
-	}
-	token, err := syscall.OpenCurrentProcessToken()
-	if err != nil {
-		return nil, fmt.Errorf("store: the process token: %w", err)
-	}
-	defer token.Close()
-	var n uint32
-	if err := syscall.GetTokenInformation(token, tokenOwnerClass, nil, 0, &n); err != syscall.ERROR_INSUFFICIENT_BUFFER {
-		return nil, fmt.Errorf("store: the owner of the process token: %w", err)
-	}
-	b := make([]byte, n)
-	if err := syscall.GetTokenInformation(token, tokenOwnerClass, &b[0], n, &n); err != nil {
-		return nil, fmt.Errorf("store: the owner of the process token: %w", err)
-	}
-	def, err := (*struct{ Owner *syscall.SID })(unsafe.Pointer(&b[0])).Owner.String()
-	if err != nil {
-		return nil, fmt.Errorf("store: %w", err)
-	}
-	return []string{own, def}, nil
 }
 
 // private is the security descriptor of an entry open to the user alone:
@@ -178,26 +144,42 @@ type access struct {
 	granted   []ace
 }
 
-// ownerOnly refuses an entry that grants access to anyone but its owner: one
-// that is owned by anyone but the user, whose access-control list has an entry
-// that allows a security identifier other than the user's own, or no list at
-// all, which gives everyone full access, or, for a directory, whose entries do
-// not reach the files and directories made in it. what names the entry in the
-// error; path is where it is.
+// ownerOnly refuses an entry that is a reparse point, which a home never holds,
+// and one that grants access to anyone but its owner: one that is owned by
+// anyone but the user, whose access-control list has an entry that allows a
+// security identifier other than the user's own, or no list at all, which
+// gives everyone full access, or, for a directory, whose entries do not reach
+// the files and directories made in it. what names the entry in the error;
+// path is where it is.
 func ownerOnly(path string, info fs.FileInfo, what string) error {
-	owners, err := ownerSIDs()
+	name, err := syscall.UTF16PtrFromString(extendedPath(path))
+	if err != nil {
+		return fmt.Errorf("store: %w", err)
+	}
+	attrs, err := syscall.GetFileAttributes(name)
+	if err != nil {
+		return fmt.Errorf("store: reading the attributes of %s: %w", what, err)
+	}
+	if attrs&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		return fmt.Errorf("%w: %s is a reparse point, which a home does not hold", ErrLayout, what)
+	}
+	user, err := userSID()
 	if err != nil {
 		return err
+	}
+	own, err := user.String()
+	if err != nil {
+		return fmt.Errorf("store: %w", err)
 	}
 	a, err := readAccess(path)
 	if err != nil {
 		return fmt.Errorf("store: reading the access of %s: %w", what, err)
 	}
-	if a.owner != owners[0] && a.owner != owners[1] {
+	if a.owner != own {
 		return fmt.Errorf("%w: %s is open beyond its owner (it is owned by %s)", ErrLayout, what, a.owner)
 	}
 	for _, e := range a.granted {
-		if e.sid != owners[0] {
+		if e.sid != own {
 			return fmt.Errorf("%w: %s is open beyond its owner (its access-control list grants access to %s)", ErrLayout, what, e.sid)
 		}
 		if info.IsDir() && e.flags&(objectInheritACE|containerInheritACE|noPropagateACE|inheritOnlyACE) != objectInheritACE|containerInheritACE {
@@ -362,14 +344,16 @@ func SecureDir(dir string) error {
 // there, open to its owner only: a new file is created with its private
 // descriptor already applied, so that no other account holds a handle to it,
 // and the descriptor is applied to the opened handle itself, never to a second
-// lookup of the name, before anything is written.
+// lookup of the name, before anything is written. The file is opened without
+// sharing: a file another handle has open for reading, writing or deleting is
+// refused, and none can be opened while it is held.
 func OpenPrivate(path string) (*os.File, error) {
 	p, err := newPrivate(false)
 	if err != nil {
 		return nil, err
 	}
 	defer p.free()
-	f, err := openHandle(path, syscall.GENERIC_WRITE|writeDAC|writeOwner, syscall.OPEN_ALWAYS, p.attributes())
+	f, err := openHandle(path, syscall.GENERIC_WRITE|writeDAC|writeOwner, 0, syscall.OPEN_ALWAYS, p.attributes())
 	if err != nil {
 		return nil, err
 	}
