@@ -51,4 +51,4 @@ The adapter places every input in the session's **one canonical input sequence**
 
 ## What is not defined here
 
-Pending approvals, the stream by which a reader is told of a new message, attachment to a session that is already running and the control of worker endpoints are the same-session adapter's own contracts. Stage 4 defines and qualifies them, separately for Claude and for local Codex, and adds what it needs to this file as a minor change.
+Pending approvals, the stream by which a reader is told of a new message, attachment to a session that is already running and the control of worker endpoints are the same-session adapter's own contracts. Stage 4 defines and qualifies them, separately for Claude and for local Codex, and adds what it needs to this file as a minor change. What the Hive Mind sees of an approval is the design's: a message of its own kind in the dock and in Read Hive, answered from the dock only, never a decision card, and notified like a decision, as the design's [Session dock and reader](../docs/design.md#session-dock-and-reader) states.

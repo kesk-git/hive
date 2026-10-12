@@ -19,7 +19,7 @@ hive-<command> --version
 ```
 
 - `<operation>` is the first argument and is one of the operations the command declares.
-- `--home` names the private home. It is required for every operation except `capabilities`. There is no default home, no home taken from the environment and no search for one.
+- `--home` names the private home. It is required for every operation except `capabilities`. There is no default home, no home taken from the environment and no search for one. Where a home sits is [records.md](records.md#the-home)'s rule, Hive's root, which tells a caller which directory to name and never names it for a command.
 - **The request is never an argument.** It is read from the file `--request-file` names, or from standard input when that option is absent.
 - The response is written to the file `--response-file` names, or to standard output when that option is absent.
 - A command reads no environment variable as an input to the contract. It uses the environment only as any process does: to find the external executables it runs, and for those executables' own configuration. A command sets a child's environment only through Tendril, the launch primitive of the [one process-execution path](distribution.md#what-a-hive-executable-may-run), and a value it resolved appears in no argument, response, receipt or log, under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section.

@@ -33,9 +33,46 @@ The seven package targets and their scopes are the design's. What each must prov
 4. **No private home, no real clone.** Every test creates the homes, clones and worktrees it uses under a temporary directory and removes them. No test reads or writes an existing private home, an existing worktree pool, a project's clone or any state of an existing installation.
 5. **Deterministic.** A test that depends on time takes the clock as an input. A test of concurrency runs its interleavings by control, not by sleeping and hoping.
 6. **One command each.** Each target is one command from the repository root with no argument and no environment to set, the same command on each of the three platforms, exits 0 on success, and prints the name of each failing test otherwise.
-7. **Bounded.** Each package target completes within the bound the build plan sets for one validation run. A target that outgrows it is split by the package's owner, never skipped.
-8. **A target that has nothing to run fails.** A target whose package holds no test exits nonzero, so an empty package cannot pass by default.
-9. **Three platforms.** Every target passes on macOS, Windows and Linux, and a pass on one establishes nothing about the others. The macOS runs take place on the operator's own Mac. GitHub's hosted Windows and Linux runners, for this public repository, are Hive's declared test environment for those two platforms, by the operator's decision: they run the targets there and report the results, which are evidence and never the gate, whose verdict and merge stay on the operator's machine. A test whose behaviour depends on the platform states what it expects on each of the three, and no test passes on a platform by being skipped there.
+7. **Bounded.** A Hunt's declared checks at a head complete within ten minutes on the operator's machine and any one target within five, each measured from the command's start with no wait for a lock counted, apart from a long run that is the Hunt's own evidence, as the design's [How Hive tests](../docs/design.md#how-hive-tests) states. A target that outgrows its bound is split by the package's owner or declared long in Hive's [test contract](#a-projects-test-contract), and then runs at the landing that completes a Target; it is never skipped.
+8. **A target that has nothing to run fails.** A target whose package holds no test exits nonzero, so an empty package cannot pass by default. Hive's test contract marks such a target not built, and the gate command runs the built targets only.
+9. **Three platforms.** Every target passes on macOS, Windows and Linux, and a pass on one establishes nothing about the others. The macOS runs take place on the operator's own Mac. GitHub's hosted Windows and Linux runners, for this public repository, are Hive's declared test environment for those two platforms, by the operator's decision: they run the targets there and report the results, which are evidence of a remote producer that the gate reads under the design's [hybrid on evidence](../docs/design.md#synapse-on-the-operators-machine-with-both-reviewers), and never the gate, whose verdict and merge stay on the operator's machine. One workflow file under `.github/workflows/` runs `make test` on both for every Harvest head and every night; its results are required at the landing that completes a Target and in the scheduled run, and are informational at every other head. A test whose behaviour depends on the platform states what it expects on each of the three, and no test passes on a platform by being skipped there.
+
+## A project's test contract
+
+Each project declares its tests in one file at the root of its repository, owned by the project and kept there as what tests the application, as the design's [How Hive tests](../docs/design.md#how-hive-tests) states. It is a record kind of its own, described here in prose; its schema enters with stage 5, the first stage that reads it, as a minor change. Beside the project-level commands the gate already runs, build, format, lint and smoke, it holds one row per test:
+
+| Field | Content |
+| --- | --- |
+| `name` | The test's name, unique in the file, which a receipt names; for Hive, the `make` target's name. |
+| `command` | One command from the repository root, with no argument and no environment to set, which exits 0 on a pass, as rule 6 asks of a target. |
+| `class` | `check` or `long`: a Hunt's check at a head runs the checks it affects, and the landing that completes a Target runs the long tests. |
+| `reads` | The paths and globs the test reads, its own files included; `**` for everything. |
+| `bound_seconds` | The time within which the test must finish on the operator's machine, measured from the command's start: a wait for a lock is not counted. |
+| `needs` | Any of `quiet`, a quiet machine; `display`; `whole-machine`; and `network`, which Hive's own tests never name. |
+| `platforms` | The platforms the test must pass on; every row of Hive's own names all three. |
+| `measured_seconds` | The time the last scheduled run measured, which Hive writes and a person never does; every scheduled run records it, with the test's last result, in its receipt. |
+| `status` | `built`, or `not-built` for a target whose package holds no test yet. |
+
+Three rules follow from it, and every set the gate runs is computed from them:
+
+1. **The affected set.** A test is affected at a head when its `reads` meet a path of `git diff --name-only --no-renames -z` between the head of its last recorded pass and that head, which lists a rename's source and its destination as two paths, each NUL-terminated so that no filename is misread. A changed path that no row declares affects every test, and so do this file, the build files (`Makefile`, `go.mod`, `go.sum` or a project's own) and a lockfile; a test that uses a helper declares it in its `reads`.
+2. **A pass carries.** A pass is a receipt per test per head. It carries to a later head whose affected set leaves the test out, and the receipt names the head the test ran at and that the comparison found nothing.
+3. **Long by measurement.** `class` follows the test's invocation on the operator's machine: it is `long` when `measured_seconds` passes the bound for one test, when `needs` names anything, or when `platforms` leaves out the operator's machine, so that the test has no local invocation. A row that names the other platforms beside the operator's machine stays `check`: the Windows and Linux results are a separate obligation, required at the landing that completes a Target and in the scheduled run and informational at every other head, as rule 9 states. A project may declare a test long by hand; nothing declares one short by hand.
+
+Hive's own test contract holds these rows, and by rule 1 a change to a build file affects every one of them:
+
+| `name` | `command` | `class` | `reads` | `bound_seconds` | `status` |
+| --- | --- | --- | --- | --- | --- |
+| `check` | `make check` | `check` | `**/*.go`, `spec/schemas/**` | 60 | `built` |
+| `test-contract` | `make test-contract` | `check` | `contract/**`, `spec/**`, `**/*.go`, `packages/*/hive-package.json` | 300 | `built` |
+| `test-pool` to `test-ui`, seven rows | `make test-<package>` | `check` | `packages/<package>/**`, `contract/**`, `spec/**` | 300 each | `not-built` |
+| `build` | `make build` | `check` | `**/*.go`, `spec/schemas/**` | 120 | `built` |
+| `test-integration` | `make test-integration` | `check` until measured | `**` | 300 | `not-built` |
+| `test-distribution` | `make test-distribution` | `long`, needing the whole machine, on all three platforms | `**` | 900 | `not-built` |
+| `check-imports` | `make check-imports` | `check` | `**` | 60 | `not-built` |
+| `windows`, `linux` | the workflow's `make test` on each | `long`, on that platform | `**` | 900 | `not-built` |
+
+The scheduled full run runs every row with every cache defeated, `go test -count=1` for Hive, each test alone in this file's order, and records each test's measured time and last result in the run's receipt, writing the time into `measured_seconds`.
 
 ## What the targets do not cover
 

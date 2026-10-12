@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-imperative.render.request:v1",
   "title": "hive-imperative render: request body",
-  "description": "Renders the dispatch text and the launch parameters of one Imperative revision. Read-only and deterministic: the same revision, specification revision and renderer version give the same text and digest. The text is private; the caller never puts it in a repository, a Harvest, a comment or a log.",
+  "description": "Renders the dispatch text and the launch parameters of one Imperative revision. Read-only and deterministic: the same revision, specification revision, rules in force for the revision's class and renderer version give the same text and digest. The text is private; the caller never puts it in a repository, a Harvest, a comment or a log.",
   "type": "object",
   "additionalProperties": false,
   "required": [
