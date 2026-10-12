@@ -7,6 +7,8 @@ README.md
 LICENSE                              added by its own change, before any import
 NOTICE                               third-party notices, generated from imports/
 .gitattributes                       line feeds kept in every checkout, on every platform
+.claude/
+  settings.json                      repository configuration for Claude Code: includeCoAuthoredBy and attribution.sessionUrl, both false, keep AI co-author and session trailers off
 go.mod                               the one module and the pinned Go release
 Makefile                             the test, check and build targets
 docs/
@@ -58,8 +60,14 @@ Of these, this definition creates `spec/`, the eight `hive-package.json` files a
 8. **Page files are hand-written.** The `ui` package's HTML, CSS and JavaScript live under `packages/ui/internal/assets/` as standard files that the platform's own web engine loads as they are, inside Hive's own app, and are embedded into `hive-ui`. The repository has no bundler, no transpiler, no package manifest of another ecosystem and no generated page file.
 9. **Fixtures stay with their owner.** A package's fixtures are under its `testdata/`. Fixtures for the schemas are under `contract/testdata/schemas/<name>/valid/` and `.../invalid/`. Nothing under a `testdata/` directory is read by a delivered executable.
 10. **Upstream notices stay with the package that maintains the import**, under `packages/<name>/upstream/<import_id>/`, as the [import record](imports.md) lists them.
-11. **Nothing private is committed.** No private home, no record from one, no credential, no machine path and no decision text enters the repository. Fixtures are written for the purpose and use invented identities.
+11. **The landing test.** The reader and tense questions apply to every path a change adds or changes; the exposure question applies to every path and to the Harvest body and the commit messages.
+    - *Reader:* who reads it: the build, a test, the delivered application, or a person using or changing the current code? If only the work's supervisors, the operator or an audit read it, it is a record.
+    - *Tense:* does the path state the present, edited in place, or record an event: a run, a lane, a head, a date, a result, who said what? An event is a record. A version note under `spec/versions/` is the one exception. An import record's pinned upstream identity and recording date describe the dependency as it is now and pass; the licence and copyright notices an import keeps verbatim are a third party's notice, not anyone's own words.
+    - *Exposure:* read it as a stranger would. It holds no home or machine path or user name, no account, token or credential detail, no instruction text, no one's verbatim words and no private decision id standing in for its substance.
+
+    A path that fails the first or second question does not land: it moves to its owner in the private home, in the same lane. A line that fails the third is rewritten first. A Harvest body and the commit messages state the requirement and the outcome, what changed, the risk, the testing and the gate's findings; they never quote the Hive Mind and they pass the exposure question. What never enters a path: notes, Imperatives, proof, captures, logs, scan results, progress or review records, transcripts and anyone's own words. Fixtures are written for the purpose and use invented identities. The same test governs the repositories of the projects Hive runs; a record already committed there moves out in one cleanup lane for that project, and git history keeps it, with nothing rewritten.
 12. **The same bytes in every checkout.** Every committed text file keeps its line feeds in a checkout on every platform, so that the schemas embedded into an executable and the fixtures a test reads are the same bytes on macOS, Windows and Linux; the repository's own attributes say so, and no checkout setting of a platform may translate them. No two committed paths differ only in case, and no committed name holds a character or a device name that one of the three platforms refuses, under the rules [records.md](records.md#encoding) states for a path.
+13. **No AI watermark.** No AI co-author or session trailer appears in a commit or a merge commit, and no generated-by line in a pull request, a comment or a file. The repository's `.claude/settings.json` keeps Claude Code's co-author trailer and session trailer off.
 
 ## File naming
 
