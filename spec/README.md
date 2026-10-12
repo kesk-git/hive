@@ -4,7 +4,7 @@ This directory holds the contracts of the first two stages of the [ordered imple
 
 [The design](../docs/design.md) says what Hive is and why. This specification says where each thing lives, who owns it and what proves it. Where the two differ, the design governs and the difference is a defect in this specification.
 
-Contract version: **1.12**. What each version changed is recorded under [versions/](versions/), one file per version.
+Contract version: **1.13**. What each version changed is recorded under [versions/](versions/), one file per version.
 
 ## What is defined
 
@@ -15,7 +15,7 @@ Contract version: **1.12**. What each version changed is recorded under [version
 | [naming.md](naming.md) | The Spawning Pool's names in every form, and the rules that keep it apart from the Pool. |
 | [packages.md](packages.md) | The seven package owners, the command each owns, the calls each may make and the shared contract library. |
 | [identities.md](identities.md) | Home, workspace, project and clone identities, the identifier form, scope and how identities are created. |
-| [records.md](records.md) | The on-disk record format: encoding, versioning, atomic replacement, the home layout, the event journal and locks. |
+| [records.md](records.md) | The on-disk record format: encoding, versioning, atomic replacement, where a home sits and its layout, the event journal and locks. |
 | [commands.md](commands.md) | The command contract: invocation, the request and response envelopes, exit and error states, size errors, replay and capability declarations. |
 | [receipts.md](receipts.md) | The receipt envelope, kind names and the rule that a receipt states one fact. |
 | [events.md](events.md) | The event envelope, the three times, ordering, deduplication and the journal. |

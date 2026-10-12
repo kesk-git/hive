@@ -1,6 +1,6 @@
 # Review files
 
-A mockup or design review is a directory of files in the owning supervisor's private home. The design fixes the files and what each must hold; this file fixes their schemas, names and writers. The surface that shows them, Hive's own app that serves them and the routing of a submitted round are stage 6's.
+A review of an artifact, a mockup, a report, a plan, a comparison or a decision page, is a directory of files in the owning supervisor's private home. The design fixes the files and what each must hold; this file fixes their schemas, names and writers. The surface that shows them, Hive's own app that serves them and the routing of a submitted round are stage 6's.
 
 Owner: `ui`, which is the only writer of anything under `reviews/`. Schemas: [`review.v1`](schemas/review.v1.schema.json), [`review-feedback.v1`](schemas/review-feedback.v1.schema.json), [`review-reply.v1`](schemas/review-reply.v1.schema.json), [`review-final.v1`](schemas/review-final.v1.schema.json). Proved by `test-contract` for the shapes and by `test-ui` for the behavior.
 
@@ -33,9 +33,9 @@ Every file is written by `ui`, through `hive-ui`. The party that supplies the co
 | File | Supplied by | Written |
 | --- | --- | --- |
 | `review.json` | The owning supervisor registers the review; the Lictor publishes each revision | Replaced atomically at each change, under the review's lock |
-| `revision-NNNN.html` and its assets | The assigned Lictor | Once. Never changed |
+| `revision-NNNN.html` and its assets | The assigned Lictor, or the owner writing an artifact for its own task | Once. Never changed |
 | `round-NNNN.feedback.json` | The Hive Mind, through the page | Replaced atomically as events are added; earlier events are never changed or dropped |
-| `round-NNNN.reply.json` | The assigned Lictor | Once |
+| `round-NNNN.reply.json` | The assigned Lictor, or the owner writing an artifact for its own task | Once |
 | `final.json` | The Hive Mind pressing Done | Once |
 
 Any package of the same home may read these files through the contract library's validated reader, without a lock, as the Shadow does to read the registered review files; none but `ui` writes them. A Lictor and a supervisor never write these files directly. They call `hive-ui`, whose operations for registering, publishing and replying stage 6 defines. The feedback writer is the one narrowly scoped writer the page reaches, and it writes only the registered round's file.
@@ -46,15 +46,15 @@ The review's identity and manifest.
 
 - **Identity:** `review_id`, the [scope](identities.md#scope) (`hive` for the Hive's own projectless work, otherwise `project`, or `workspace` for work that belongs to no single project), `task_id` and `generation`.
 - **`owner`:** the supervisor that owns the review: the Hive, or the Fleet of one workspace, by home.
-- **`lictor`:** the assigned Lictor, as the task and generation of the execution that writes revisions and replies.
+- **`lictor`:** the assigned Lictor, as the task and generation of the execution that writes revisions and replies. Where the owner writes and registers an artifact for its own task itself, as the design allows, `lictor` names that task and generation, and the owner writes the revisions and replies a Lictor would.
 - **`parent_route`:** the registered route to the owner's parent, or `none` for the Hive's own review. Identifiers and this route decide ownership; a matching short name or a selected filter never does.
 - **`revisions`:** the manifest. One entry per published revision: its number, its HTML file and every asset it may load, each with path, digest and size, the round it answers where there is one, and when it was published. An entry is never changed or removed.
 - **`current_revision`** and **`current_round`:** what the page shows and where new feedback goes. `current_revision` is 0 until the first revision is published.
-- **`completion`:** null until Done, then a reference to `final.json`.
+- **`completion`:** null until Done, then a reference to `final.json`. Once it is set, the review takes no new revision: `hive-ui` refuses to publish one, and further work goes to a new review.
 
 A new current revision is published only after its HTML, its assets and any reply to the previous round are durable. Publishing is one replacement of `review.json`.
 
-Hive's own app serves a revision's HTML and its declared assets, from inside the program, and nothing else, after checking each path and digest against this manifest.
+Hive's own app serves a revision's HTML and its declared assets, from inside the program, and nothing else, after checking each path and digest against this manifest. A revision is self-contained: its HTML references nothing remote, every asset it loads is in the manifest, and the sealed-off frame the app shows it in is given no network.
 
 ## `round-NNNN.feedback.json`
 

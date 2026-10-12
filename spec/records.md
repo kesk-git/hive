@@ -44,7 +44,11 @@ Every record carries `schema`, the name of its schema (`hive.request`, `pool.ite
 
 ## The home
 
-A private home is a directory outside every project repository, selected explicitly for every command. Its top level is fixed:
+A private home is a directory outside every project repository, selected explicitly for every command by `--home`.
+
+Every home on a machine sits in **Hive's root**, the one folder per machine that holds everything Hive keeps there, as the design's [Credentials, files and resident processes](../docs/design.md#credentials-files-and-resident-processes) states: the Hive's own home is `hive/` in it, and each Fleet's home is a directory under `fleets/` named by that home's identifier. The root is the platform's own place for an application's data unless the Hive Mind names another folder: on macOS `Library/Application Support/Hive` in the user's home directory; on Windows `Hive` in the folder `LOCALAPPDATA` names, which is the machine's own and never the roaming folder `APPDATA` names; and on Linux `hive` in the folder `XDG_DATA_HOME` names, or `.local/share/hive` in the user's home directory where that variable is unset or not an absolute path. One function of the contract library resolves it from those variables, and not through the standard library's `os.UserConfigDir`, which gives the roaming folder on Windows and the configuration folder on Linux. The root is resolved only where Hive is started; a Fleet's home is provisioned in the root that holds the Hive's home, so its provisioning reads the root from that home and from no environment variable; and every command takes its home from `--home` alone, as [decision 8](decisions.md#8-requests-never-travel-as-arguments-and-the-home-is-always-named) requires. A folder the Hive Mind names in place of the platform's own meets every rule of this section, and like a home it is never inside a Git working tree; how the app keeps that choice is left to stage 6, as [decisions.md](decisions.md#left-to-the-stage-that-needs-it) lists. Nothing of Hive's is kept inside a project: a project's records sit in the home of the Fleet that owns it, found from a checkout by the clone's [identity](identities.md#the-four-identity-records), and nothing is left in the checkout.
+
+A home's top level is fixed:
 
 | Path | Owner | Holds |
 | --- | --- | --- |

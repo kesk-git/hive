@@ -84,6 +84,8 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 **Decision.** A request is read from a file or standard input, never from an argument. `--home` is required; there is no default, no environment variable and no search.
 
+**As contract version 1.13 adds.** Every home sits in Hive's root, one folder per machine in the platform's place for an application's own data or another folder the Hive Mind names, as [records.md](records.md#the-home) states. The root says where a home is and never which home a command acts on: it is resolved where Hive is started, and every command still takes its home from `--home` alone.
+
 **Reason.** The design requires that a large request never be one argument and that private records never be ambient inputs. Making the file the only route removes the size boundary instead of guarding it, and removes the question of which requests are small enough. Naming the home every time is the plain form of "never ambient".
 
 **Rejected.** *Arguments for small requests and a file for large ones* is two paths to test and one threshold to get wrong. *A default home from the environment* is the ambient input the design rules out.
@@ -215,12 +217,13 @@ These are not decided here, deliberately. Each is cheap to add later and would b
 | Open point | First needed |
 | --- | --- |
 | The Pool's own records and the layout inside `pool/` | Stage 2; settled in [pool.md](pool.md), with that stage's own decisions listed there |
-| Where the Spawning Pool keeps its worktrees on disk, and its lease record | Stage 3 |
+| Where the Spawning Pool keeps its worktrees on disk, in Hive's root or the platform's own place for an application's caches and never in a folder of the operator's own, and its lease record | Stage 3 |
 | A streamed form of response | Stage 4 |
-| Pending approvals in the session, and how a reader is told of a new message | Stage 4 |
+| The record and transport of a pending approval in the session, which the design shows in the dock and notifies like a decision, and how a reader is told of a new message | Stage 4 |
 | The minimum version of each of the five, by probe | The stage that first runs each |
 | The version each named exception of [the toolchain](distribution.md#the-toolchain) is pinned to | Stage 4 for go-keyring, stage 6 for purego |
-| What each platform needs beside `hive-ui` for the app's icon, menus and notifications | Stage 6 |
+| What each platform needs beside `hive-ui` for the app's icon, menus and notifications, but for Windows's notifications, which come from the app's own icon in the notification area and need nothing registered | Stage 6 |
+| How the app keeps a folder the Hive Mind named as Hive's root in place of the platform's own, and what each repair of its setup check runs on each platform | Stage 6, with the app |
 | Where instructions and skills sit in the artefact | The stage that first delivers one |
 | Retention periods and segment sizes | The stage that owns each store, as configuration |
 | Which package declares the optional browser stack | The stage that first selects a browser task |
