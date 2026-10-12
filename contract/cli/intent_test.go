@@ -242,3 +242,22 @@ func openStore(t testing.TB, home string) *store.Store {
 	}
 	return st
 }
+
+// An intent whose receipts the unknown answer could not carry within the
+// response limit is refused before anything is written, so that the receipts
+// committed are always the ones returned, and the effect does not run.
+func TestIntentWhoseReceiptsCannotBeReturnedIsRefused(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	h.exe.command("hive-fleet").Limits.MaxResponseBytes = 4096
+	before := tree(t, home)
+	resp := h.invoke(t, home, "effect", effectRequest(t, 8, "large receipt"))
+	expect(t, resp, envelope.TooLarge, "record_too_large")
+	if len(resp.Receipts) != 0 || h.calls["effected"] != 0 || outcomeOf(home, 8) {
+		t.Errorf("%+v, effect %d", resp, h.calls["effected"])
+	}
+	after := tree(t, home)
+	delete(after, "locks/dispatch.lock")
+	delete(before, "locks/dispatch.lock")
+	same(t, before, after)
+}

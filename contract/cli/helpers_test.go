@@ -291,7 +291,11 @@ func newHarness(t testing.TB) *harness {
 		{OperationDecl: decl("effect", true), Handle: count("effect", func(c *Call) (*Result, error) {
 			mode, _ := c.Request.Body["home"].(map[string]any)["name"].(string)
 			path := store.RecordPath("dispatch", "thing", "intended")
-			intended, err := c.NewReceipt("dispatch.thing.intended", "1.0", nil, nil, nil)
+			var body map[string]any
+			if mode == "large receipt" {
+				body = map[string]any{"filler": strings.Repeat("x", 5000)}
+			}
+			intended, err := c.NewReceipt("dispatch.thing.intended", "1.0", nil, nil, body)
 			if err != nil {
 				return nil, err
 			}

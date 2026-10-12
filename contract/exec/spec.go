@@ -73,8 +73,6 @@ type Spec struct {
 	// the stage which first runs it names, copied by name from Hive's own
 	// environment where they are set.
 	Config []string
-	// Tendril is the one variable Tendril sets from a resolved value, or nil.
-	Tendril *Var
 	// Start is the kind of start; plain when empty.
 	Start StartKind
 	// Stdin, Stdout and Stderr are the streams of a plain or resident start.

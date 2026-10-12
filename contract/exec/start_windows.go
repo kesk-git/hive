@@ -25,6 +25,11 @@ type winTree struct {
 	// console is the pseudoconsole of a terminal start.
 	console *winConsole
 	once    sync.Once
+
+	// mu keeps the job's handle from being used while it is closed. Once the
+	// job is closed everything in it has been ended, and it is not asked.
+	mu        sync.Mutex
+	jobClosed bool
 }
 
 func (t *winTree) wait() Result {
@@ -73,12 +78,22 @@ func (t *winTree) end() error {
 	if t.job == 0 {
 		return errors.New("exec: a run in no job has no tree to end")
 	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.jobClosed {
+		return nil
+	}
 	return call(procTerminateJobObject, uintptr(t.job), terminatedByInterrupt)
 }
 
 // empty says whether no process is left in the job.
 func (t *winTree) empty() bool {
 	if t.job == 0 {
+		return true
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.jobClosed {
 		return true
 	}
 	n, err := activeProcesses(t.job)
@@ -99,7 +114,10 @@ func (t *winTree) close() {
 			syscall.CloseHandle(t.process)
 		}
 		if t.job != 0 {
+			t.mu.Lock()
 			syscall.CloseHandle(t.job)
+			t.jobClosed = true
+			t.mu.Unlock()
 		}
 	})
 }

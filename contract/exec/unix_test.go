@@ -239,3 +239,45 @@ func TestAGroupNumberTakenByAnotherProcessIsNotSignaled(t *testing.T) {
 		t.Errorf("a group seen gone was signaled: %v", err)
 	}
 }
+
+// A group whose leader has ended and which a descendant keeps is watched, so
+// that it is seen gone when the descendant ends and is never signaled after,
+// without Stop having looked; until then Stop still ends the descendant.
+func TestAGroupKeptByADescendantIsWatchedUntilGone(t *testing.T) {
+	fakeDir(t, "fakeprog")
+	spawn := func() (*Run, ProcessID) {
+		run := fake(t, Spec{Stdout: Pipe()}, "tree")
+		pid, _ := strconv.Atoi(strings.TrimPrefix(readLine(t, run.Stdout()), "child "))
+		child, err := identify(pid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		syscall.Kill(run.ID.PID, syscall.SIGKILL)
+		if res := run.Wait(); res.Outcome != Ended {
+			t.Fatalf("%+v", res)
+		}
+		return run, child
+	}
+
+	run, child := spawn()
+	defer kill(child)
+	tree := run.tree.(*unixTree)
+	if tree.over.Load() {
+		t.Fatal("a group a descendant keeps is gone")
+	}
+	syscall.Kill(child.PID, syscall.SIGKILL)
+	deadline := time.Now().Add(5 * time.Second)
+	for !tree.over.Load() {
+		if time.Now().After(deadline) {
+			t.Fatal("the group was not seen gone when its last process ended")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	run, child = spawn()
+	defer kill(child)
+	if _, err := run.Stop(Grace{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	waitGone(t, child)
+}

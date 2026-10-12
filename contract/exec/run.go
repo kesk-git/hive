@@ -90,7 +90,7 @@ func Start(spec Spec) (*Run, error) {
 	if serr != nil {
 		return nil, serr
 	}
-	env, err := buildEnv(envInput{goos: goos, environ: ownEnviron(), config: spec.Config, terminal: spec.Start == TerminalStart, tendril: spec.Tendril})
+	env, err := buildEnv(envInput{goos: goos, environ: ownEnviron(), config: spec.Config, terminal: spec.Start == TerminalStart})
 	if err != nil {
 		return nil, &StartError{Reason: Refused, Program: spec.Program, Err: err}
 	}

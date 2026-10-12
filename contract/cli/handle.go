@@ -527,23 +527,47 @@ func (e *Executable) unknownAnswer(c *Command, operation, requestID, message str
 	return e.failure(requestID, c.Name, operation, envelope.Common(envelope.CodeOutcomeUnknown, message))
 }
 
-// unknownAfterIntent is the answer of a request whose intent is committed and
-// whose outcome is not established: outcome_unknown with exactly the receipts
-// of the committed intents, which are on disk, and no outcome recorded. Where
-// the answer with them would not fit the response limit it is given without
-// them, as the floor holds.
-func (e *Executable) unknownAfterIntent(c *Command, op *Operation, requestID, why string, committed []envelope.Receipt) *envelope.Response {
-	message := "the intent of this request is committed and its outcome is not established; reconcile before any retry"
-	if why != "" {
-		message += ": " + why
-	}
+// unknownMessage is the message of the unknown answer after a committed
+// intent, which a reason for the failure may follow.
+const unknownMessage = "the intent of this request is committed and its outcome is not established; reconcile before any retry"
+
+// unknownWith is the unknown answer with the message and the receipts.
+func (e *Executable) unknownWith(c *Command, op *Operation, requestID, message string, committed []envelope.Receipt) *envelope.Response {
 	f := envelope.Common(envelope.CodeOutcomeUnknown, clip(message, string(envelope.Unknown)))
 	f.Receipts = slices.Clone(committed)
-	resp := e.failure(requestID, c.Name, op.Name, f)
-	if e.preflight(c, resp) != nil {
-		resp = e.unknownAnswer(c, op.Name, requestID, interruptedMessage)
+	return e.failure(requestID, c.Name, op.Name, f)
+}
+
+// unknownAfterIntent is the answer of a request whose intent is committed and
+// whose outcome is not established: outcome_unknown with exactly the receipts
+// of the committed intents, which are on disk, and no outcome recorded. The
+// reason is given where it fits; the answer without it always fits, since
+// CommitIntent admits no intent whose receipts it could not carry.
+func (e *Executable) unknownAfterIntent(c *Command, op *Operation, requestID, why string, committed []envelope.Receipt) *envelope.Response {
+	if why != "" {
+		if resp := e.unknownWith(c, op, requestID, unknownMessage+": "+why, committed); e.preflight(c, resp) == nil {
+			return resp
+		}
 	}
-	return resp
+	return e.unknownWith(c, op, requestID, unknownMessage, committed)
+}
+
+// unknownCarries checks that the unknown answers a committed intent can need,
+// with the receipts of the intents, fit the response limit: the one after an
+// effect and the one of an interrupted transaction. It returns the failure
+// that refuses the intent, or nil.
+func (e *Executable) unknownCarries(c *Command, op *Operation, requestID string, receipts []envelope.Receipt) *envelope.Failure {
+	for _, message := range []string{unknownMessage, interruptedMessage} {
+		bad := e.preflight(c, e.unknownWith(c, op, requestID, message, receipts))
+		if bad == nil {
+			continue
+		}
+		if bad.Error.LimitBytes != nil && bad.Error.ActualBytes != nil {
+			return envelope.Oversize("the answer to an intent whose outcome is not established, with its receipts,", *bad.Error.LimitBytes, *bad.Error.ActualBytes)
+		}
+		return &envelope.Failure{Status: bad.Status, Err: *bad.Error}
+	}
+	return nil
 }
 
 // afterIntent shapes the failure an operation returned for what it committed
@@ -608,14 +632,6 @@ func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *e
 	if bad := e.preflight(c, resp); bad != nil {
 		if !durable {
 			return bad
-		}
-		if len(resp.Receipts) > 0 && resp.Status == envelope.Unknown {
-			// The receipts of the intents made the interrupted answer too
-			// large: it is given without them.
-			resp.Receipts = nil
-			if e.preflight(c, resp) == nil {
-				return resp
-			}
 		}
 		fmt.Fprintf(stderr, "%s %s: the recorded response of %s is %s\n", c.Name, op.Name, requestID, bad.Error.Message)
 		return e.unknownAnswer(c, op.Name, requestID, oversizeReplayMessage)

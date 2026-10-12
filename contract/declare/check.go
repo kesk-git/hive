@@ -201,8 +201,8 @@ func duplicates(list []string) []string {
 // Names checks that every name carries its owner and that the naming rules
 // of spec/naming.md hold for what a declaration names: each package's
 // executable and test target have the forms the specification gives; its
-// record, receipt, event and error names begin with a prefix of its own,
-// which no other package has; the Spawning Pool is never shortened in an
+// record, receipt, event and error names begin with its own name, which no
+// other package has; the Spawning Pool is never shortened in an
 // identifier, and the bare word pool belongs to the package named pool alone.
 func (s *Set) Names() Problems {
 	var ps Problems
@@ -222,6 +222,9 @@ func (s *Set) Names() Problems {
 			}
 			if !has(p.KindPrefixes, p.Name) {
 				add("kind_prefixes lack %s, the package's own name", p.Name)
+			}
+			if len(p.KindPrefixes) != 1 {
+				add("kind_prefixes are %v; the only prefix of %s is its own name", p.KindPrefixes, p.Name)
 			}
 		case KindLibrary:
 			if p.TestTarget != "test-contract" {
@@ -299,29 +302,35 @@ func spawningPoolNames(owner, id string) []string {
 // home (spec/packages.md, What ownership means): the home paths of the
 // packages are relative to the home, none holds another, and the journal and
 // the locks, which are shared through the contract library, belong to no
-// package. A package without a store, as word, declares none.
+// package. Paths are compared in any case, since the default file systems of
+// macOS and Windows would take two that differ only in case for one
+// (spec/records.md); a package may nest its own paths, but not alias them by
+// case. A package without a store, as word, declares none.
 func (s *Set) HomeOwnership() Problems {
 	var ps Problems
-	type claim struct{ pkg, path string }
+	type claim struct{ pkg, path, folded string }
 	var claims []claim
 	for _, p := range s.All() {
 		for _, h := range p.HomePaths {
 			clean := strings.TrimSuffix(h, "/")
-			first, _, _ := strings.Cut(clean, "/")
+			folded := strings.ToLower(clean)
+			first, _, _ := strings.Cut(folded, "/")
 			if first == "journal" || first == "locks" {
 				ps = append(ps, Problem{"home ownership", p.Dir, fmt.Sprintf("%s declares %s, which is shared through the contract library", p.Name, h)})
 			}
-			claims = append(claims, claim{p.Name, clean})
+			claims = append(claims, claim{p.Name, clean, folded})
 		}
 	}
+	within := func(a, b string) bool { return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/") }
 	for i, a := range claims {
 		for _, b := range claims[i+1:] {
-			if a.pkg == b.pkg {
+			if !within(a.folded, b.folded) {
 				continue
 			}
-			if a.path == b.path || strings.HasPrefix(a.path, b.path+"/") || strings.HasPrefix(b.path, a.path+"/") {
-				ps = append(ps, Problem{"home ownership", "home_paths", fmt.Sprintf("%s of %s and %s of %s overlap", a.path, a.pkg, b.path, b.pkg)})
+			if a.pkg == b.pkg && within(a.path, b.path) {
+				continue
 			}
+			ps = append(ps, Problem{"home ownership", "home_paths", fmt.Sprintf("%s of %s and %s of %s overlap", a.path, a.pkg, b.path, b.pkg)})
 		}
 	}
 	return ps

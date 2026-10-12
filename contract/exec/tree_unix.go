@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync/atomic"
 	"syscall"
+	"time"
 )
 
 // unixTree is a run's process group: the group the start created, which is
@@ -17,7 +18,11 @@ import (
 // The group's number belongs to the tree only while a process of the group
 // lives: once none does, the number may name any group. So the tree is
 // signaled only until it has once been seen gone, and never when the process
-// of that number is now another one.
+// of that number is now another one. While the leader is unreaped its number
+// cannot be taken; once it is reaped, and a descendant keeps the group, the
+// group is watched until it is seen gone, so that its number is never
+// signaled after it could have been taken, whether or not the process that
+// took it can still be read.
 type unixTree struct {
 	proc *os.Process
 	pgid int
@@ -35,9 +40,26 @@ type unixTree struct {
 func (t *unixTree) wait() Result {
 	res := t.status()
 	// The leader is reaped, and its number is the group's only while a
-	// process of the group lives: look at once, while that is least doubtful.
-	t.empty()
+	// process of the group lives: look at once, while that is least doubtful,
+	// and go on looking while a descendant keeps the group.
+	if !t.empty() {
+		go t.watch()
+	}
 	return res
+}
+
+// watchEvery is how often a group whose leader has ended is looked at.
+const watchEvery = 100 * time.Millisecond
+
+// watch looks at the group until it is seen gone, which empty records.
+func (t *unixTree) watch() {
+	tick := time.NewTicker(watchEvery)
+	defer tick.Stop()
+	for range tick.C {
+		if t.empty() {
+			return
+		}
+	}
 }
 
 func (t *unixTree) status() Result {

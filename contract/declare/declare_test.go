@@ -229,6 +229,11 @@ func TestNamingRules(t *testing.T) {
 		}, "the executable of ui is hive-ui"},
 		{"the wrong test target", decl("pool"), func(m map[string]any) { m["test_target"] = "test-pools" }, "the test target of pool is test-pool"},
 		{"the package's own name is no prefix", decl("synapse"), func(m map[string]any) { m["kind_prefixes"] = []any{"syn"} }, "lack synapse"},
+		{"a prefix beside its own name", decl("word"), func(m map[string]any) { m["kind_prefixes"] = []any{"word", "alias"} }, "the only prefix of word is its own name"},
+		{"a receipt kind under a second prefix", decl("word"), func(m map[string]any) {
+			m["kind_prefixes"] = []any{"word", "alias"}
+			m["receipt_kinds"] = []any{map[string]any{"kind": "alias.answer", "asserts": "x"}}
+		}, "the only prefix of word is its own name"},
 		{"another package's name as a prefix", decl("ui"), func(m map[string]any) { m["kind_prefixes"] = []any{"ui", "word"} }, "the name of another package"},
 	}
 	for _, tc := range cases {
@@ -364,7 +369,13 @@ func TestHomeOwnership(t *testing.T) {
 		{"the same path", decl("shadow"), "pool", "overlap"},
 		{"a path inside another's", decl("shadow"), "pool/shadow", "overlap"},
 		{"a path that holds another's", decl("shadow"), "dispatch/registry", "overlap"},
+		{"the same path in another case", decl("shadow"), "Pool", "overlap"},
+		{"a path inside another's in another case", decl("shadow"), "Pool/shadow", "overlap"},
+		{"a path that holds another's in another case", decl("shadow"), "Dispatch", "overlap"},
+		{"its own path in another case", decl("shadow"), "Shadow", "overlap"},
 		{"the journal", decl("shadow"), "journal", "shared through the contract library"},
+		{"the journal in another case", decl("shadow"), "Journal", "shared through the contract library"},
+		{"the locks in another case", decl("shadow"), "Locks/shadow.lock", "shared through the contract library"},
 		{"the locks", decl("shadow"), "locks/shadow.lock", "shared through the contract library"},
 	}
 	for _, tc := range cases {

@@ -10,8 +10,8 @@ import (
 
 // The child's environment is built from nothing: the platform's base
 // variables by name, the program's configuration variables, TERM for a
-// terminal start on macOS and Linux, and Tendril's one variable; nothing of
-// the rest of Hive's environment passes, whole or by pattern.
+// terminal start on macOS and Linux; nothing of the rest of Hive's
+// environment passes, whole or by pattern.
 func TestEnvironmentOnUnix(t *testing.T) {
 	environ := []string{
 		"PATH=/bin:/usr/bin", "HOME=/home/h", "USER=u", "LOGNAME=u", "TMPDIR=/tmp", "TZ=UTC", "LANG=en_US.UTF-8",
@@ -45,21 +45,11 @@ func TestEnvironmentOnUnix(t *testing.T) {
 	if containsPrefix(got, "TERM=") {
 		t.Errorf("a plain start has TERM: %q", got)
 	}
-	// Tendril's one variable.
-	withValue, err := buildEnv(envInput{goos: "linux", environ: environ, tendril: &Var{Name: "GH_TOKEN", Value: "resolved"}})
-	if err != nil || !contains(withValue, "GH_TOKEN=resolved") || contains(withValue, "GH_TOKEN=ghp_secret") {
-		t.Errorf("%q, %v", withValue, err)
-	}
-	// Refusals: a name that is not one, a value holding a NUL, a variable the
-	// environment already has, TERM as configuration.
+	// Refusals: a name that is not one, TERM as configuration.
 	for name, in := range map[string]envInput{
-		"a name with =":      {goos: "linux", environ: environ, config: []string{"A=B"}},
-		"an empty name":      {goos: "linux", environ: environ, config: []string{""}},
-		"a NUL in a value":   {goos: "linux", environ: environ, tendril: &Var{Name: "X", Value: "a\x00b"}},
-		"a bad tendril name": {goos: "linux", environ: environ, tendril: &Var{Name: "1X", Value: "a"}},
-		"a base variable":    {goos: "linux", environ: environ, tendril: &Var{Name: "HOME", Value: "a"}},
-		"a configured one":   {goos: "linux", environ: environ, config: []string{"HIVE_CONFIG"}, tendril: &Var{Name: "HIVE_CONFIG", Value: "a"}},
-		"TERM twice":         {goos: "linux", environ: environ, config: []string{"TERM"}, terminal: true},
+		"a name with =": {goos: "linux", environ: environ, config: []string{"A=B"}},
+		"an empty name": {goos: "linux", environ: environ, config: []string{""}},
+		"TERM twice":    {goos: "linux", environ: environ, config: []string{"TERM"}, terminal: true},
 	} {
 		if _, err := buildEnv(in); err == nil {
 			t.Errorf("%s: no error", name)
@@ -86,11 +76,6 @@ func TestEnvironmentOnWindows(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %q\nwant %q", got, want)
-	}
-	// A Tendril variable that differs from a present one only in case is that
-	// variable.
-	if _, err := buildEnv(envInput{goos: "windows", environ: environ, tendril: &Var{Name: "path", Value: "x"}}); err == nil {
-		t.Error("a variable that differs only in case passed")
 	}
 	// The order is by name without regard to case.
 	if !sort.SliceIsSorted(got, func(i, j int) bool {
@@ -132,12 +117,12 @@ func TestChildEnvironment(t *testing.T) {
 	t.Setenv("LC_ALL", "C")
 	t.Setenv("TERM", "dumb")
 	t.Setenv("HOME", t.TempDir())
-	spec := withFake(t, Spec{Config: []string{"HIVE_TEST_CONFIG", "HIVE_TEST_UNSET"}, Tendril: &Var{Name: "HIVE_TENDRIL", Value: "one-value"}}, "env")
+	spec := withFake(t, Spec{Config: []string{"HIVE_TEST_CONFIG", "HIVE_TEST_UNSET"}}, "env")
 	out, res := runOutput(t, spec)
 	if res.Outcome != Exited || res.Code != 0 {
 		t.Fatalf("%v", res)
 	}
-	want, err := buildEnv(envInput{goos: runtime.GOOS, environ: ownEnviron(), config: spec.Config, tendril: spec.Tendril})
+	want, err := buildEnv(envInput{goos: runtime.GOOS, environ: ownEnviron(), config: spec.Config})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +147,7 @@ func TestChildEnvironment(t *testing.T) {
 			}
 		}
 	}
-	if !contains(got, "HIVE_TEST_CONFIG=configured") || !contains(got, "HIVE_TENDRIL=one-value") {
+	if !contains(got, "HIVE_TEST_CONFIG=configured") {
 		t.Errorf("%q", got)
 	}
 }

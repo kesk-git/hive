@@ -146,7 +146,10 @@ type Intent struct {
 //
 // Nothing outside Hive may happen before CommitIntent has returned without
 // an error. A failure it returns says why nothing was written, as the
-// store's refusals do, and the operation returns it. An error that is an
+// store's refusals do, and the operation returns it. An intent whose
+// receipts, with those of the intents before it, the unknown answer could not
+// carry within the command's response limit is refused as too large, since
+// the receipts committed are always returned. An error that is an
 // *store.InterruptedError means the transaction is durable and not complete:
 // the operation returns it unchanged, makes no effect, and the harness
 // answers unknown; the next command to lock the store completes it.
@@ -173,6 +176,9 @@ func (c *Call) CommitIntent(in Intent) ([]store.Written, error) {
 	receipts, err := encodeReceipts(in.Receipts)
 	if err != nil {
 		return nil, err
+	}
+	if f := c.Executable.unknownCarries(c.Command, c.Operation, c.Request.RequestID, append(slices.Clone(c.intent), in.Receipts...)); f != nil {
+		return nil, f
 	}
 	done, err := c.writer.Commit(store.Tx{RequestID: c.Request.RequestID, Records: records, Receipts: receipts, Events: in.Events})
 	if err != nil {

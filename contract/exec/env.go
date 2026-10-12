@@ -8,14 +8,6 @@ import (
 	"strings"
 )
 
-// Var is the one variable Tendril, the launch primitive of the design's
-// Secrets section, sets in a child from a resolved value. It is the only way
-// a value enters a child, never an argument.
-type Var struct {
-	Name  string
-	Value string
-}
-
 // The base variables a platform needs for any program to run, each copied by
 // name from Hive's own environment where it is set.
 var (
@@ -44,13 +36,11 @@ type envInput struct {
 	config []string
 	// terminal says the start is a terminal start.
 	terminal bool
-	tendril  *Var
 }
 
 // buildEnv builds the child's environment from nothing, for one run: the
 // platform's base variables, the program's configuration variables, TERM for
-// a terminal start on macOS and Linux, and Tendril's one variable. Nothing
-// else of Hive's environment passes, neither whole nor by pattern. The
+// a terminal start on macOS and Linux. Nothing else of Hive's environment passes, neither whole nor by pattern. The
 // variables are in a fixed order, which on Windows is the order the platform
 // requires: by name, without regard to case.
 func buildEnv(in envInput) ([]string, error) {
@@ -139,18 +129,6 @@ func buildEnv(in envInput) ([]string, error) {
 			return nil, fmt.Errorf("exec: TERM is set by a terminal start and is no configuration variable")
 		}
 		add("TERM", Term)
-	}
-	if in.tendril != nil {
-		if err := checkVarName(in.tendril.Name); err != nil {
-			return nil, err
-		}
-		if strings.ContainsRune(in.tendril.Value, 0) {
-			return nil, fmt.Errorf("exec: the value of %s holds a NUL character", in.tendril.Name)
-		}
-		if have(in.tendril.Name) {
-			return nil, fmt.Errorf("exec: %s is already in the child's environment and is no variable of Tendril's", in.tendril.Name)
-		}
-		add(in.tendril.Name, in.tendril.Value)
 	}
 	key := func(kv string) string {
 		name, _, _ := strings.Cut(kv, "=")
