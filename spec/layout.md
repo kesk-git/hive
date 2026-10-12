@@ -6,6 +6,7 @@ Hive is one repository and one Go module. The seven packages are directories of 
 README.md
 LICENSE                              added by its own change, before any import
 NOTICE                               third-party notices, generated from imports/
+.gitattributes                       line feeds kept in every checkout, on every platform
 go.mod                               the one module and the pinned Go release
 Makefile                             the test, check and build targets
 docs/
@@ -53,11 +54,12 @@ Of these, this definition creates `spec/`, the eight `hive-package.json` files a
 4. **One main package per Hive package**, at `packages/<name>/cmd/<executable>/`, where `<executable>` is the `executable` of the declaration. See [commands.md](commands.md#executables-and-command-names).
 5. **`contract/` is the only shared code.** Any package may import it. It imports nothing from `packages/`. It holds no store, no command and no rule that belongs to one package.
 6. **`spec/` is embedded, not copied.** `spec/embed.go` is the one Go file under `spec/`. It embeds `schemas/` and exports it to `contract/`. No schema is duplicated into a package.
-7. **Process execution has one path.** Only `contract/exec` imports the standard library's process-execution package. Every other package runs an external executable or another Hive command through it. See [distribution.md](distribution.md#what-a-hive-executable-may-run).
+7. **Process execution has one path.** Only `contract/exec` starts a process, by any means: it alone imports the standard library's process-execution package, `os/exec`, calls `os.StartProcess` or a process-creation function of `syscall`, or reaches a platform's own process-creation call through a system library. Every other package runs an external executable or another Hive command through it. See [distribution.md](distribution.md#the-one-process-execution-path).
 8. **Browser files are hand-written.** The `ui` package's HTML, CSS and JavaScript live under `packages/ui/internal/assets/` as standard files that a browser loads as they are, and are embedded into `hive-ui`. The repository has no bundler, no transpiler, no package manifest of another ecosystem and no generated browser file.
 9. **Fixtures stay with their owner.** A package's fixtures are under its `testdata/`. Fixtures for the schemas are under `contract/testdata/schemas/<name>/valid/` and `.../invalid/`. Nothing under a `testdata/` directory is read by a delivered executable.
 10. **Upstream notices stay with the package that maintains the import**, under `packages/<name>/upstream/<import_id>/`, as the [import record](imports.md) lists them.
 11. **Nothing private is committed.** No private home, no record from one, no credential, no machine path and no decision text enters the repository. Fixtures are written for the purpose and use invented identities.
+12. **The same bytes in every checkout.** Every committed text file keeps its line feeds in a checkout on every platform, so that the schemas embedded into an executable and the fixtures a test reads are the same bytes on macOS, Windows and Linux; the repository's own attributes say so, and no checkout setting of a platform may translate them. No two committed paths differ only in case, and no committed name holds a character or a device name that one of the three platforms refuses, under the rules [records.md](records.md#encoding) states for a path.
 
 ## File naming
 

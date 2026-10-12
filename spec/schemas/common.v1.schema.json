@@ -175,21 +175,21 @@
       "maxLength": 100
     },
     "home_relative_path": {
-      "description": "A path relative to its declared base, with forward slashes, no empty, '.' or '..' segment and no leading slash.",
+      "description": "A path relative to its declared base, with forward slashes, no empty, '.' or '..' segment and no leading slash. A segment holds no backslash, colon, '*', '?', '\"', '<', '>', '|' or control character, does not end in a dot or a space, and is not a device name Windows reserves, so the path names the same file on macOS, Windows and Linux. See spec/records.md, Encoding.",
       "type": "string",
       "minLength": 1,
       "maxLength": 1024,
-      "pattern": "^[^/\\x00]+(/[^/\\x00]+)*$",
+      "pattern": "^[^/\\\\:*?\"<>|\\x00-\\x1f]+(/[^/\\\\:*?\"<>|\\x00-\\x1f]+)*$",
       "not": {
-        "pattern": "(^|/)\\.\\.?(/|$)"
+        "pattern": "(^|/)\\.\\.?(/|$)|[. ](/|$)|(^|/)([Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(\\.[^/]*)?(/|$)"
       }
     },
     "absolute_path": {
-      "description": "An absolute physical path with symbolic links resolved. Private: it never leaves the home that records it.",
+      "description": "An absolute physical path as the platform's file system reports it, with symbolic links and junctions resolved and forward slashes: '/...' on macOS and Linux, the drive form 'C:/...' on Windows. Private: it never leaves the home that records it.",
       "type": "string",
       "minLength": 2,
       "maxLength": 4096,
-      "pattern": "^/[^\\x00]*$"
+      "pattern": "^(/[^\\x00]*|[A-Za-z]:/[^\\x00\\\\]*)$"
     },
     "scope_level": {
       "description": "hive: the Hive's own projectless work. workspace: one workspace as a whole. project: one registered project.",

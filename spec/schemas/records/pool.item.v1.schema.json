@@ -448,7 +448,7 @@
       }
     },
     "placement": {
-      "description": "mac: on the Mac. claude-cloud-session: in a Claude cloud session. policy: left to the policy resolver. codex-cloud: Codex in the Void, a named value that admission refuses while the backend is parked.",
+      "description": "mac: on the operator's machine, the one the Hive runs on, whether it runs macOS, Windows or Linux; the value keeps its name on every platform. claude-cloud-session: in a Claude cloud session. policy: left to the policy resolver. codex-cloud: Codex in the Void, a named value that admission refuses while the backend is parked.",
       "enum": [
         "mac",
         "claude-cloud-session",
@@ -523,7 +523,7 @@
       "maximum": 4
     },
     "validation_axis": {
-      "description": "synapse: Synapse on the Mac validates the result. direct: an explicitly authorized direct delivery with its stated checks.",
+      "description": "synapse: Synapse on the operator's machine validates the result. direct: an explicitly authorized direct delivery with its stated checks.",
       "enum": [
         "synapse",
         "direct"
