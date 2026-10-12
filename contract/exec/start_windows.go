@@ -100,6 +100,10 @@ func (t *winTree) empty() bool {
 	return err == nil && n == 0
 }
 
+// release does nothing: the job ends what is left of the tree when it is
+// closed.
+func (t *winTree) release() {}
+
 func (t *winTree) closeEnds() bool { return t.job != 0 }
 
 // close releases Hive's handles. Closing the job ends what is still in it.

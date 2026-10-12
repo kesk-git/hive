@@ -272,6 +272,7 @@ func (stuckTree) interrupt() error { return nil }
 func (stuckTree) request() error   { return nil }
 func (stuckTree) end() error       { return nil }
 func (stuckTree) empty() bool      { return false }
+func (stuckTree) release()         {}
 func (stuckTree) closeEnds() bool  { return false }
 func (stuckTree) close()           {}
 

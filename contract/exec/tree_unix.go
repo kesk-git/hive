@@ -17,11 +17,12 @@ import (
 //
 // The group's number is the leader's id, and no process or group can be
 // given it while the leader, Hive's own child, exists, ended or not, until
-// Hive reaps it. So the reaper only observes the leader's end, and the leader
-// is reaped once the run is released, or once Hive has ended the group and
-// no process of it is left, since none it ended can start another; the
-// group is never signaled after: every signal goes to a group whose number
-// cannot have been given to another.
+// Hive reaps it. So the leader is held unreaped for as long as Hive holds the
+// run, and every signal goes to a group whose number cannot have been given
+// to another. Hive never looks at whether the group is empty: letting the run
+// go is one last SIGKILL to the group and then the reap, after which the
+// group is never signaled again. A resident start is let go without being
+// ended.
 type unixTree struct {
 	proc *os.Process
 	pgid int
@@ -30,17 +31,13 @@ type unixTree struct {
 	// term is the controller side of a terminal start.
 	term *os.File
 
-	// mu orders the signals against the reaping of the leader.
+	// mu orders the signals against the release.
 	mu sync.Mutex
 	// exited is set once the leader's end has been observed.
 	exited bool
-	// released is set once the run is released: the leader is reaped as
+	// released is set once Hive has let the run go: the leader is reaped as
 	// soon as it has ended.
 	released bool
-	// ended is set once Hive has sent the group SIGKILL.
-	ended bool
-	// reaped is set once the leader is reaped.
-	reaped bool
 }
 
 // The codes of a child's end in the siginfo waitid fills, the same on macOS
@@ -55,14 +52,14 @@ const (
 const pPID = 1
 
 // wait observes the leader's end without reaping it, and reaps it at once
-// where the run is released.
+// where the run is already let go.
 func (t *unixTree) wait() Result {
 	res := t.observe()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.exited = true
 	if t.released {
-		t.reap()
+		t.proc.Wait()
 	}
 	return res
 }
@@ -91,15 +88,6 @@ func (t *unixTree) observe() Result {
 	return Result{Outcome: Lost, Err: errors.New("exec: the process neither exited nor was ended by a signal")}
 }
 
-// reap reaps the ended leader, after which the group is never signaled.
-// The caller holds mu.
-func (t *unixTree) reap() {
-	if !t.reaped {
-		t.proc.Wait()
-		t.reaped = true
-	}
-}
-
 // interrupt writes Control-C, 0x03, to the terminal's input, which its line
 // discipline turns into SIGINT for the foreground process group.
 func (t *unixTree) interrupt() error {
@@ -123,40 +111,25 @@ func (t *unixTree) request() error {
 // end sends SIGKILL to the group.
 func (t *unixTree) end() error { return t.signal(syscall.SIGKILL) }
 
-// signal sends the signal to the group while its leader is unreaped.
+// signal sends the signal to the group while Hive holds the run.
 func (t *unixTree) signal(sig syscall.Signal) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.reaped {
+	if t.released {
 		return nil
 	}
 	if err := syscall.Kill(-t.pgid, sig); err != nil && !gone(err) {
 		return err
 	}
-	if sig == syscall.SIGKILL {
-		t.ended = true
-	}
 	return nil
 }
 
-// empty says whether no process of the group is left but the ended leader,
-// and reaps the leader once none is after Hive ended the group.
+// empty says whether the leader has ended. The group is not looked at: what
+// is left of it is ended when the run is let go.
 func (t *unixTree) empty() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.reaped {
-		return true
-	}
-	if !t.exited {
-		return false
-	}
-	if live, err := groupLives(t.pgid); live || err != nil {
-		return false
-	}
-	if t.ended {
-		t.reap()
-	}
-	return true
+	return t.exited
 }
 
 // gone says whether the error of a signal to the group says that no process
@@ -168,11 +141,15 @@ func gone(err error) bool {
 	return errors.Is(err, syscall.ESRCH) || errors.Is(err, syscall.EPERM)
 }
 
-func (t *unixTree) closeEnds() bool { return false }
+// closeEnds says that close ends what is left of the group, except for a
+// resident start.
+func (t *unixTree) closeEnds() bool { return !t.resident }
 
-// close releases the process of a resident start. The leader of any other
-// start is reaped now if it has ended, and otherwise as soon as it ends.
-func (t *unixTree) close() {
+// release lets the run go: one last SIGKILL to the group, and the reap of
+// the leader, now if it has ended and otherwise as soon as it ends. A
+// resident start is let go without being ended: Hive releases its process,
+// which nothing waits for.
+func (t *unixTree) release() {
 	if t.resident {
 		if t.proc != nil {
 			t.proc.Release()
@@ -181,8 +158,15 @@ func (t *unixTree) close() {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.released {
+		return
+	}
 	t.released = true
+	syscall.Kill(-t.pgid, syscall.SIGKILL)
 	if t.exited {
-		t.reap()
+		t.proc.Wait()
 	}
 }
+
+// close lets the run go.
+func (t *unixTree) close() { t.release() }

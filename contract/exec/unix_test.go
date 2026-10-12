@@ -201,90 +201,75 @@ func TestResidentIsInASessionOfItsOwn(t *testing.T) {
 	}
 }
 
-// A group's number is its leader's id, which no other process or group can
-// be given while the leader is unreaped. A run whose leader has ended while a
-// descendant keeps the group holds the leader unreaped: its id still names
-// the run's own leader, with the start time it was started with, and Stop
-// ends the descendant through the group. Once the run is ended the leader is
-// reaped, and the group is not signaled again.
-func TestAnEndedLeaderIsHeldWhileItsGroupLives(t *testing.T) {
+// A helper that outlives its leader keeps running while Hive holds the run,
+// and the leader is held unreaped, so that the group's number stays the
+// run's: the leader's id still names it, with the start time it was started
+// with. Letting the run go, by Close or by Stop, ends the helper with one
+// last SIGKILL to the group and reaps the leader.
+func TestAHelperRunsUntilTheRunIsLetGo(t *testing.T) {
 	fakeDir(t, "fakeprog")
-	run := fake(t, Spec{Stdout: Pipe()}, "tree")
-	pid, _ := strconv.Atoi(strings.TrimPrefix(readLine(t, run.Stdout()), "child "))
-	child, err := identify(pid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer kill(child)
-	syscall.Kill(run.ID.PID, syscall.SIGKILL)
-	if res := run.Wait(); res.Outcome != Ended || res.Signal != "killed" {
-		t.Fatalf("%+v", res)
-	}
-	if now, err := identify(run.ID.PID); err != nil || now != run.ID {
-		t.Fatalf("the id of the ended leader names %+v, %v; it was started as %+v", now, err, run.ID)
-	}
-	if run.tree.empty() || !alive(child) {
-		t.Fatal("the group a descendant keeps is gone")
-	}
-	res, err := run.Stop(Grace{}, nil)
-	if err != nil || res.Outcome != StoppedByHive {
-		t.Fatalf("%+v %v", res, err)
-	}
-	waitGone(t, child)
-	if now, err := identify(run.ID.PID); err == nil && now == run.ID {
-		t.Error("the leader of an ended run is not reaped")
-	}
-	if again, err := run.Stop(Grace{}, func() error { t.Error("recorded again"); return nil }); err != nil || again.Outcome != StoppedByHive {
-		t.Errorf("%+v %v", again, err)
+	for name, letGo := range map[string]func(*testing.T, *Run){
+		"close": func(t *testing.T, run *Run) {
+			if err := run.Close(); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"stop": func(t *testing.T, run *Run) {
+			res, err := run.Stop(Grace{}, func() error { t.Error("the end was recorded for a run whose process had ended"); return nil })
+			if err != nil || res.Outcome != Ended || res.Signal != "killed" {
+				t.Fatalf("%+v %v", res, err)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			run := fake(t, Spec{Stdout: Pipe()}, "tree")
+			pid, _ := strconv.Atoi(strings.TrimPrefix(readLine(t, run.Stdout()), "child "))
+			helper, err := identify(pid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer kill(helper)
+			syscall.Kill(run.ID.PID, syscall.SIGKILL)
+			if res := run.Wait(); res.Outcome != Ended || res.Signal != "killed" {
+				t.Fatalf("%+v", res)
+			}
+			time.Sleep(100 * time.Millisecond)
+			if !alive(helper) {
+				t.Fatal("the helper was ended before the run was let go")
+			}
+			if now, err := identify(run.ID.PID); err != nil || now != run.ID {
+				t.Fatalf("the id of the ended leader names %+v, %v; it was started as %+v", now, err, run.ID)
+			}
+			letGo(t, run)
+			waitGone(t, helper)
+			waitGone(t, run.ID)
+		})
 	}
 }
 
-// The leader is held until the run is ended or released: one that ended
-// alone is held until the run is released, and a released run's leader is
-// reaped whether it ended before the release or after.
-func TestTheLeaderIsReapedOnceTheRunEnds(t *testing.T) {
+// Once the run is let go and its leader reaped, its group is never signaled
+// again, whatever its number comes to name: here another run's group, put in
+// its place as the number would be if it were given again.
+func TestAGroupLetGoIsNeverSignaledAgain(t *testing.T) {
 	fakeDir(t, "fakeprog")
-	reaped := func(id ProcessID) bool {
-		now, err := identify(id.PID)
-		return err != nil || now != id
+	run := fake(t, Spec{Stdout: Pipe()}, "holdterm")
+	readLine(t, run.Stdout())
+	if res, err := run.Stop(Grace{}, nil); err != nil || res.Outcome != StoppedByHive {
+		t.Fatalf("%+v %v", res, err)
 	}
-	alone := fake(t, Spec{}, "exit", "0")
-	if res := alone.Wait(); !res.Passed() || reaped(alone.ID) {
-		t.Errorf("a leader that ended alone: %+v, reaped before the release %v", res, reaped(alone.ID))
+	waitGone(t, run.ID)
+	other := fake(t, Spec{Stdout: Pipe()}, "hold")
+	readLine(t, other.Stdout())
+	run.tree.(*unixTree).pgid = other.tree.(*unixTree).pgid
+	if _, err := run.Stop(Grace{}, nil); err != nil {
+		t.Error(err)
 	}
-	alone.Close()
-	if !reaped(alone.ID) {
-		t.Error("a released run's leader that ended alone was not reaped")
-	}
-
-	before := fake(t, Spec{Stdout: Pipe()}, "tree")
-	pid, _ := strconv.Atoi(strings.TrimPrefix(readLine(t, before.Stdout()), "child "))
-	child, err := identify(pid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer kill(child)
-	syscall.Kill(before.ID.PID, syscall.SIGKILL)
-	before.Wait()
-	if reaped(before.ID) {
-		t.Fatal("a leader whose group lives was reaped")
-	}
-	before.Close()
-	if !reaped(before.ID) || !alive(child) {
-		t.Errorf("released after the end: reaped %v, descendant alive %v", reaped(before.ID), alive(child))
-	}
-
-	after := fake(t, Spec{Stdout: Pipe()}, "tree")
-	pid, _ = strconv.Atoi(strings.TrimPrefix(readLine(t, after.Stdout()), "child "))
-	child, err = identify(pid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer kill(child)
-	after.Close()
-	syscall.Kill(after.ID.PID, syscall.SIGKILL)
-	after.Wait()
-	if !reaped(after.ID) {
-		t.Error("a released run's leader was not reaped when it ended")
+	run.tree.request()
+	run.tree.end()
+	run.tree.release()
+	run.Close()
+	time.Sleep(100 * time.Millisecond)
+	if !alive(other.ID) {
+		t.Error("the group of a run let go was signaled")
 	}
 }

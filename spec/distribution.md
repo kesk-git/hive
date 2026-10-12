@@ -157,6 +157,8 @@ A run is stopped in up to three steps, each taken only after the one before has 
 2. **Request.** On macOS and Linux, `SIGTERM` to the process group, and for a terminal start also closing the controller side, which hangs the terminal up (`SIGHUP`). On Windows, for a terminal start, closing the pseudoconsole, which sends `CTRL_CLOSE_EVENT` to its processes; for a plain start, closing its standard input, the one request Windows offers a process that has no console. A resident operation of Hive's is asked to stop through its own command, as the stage that builds it states.
 3. **End.** On macOS and Linux, `SIGKILL` to the process group. On Windows, `TerminateJobObject` with the exit code `0xC000013A`, the status Windows itself gives a console program ended by Control-C, which no Hive status uses.
 
+On macOS and Linux the run's own process is held unreaped for as long as Hive holds the run, so that the number of its group can name no other group, and Hive never checks whether the group is empty: a step is not taken once that process has ended, and letting the run go, when it is stopped, closed or the command that started it returns, is one last `SIGKILL` to the group and then the reap. A resident start is let go without being ended.
+
 Before it ends a tree, the run records that it is ending it, so that its result is read from that record and never inferred from an exit code. A unary command waits for, or ends, every run it started before it returns, and nothing of it outlives it but a resident start. If the command itself dies, its runs may go on as orphans on macOS and Linux, and on Windows they end with its job; either way the command's intent stands and the next command reconciles, so no contract depends on which.
 
 ### A resident start

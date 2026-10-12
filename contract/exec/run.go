@@ -24,13 +24,21 @@ type tree interface {
 	request() error
 	// end ends the whole tree: SIGKILL to the group, or TerminateJobObject.
 	end() error
-	// empty says whether no process of the tree is left.
+	// empty says whether the tree is gone: on Windows no process is left in
+	// the job; on macOS and Linux the leader has ended, and what is left of
+	// the group is ended when the run is let go.
 	empty() bool
+	// release lets the run go once it is stopped: on macOS and Linux one
+	// last SIGKILL to the group and the reap of the leader, after which the
+	// group is never signaled; on Windows nothing, as the job ends with
+	// close.
+	release()
 	// closeEnds says whether close ends what is still in the tree.
 	closeEnds() bool
 	// close releases what Hive holds, except what the reaper of a run
 	// waited for still uses, which the reaper releases itself: on Windows
-	// the job, which ends what is in it.
+	// the job, and on macOS and Linux the run, as release does, either of
+	// which ends what is left of the tree.
 	close()
 }
 
@@ -165,45 +173,48 @@ const pollEvery = 10 * time.Millisecond
 // before has had the grace period: for a terminal start the interrupt,
 // Control-C written to its input; the request, which asks the tree to end;
 // and the end, which ends the whole tree. A step is not taken once the tree
-// is gone.
+// is gone, which on macOS and Linux is once the run's own process has ended.
+// Stop then lets the run go: on macOS and Linux one last SIGKILL to the
+// group ends what is left of it.
 //
 // Before it ends the tree, Stop calls ending, which records that Hive is
 // ending it, so that the result is read from that record and never inferred
 // from an exit code. An error from ending stops Stop before anything is
 // ended, and is returned. A tree Hive ended reads StoppedByHive, whatever
-// exit code or signal the end gave. A tree still not gone ten seconds after
-// the end is not stopped, and Stop returns an error. A resident start is
-// stopped through its own command, and Stop on one is refused.
+// exit code or signal the end gave. A run whose process has not ended ten
+// seconds after the end is not stopped, and Stop returns an error. A
+// resident start is stopped through its own command, and Stop on one is
+// refused.
 func (r *Run) Stop(g Grace, ending func() error) (Result, error) {
 	if r.kind == ResidentStart {
 		return Result{}, errors.New("exec: a resident start is stopped through its own command")
 	}
 	r.stopMu.Lock()
 	defer r.stopMu.Unlock()
-	if r.gone() {
-		return r.Wait(), nil
-	}
-	if r.term != nil {
+	gone := r.gone()
+	if !gone && r.term != nil {
 		_ = r.tree.interrupt()
-		if r.goneWithin(g.Interrupt) {
-			return r.Wait(), nil
+		gone = r.goneWithin(g.Interrupt)
+	}
+	if !gone {
+		_ = r.tree.request()
+		gone = r.goneWithin(g.Request)
+	}
+	var err error
+	if !gone {
+		if ending != nil {
+			if err := ending(); err != nil {
+				return Result{}, err
+			}
+		}
+		r.markEnding()
+		if err = r.tree.end(); err == nil && !r.goneWithin(stopWait) {
+			err = fmt.Errorf("exec: the run's process has not ended %v after the end", stopWait)
 		}
 	}
-	_ = r.tree.request()
-	if r.goneWithin(g.Request) {
-		return r.Wait(), nil
-	}
-	if ending != nil {
-		if err := ending(); err != nil {
-			return Result{}, err
-		}
-	}
-	r.markEnding()
-	if err := r.tree.end(); err != nil {
+	r.tree.release()
+	if err != nil {
 		return Result{}, err
-	}
-	if !r.goneWithin(stopWait) {
-		return Result{}, fmt.Errorf("exec: the tree is not gone %v after it was ended", stopWait)
 	}
 	return r.Wait(), nil
 }
@@ -219,8 +230,8 @@ func (r *Run) markEnding() {
 	}
 }
 
-// gone says whether the run's process has ended and no process of its tree
-// is left.
+// gone says whether the run's process has ended and the tree is gone, as the
+// platform's tree says.
 func (r *Run) gone() bool {
 	select {
 	case <-r.done:
@@ -245,8 +256,9 @@ func (r *Run) goneWithin(d time.Duration) bool {
 	}
 }
 
-// Close releases what Hive holds of the run: its pipes, its terminal and, on
-// Windows, its job, which ends what is still in it. For a resident start it
+// Close releases what Hive holds of the run: its pipes, its terminal and its
+// tree, which ends what is still in it: on Windows by closing its job, on
+// macOS and Linux by one last SIGKILL to its group. For a resident start it
 // releases the handle of a process it does not wait for and ends nothing.
 func (r *Run) Close() error {
 	r.mu.Lock()
