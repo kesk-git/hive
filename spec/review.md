@@ -1,6 +1,6 @@
 # Review files
 
-A mockup or design review is a directory of files in the owning supervisor's private home. The design fixes the files and what each must hold; this file fixes their schemas, names and writers. The surface that shows them, the server that serves them and the routing of a submitted round are stage 6's.
+A mockup or design review is a directory of files in the owning supervisor's private home. The design fixes the files and what each must hold; this file fixes their schemas, names and writers. The surface that shows them, Hive's own app that serves them and the routing of a submitted round are stage 6's.
 
 Owner: `ui`, which is the only writer of anything under `reviews/`. Schemas: [`review.v1`](schemas/review.v1.schema.json), [`review-feedback.v1`](schemas/review-feedback.v1.schema.json), [`review-reply.v1`](schemas/review-reply.v1.schema.json), [`review-final.v1`](schemas/review-final.v1.schema.json). Proved by `test-contract` for the shapes and by `test-ui` for the behavior.
 
@@ -54,7 +54,7 @@ The review's identity and manifest.
 
 A new current revision is published only after its HTML, its assets and any reply to the previous round are durable. Publishing is one replacement of `review.json`.
 
-The server serves a revision's HTML and its declared assets and nothing else, after checking each path and digest against this manifest.
+Hive's own app serves a revision's HTML and its declared assets, from inside the program, and nothing else, after checking each path and digest against this manifest.
 
 ## `round-NNNN.feedback.json`
 
@@ -69,7 +69,7 @@ Exactly one per round. It carries the round's bindings and the ordered events of
 | `event_id` | Chosen by the page and reused on retry, so a retried save is one event. |
 | `sequence` | Assigned by the writer: consecutive from 1 in the file. |
 | `captured_at`, `received_at` | When the page captured the input, and when the writer made it durable. |
-| `operator` | The authenticated operator as the serving login established it: the local home-bound UI session, or the verified private-network identity. Never a value the browser supplied. |
+| `operator` | The operator as Hive's own app knows them: the user the app runs as, on the operator's machine, whose `login` is `local-session`. Never a value a page supplied. Since contract version 1.10 the app serves no other device, so `private-network` stays in the schema's list and is written by nothing. |
 | `kind` | `target`, `note`, `card-draft`, `submit` or `done`. |
 | `control_label` | The exact label of the control pressed. Required for `submit` and `done`. |
 

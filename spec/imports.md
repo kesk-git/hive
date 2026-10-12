@@ -1,6 +1,6 @@
 # Import record
 
-Hive takes source from other projects in two places, the Pool from tasks-axi and the Spawning Pool from Treehouse, and may later take a library. Each time, a record is written first. This file fixes when a record is required, what it holds and what checks it.
+Hive takes source from other projects in two places, the Pool from tasks-axi and the Spawning Pool from Treehouse, and two libraries, the named exceptions of [the toolchain](distribution.md#the-toolchain): go-keyring and purego. Each time, a record is written first. This file fixes when a record is required, what it holds and what checks it.
 
 Owner: the repository; each record names the package that maintains what it covers. Schema: [`import-record.v1`](schemas/import-record.v1.schema.json). Proved by `check-imports`.
 
@@ -63,13 +63,15 @@ The root `NOTICE` is the notices of all records together. It is committed, and `
 
 It cannot prove that an unrecorded copy was never made. That is a matter for review, and the rule for a reviewer is simple: source that resembles an upstream and has no record is a finding.
 
-## The two planned imports
+## The planned imports
 
-Neither is made by this definition. Each is made by its stage, record first. The owner's declaration keeps its `imports` list empty until the record exists, and the stage that makes the import adds the `import_id` to the list in the same change.
+None is made by this definition. Each is made by its stage, record first. The owner's declaration keeps its `imports` list empty until the record exists, and the stage that makes the import adds the `import_id` to the list in the same change, and for a library also the module with its `import_id` to the declaration's `libraries`.
 
 | Import | Owner | Kind | Upstream baseline named by the design |
 | --- | --- | --- | --- |
 | `tasks-axi` | `pool` | `translation` | Release 0.2.6 |
 | `treehouse` | `spawning-pool` | `adaptation` | Release v3.1.2 |
+| `go-keyring` | `contract` | `dependency` | The module `github.com/zalando/go-keyring`, at the version stage 4 pins |
+| `purego` | `ui` | `dependency` | The module `github.com/ebitengine/purego`, at the version stage 6 pins |
 
-tasks-axi is written in TypeScript and Hive is written in Go, so the Pool's adaptation is a translation: its parser, transitions, archives and moves are re-expressed, and its tests are carried over as translated tests, each naming the upstream test it re-expresses. Treehouse is written in Go and is adapted directly. See [decisions.md](decisions.md#1-go-for-everything-delivered).
+tasks-axi is written in TypeScript and Hive is written in Go, so the Pool's adaptation is a translation: its parser, transitions, archives and moves are re-expressed, and its tests are carried over as translated tests, each naming the upstream test it re-expresses. Treehouse is written in Go and is adapted directly. See [decisions.md](decisions.md#1-go-for-everything-delivered). Each module that go-keyring brings, its Windows and Linux store clients and what they bring in turn, has a `dependency` record of its own, made in the same change, and is named in go-keyring's `transitive`.

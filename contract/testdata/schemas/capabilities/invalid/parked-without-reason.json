@@ -27,7 +27,6 @@
       ],
       "executes": [
         "gh",
-        "tmux",
         "claude",
         "codex",
         "no-mistakes",

@@ -135,7 +135,7 @@ Adding a code is a minor change. A code is never reused for another meaning. `se
 It declares the command's package and executable, the contract and implementation versions, the limits, and for every operation of the command other than `capabilities` itself:
 
 - its `state`: `supported`, `unsupported` or `parked`, with a reason for the last two;
-- its `mode`: `unary` for one request and one response, or `resident` for an operation that writes its response once it has durably started and then runs until stopped, as the Shadow and the UI server do;
+- its `mode`: `unary` for one request and one response, or `resident` for an operation that writes its response once it has durably started and then runs until stopped, as the Shadow's observer, Hive's own app and a session host of the terminal host do;
 - whether it mutates, the body versions it accepts and the schemas of its request and response bodies;
 - the receipt kinds it writes, the external executables it may run and the commands of other packages it may call;
 - the platform utilities it may run, carried in the operation's own `platform` member, each a name from the package's declared `platform` list. The member exists from `schema_version` 1.1 of the declaration; a declaration at 1.0 holds none and is still read. `test-contract` compares that member with the package's `platform` list as it already compares `executes`.

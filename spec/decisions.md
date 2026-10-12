@@ -8,11 +8,13 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 **Decision.** Hive is written in Go, pinned to release line 1.27. The standard library is the only library at stage 1.
 
-**Reason.** The design forbids a seventh runtime prerequisite. Go builds each executable as one self-contained file that needs nothing installed, on macOS, Windows and Linux alike, from any one of them, and its standard library covers what stage 1 needs: JSON, files and locks, processes, an HTTP server and embedded files, and through its `syscall` package each platform's own pseudo-terminal, job objects, access-control lists and credential store. Treehouse, the larger of the two adaptations, is written in Go and can be adapted directly.
+**As contract version 1.10 adds.** Beyond stage 1 the rule stays the standard library only, with two named exceptions that the operator decided, each pinned and each with an import record for every module it brings: go-keyring, for the Windows and Linux credential stores from stage 4, and purego, for Hive's own app from stage 6. [distribution.md](distribution.md#the-toolchain) states both.
 
-**Cost.** tasks-axi is written in TypeScript. The Pool's adaptation therefore becomes a translation, and its tests are carried over by re-expression rather than kept as files. The import record says so file by file; see [imports.md](imports.md#the-two-planned-imports).
+**Reason.** The design forbids a sixth runtime prerequisite. Go builds each executable as one self-contained file that needs nothing installed, on macOS, Windows and Linux alike, from any one of them, and its standard library covers what stage 1 needs: JSON, files and locks, processes and embedded files, and through its `syscall` package each platform's own pseudo-terminal, job objects and access-control lists. Treehouse, the larger of the two adaptations, is written in Go and can be adapted directly.
 
-**Rejected.** *TypeScript*, which would keep tasks-axi's source and tests as they are, needs Node at run time or a bundled runtime of tens of megabytes inside each executable, and would turn the Treehouse adaptation into the translation instead. *Shell*, as the inherited implementation uses, has no structured data or schema validation without tools outside the six, and its concurrency and atomicity are the source of defects this design exists to remove. *Rust* meets the delivery rule and makes both adaptations translations. *Swift* does not run the package tests in a Linux session.
+**Cost.** tasks-axi is written in TypeScript. The Pool's adaptation therefore becomes a translation, and its tests are carried over by re-expression rather than kept as files. The import record says so file by file; see [imports.md](imports.md#the-planned-imports).
+
+**Rejected.** *TypeScript*, which would keep tasks-axi's source and tests as they are, needs Node at run time or a bundled runtime of tens of megabytes inside each executable, and would turn the Treehouse adaptation into the translation instead. *Shell*, as the inherited implementation uses, has no structured data or schema validation without tools outside the five, and its concurrency and atomicity are the source of defects this design exists to remove. *Rust* meets the delivery rule and makes both adaptations translations. *Swift* does not run the package tests in a Linux session.
 
 **To undo.** Expensive after stage 2. This is the first decision to settle.
 
@@ -40,7 +42,7 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 **Decision.** Schemas are JSON Schema draft 2020-12 files under `spec/schemas/`, limited to the keywords [records.md](records.md#schema-notation) lists. The contract library validates them with its own implementation of that profile. The schema files are embedded into every executable.
 
-**Reason.** The schemas are the contract between packages that may later be extracted, and between Go and the browser, so they must be in a notation that is not Go. JSON Schema is the common one. The full draft is large and its hardest parts are unneeded here; the profile is small enough to implement and test completely with the standard library, which keeps the library list empty.
+**Reason.** The schemas are the contract between packages that may later be extracted, and between Go and the pages of Hive's own app, so they must be in a notation that is not Go. JSON Schema is the common one. The full draft is large and its hardest parts are unneeded here; the profile is small enough to implement and test completely with the standard library, which keeps the library list empty.
 
 **Rejected.** *Go types as the source of truth* would make the contract unreadable outside Go. *A third-party validator* is a dependency, an import record and a transitive audit for something a few hundred lines cover. *A typed interface language with code generation* adds a toolchain and committed generated files.
 
@@ -152,23 +154,23 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 **To undo.** Cheap before stage 6.
 
-## 15. Hand-written browser files and no second toolchain
+## 15. Hand-written page files and no second toolchain
 
-**Decision.** The UI's HTML, CSS and JavaScript are standard files a browser loads as they are, embedded into `hive-ui`. The repository has no bundler, transpiler or package manifest of another ecosystem.
+**Decision, as contract version 1.10 words it.** The UI's HTML, CSS and JavaScript are standard files that the platform's own web engine loads as they are, inside Hive's own app, embedded into `hive-ui`. The repository has no bundler, transpiler or package manifest of another ecosystem.
 
-**Reason.** A second toolchain is a second set of dependencies to audit and a set of generated files whose provenance must be tracked. The UI the design describes is a map, lists and cards over live records, which current browsers support directly.
+**Reason.** A second toolchain is a second set of dependencies to audit and a set of generated files whose provenance must be tracked. The UI the design describes is a map, lists and cards over live records, which the web engines of the three platforms, WebKit, WebView2 and WebKitGTK, support directly.
 
-**Cost.** No typed browser code and no component library. Stage 6 measures the UI against budgets chosen from evidence, and may bring this decision back if they cannot be met.
+**Cost.** No typed page code and no component library. Stage 6 measures the UI against budgets chosen from evidence, and may bring this decision back if they cannot be met.
 
 **To undo.** Cheap until stage 6, and then a question for that stage.
 
 ## 16. Platforms
 
-**Decision, as contract version 1.9 amends it.** Delivered, built and tested natively on macOS, on Windows and on Linux, each on x86-64 and on ARM64, and never through WSL2 or another compatibility layer. GitHub's hosted Windows and Linux runners, for this public repository, are Hive's declared test environment for those two platforms, by the operator's decision; the macOS runs take place on the operator's own Mac. [distribution.md](distribution.md#platforms) states it.
+**Decision, as contract versions 1.9 and 1.10 amend it.** Delivered, built and tested natively on macOS, on Windows and on Linux, each on x86-64 and on ARM64, and never through WSL2 or another compatibility layer. GitHub's hosted Windows and Linux runners, for this public repository, are Hive's declared test environment for those two platforms, by the operator's decision; the macOS runs take place on the operator's own Mac. [distribution.md](distribution.md#platforms) states it.
 
-**What it replaces.** The decision accepted on 2026-10-11 delivered Hive for macOS only, built and tested it on Linux, and did not support Windows, because the design placed every supervisor on the Mac and tmux, one of the six, does not exist on Windows. The later decision that Hive runs natively on all three overrules it. Its reason about tmux no longer rules a platform out: it makes the terminal runtime, and how the operator watches and attaches to a running agent, the design's open choice [Q1](../docs/design.md#open-choices).
+**What it replaces.** The decision accepted on 2026-10-11 delivered Hive for macOS only, built and tested it on Linux, and did not support Windows, because the design placed every supervisor on the Mac and tmux, then one of the six dependencies, does not exist on Windows. The later decision that Hive runs natively on all three overrules it. Its reason about tmux no longer rules a platform out: by the operator's decision, which contract version 1.10 records, every interactive session runs in Hive's own [terminal host](../docs/design.md#the-terminal-host) on the platform's own pseudo-terminal, and tmux is no longer a dependency, so five remain.
 
-**Cost.** Every contract that touches the platform states its mechanism for all three: [the one process-execution path](distribution.md#the-one-process-execution-path), the [record format's](records.md) access, atomic replacement and locks, and the design's credential store on each platform. Code already landed for stage 1 assumes macOS and Linux in its locks, access checks and flushes, and is corrected by the lane that owns it.
+**Cost.** Every contract that touches the platform states its mechanism for all three: [the one process-execution path](distribution.md#the-one-process-execution-path), the [record format's](records.md) access, atomic replacement and locks, the design's credential store and terminal host on each platform, and Hive's own app with the web engine of each. Code already landed for stage 1 assumes macOS and Linux in its locks, access checks and flushes, and is corrected by the lane that owns it.
 
 **Rejected.** *Windows through WSL2*, which runs the Linux build inside a Linux virtual machine: that is the compatibility layer the later decision rules out, and it would leave Windows's own credential store, terminals and file system out of reach. *Windows deferred to a later stage*: every stage from 2 on builds on the process path, the record format and the store adapters, so a platform added later would reopen each of them.
 
@@ -208,7 +210,7 @@ Nothing here widens the design. Where a decision reads the design one way of two
 
 ## Left to the stage that needs it
 
-These are not decided here, deliberately. Each is cheap to add later and would be a guess now. The choices that change what the operator sees or does are not among them: the design lists those under its [open choices](../docs/design.md#open-choices), for the operator to answer.
+These are not decided here, deliberately. Each is cheap to add later and would be a guess now. The choices that change what the operator sees or does are not among them: they are the operator's, and the design states each as the operator decided it.
 
 | Open point | First needed |
 | --- | --- |
@@ -216,7 +218,9 @@ These are not decided here, deliberately. Each is cheap to add later and would b
 | Where the Spawning Pool keeps its worktrees on disk, and its lease record | Stage 3 |
 | A streamed form of response | Stage 4 |
 | Pending approvals in the session, and how a reader is told of a new message | Stage 4 |
-| The minimum version of each of the six, by probe | The stage that first runs each |
+| The minimum version of each of the five, by probe | The stage that first runs each |
+| The version each named exception of [the toolchain](distribution.md#the-toolchain) is pinned to | Stage 4 for go-keyring, stage 6 for purego |
+| What each platform needs beside `hive-ui` for the app's icon, menus and notifications | Stage 6 |
 | Where instructions and skills sit in the artefact | The stage that first delivers one |
 | Retention periods and segment sizes | The stage that owns each store, as configuration |
 | Which package declares the optional browser stack | The stage that first selects a browser task |
