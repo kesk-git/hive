@@ -58,7 +58,7 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
     },
     "held_item": {
-      "description": "work: the question holds the work it gates. decision-item: the Pool added the held item for this question, as a decision item, in the transaction that raised it.",
+      "description": "work: the question holds the work it gates. decision-item: the Pool added the held item for this question, as a decision item, in the transaction that raised it. Provenance only: a disposition reads the held item as it stands, so a decision item since given work is work.",
       "enum": [
         "work",
         "decision-item"

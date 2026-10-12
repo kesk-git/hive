@@ -40,7 +40,7 @@
           ],
           "properties": {
             "title": {
-              "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+              "$ref": "urn:hive:schema:common:v1#/$defs/label"
             },
             "body": {
               "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"

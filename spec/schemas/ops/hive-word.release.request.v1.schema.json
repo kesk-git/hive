@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-word.release.request:v1",
   "title": "hive-word release: request body",
-  "description": "The owner's disposition of an accepted answer on a question that holds work: the word hold is released and the work may proceed as the answer directs. word persists it through hive-pool release-question, as one handoff, passing on the envelope's expected_revisions. See spec/word.md.",
+  "description": "The owner's disposition of an accepted answer on a question that holds work, not a decision item as it stands: the word hold is released and the work may proceed as the answer directs. word persists it through hive-pool release-question, as one handoff, passing on the envelope's expected_revisions. See spec/word.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
