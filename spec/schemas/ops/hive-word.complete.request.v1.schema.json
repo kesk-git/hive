@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:ops:hive-word.complete.request:v1",
   "title": "hive-word complete: request body",
-  "description": "The owner's disposition of an accepted answer that releases no work: the question is closed, its hold released where nothing is left for it to gate, a held item that is, as it stands, a decision item, or work that is archived. word persists it through hive-pool complete-question, as one handoff, passing on the envelope's expected_revisions. Completing a report, a review or a round never completes a question. See spec/word.md.",
+  "description": "The owner's disposition of an accepted answer that releases no work: the question is closed, its hold released where nothing is left for it to gate, the held item and every item beneath it each archived or a decision item as it stands. word persists it through hive-pool complete-question, as one handoff, passing on the envelope's expected_revisions. Completing a report, a review or a round never completes a question. See spec/word.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
