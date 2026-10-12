@@ -203,7 +203,6 @@ func TestCommitChecksBeforeWriting(t *testing.T) {
 		{"record content that is not an object", func(tx *Tx) { tx.Records[2].Content = []byte(`"alpha"`) }, nil},
 		{"receipt content that is not JSON", func(tx *Tx) { tx.Receipts[1].Content = []byte(`{`) }, nil},
 		{"event content with a fraction", func(tx *Tx) { tx.Events[1].Content = []byte(`{"n":0.5}`) }, nil},
-		{"no outcome", func(tx *Tx) { tx.Outcome = nil }, nil},
 		{"an outcome that is not an object", func(tx *Tx) { tx.Outcome = []byte(`true`) }, nil},
 	}
 	for _, tc := range tests {
@@ -1115,4 +1114,209 @@ func TestRecoveryFlushesTxWhenNoIntentRemains(t *testing.T) {
 	if !slices.Contains(steps, "syncdir pool/tx/") {
 		t.Errorf("tx/ was not flushed: %v", steps)
 	}
+}
+
+// A transaction that carries no outcome commits its records, receipts and
+// events and removes its intent, and writes nothing under requests/: the
+// request stays open, and a later transaction of the same request records
+// its outcome as any other does.
+func TestCommitWithoutOutcome(t *testing.T) {
+	withoutOutcome := func() Tx {
+		tx := fullTx()
+		tx.Outcome = nil
+		return tx
+	}
+	s, j := seeded(t)
+	w := lock(t, s)
+	if _, err := w.Commit(withoutOutcome()); err != nil {
+		t.Fatal(err)
+	}
+	w.Release()
+	files := tree(t, s.Dir)
+	for _, rel := range []string{OutcomePath("pool", req9), IntentPath("pool", req9)} {
+		if _, ok := files[rel]; ok {
+			t.Errorf("%s was written", rel)
+		}
+	}
+	for _, rel := range []string{task1, task2, ws1, ReceiptPath("pool", rcpt1), ReceiptPath("pool", rcpt2)} {
+		if _, ok := files[rel]; !ok {
+			t.Errorf("%s was not written", rel)
+		}
+	}
+	if len(j.order) != 2 {
+		t.Errorf("journal = %v", j.order)
+	}
+	if s.durable(req9) {
+		t.Error("the request reads as durable with no outcome and no intent")
+	}
+
+	// The request is still open: a transaction of the same request that
+	// carries an outcome records it, and the intent it used is free again.
+	w = lock(t, s)
+	defer w.Release()
+	if _, err := w.Commit(Tx{RequestID: req9, Outcome: []byte(`{"status":"ok"}`)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Read(OutcomePath("pool", req9)); err != nil {
+		t.Error(err)
+	}
+}
+
+// A transaction without an outcome is interrupted at each of its steps, and
+// the next lock completes it without ever writing an outcome.
+func TestCommitWithoutOutcomeInterruptedAtEachStep(t *testing.T) {
+	tx := func() Tx {
+		tx := fullTx()
+		tx.Outcome = nil
+		return tx
+	}
+	done, doneEvents := func() (map[string]string, []string) {
+		s, j := seeded(t)
+		w := lock(t, s)
+		defer w.Release()
+		if _, err := w.Commit(tx()); err != nil {
+			t.Fatal(err)
+		}
+		return tree(t, s.Dir), j.order
+	}()
+	s, _ := seeded(t)
+	w := lock(t, s)
+	steps := trace(t, s, func() {
+		if _, err := w.Commit(tx()); err != nil {
+			t.Fatal(err)
+		}
+	})
+	w.Release()
+	durable := slices.Index(steps, "syncdir "+IntentPath("pool", req9))
+	if durable < 0 {
+		t.Fatalf("steps = %v", steps)
+	}
+	for _, step := range steps[durable:] {
+		if strings.Contains(step, "requests/") {
+			t.Errorf("the transaction touches %s", step)
+		}
+	}
+	for i, step := range steps {
+		if i < durable {
+			continue
+		}
+		t.Run(step, func(t *testing.T) {
+			s, j := seeded(t)
+			w := lock(t, s)
+			hit := faultAt(s, step, 1)
+			_, err := w.Commit(tx())
+			w.Release()
+			if !*hit || !errors.Is(err, errCrash) {
+				t.Fatalf("the interruption did not happen: hit %v, err %v", *hit, err)
+			}
+			s.fault = nil
+			lock(t, s).Release()
+			got := tree(t, s.Dir)
+			sameTree(t, "after recovery", got, done)
+			if _, ok := got[OutcomePath("pool", req9)]; ok {
+				t.Error("recovery wrote an outcome")
+			}
+			if !slices.Equal(j.order, doneEvents) {
+				t.Errorf("journal = %v", j.order)
+			}
+		})
+	}
+}
+
+// An intent without an outcome is read back as it was written, and one that
+// names another request's outcome is still refused.
+func TestIntentWithoutOutcomeRoundTrip(t *testing.T) {
+	s, _ := seeded(t)
+	tx := fullTx()
+	tx.Outcome = nil
+	in, err := s.plan(tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.outcome != nil {
+		t.Fatal("planned an outcome")
+	}
+	data, err := s.encodeIntent(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(data, []byte(`"outcome"`)) {
+		t.Error("the intent names an outcome")
+	}
+	write(t, s, IntentPath("pool", req9), data)
+	back, err := s.readIntent(IntentPath("pool", req9))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if back.outcome != nil || len(back.records) != 3 || len(back.receipts) != 2 || len(back.events) != 2 {
+		t.Errorf("read back %+v", back)
+	}
+}
+
+// The lock taken for a request whose transaction carries no outcome reports
+// it interrupted at every step of the recovery that completes it, those after
+// its intent is removed included, when nothing of the request is left on disk
+// to show it; and so when an intent after it stops the recovery.
+func TestLockForReportsATransactionWithoutOutcome(t *testing.T) {
+	interrupted := func(t *testing.T) *Store {
+		t.Helper()
+		s, _ := seeded(t)
+		w := lock(t, s)
+		tx := fullTx()
+		tx.Outcome = nil
+		faultAt(s, "create "+task2, 1)
+		if _, err := w.Commit(tx); !errors.Is(err, errCrash) {
+			t.Fatal(err)
+		}
+		w.Release()
+		s.fault = nil
+		return s
+	}
+	reportsReq9 := func(t *testing.T, err error) {
+		t.Helper()
+		var ie *InterruptedError
+		if !errors.As(err, &ie) || ie.RequestID != req9 {
+			t.Errorf("%s, whose transaction is durable, is not reported interrupted: %v", req9, err)
+		}
+	}
+	s := interrupted(t)
+	steps := trace(t, s, func() {
+		w, err := s.LockFor(req9)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Release()
+	})
+	removed := slices.Index(steps, "remove "+IntentPath("pool", req9))
+	if removed < 0 || removed == len(steps)-1 {
+		t.Fatalf("recovery steps %v remove no intent before their last step", steps)
+	}
+	for _, step := range steps {
+		t.Run(step, func(t *testing.T) {
+			s := interrupted(t)
+			hit := faultAt(s, step, 1)
+			_, err := s.LockFor(req9)
+			if !*hit || !errors.Is(err, errCrash) {
+				t.Fatalf("the interruption did not happen: hit %v, %v", *hit, err)
+			}
+			reportsReq9(t, err)
+		})
+	}
+
+	t.Run("an intent after it stops the recovery", func(t *testing.T) {
+		s := interrupted(t)
+		later := id("req", 10)
+		task6 := RecordPath("pool", "item", id("task", 6))
+		data, _ := s.encodeIntent(plan(t, s, Tx{RequestID: later, Records: []RecordWrite{{task6, []byte(`{"n":6}`), 0}}}))
+		write(t, s, IntentPath("pool", later), data)
+		write(t, s, task6, record(t, map[string]any{"n": int64(7)}, 1, "2026-10-11T08:00:00.000Z"))
+		_, err := s.LockFor(req9)
+		if !errors.Is(err, ErrRecordMalformed) {
+			t.Fatalf("the later intent did not stop the recovery: %v", err)
+		}
+		if _, statErr := os.Stat(s.abs(IntentPath("pool", req9))); !errNotExist(statErr) {
+			t.Fatal("the intent of the request was not completed first")
+		}
+		reportsReq9(t, err)
+	})
 }

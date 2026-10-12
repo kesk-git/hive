@@ -348,9 +348,10 @@ func TestRefused(t *testing.T) {
 	}
 	same(t, recorded, tree(t, home))
 
-	// An unknown outcome returns no receipt and writes nothing: this build
-	// makes none durable before an outside effect, so a handler that names one
-	// is at fault, and the caller is never handed a receipt that is not on disk.
+	// An unknown outcome of an operation that committed no intent returns no
+	// receipt and writes nothing, so a handler that names one is at fault, and
+	// the caller is never handed a receipt that is not on disk. The receipts
+	// of a committed intent are returned (see intent_test.go).
 	bare := h.invoke(t, home, "refuse", request(t, "refuse", 3, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "unknown bare" }))
 	expect(t, bare, envelope.Unknown, "outcome_unknown")
 	if bare.Replayed || len(bare.Receipts) != 0 {

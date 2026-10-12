@@ -21,4 +21,11 @@
 // never exits and never parses an argument; it returns a *envelope.Failure
 // to end the invocation with a status other than ok, and the receipts a
 // refusal or a hold leaves ride on that Failure.
+//
+// An operation with an effect outside Hive commits its intent first, with
+// Call.CommitIntent: the records, receipts and events of the intent are
+// durable, as one transaction, before the effect, and the request has no
+// recorded outcome until the operation ends. An unknown outcome then returns
+// exactly the receipts of the committed intents and records no outcome, so
+// that the same request, sent again, reconciles.
 package cli
