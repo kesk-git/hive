@@ -86,7 +86,7 @@ The designs written need no new dependency: Windows's pseudoconsole, job objects
 ## Checks
 
 - `make check`: passes (exit 0: `gofmt -l .` empty, `go vet ./...` clean).
-- `make test-contract`: passes (exit 0: `contract/canon`, `cli`, `clock`, `envelope`, `ids`, `journal`, `schema` and `store` all `ok`), on Linux x86-64 with Go 1.27.0, the first run of Hive's tests on Linux.
+- `make test-contract`: passes (exit 0: `contract/canon`, `cli`, `clock`, `envelope`, `ids`, `journal`, `schema` and `store` all `ok`, also uncached with `-count=1`), on Linux x86-64 with Go 1.27.0, the first run of Hive's tests on Linux.
 - Not part of the required checks, for the record: `GOOS=darwin go vet ./...` passes; `GOOS=windows go build` fails in `contract/store`, `contract/journal` and `contract/cli` at `syscall.Flock`, the first code follow-up.
 
-working
+done fm/hive-design-cross-platform
