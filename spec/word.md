@@ -54,6 +54,8 @@ A question holds one item through one `word` hold: the work it gates, which a qu
 
 A round is `open` while any of its cards is `open`, and `closed` from the moment none is; a closed round takes no new card and never reopens. An unreconciled answer changes no state of the question, the card or the round.
 
+A review's [final record](review.md#finaljson) reads each card's decision in these states: `pending` for a question open or deferred, `accepted` for one answered, `released`, `completed`, and `superseded` for one closed as moot, each with the receipt that establishes it.
+
 ## Operations
 
 Each mutating operation is one handoff to one `hive-pool` operation, which does all of what follows in one transaction and writes the receipts named, each with the Pool's event of the same name. Who may send each, by the envelope's `caller`, which is attribution and never authentication:
