@@ -121,8 +121,8 @@ type Call struct {
 	// writer holds the store's lock for a mutating operation.
 	writer *store.Writer
 	// intent are the receipts of the intents CommitIntent made durable, in
-	// order, and intended says that one was made durable, whether or not it
-	// had receipts.
+	// order, as read back from what was written, and intended says that one
+	// was made durable, whether or not it had receipts.
 	intent   []envelope.Receipt
 	intended bool
 }
@@ -177,7 +177,11 @@ func (c *Call) CommitIntent(in Intent) ([]store.Written, error) {
 	if err != nil {
 		return nil, err
 	}
-	if f := c.Executable.unknownCarries(c.Command, c.Operation, c.Request.RequestID, append(slices.Clone(c.intent), in.Receipts...)); f != nil {
+	written, err := decodeReceipts(receipts)
+	if err != nil {
+		return nil, err
+	}
+	if f := c.Executable.unknownCarries(c.Command, c.Operation, c.Request.RequestID, append(slices.Clone(c.intent), written...)); f != nil {
 		return nil, f
 	}
 	done, err := c.writer.Commit(store.Tx{RequestID: c.Request.RequestID, Records: records, Receipts: receipts, Events: in.Events})
@@ -188,13 +192,21 @@ func (c *Call) CommitIntent(in Intent) ([]store.Written, error) {
 		}
 		return nil, storeFailure(err)
 	}
-	c.intent = append(c.intent, in.Receipts...)
+	c.intent = append(c.intent, written...)
 	c.intended = true
 	return done.Records, nil
 }
 
-// Committed returns the receipts of the intents this call has made durable.
-func (c *Call) Committed() []envelope.Receipt { return slices.Clone(c.intent) }
+// Committed returns the receipts of the intents this call has made durable,
+// as they are stored. They are copies: changing them changes nothing the
+// harness returns.
+func (c *Call) Committed() ([]envelope.Receipt, error) {
+	receipts, err := encodeReceipts(c.intent)
+	if err != nil {
+		return nil, err
+	}
+	return decodeReceipts(receipts)
+}
 
 // Result is what a handler returns for ok.
 type Result struct {

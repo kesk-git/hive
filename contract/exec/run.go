@@ -2,6 +2,7 @@ package exec
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"runtime"
 	"sync"
@@ -154,8 +155,8 @@ func (r *Run) Wait() Result {
 	return r.result
 }
 
-// stopped is how long Stop waits, after the end, for the tree to be gone.
-const stopWait = 10 * time.Second
+// stopWait is how long Stop waits, after the end, for the tree to be gone.
+var stopWait = 10 * time.Second
 
 // pollEvery is how often Stop looks at the tree.
 const pollEvery = 10 * time.Millisecond
@@ -170,8 +171,9 @@ const pollEvery = 10 * time.Millisecond
 // ending it, so that the result is read from that record and never inferred
 // from an exit code. An error from ending stops Stop before anything is
 // ended, and is returned. A tree Hive ended reads StoppedByHive, whatever
-// exit code or signal the end gave. A resident start is stopped through its
-// own command, and Stop on one is refused.
+// exit code or signal the end gave. A tree still not gone ten seconds after
+// the end is not stopped, and Stop returns an error. A resident start is
+// stopped through its own command, and Stop on one is refused.
 func (r *Run) Stop(g Grace, ending func() error) (Result, error) {
 	if r.kind == ResidentStart {
 		return Result{}, errors.New("exec: a resident start is stopped through its own command")
@@ -200,9 +202,10 @@ func (r *Run) Stop(g Grace, ending func() error) (Result, error) {
 	if err := r.tree.end(); err != nil {
 		return Result{}, err
 	}
-	r.goneWithin(stopWait)
-	res := r.Wait()
-	return res, nil
+	if !r.goneWithin(stopWait) {
+		return Result{}, fmt.Errorf("exec: the tree is not gone %v after it was ended", stopWait)
+	}
+	return r.Wait(), nil
 }
 
 // markEnding records that Hive is ending the tree, so that the result is read

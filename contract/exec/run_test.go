@@ -262,3 +262,36 @@ func TestProcessIdentity(t *testing.T) {
 	}
 	_ = time.Second
 }
+
+// stuckTree is a tree whose processes the end does not end, as a process in
+// uninterruptible sleep is not.
+type stuckTree struct{}
+
+func (stuckTree) wait() Result     { select {} }
+func (stuckTree) interrupt() error { return nil }
+func (stuckTree) request() error   { return nil }
+func (stuckTree) end() error       { return nil }
+func (stuckTree) empty() bool      { return false }
+func (stuckTree) closeEnds() bool  { return false }
+func (stuckTree) close()           {}
+
+// A tree still not gone after the end is not reported stopped: Stop returns
+// an error rather than waiting for a process that has not ended.
+func TestStopReportsATreeTheEndDidNotEnd(t *testing.T) {
+	defer func(d time.Duration) { stopWait = d }(stopWait)
+	stopWait = 50 * time.Millisecond
+	run := &Run{started: started{tree: stuckTree{}}, done: make(chan struct{})}
+	finished := make(chan error, 1)
+	go func() {
+		_, err := run.Stop(Grace{}, nil)
+		finished <- err
+	}()
+	select {
+	case err := <-finished:
+		if err == nil {
+			t.Error("Stop reported a tree that is not gone as stopped")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop waited for a process that has not ended")
+	}
+}

@@ -69,6 +69,7 @@ func TestResidentOutlivesItsStarter(t *testing.T) {
 		t.Fatalf("the resident did not outlive its starter: %v", err)
 	}
 	defer kill(id)
+	starter.Close()
 	if !alive(id) || alive(starter.ID) {
 		t.Error("the resident is not running or the starter is")
 	}

@@ -261,3 +261,24 @@ func TestIntentWhoseReceiptsCannotBeReturnedIsRefused(t *testing.T) {
 	delete(before, "locks/dispatch.lock")
 	same(t, before, after)
 }
+
+// The receipts an unknown outcome returns are the ones stored, however the
+// operation changes the receipt it committed, or the copy Committed gave it,
+// after the commit.
+func TestCommittedReceiptsAreTheOnesStored(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	h.exe.command("hive-fleet").Limits.MaxResponseBytes = 4096
+	resp := h.invoke(t, home, "effect", effectRequest(t, 9, "changed after the commit"))
+	expect(t, resp, envelope.Unknown, "outcome_unknown")
+	if len(resp.Receipts) != 1 {
+		t.Fatalf("%+v", resp)
+	}
+	written, err := os.ReadFile(filepath.Join(home, filepath.FromSlash(store.ReceiptPath("dispatch", resp.Receipts[0].ReceiptID))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enc, _ := resp.Receipts[0].Encode(); string(written) != string(enc) {
+		t.Errorf("the receipt returned is not the one stored:\n%s\n%s", enc, written)
+	}
+}

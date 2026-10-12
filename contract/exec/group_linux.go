@@ -19,10 +19,14 @@ type siginfo struct {
 	_      [128]byte
 }
 
-// groupLives says whether a process of the group is left that has not ended.
-// Linux counts an ended, unreaped process as one a signal reaches, so the
-// processes are read from /proc: the state, field 3 of /proc/<pid>/stat, is
-// neither zombie nor dead, and the group, field 5, is the one asked for.
+// groupLives says whether a process of the group may be left that has not
+// ended. Linux counts an ended, unreaped process as one a signal reaches, so
+// the processes are read from /proc: the state, field 3 of /proc/<pid>/stat,
+// is neither zombie nor dead, and the group, field 5, is the one asked for.
+// The listing is not one moment: a process of the group listed that ended
+// before it was read may have started another after the listing was taken.
+// So a listed process that can no longer be read, and an ended one of the
+// group other than its leader, leave the answer that one may be left.
 func groupLives(pgid int) (bool, error) {
 	d, err := os.Open("/proc")
 	if err != nil {
@@ -40,15 +44,19 @@ func groupLives(pgid int) (bool, error) {
 		}
 		data, err := os.ReadFile("/proc/" + name + "/stat")
 		if err != nil {
-			continue
+			return true, nil
 		}
 		s := string(data)
 		i := strings.LastIndexByte(s, ')')
 		if i < 0 {
-			continue
+			return true, nil
 		}
 		fields := strings.Fields(s[i+1:])
-		if len(fields) > 2 && fields[2] == want && fields[0] != "Z" && fields[0] != "X" {
+		switch {
+		case len(fields) < 3:
+			return true, nil
+		case fields[2] != want:
+		case fields[0] != "Z" && fields[0] != "X", name != want:
 			return true, nil
 		}
 	}

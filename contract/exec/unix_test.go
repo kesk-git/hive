@@ -239,8 +239,9 @@ func TestAnEndedLeaderIsHeldWhileItsGroupLives(t *testing.T) {
 	}
 }
 
-// The leader is reaped once nothing is left to signal: at once when it ends
-// alone, and when the run is released, whether it ended before or after.
+// The leader is held until the run is ended or released: one that ended
+// alone is held until the run is released, and a released run's leader is
+// reaped whether it ended before the release or after.
 func TestTheLeaderIsReapedOnceTheRunEnds(t *testing.T) {
 	fakeDir(t, "fakeprog")
 	reaped := func(id ProcessID) bool {
@@ -248,8 +249,12 @@ func TestTheLeaderIsReapedOnceTheRunEnds(t *testing.T) {
 		return err != nil || now != id
 	}
 	alone := fake(t, Spec{}, "exit", "0")
-	if res := alone.Wait(); !res.Passed() || !reaped(alone.ID) {
-		t.Errorf("a leader that ended alone: %+v, reaped %v", res, reaped(alone.ID))
+	if res := alone.Wait(); !res.Passed() || reaped(alone.ID) {
+		t.Errorf("a leader that ended alone: %+v, reaped before the release %v", res, reaped(alone.ID))
+	}
+	alone.Close()
+	if !reaped(alone.ID) {
+		t.Error("a released run's leader that ended alone was not reaped")
 	}
 
 	before := fake(t, Spec{Stdout: Pipe()}, "tree")

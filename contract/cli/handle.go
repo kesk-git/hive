@@ -684,6 +684,21 @@ func (e *Executable) commit(w *store.Writer, requestID, digest string, resp *env
 	return err
 }
 
+// decodeReceipts reads receipts back from what a transaction writes, so that
+// what is returned of them is what is stored, and shares nothing with the
+// receipts they were made from.
+func decodeReceipts(written []store.Receipt) ([]envelope.Receipt, error) {
+	out := make([]envelope.Receipt, 0, len(written))
+	for _, w := range written {
+		r, err := envelope.DecodeReceipt(w.Content)
+		if err != nil {
+			return nil, fmt.Errorf("a receipt is not valid: %w", err)
+		}
+		out = append(out, *r)
+	}
+	return out, nil
+}
+
 // encodeReceipts makes the receipts of a transaction.
 func encodeReceipts(receipts []envelope.Receipt) ([]store.Receipt, error) {
 	var out []store.Receipt

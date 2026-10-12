@@ -18,9 +18,10 @@ import (
 // The group's number is the leader's id, and no process or group can be
 // given it while the leader, Hive's own child, exists, ended or not, until
 // Hive reaps it. So the reaper only observes the leader's end, and the leader
-// is reaped once no process of the group is left, or once the run is
-// released, and the group is never signaled after: every signal goes to a
-// group whose number cannot have been given to another.
+// is reaped once the run is released, or once Hive has ended the group and
+// no process of it is left, since none it ended can start another; the
+// group is never signaled after: every signal goes to a group whose number
+// cannot have been given to another.
 type unixTree struct {
 	proc *os.Process
 	pgid int
@@ -36,6 +37,8 @@ type unixTree struct {
 	// released is set once the run is released: the leader is reaped as
 	// soon as it has ended.
 	released bool
+	// ended is set once Hive has sent the group SIGKILL.
+	ended bool
 	// reaped is set once the leader is reaped.
 	reaped bool
 }
@@ -52,15 +55,13 @@ const (
 const pPID = 1
 
 // wait observes the leader's end without reaping it, and reaps it at once
-// where no other process of the group is left or the run is released.
+// where the run is released.
 func (t *unixTree) wait() Result {
 	res := t.observe()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.exited = true
 	if t.released {
-		t.reap()
-	} else if live, err := groupLives(t.pgid); !live && err == nil {
 		t.reap()
 	}
 	return res
@@ -132,11 +133,14 @@ func (t *unixTree) signal(sig syscall.Signal) error {
 	if err := syscall.Kill(-t.pgid, sig); err != nil && !gone(err) {
 		return err
 	}
+	if sig == syscall.SIGKILL {
+		t.ended = true
+	}
 	return nil
 }
 
 // empty says whether no process of the group is left but the ended leader,
-// and reaps the leader once none is.
+// and reaps the leader once none is after Hive ended the group.
 func (t *unixTree) empty() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -149,7 +153,9 @@ func (t *unixTree) empty() bool {
 	if live, err := groupLives(t.pgid); live || err != nil {
 		return false
 	}
-	t.reap()
+	if t.ended {
+		t.reap()
+	}
 	return true
 }
 

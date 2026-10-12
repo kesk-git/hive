@@ -321,6 +321,14 @@ func newHarness(t testing.TB) *harness {
 			switch mode {
 			case "unknown":
 				return nil, envelope.Common(envelope.CodeOutcomeUnknown, "the adapter did not answer")
+			case "changed after the commit":
+				intended.Body["filler"] = strings.Repeat("x", 5000)
+				held, err := c.Committed()
+				if err != nil {
+					return nil, err
+				}
+				held[0].Body["other"] = "changed"
+				return nil, envelope.Common(envelope.CodeOutcomeUnknown, "the adapter did not answer")
 			case "unknown with a receipt":
 				rc, err := c.NewReceipt("dispatch.thing.refused", "1.0", nil, nil, nil)
 				if err != nil {
