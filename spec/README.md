@@ -4,7 +4,7 @@ This directory holds the contracts of the first two stages of the [ordered imple
 
 [The design](../docs/design.md) says what Hive is and why. This specification says where each thing lives, who owns it and what proves it. Where the two differ, the design governs and the difference is a defect in this specification.
 
-Contract version: **1.16**. What each version changed is recorded under [versions/](versions/), one file per version.
+Contract version: **1.17**. What each version changed is recorded under [versions/](versions/), one file per version.
 
 ## What is defined
 
