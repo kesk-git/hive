@@ -135,7 +135,7 @@ func startPlatform(p plan) (*started, *StartError) {
 		return fail(err)
 	}
 	st.id, _ = identify(proc.Pid)
-	st.tree = &unixTree{proc: proc, pgid: proc.Pid, id: st.id, resident: p.spec.Start == ResidentStart, term: master}
+	st.tree = &unixTree{proc: proc, pgid: proc.Pid, resident: p.spec.Start == ResidentStart, term: master}
 	if master != nil {
 		st.term = &pty{master: master}
 	}

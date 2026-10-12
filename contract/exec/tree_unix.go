@@ -5,9 +5,9 @@ package exec
 import (
 	"errors"
 	"os"
-	"sync/atomic"
+	"sync"
 	"syscall"
-	"time"
+	"unsafe"
 )
 
 // unixTree is a run's process group: the group the start created, which is
@@ -15,68 +15,88 @@ import (
 // does by starting a session of its own, leaves the tree, and Hive never
 // relies on ending such a process through its starter's tree.
 //
-// The group's number belongs to the tree only while a process of the group
-// lives: once none does, the number may name any group. So the tree is
-// signaled only until it has once been seen gone, and never when the process
-// of that number is now another one. While the leader is unreaped its number
-// cannot be taken; once it is reaped, and a descendant keeps the group, the
-// group is watched until it is seen gone, so that its number is never
-// signaled after it could have been taken, whether or not the process that
-// took it can still be read.
+// The group's number is the leader's id, and no process or group can be
+// given it while the leader, Hive's own child, exists, ended or not, until
+// Hive reaps it. So the reaper only observes the leader's end, and the leader
+// is reaped once no process of the group is left, or once the run is
+// released, and the group is never signaled after: every signal goes to a
+// group whose number cannot have been given to another.
 type unixTree struct {
 	proc *os.Process
 	pgid int
-	// id is the identity of the group's leader as started.
-	id ProcessID
-	// over is set once the group has been seen gone, or its number has been
-	// seen taken by another process.
-	over atomic.Bool
 	// resident is a start no reaper waits for.
 	resident bool
 	// term is the controller side of a terminal start.
 	term *os.File
+
+	// mu orders the signals against the reaping of the leader.
+	mu sync.Mutex
+	// exited is set once the leader's end has been observed.
+	exited bool
+	// released is set once the run is released: the leader is reaped as
+	// soon as it has ended.
+	released bool
+	// reaped is set once the leader is reaped.
+	reaped bool
 }
 
+// The codes of a child's end in the siginfo waitid fills, the same on macOS
+// and Linux.
+const (
+	cldExited = 1
+	cldKilled = 2
+	cldDumped = 3
+)
+
+// pPID is waitid's P_PID: the id names one process.
+const pPID = 1
+
+// wait observes the leader's end without reaping it, and reaps it at once
+// where no other process of the group is left or the run is released.
 func (t *unixTree) wait() Result {
-	res := t.status()
-	// The leader is reaped, and its number is the group's only while a
-	// process of the group lives: look at once, while that is least doubtful,
-	// and go on looking while a descendant keeps the group.
-	if !t.empty() {
-		go t.watch()
+	res := t.observe()
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.exited = true
+	if t.released {
+		t.reap()
+	} else if live, err := groupLives(t.pgid); !live && err == nil {
+		t.reap()
 	}
 	return res
 }
 
-// watchEvery is how often a group whose leader has ended is looked at.
-const watchEvery = 100 * time.Millisecond
-
-// watch looks at the group until it is seen gone, which empty records.
-func (t *unixTree) watch() {
-	tick := time.NewTicker(watchEvery)
-	defer tick.Stop()
-	for range tick.C {
-		if t.empty() {
-			return
+// observe waits for the leader to end, with WNOWAIT so that it stays
+// unreaped, and reports how it ended.
+func (t *unixTree) observe() Result {
+	var info siginfo
+	for {
+		_, _, errno := syscall.Syscall6(syscall.SYS_WAITID, pPID, uintptr(t.pgid), uintptr(unsafe.Pointer(&info)), syscall.WEXITED|syscall.WNOWAIT, 0, 0)
+		if errno == syscall.EINTR {
+			continue
 		}
+		if errno != 0 {
+			return Result{Outcome: Lost, Err: errno}
+		}
+		break
 	}
-}
-
-func (t *unixTree) status() Result {
-	state, err := t.proc.Wait()
-	if err != nil {
-		return Result{Outcome: Lost, Err: err}
-	}
-	status, ok := state.Sys().(syscall.WaitStatus)
-	switch {
-	case !ok:
-		return Result{Outcome: Lost, Err: errors.New("exec: the wait status is not readable")}
-	case status.Exited():
-		return Result{Outcome: Exited, Code: int64(status.ExitStatus())}
-	case status.Signaled():
-		return Result{Outcome: Ended, Code: int64(status.Signal()), Signal: status.Signal().String()}
+	switch info.Code {
+	case cldExited:
+		return Result{Outcome: Exited, Code: int64(info.Status)}
+	case cldKilled, cldDumped:
+		sig := syscall.Signal(info.Status)
+		return Result{Outcome: Ended, Code: int64(sig), Signal: sig.String()}
 	}
 	return Result{Outcome: Lost, Err: errors.New("exec: the process neither exited nor was ended by a signal")}
+}
+
+// reap reaps the ended leader, after which the group is never signaled.
+// The caller holds mu.
+func (t *unixTree) reap() {
+	if !t.reaped {
+		t.proc.Wait()
+		t.reaped = true
+	}
 }
 
 // interrupt writes Control-C, 0x03, to the terminal's input, which its line
@@ -102,33 +122,35 @@ func (t *unixTree) request() error {
 // end sends SIGKILL to the group.
 func (t *unixTree) end() error { return t.signal(syscall.SIGKILL) }
 
-// signal sends the signal to the group, unless it is gone: signal 0 asks only
-// whether a process is left in it.
+// signal sends the signal to the group while its leader is unreaped.
 func (t *unixTree) signal(sig syscall.Signal) error {
-	if t.over.Load() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.reaped {
 		return nil
 	}
-	if cur, err := identify(t.pgid); err == nil && t.id.Start != 0 && cur != t.id {
-		t.over.Store(true)
-		return nil
+	if err := syscall.Kill(-t.pgid, sig); err != nil && !gone(err) {
+		return err
 	}
-	err := syscall.Kill(-t.pgid, sig)
-	if gone(err) {
-		t.over.Store(true)
-		return nil
-	}
-	return err
+	return nil
 }
 
-// empty says whether the group has no process left.
+// empty says whether no process of the group is left but the ended leader,
+// and reaps the leader once none is.
 func (t *unixTree) empty() bool {
-	if t.over.Load() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.reaped {
 		return true
 	}
-	if t.signal(0) != nil {
+	if !t.exited {
 		return false
 	}
-	return t.over.Load()
+	if live, err := groupLives(t.pgid); live || err != nil {
+		return false
+	}
+	t.reap()
+	return true
 }
 
 // gone says whether the error of a signal to the group says that no process
@@ -142,10 +164,19 @@ func gone(err error) bool {
 
 func (t *unixTree) closeEnds() bool { return false }
 
-// close releases the process of a resident start. The process of any other
-// start is released when the reaper has waited for it.
+// close releases the process of a resident start. The leader of any other
+// start is reaped now if it has ended, and otherwise as soon as it ends.
 func (t *unixTree) close() {
-	if t.resident && t.proc != nil {
-		t.proc.Release()
+	if t.resident {
+		if t.proc != nil {
+			t.proc.Release()
+		}
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.released = true
+	if t.exited {
+		t.reap()
 	}
 }

@@ -46,7 +46,8 @@ func TestMain(m *testing.M) {
 //	hold        print ready and wait to be ended
 //	holdterm    print ready, ignore requests to end and wait
 //	slowterm    print ready, and on a request to end exit 0 after a pause
-//	tree        start a grandchild that holds, print its id, and hold
+//	tree        start a grandchild that holds ignoring requests to end, print
+//	            its id once it is ready, and hold ignoring them too
 //	selfkill    end itself with a signal it does not handle
 //	ids         print the process id, group and session
 //	fds         print the descriptors open beyond the standard three
@@ -120,13 +121,22 @@ func runFake(args []string) {
 	}
 }
 
-// fakeTree starts a grandchild of the same program that holds, prints its
-// process id, and holds too. With "leave" the grandchild leaves the tree, as
-// a daemon does.
+// fakeTree starts a grandchild of the same program that holds ignoring
+// requests to end, waits until it is ready, prints its process id, and holds
+// ignoring them too, so that only the end ends the tree. With "leave" the
+// grandchild leaves the tree, as a daemon does.
 func fakeTree(out *os.File, args []string) {
-	cmd := exec.Command(os.Args[0], fakeFlag, "hold")
+	signal.Ignore(syscall.SIGTERM)
+	cmd := exec.Command(os.Args[0], fakeFlag, "holdterm")
 	leaveTree(cmd, len(args) > 0 && args[0] == "leave")
-	if err := cmd.Start(); err != nil {
+	ready, err := cmd.StdoutPipe()
+	if err == nil {
+		err = cmd.Start()
+	}
+	if err == nil {
+		_, err = bufio.NewReader(ready).ReadString('\n')
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(98)
 	}
