@@ -95,11 +95,15 @@ type jobAccounting struct {
 // attribute list.
 type startupInfoEx struct {
 	syscall.StartupInfo
-	AttributeList uintptr
+	AttributeList *byte
 }
 
 // call checks the result of a call that returns a BOOL and sets the last
-// error.
+// error. An argument that is a pointer converted to uintptr in the argument
+// list is kept on the heap and alive for the whole call, as for
+// LazyProc.Call itself.
+//
+//go:uintptrescapes
 func call(p *syscall.LazyProc, args ...uintptr) error {
 	r, _, err := p.Call(args...)
 	if r == 0 {
@@ -138,9 +142,12 @@ func activeProcesses(job syscall.Handle) (uint32, error) {
 	return info.ActiveProcesses, nil
 }
 
-// attributeList is the attribute list of an extended startup block.
+// attributeList is the attribute list of an extended startup block, with
+// the handles its attributes point to, which must stay valid until the list
+// is deleted.
 type attributeList struct {
-	buf []byte
+	buf     []byte
+	handles [][]syscall.Handle
 }
 
 // newAttributeList makes a list with room for count attributes.
@@ -158,17 +165,21 @@ func newAttributeList(count int) (*attributeList, error) {
 	return l, nil
 }
 
-func (l *attributeList) pointer() uintptr { return uintptr(unsafe.Pointer(&l.buf[0])) }
+// updateHandles sets an attribute to a list of handles, which the list keeps
+// until it is deleted.
+func (l *attributeList) updateHandles(attribute uintptr, handles []syscall.Handle) error {
+	l.handles = append(l.handles, handles)
+	return call(procUpdateProcThreadAttribute, uintptr(unsafe.Pointer(&l.buf[0])), 0, attribute, uintptr(unsafe.Pointer(&handles[0])), unsafe.Sizeof(handles[0])*uintptr(len(handles)), 0, 0)
+}
 
-// update sets an attribute to the value of size bytes at the address value,
-// which must stay valid until the process is created; for the pseudoconsole
-// the value is the handle itself.
-func (l *attributeList) update(attribute, value, size uintptr) error {
-	return call(procUpdateProcThreadAttribute, l.pointer(), 0, attribute, value, size, 0, 0)
+// updateHandle sets an attribute whose value is the handle itself, as the
+// pseudoconsole's is.
+func (l *attributeList) updateHandle(attribute uintptr, h syscall.Handle) error {
+	return call(procUpdateProcThreadAttribute, uintptr(unsafe.Pointer(&l.buf[0])), 0, attribute, uintptr(h), unsafe.Sizeof(h), 0, 0)
 }
 
 func (l *attributeList) delete() {
-	procDeleteProcThreadAttributeList.Call(l.pointer())
+	procDeleteProcThreadAttributeList.Call(uintptr(unsafe.Pointer(&l.buf[0])))
 }
 
 // coord packs a terminal's size as a COORD, which is passed by value.

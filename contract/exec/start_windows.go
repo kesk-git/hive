@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -436,25 +435,21 @@ func startPlatform(p plan) (*started, *StartError) {
 	}
 	closers = append(closers, list.delete)
 	if !resident {
-		jobs := []syscall.Handle{job}
-		if err := list.update(procThreadAttributeJobList, uintptr(unsafe.Pointer(&jobs[0])), unsafe.Sizeof(jobs[0])*uintptr(len(jobs))); err != nil {
+		if err := list.updateHandles(procThreadAttributeJobList, []syscall.Handle{job}); err != nil {
 			return fail(fmt.Errorf("exec: the job attribute: %w", err))
 		}
-		defer runtime.KeepAlive(jobs)
 	}
 	if terminal {
-		if err := list.update(procThreadAttributePseudoConsole, uintptr(tree.console.hpc), unsafe.Sizeof(tree.console.hpc)); err != nil {
+		if err := list.updateHandle(procThreadAttributePseudoConsole, tree.console.hpc); err != nil {
 			return fail(fmt.Errorf("exec: the pseudoconsole attribute: %w", err))
 		}
-	} else if err := list.update(procThreadAttributeHandleList, uintptr(unsafe.Pointer(&inherit[0])), unsafe.Sizeof(inherit[0])*uintptr(len(inherit))); err != nil {
+	} else if err := list.updateHandles(procThreadAttributeHandleList, inherit); err != nil {
 		return fail(fmt.Errorf("exec: the handle list: %w", err))
 	}
-	si.AttributeList = list.pointer()
+	si.AttributeList = &list.buf[0]
 
 	var pi syscall.ProcessInformation
 	err = syscall.CreateProcess(appName, cmdline, nil, nil, !terminal, flags, &env[0], dir, &si.StartupInfo, &pi)
-	runtime.KeepAlive(inherit)
-	runtime.KeepAlive(list)
 	if err != nil {
 		if resident && errors.Is(err, syscall.ERROR_ACCESS_DENIED) {
 			return nil, &StartError{Reason: BreakawayRefused, Err: err}
