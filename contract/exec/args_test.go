@@ -132,17 +132,17 @@ func TestArgumentChecks(t *testing.T) {
 	}
 }
 
-// A Windows command line is over its limit at 32,767 UTF-16 code units, after
-// quoting, counted in code units: a character outside the basic plane counts
-// two.
+// A Windows command line is over its limit at 32,766 UTF-16 code units, after
+// quoting, so that with its NUL it fits 32,767; units are counted as code
+// units: a character outside the basic plane counts two.
 func TestWindowsLimit(t *testing.T) {
 	line := func(n int) string { return strings.Repeat("a", n) }
-	if err := checkWindowsLimit(line(32767)); err != nil {
-		t.Errorf("32767 units: %v", err)
+	if err := checkWindowsLimit(line(32766)); err != nil {
+		t.Errorf("32766 units: %v", err)
 	}
-	err := checkWindowsLimit(line(32768))
-	if err == nil || err.Reason != TooLarge || err.Limit != 32767 || err.Actual != 32768 {
-		t.Errorf("32768 units: %+v", err)
+	err := checkWindowsLimit(line(32767))
+	if err == nil || err.Reason != TooLarge || err.Limit != 32766 || err.Actual != 32767 {
+		t.Errorf("32767 units: %+v", err)
 	}
 	// Quoting counts: 16,400 quotes become 32,800 units once escaped.
 	quoted := windowsCommandLine(`C:\x.exe`, []string{strings.Repeat(`"`, 16400)})
@@ -156,7 +156,7 @@ func TestWindowsLimit(t *testing.T) {
 	if got, want := utf16Units("a🎉é"), len(utf16.Encode([]rune("a🎉é"))); got != want {
 		t.Errorf("units = %d, want %d", got, want)
 	}
-	if f := err.Failure(); f.Status != "too_large" || f.Err.Code != "record_too_large" || *f.Err.LimitBytes != 32767 || *f.Err.ActualBytes != 32768 {
+	if f := err.Failure(); f.Status != "too_large" || f.Err.Code != "record_too_large" || *f.Err.LimitBytes != 32766 || *f.Err.ActualBytes != 32767 {
 		t.Errorf("%+v", f)
 	}
 }

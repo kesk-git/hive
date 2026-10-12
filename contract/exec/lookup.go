@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 )
 
 // startPath is the search path Hive's own process was started with. It is
@@ -68,7 +67,7 @@ func searchDirs(searchPath string) []string {
 var batchSuffixes = []string{".cmd", ".bat"}
 
 func findWindows(dirs []string, name string, stat statFunc) (string, *StartError) {
-	exe, stem := windowsNames(name)
+	exe := name + ".exe"
 	for _, dir := range dirs {
 		path := filepath.Join(dir, exe)
 		if fi, err := stat(path); err == nil && !fi.IsDir() {
@@ -77,23 +76,13 @@ func findWindows(dirs []string, name string, stat statFunc) (string, *StartError
 	}
 	for _, dir := range dirs {
 		for _, suffix := range batchSuffixes {
-			path := filepath.Join(dir, stem+suffix)
+			path := filepath.Join(dir, name+suffix)
 			if fi, err := stat(path); err == nil && !fi.IsDir() {
 				return "", &StartError{Reason: BatchFile, File: path}
 			}
 		}
 	}
 	return "", &StartError{Reason: Missing}
-}
-
-// windowsNames are the file name a program is found by on Windows and the
-// name without its suffix: the name is looked for as <name>.exe, and a name
-// that already ends in .exe, as cmd.exe does, is the file name itself.
-func windowsNames(name string) (exe, stem string) {
-	if strings.EqualFold(filepath.Ext(name), ".exe") {
-		return name, strings.TrimSuffix(name, name[len(name)-4:])
-	}
-	return name + ".exe", name
 }
 
 // lookup finds the program of the run on this platform's search path.

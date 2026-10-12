@@ -7,8 +7,9 @@ import (
 )
 
 // windowsCommandLineUnits is the limit of a Windows command line, in UTF-16
-// code units, after quoting (spec/distribution.md, Arguments).
-const windowsCommandLineUnits = 32767
+// code units, after quoting (spec/distribution.md, Arguments): CreateProcessW
+// takes 32,767 characters including the terminating NUL.
+const windowsCommandLineUnits = 32766
 
 // checkArguments applies the rules every argument obeys before anything
 // starts: none holds a NUL character, and on Windows every one is valid

@@ -2,6 +2,7 @@ package exec
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -90,6 +91,8 @@ func checkBare(name string) error {
 		return fmt.Errorf("exec: a program has a name")
 	case name == "." || name == "..":
 		return fmt.Errorf("exec: %q is not a program name", name)
+	case strings.EqualFold(filepath.Ext(name), ".exe"):
+		return fmt.Errorf("exec: %q ends in .exe; a program's name is a bare word with no extension on every platform", name)
 	case strings.ContainsAny(name, `/\:`):
 		return fmt.Errorf("exec: %q is a path, and a run names its program by a bare name", name)
 	}

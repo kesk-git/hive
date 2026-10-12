@@ -114,8 +114,12 @@ func TestLookupOnWindows(t *testing.T) {
 	if got, err := win("both"); err != nil || !strings.EqualFold(got, "/w/b/both.exe") {
 		t.Errorf("an executable and a batch file of one name: %q, %v", got, err)
 	}
-	if got, err := win("cmd.exe"); err != nil || got != "/w/c/cmd.exe" {
-		t.Errorf("cmd.exe: %q, %v", got, err)
+	if got, err := win("cmd"); err != nil || got != "/w/c/cmd.exe" {
+		t.Errorf("cmd: %q, %v", got, err)
+	}
+	// A name is looked for as <name>.exe and never as given.
+	if got, err := win("cmd.exe"); err == nil {
+		t.Errorf("cmd.exe was found as %q", got)
 	}
 	for _, name := range []string{"tool", "script", "x", "y", "plain", "dir"} {
 		got, err := win(name)
@@ -201,7 +205,7 @@ func TestProgramNames(t *testing.T) {
 	good := []Program{
 		{Core, "git"}, {Core, "gh"}, {Core, "claude"}, {Core, "codex"},
 		{Transitional, "no-mistakes"}, {Optional, "chrome-devtools-axi"},
-		{Hive, "hive-pool"}, {Hive, "hive-spawning-pool"}, {Platform, "security"}, {Project, "make"}, {Project, "cmd.exe"},
+		{Hive, "hive-pool"}, {Hive, "hive-spawning-pool"}, {Platform, "security"}, {Project, "make"}, {Project, "cmd"}, {Project, "python3.11"},
 	}
 	for _, p := range good {
 		if err := p.Check(); err != nil {
@@ -211,7 +215,7 @@ func TestProgramNames(t *testing.T) {
 	bad := []Program{
 		{Core, "svn"}, {Core, "/usr/bin/git"}, {Core, `..\git`}, {Core, "git status"}, {Core, ""}, {Core, "."}, {Core, ".."},
 		{Transitional, "git"}, {Optional, "git"}, {Hive, "git"}, {Hive, "hive-"}, {Hive, "Hive-pool"}, {Platform, "Security"},
-		{Platform, "../security"}, {Project, "a/b"}, {Project, "c:x"}, {Project, "a\nb"}, {Project, "a\x00b"}, {"mystery", "git"}, {"", "git"},
+		{Platform, "../security"}, {Project, "a/b"}, {Project, "cmd.exe"}, {Core, "git.EXE"}, {Project, "tool.Exe"}, {Project, "c:x"}, {Project, "a\nb"}, {Project, "a\x00b"}, {"mystery", "git"}, {"", "git"},
 	}
 	for _, p := range bad {
 		if err := p.Check(); err == nil {
