@@ -1,2 +1,3 @@
+no_ci: true
 commands:
   test: make check test-contract build
