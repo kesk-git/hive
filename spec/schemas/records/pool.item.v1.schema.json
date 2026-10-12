@@ -65,7 +65,7 @@
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/level"
     },
     "wave": {
-      "description": "On a Target only: the Wave the Target belongs to on the project's roadmap, as the define step or the roadmap round recorded it. The Wave is the fourth level of the work hierarchy, an ordered group of Targets with an outcome on the roadmap, recorded as this grouping data on each of its Targets: it has no worker, no Pool item of its own, no owner and no state of its own.",
+      "description": "On a Target only: the Wave the Target belongs to on the project's roadmap, as the owning supervisor recorded it when it filed the Target or moved it: at the project's creation, from one sentence of the Hive Mind's, or from an accepted card of a roadmap round. The Wave is the fourth level of the work hierarchy, an ordered group of Targets with an outcome on the roadmap, recorded as this grouping data on each of its Targets: it has no worker, no Pool item of its own, no owner and no state of its own.",
       "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/wave"
     },
     "state": {
@@ -490,7 +490,7 @@
       ]
     },
     "wave": {
-      "description": "A Wave on the project's roadmap: its slug, its title and its ordinal in the roadmap's order, as the define step or the roadmap round recorded them. Carried by a Target only.",
+      "description": "A Wave on the project's roadmap: its slug, its title and its ordinal in the roadmap's order, as the owning supervisor recorded them when it filed the Target or moved it. Carried by a Target only.",
       "type": "object",
       "additionalProperties": false,
       "required": [
