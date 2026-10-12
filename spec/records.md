@@ -58,7 +58,7 @@ A home's top level is fixed:
 | `pool/` | `pool` | The Pool's store, including what `word` persists through it. |
 | `spawning-pool/` | `spawning-pool` | Leases and their receipts. |
 | `dispatch/` | `dispatch` | The identity registry, execution records, schedules, sessions, policy with the dispatch matrix, and from stage 4 the Spoor records of the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section. |
-| `shadow/` | `shadow` | Observations, cursors and wakes, and the record of the Shadow's cadence. |
+| `shadow/` | `shadow` | Observations, cursors and wakes, the record of the Shadow's cadence, and from stage 4 the progress record of each Hunt that the design's [Progress in real time](../docs/design.md#progress-in-real-time) states. |
 | `synapse/` | `synapse` | The run ledger and evidence. |
 | `ui/` | `ui` | The UI's own state. |
 | `reviews/` | `ui` | [Review directories](review.md), at the path the design fixes. |
