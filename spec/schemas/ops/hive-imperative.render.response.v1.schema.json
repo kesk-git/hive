@@ -24,7 +24,7 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
     },
     "text": {
-      "description": "The four sections in order, Task, Setup, Rules, Definition of done, opened by the worker role boundary, with the Standard's criteria rendered from the specification revision the Imperative names.",
+      "description": "The four sections in order, Task, Setup, Rules, Definition of done, opened by the worker role boundary, with the Standard's criteria rendered from the specification revision the Imperative names and, in Rules after the Boundary, the playbook of the revision's class rendered from the rules in force for it.",
       "type": "string",
       "minLength": 1
     },
