@@ -1,0 +1,2 @@
+commands:
+  test: make check test-contract build
