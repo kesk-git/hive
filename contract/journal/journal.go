@@ -153,6 +153,16 @@ func Open(dir string, opts Options) (*Journal, error) {
 	return j, nil
 }
 
+// openSegment opens the segment named name for reading, as store.OpenRead
+// does, its path resolved through the home's Path.
+func (j *Journal) openSegment(name string) (*os.File, error) {
+	path, err := j.path(name)
+	if err != nil {
+		return nil, err
+	}
+	return store.OpenRead(path)
+}
+
 // path is the path of name in the journal's directory, or of the directory
 // itself for "", resolved through the home's Path.
 func (j *Journal) path(name string) (string, error) {
@@ -238,6 +248,9 @@ func (j *Journal) segments() ([]segment, error) {
 		if !isSeg {
 			continue
 		}
+		if _, err := j.path(e.Name()); err != nil {
+			return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
+		}
 		if !e.Type().IsRegular() {
 			return nil, fmt.Errorf("%w: journal: %s is not a regular file", store.ErrRecordMalformed, e.Name())
 		}
@@ -271,11 +284,7 @@ var errChanged = errors.New("journal: the file changed while it was read")
 // a second time and found identical; a file cut or changed meanwhile is read
 // again.
 func (j *Journal) readTail(name string, newest bool) (*tail, error) {
-	path, err := j.path(name)
-	if err != nil {
-		return nil, err
-	}
-	f, err := store.OpenRead(path)
+	f, err := j.openSegment(name)
 	if err != nil {
 		return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
 	}

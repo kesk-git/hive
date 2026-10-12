@@ -180,11 +180,7 @@ func (r *Reader) load() (bool, error) {
 // byte range has been read a second time and found identical, and a range
 // that has changed is read again from the offset reached.
 func (r *Reader) read(closed bool) ([]byte, bool, error) {
-	path, err := r.j.path(r.seg.name)
-	if err != nil {
-		return nil, false, err
-	}
-	f, err := store.OpenRead(path)
+	f, err := r.j.openSegment(r.seg.name)
 	if errNotExist(err) {
 		return nil, false, err
 	}

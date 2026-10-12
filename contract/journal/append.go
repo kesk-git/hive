@@ -3,6 +3,7 @@ package journal
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -240,11 +241,12 @@ func (j *Journal) repairLine(st *state, stamp, homeID, correlation string) (*lin
 func (j *Journal) present(st *state, events []store.Event) (map[string]bool, error) {
 	found := map[string]bool{}
 	for i := len(st.segs) - 1; i >= 0 && len(found) < len(events); i-- {
-		path, err := j.path(st.segs[i].name)
+		f, err := j.openSegment(st.segs[i].name)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
 		}
-		data, err := store.ReadFile(path)
+		data, err := io.ReadAll(f)
+		f.Close()
 		if err != nil {
 			return nil, fmt.Errorf("%w: journal: %v", store.ErrRecordMalformed, err)
 		}

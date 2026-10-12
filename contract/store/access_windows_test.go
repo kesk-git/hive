@@ -70,12 +70,16 @@ func junction(t testing.TB, target, link string) {
 }
 
 // platformLayoutCases are the homes only this platform refuses: a known
-// directory that is a junction, which is a reparse point that is not a
-// symbolic link.
+// directory and an unknown entry that are junctions, which are reparse points
+// that are not symbolic links.
 var platformLayoutCases = []layoutCase{
 	{"a known directory that is a junction", func(t *testing.T, home string) string {
 		os.Remove(filepath.Join(home, "pool"))
 		junction(t, filepath.Join(home, "ui"), filepath.Join(home, "pool"))
+		return home
+	}, ErrLayout},
+	{"an unknown entry that is a junction", func(t *testing.T, home string) string {
+		junction(t, filepath.Join(home, "ui"), filepath.Join(home, "Backup"))
 		return home
 	}, ErrLayout},
 }

@@ -399,7 +399,14 @@ func (s *Store) intents() ([]string, error) {
 	}
 	var names []string
 	for _, e := range entries {
-		if e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".json") {
+		if !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		rel := s.pkg + "/" + txDir + "/" + e.Name()
+		if _, err := s.Path(rel); err != nil {
+			return nil, fmt.Errorf("%w: intent %s: %v", ErrRecordMalformed, rel, err)
+		}
+		if e.Type().IsRegular() {
 			names = append(names, e.Name())
 		}
 	}

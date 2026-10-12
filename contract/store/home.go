@@ -123,7 +123,11 @@ func CheckHome(dir string) (*Home, error) {
 	h := &Home{Dir: real}
 	for _, e := range entries {
 		name := e.Name()
-		info, err := os.Lstat(filepath.Join(real, name))
+		path, err := homePath(real, name)
+		if err != nil {
+			return nil, err
+		}
+		info, err := os.Lstat(path)
 		if err != nil {
 			return nil, fmt.Errorf("store: home: %w", err)
 		}
@@ -132,10 +136,10 @@ func CheckHome(dir string) (*Home, error) {
 			if !info.Mode().IsRegular() {
 				return nil, fmt.Errorf("%w: %s is not a regular file", ErrLayout, name)
 			}
-			if err := ownerOnly(filepath.Join(real, name), info, name); err != nil {
+			if err := ownerOnly(path, info, name); err != nil {
 				return nil, err
 			}
-			id, err := readHomeRecord(filepath.Join(real, name))
+			id, err := readHomeRecord(path)
 			if err != nil {
 				return nil, err
 			}
@@ -144,7 +148,7 @@ func CheckHome(dir string) (*Home, error) {
 			if !info.IsDir() {
 				return nil, fmt.Errorf("%w: %s is not a directory", ErrLayout, name)
 			}
-			if err := ownerOnly(filepath.Join(real, name), info, name); err != nil {
+			if err := ownerOnly(path, info, name); err != nil {
 				return nil, err
 			}
 		default:
@@ -181,10 +185,14 @@ func homePath(dir, rel string) (string, error) {
 
 // insideRepository refuses a directory that is, or is under, a Git working
 // tree: one with a .git entry, a directory in a main working tree and a file
-// in a linked one.
+// in a linked one. The home's own .git is looked for through its Path.
 func insideRepository(dir string) error {
+	git, err := homePath(dir, ".git")
+	if err != nil {
+		return err
+	}
 	for p := dir; ; {
-		if _, err := os.Lstat(filepath.Join(p, ".git")); err == nil {
+		if _, err := os.Lstat(git); err == nil {
 			return fmt.Errorf("%w: %s is under %s", ErrInsideRepository, dir, p)
 		}
 		parent := filepath.Dir(p)
@@ -192,6 +200,7 @@ func insideRepository(dir string) error {
 			return nil
 		}
 		p = parent
+		git = filepath.Join(p, ".git")
 	}
 }
 

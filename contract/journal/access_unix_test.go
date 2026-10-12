@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/kesk-git/hive/contract/store"
 )
 
 // The access a test home, and what is made in it, has on macOS and Linux is
@@ -56,4 +58,22 @@ func closeSegments(t *testing.T, home string) {
 			t.Skip("the file system does not keep the owner from reading a file with no access")
 		}
 	}
+}
+
+// A journal whose directory lists its segments but cannot be searched is
+// malformed, as a segment that cannot be read is.
+func TestUnsearchableJournalIsMalformed(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: a closed directory does not refuse a search")
+	}
+	home := newHome(t, false)
+	j, _ := open(t, home, "pool", 0)
+	append_(t, j, event(t, "pool", 1))
+	dir := filepath.Join(home, journalDir)
+	if err := os.Chmod(dir, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, dirMode) })
+	_, err := j.Head()
+	wantErr(t, "Head", err, store.ErrRecordMalformed)
 }

@@ -120,3 +120,47 @@ func TestLinkInAPackageIsRefused(t *testing.T) {
 		t.Errorf("what the link leads to was not left alone: %v", err)
 	}
 }
+
+// A link deep in tmp/ is refused before the cleanup a writer runs goes through
+// it, and what it leads to is left alone.
+func TestLinkNestedInTmpIsRefused(t *testing.T) {
+	home := newHome(t)
+	s, _, _ := open(t, home, "pool")
+	outside := t.TempDir()
+	kept := filepath.Join(outside, "kept.txt")
+	if err := os.WriteFile(kept, []byte("kept\n"), fileMode); err != nil {
+		t.Fatal(err)
+	}
+	write(t, s, "pool/tmp/sub/"+req1+tempSuffix, []byte("x"))
+	symlink(t, outside, filepath.Join(home, "pool", tmpDir, "sub", "link"))
+	if w, err := s.Lock(); !errors.Is(err, ErrLayout) {
+		if err == nil {
+			w.Release()
+		}
+		t.Fatalf("Lock with a link in tmp/sub/: %v", err)
+	}
+	if _, err := os.Stat(kept); err != nil {
+		t.Errorf("what the link leads to was not left alone: %v", err)
+	}
+}
+
+// An intent that is a link is refused as a malformed intent, never passed
+// over, so a writer does not go on as if no transaction were left behind.
+func TestLinkedIntentIsRefused(t *testing.T) {
+	home := newHome(t)
+	s, _, _ := open(t, home, "pool")
+	target := filepath.Join(t.TempDir(), "intent.json")
+	if err := os.WriteFile(target, []byte("{}\n"), fileMode); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, "pool", txDir), dirMode); err != nil {
+		t.Fatal(err)
+	}
+	symlink(t, target, s.abs(IntentPath("pool", req1)))
+	if w, err := s.Lock(); !errors.Is(err, ErrRecordMalformed) {
+		if err == nil {
+			w.Release()
+		}
+		t.Fatalf("Lock with a linked intent: %v", err)
+	}
+}

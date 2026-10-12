@@ -3,6 +3,7 @@
 package store
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -54,4 +55,23 @@ func refuseReplace(t testing.TB, s *Store, rel string) (restore func(), ok bool)
 		t.Fatal(err)
 	}
 	return func() { os.Chmod(dir, dirMode) }, true
+}
+
+// A record in a directory that cannot be searched is malformed, as any record
+// that cannot be read is.
+func TestUnsearchableRecordIsMalformed(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: a closed directory does not refuse a search")
+	}
+	home := newHome(t)
+	s, _, _ := open(t, home, "pool")
+	write(t, s, task1, record(t, map[string]any{"n": int64(1)}, 1, "2026-10-11T08:00:00.000Z"))
+	dir := filepath.Dir(s.abs(task1))
+	if err := os.Chmod(dir, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, dirMode) })
+	if _, err := s.ReadRecord(task1); !errors.Is(err, ErrRecordMalformed) {
+		t.Fatalf("ReadRecord in an unsearchable directory: %v", err)
+	}
 }

@@ -252,15 +252,42 @@ func (s *Store) clearTmp() error {
 		return fmt.Errorf("store: emptying %s: %w", tmpDir, err)
 	}
 	for _, e := range entries {
-		p, err := s.Path(rel + "/" + e.Name())
-		if err != nil {
-			return err
-		}
-		if err := os.RemoveAll(p); err != nil {
+		if err := s.removeAll(rel + "/" + e.Name()); err != nil {
 			return fmt.Errorf("store: emptying %s: %w", tmpDir, err)
 		}
 	}
 	return syncDir(dir)
+}
+
+// removeAll removes the entry at rel and, for a directory, everything in it,
+// each entry resolved through the home's Path before it is touched.
+func (s *Store) removeAll(rel string) error {
+	p, err := s.Path(rel)
+	if err != nil {
+		return err
+	}
+	info, err := os.Lstat(p)
+	if errNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		entries, err := os.ReadDir(p)
+		if err != nil {
+			return err
+		}
+		for _, e := range entries {
+			if err := s.removeAll(rel + "/" + e.Name()); err != nil {
+				return err
+			}
+		}
+	}
+	if err := os.Remove(p); err != nil && !errNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // readFile reads the file at rel and checks its form: one JSON document in
@@ -268,10 +295,10 @@ func (s *Store) clearTmp() error {
 // with fs.ErrNotExist; any other fault is ErrRecordMalformed.
 func (s *Store) readFile(rel string) ([]byte, error) {
 	full, err := s.Path(rel)
-	if err != nil {
-		return nil, err
+	var data []byte
+	if err == nil {
+		data, err = ReadFile(full)
 	}
-	data, err := ReadFile(full)
 	if err != nil {
 		if errNotExist(err) {
 			return nil, fmt.Errorf("store: %s: %w", rel, fs.ErrNotExist)

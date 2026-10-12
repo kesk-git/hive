@@ -145,6 +145,10 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			symlink(t, filepath.Join(home, "ui"), filepath.Join(home, "pool"))
 			return home
 		}, ErrLayout},
+		{"an unknown entry that is a symbolic link", func(t *testing.T, home string) string {
+			symlink(t, filepath.Join(home, "ui"), filepath.Join(home, "Backup"))
+			return home
+		}, ErrLayout},
 		{"a known directory open to others", func(t *testing.T, home string) string {
 			grantOthers(t, filepath.Join(home, locksDir), 0o755)
 			return home
