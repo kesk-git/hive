@@ -11,7 +11,7 @@ An answer keeps its recorded source and nothing more is asked of it: Hive asks n
 - **Records.** A question and a decision round are Pool records with `pool.` kinds, at `pool/records/question/<question_id>.json` and `pool/records/decision-round/<decision_round_id>.json`. `word` never opens them: it reads them through `hive-pool read` and writes them through the six operations of [Operations](#operations). The names carry the owner of the file, `pool`; the identities carry the minter, `word`, as [identities.md](identities.md#identifier-form) registers `q_`, `dr_` and `card_`. A card is an entry of its round, and a question has exactly one card.
 - **Receipts.** `word` has no part of the home and writes no receipt. The receipts of a `hive-word` operation are the receipts of the one `hive-pool` request it made, returned in its own response's `receipts` in full. A reader that sees "`word`'s receipt" in the design reads the receipt `hive-word` returned.
 - **Events.** `word` appends no event: it has no transaction. The Pool's `pool.question.*` events report what `word` persisted.
-- **Replay is a handoff.** `word` has no `requests/` store, so its replay is the Pool's, by the rule [commands.md](commands.md#a-command-with-no-store) gives a command with no store. Before any check and before any identity is minted, `word` reads the Pool's recorded outcome of its own `request_id` through `hive-pool read` of kind `request-outcome`, which recovers an interrupted transaction first, and compares the digest recorded there with the digest of the request in hand. Equal: the request is a retry, and `word` returns the recorded outcome, adapted as below, with `replayed` true, without one check against the present records, so a retry of an answer is never refused because the first answer changed the round. Different: `conflict`, `replay_mismatch`, and nothing is sent. None recorded: its checks run, identities are minted and it sends its one `hive-pool` request as a handoff, under its own `request_id`, `correlation_id` and scope, with `caller` the package `word` and its command `hive-word`, and as `causation` its own request: schema `hive.request`, its `request_id` and the digest of its canonical form. The Pool keys that request's replay on the causation's digest, so two identical `hive-word` requests that race past the read both receive the outcome of whichever reached the Pool first, with that one's identities.
+- **Replay is a handoff.** `word` has no `requests/` store, so its replay is the Pool's, by the rule [commands.md](commands.md#a-command-with-no-store) gives a command with no store. After its request is validated and its home, scope and caller are checked, and before any check of the records and before any identity is minted, `word` reads the Pool's recorded outcome of its own `request_id` through `hive-pool read` of kind `request-outcome`, which recovers an interrupted transaction first, and compares the digest recorded there with the digest of the request in hand. Equal: the request is a retry, and `word` returns the recorded outcome, adapted as below, with `replayed` true, without one check against the present records, so a retry of an answer is never refused because the first answer changed the round. Different: `conflict`, `replay_mismatch`, and nothing is sent. None recorded: an answer's source is checked, identities are minted and `word` sends its one `hive-pool` request as a handoff, under its own `request_id`, `correlation_id` and scope, with `caller` the package `word` and its command `hive-word`, and as `causation` its own request: schema `hive.request`, its `request_id` and the digest of its canonical form. The Pool keys that request's replay on the causation's digest, so two identical `hive-word` requests that race past the read both receive the outcome of whichever reached the Pool first, with that one's identities.
 - **Adapting the outcome.** The recorded response is the Pool's. For `hold`, the body is the Pool's `question`, `round`, `hold` and `item`, with `question_id`, `decision_round_id`, `card_id` and `hold_id` read from them; for `answer`, the Pool's body, except that an outcome whose disposition is `unreconciled` is returned as `held`, with no body, the hold in `error.hold` and code `word.question_changed`; for every other operation, the Pool's body unchanged. The receipts are the recorded ones, and a refusal, conflict or hold the Pool returned is returned unchanged, with the Pool's code.
 - **Who may persist the word.** The six operations refuse at the Pool, with `authority_insufficient`, any request that is not a handoff from `hive-word`: the caller names the package `word` and its command `hive-word`, and the `causation` is a `hive.request` of the request's own `request_id` with its digest. The restriction is the Pool's and not the caller's to apply. It is attribution, as [What this does not prevent](#what-this-does-not-prevent) says, and not authentication.
 - **Whose checks.** Every check that reads a question, a round, a hold or an item as they stand is the Pool's, made inside the transaction that writes, under its lock, so that no two requests racing past a read can both apply. `word`'s own checks are the two that need nothing of the Pool's: who brings the request, and for a review submission that the round file carries the words. A refusal of `word`'s own comes before any call, with its own code.
@@ -50,7 +50,7 @@ A question holds one item through one `word` hold: the work it gates, which a qu
 - **Acceptance is not release.** An answer is recorded and applied in one transaction, and it never releases the hold: the owning supervisor reads the exact words and records their disposition, `release` or `complete`, with a disposition note of its own, which the card shows beside the Hive Mind's words. Until then the hold stays and the held work waits on its supervisor, as the design's [Progress in real time](../docs/design.md#progress-in-real-time) reads it. A reader shows the acceptance and the disposition as two facts, each with its receipt.
 - **A deferral is not approval.** Later leaves the work held and records a revisit date, which the Shadow reads and Scheduled lists; reaching it re-presents the card and runs nothing.
 - **Released, completed and moot are final.** Such a question takes no further answer at its current revision, no revision, no disposition and no close. A later change of the Hive Mind's word on that matter is a new question, raised on the work it concerns.
-- **Nothing is deleted.** A question and its round are never removed: archiving the held item, the round's review or the report that raised it keeps them whole, with every answer and receipt, and their retention is the Pool's configuration, as [pool.md](pool.md#left-undecided) leaves it.
+- **Nothing is deleted.** No operation removes a question or its round: archiving the held item, the round's review or the report that raised it keeps them whole, with every answer and receipt, and how long they are kept beyond that is the Pool's retention configuration, as [pool.md](pool.md#left-undecided) leaves it.
 
 A round is `open` while any of its cards is `open`, and `closed` from the moment none is; a closed round takes no new card and never reopens. An unreconciled answer changes no state of the question, the card or the round.
 
@@ -58,24 +58,24 @@ A review's [final record](review.md#finaljson) reads each card's decision in the
 
 ## Operations
 
-Each mutating operation is one handoff to one `hive-pool` operation, which does all of what follows in one transaction and writes the receipts named, each with the Pool's event of the same name. Who may send each, by the envelope's `caller`, which is attribution and never authentication:
+Each mutating operation is one handoff to one `hive-pool` operation, which does all of what follows in one transaction and writes the receipts named, with the Pool's events that [pool.md](pool.md#receipts-and-events) lists for them. Who may send each, by the envelope's `caller`, which is attribution and never authentication:
 
 | `hive-word` | `hive-pool` | Caller accepted | Receipts |
 | --- | --- | --- | --- |
-| `hold` | `hold-question` | a supervisor, the operator or a package | `pool.question.held`; `pool.hold.placed` unless a questionless hold is bound; `pool.item.added` for a decision item |
-| `revise` | `revise-question` | a supervisor, the operator or a package | `pool.question.revised` |
+| `hold` | `hold-question` | a supervisor, the operator, or a package other than `ui` | `pool.question.held`; `pool.hold.placed` unless a questionless hold is bound; `pool.item.added` for a decision item |
+| `revise` | `revise-question` | a supervisor, the operator, or a package other than `ui` | `pool.question.revised` |
 | `answer` | `answer-question` | a supervisor, the operator or the package `ui` relaying a review submission | `pool.answer.accepted`, with `pool.answer.superseded` when it supersedes; `pool.question.deferred`; or `pool.answer.unreconciled` |
 | `release` | `release-question` | a supervisor or the operator | `pool.question.released`, `pool.hold.released` |
 | `complete` | `complete-question` | a supervisor or the operator | `pool.question.completed`, `pool.hold.released` |
 | `close` | `close-question` | a supervisor or the operator | `pool.question.mooted`, `pool.hold.released` |
 
-Any other caller, a worker always among them, is refused with `word.not_authorized` before anything is sent. The check stops an honest mistake and proves nothing about who typed. `revise`, `release`, `complete` and `close` pass on the envelope's `expected_revisions`, which name the question's record revision the caller read; a different revision at the Pool is `revision_conflict`.
+Any other caller, a worker always among them, is refused with `word.not_authorized` before anything is sent, and so is the package `ui` bringing an answer whose source is not a review submission. The check stops an honest mistake and proves nothing about who typed. `revise`, `release`, `complete` and `close` pass on the envelope's `expected_revisions`, which name the question's record revision the caller read; a different revision at the Pool is `revision_conflict`.
 
 ### `hold`
 
 Raises a question and holds the item it gates. The request names the held item, or a `new_item` for a question with its own scope, never both; carries the question's text, the consequence of leaving it unanswered, the options with the recommendation, the `amount` of a spend ask and the origin; and names the round to join or asks for a new one. `word` mints `question_id`, `card_id` and, for a new round, `decision_round_id`, and sends `hive-pool hold-question` with the request's `issued_at` as the question's `asked_at`. The Pool:
 
-- refuses a held item that does not exist (`not_found`), lies outside the request's scope (`scope_mismatch`) or is archived (`pool.held_item_archived`); options whose identities repeat, or a recommendation that is not one of them, (`pool.option_unknown`); and an identity that already exists (`already_exists`);
+- refuses a held item that does not exist (`not_found`), lies outside the request's scope (`scope_mismatch`) or is archived (`pool.held_item_archived`); options whose identities repeat or a recommendation that is not one of them (`pool.option_unknown`); and an identity that already exists (`already_exists`);
 - for a `new_item`, adds a decision item in the request's scope: its title and body, `deliverable` `decision`, no level, `definition` `not-required`, queued;
 - binds the question to the held item's active `word` hold that no question names, the earliest placed where there are several, as a legacy import leaves them; otherwise places a new `word` hold with the hold reason given, or the question's text;
 - writes the question at revision 1, `open`, with the item it holds marked `work` or `decision-item`;
@@ -106,7 +106,7 @@ Then it sends `hive-pool answer-question` once. The Pool reads the question, its
 
 | Check | Result |
 | --- | --- |
-| The binding names a question of this home, its one card and its round, and a revision the question has | `not_found` otherwise |
+| The binding names a question of this home, its one card, its round, the item it holds and a revision the question has | `not_found` otherwise |
 | An answer to this question with the same source is recorded | The first answer's receipts, with `duplicate` true; nothing is written |
 | The round was collected whole | `refused`, `pool.round_incomplete` otherwise |
 | The option, if any, is an option of the revision answered | `invalid`, `pool.option_unknown` otherwise |
@@ -171,7 +171,7 @@ The response lists, when the word does not stand, each reason once: `unanswered`
 
 An authority reference of kind `word` names a question, as a record reference with `schema` `pool.question`, its `question_id` as `id`, and the question's `record_revision` that the caller read when it relied on the answer. It stands when, and only when, all of these hold:
 
-1. The reference has that schema and a `record_revision`, and names a question of this home; else `malformed` or `not-found`.
+1. The reference has that schema and a `record_revision` no greater than the question's own, and names a question of this home; else `malformed` or `not-found`.
 2. The question is `answered`, `released` or `completed`, so it stands on an applied answer; a deferred, open or moot question never stands.
 3. The applied answer was recorded at a record revision no greater than the reference's: the answer the caller relied on is the one still applied. An answer that superseded it since is `superseded`; an answer first applied after the revision named is `unanswered`.
 4. The question's scope contains the envelope's: the same home, and a Hive question for any scope of it, a workspace question for that workspace and its projects, a project question for that project.
@@ -188,7 +188,7 @@ A process running as the same user that ignores its instructions can call `hive-
 
 | Code | Status | Meaning |
 | --- | --- | --- |
-| `word.not_authorized` | `refused` | The caller is not one the operation accepts, or an operator-request source is brought by a caller that is not the operator. |
+| `word.not_authorized` | `refused` | The caller is not one the operation accepts, `ui` brings an answer whose source is not a review submission, or an operator-request source is brought by a caller that is not the operator. |
 | `word.question_changed` | `held` | The answer was given against an earlier revision and is recorded unreconciled; `error.hold` names the hold. |
 
 `word` also returns, as [commands.md](commands.md#common-error-codes) defines them, `authority_insufficient` for a review submission whose submit event is absent from its round file or carries other words, and `replay_mismatch` for a `request_id` used before with another request.
