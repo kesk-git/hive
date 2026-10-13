@@ -32,6 +32,14 @@ A Hive without the exception present is whole. It is not checked at start, and i
 
 A project's own validation commands are a third thing: they belong to the project, run in the environment the project supplies, and may need whatever the project needs. They are declared as `project` and are never part of Hive's distribution.
 
+## Plug-in boundary
+
+The core carries no tool server and no third-party skill. The operator may plug them into Claude Code or Codex using the harness's own configuration, outside Hive's records. Hive configures, records, launches and vouches for none of those additions. A server must sign in by itself under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none); a resident server requiring an environment token is refused, since Tendril runs short-lived invocations only.
+
+Desktop control, live-browser-session attachment, bot-detection evasion and swarm frameworks are refused. The optional browser stack remains a selected feature outside the core and must not enable these classes.
+
+Prove the core artefact contains neither a server nor a third-party skill; a harness-configured self-signing server changes no Hive record; a resident token-in-environment server is refused before launch; and each of the four classes is refused. These proofs enter `test-distribution` for the artefact and `test-dispatch` for launch qualification when that route is built.
+
 ## The artefact
 
 The build produces one directory per platform:

@@ -22,6 +22,7 @@ Contract version: **1.20**. What each version changed is recorded under [version
 | [session-messages.md](session-messages.md) | The session message and the input receipt of the one supervisor conversation. |
 | [review.md](review.md) | The four files of a review directory. |
 | [test-targets.md](test-targets.md) | The test targets, what each runs and what each must prove, and the test contract a project declares. |
+| [synapse.md](synapse.md) | Prospective stage 5 gate behaviour, review rounds, rulings and route qualification. |
 | [distribution.md](distribution.md) | The five-dependency distribution contract: the three platforms, macOS, Windows and Linux, the artefact of each, the standard library and its two named exceptions, and the one process-execution path. |
 | [imports.md](imports.md) | The import record that precedes any upstream source. |
 | [pool.md](pool.md) | Stage 2: the Pool's store, records, operations, the execution place, admission, the Imperative, specifications, rules, generated knowledge, legacy import and export, receipts, events and error codes. |
