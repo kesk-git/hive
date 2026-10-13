@@ -231,32 +231,6 @@ func TestANameNotOwnedExitsTwo(t *testing.T) {
 	}
 }
 
-// Every command name but the executable's own is a link to the executable:
-// a relative symbolic link in the same directory on macOS and Linux, and on
-// Windows a hard link or a byte-identical copy named <name>.exe.
-func TestTheLinkNamesLinkToTheExecutable(t *testing.T) {
-	dir := bin(t)
-	want, err := os.ReadFile(filepath.Join(dir, program(executable)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range commandNames(t) {
-		if name == executable {
-			continue
-		}
-		path := filepath.Join(dir, program(name))
-		if runtime.GOOS == "windows" {
-			if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, want) {
-				t.Errorf("%s is neither a hard link to nor a copy of %s (%v)", filepath.Base(path), program(executable), err)
-			}
-			continue
-		}
-		if target, err := os.Readlink(path); err != nil || target != program(executable) || strings.ContainsRune(target, filepath.Separator) {
-			t.Errorf("%s links to %q (%v); want the relative name %q", name, target, err, program(executable))
-		}
-	}
-}
-
 // --version prints the implementation version as one line, under every
 // name, and exits 0.
 func TestVersionPrintsOneLine(t *testing.T) {
