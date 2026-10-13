@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kesk-git/hive/integration/distribution/fixture"
+	"github.com/kesk-git/hive/integration/distribution/harness"
 	"github.com/kesk-git/hive/integration/distribution/proof"
 )
 
@@ -28,7 +28,7 @@ func TestBinaryOfEachPlatformPasses(t *testing.T) {
 	for _, goos := range []string{"linux", "darwin", "windows"} {
 		t.Run(goos, func(t *testing.T) {
 			out := filepath.Join(t.TempDir(), exeName(goos))
-			fixture.Build(t, hello, out, goos, "amd64", true)
+			harness.Build(t, hello, out, goos, "amd64", true)
 			if got := proof.Binary(out, "hive-pool", goos); len(got) != 0 {
 				t.Error(got)
 			}
@@ -59,12 +59,12 @@ func TestBinaryOfEachPlatformPasses(t *testing.T) {
 func TestBinaryBreaks(t *testing.T) {
 	dir := t.TempDir()
 	untrimmed := filepath.Join(dir, "untrimmed")
-	fixture.Build(t, hello, untrimmed, "linux", "amd64", false)
+	harness.Build(t, hello, untrimmed, "linux", "amd64", false)
 	if got := strings.Join(proof.Binary(untrimmed, "hive-pool", "linux"), "\n"); !strings.Contains(got, "without -trimpath") {
 		t.Errorf("an executable built without -trimpath: %q", got)
 	}
 	trimmed := filepath.Join(dir, "trimmed")
-	fixture.Build(t, hello, trimmed, "linux", "amd64", true)
+	harness.Build(t, hello, trimmed, "linux", "amd64", true)
 	if got := strings.Join(proof.Binary(trimmed, "hive-pool", "windows"), "\n"); !strings.Contains(got, "not a PE executable") {
 		t.Errorf("a Linux executable in a Windows artefact: %q", got)
 	}
