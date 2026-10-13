@@ -651,3 +651,84 @@ func TestAProvisioningRequestAtAnotherScopeIsRefused(t *testing.T) {
 		}
 	}
 }
+
+// A clone whose Git directory is kept apart from its main working tree is
+// idempotent through its linked working trees too: named by one after its
+// main tree, in the same request or a later one, it is the clone of the main
+// tree. Named first through a linked tree, Git cannot name its main working
+// tree and nothing is written.
+func TestACloneWithASeparateGitDirectoryIsOneThroughItsLinkedTrees(t *testing.T) {
+	isolateGit(t)
+	base := physical(t, t.TempDir())
+	git(t, base, "init", "--quiet", "--separate-git-dir="+filepath.Join(base, "meta"), "work")
+	work := filepath.ToSlash(filepath.Join(base, "work"))
+	git(t, work, "commit", "--quiet", "--allow-empty", "-m", "start")
+	linked := filepath.ToSlash(filepath.Join(base, "linked"))
+	git(t, work, "worktree", "add", "--quiet", "-b", "side", linked)
+
+	home := newHome(t)
+	homeID, parentID := mint(t, ids.Home), mint(t, ids.Home)
+	first := send(t, home, request(t, homeID, fleetBody(parentID, projectSpec("tool", cloneSpec(work, ""), cloneSpec(linked, "")))))
+	if first.Status != envelope.Ok {
+		t.Fatalf("%s: %+v", first.Status, first.Error)
+	}
+	if got := marks(t, first.Body); !reflect.DeepEqual(got, all(true, 5)) {
+		t.Errorf("marks %v", got)
+	}
+	recs := records(t, first.Body)
+	if recs[3]["worktree_root"] != work || !reflect.DeepEqual(recs[4], recs[3]) {
+		t.Errorf("the clones are %v and %v", recs[3], recs[4])
+	}
+
+	again := send(t, home, request(t, homeID, fleetBody(parentID, projectSpec("tool", cloneSpec(linked, "")))))
+	if again.Status != envelope.Ok {
+		t.Fatalf("%s: %+v", again.Status, again.Error)
+	}
+	if got := marks(t, again.Body); !reflect.DeepEqual(got, all(false, 4)) {
+		t.Errorf("marks %v", got)
+	}
+	if got := records(t, again.Body)[3]; !reflect.DeepEqual(got, recs[3]) {
+		t.Errorf("the clone is %v, not %v", got, recs[3])
+	}
+
+	fresh := newHome(t)
+	resp := send(t, fresh, request(t, mint(t, ids.Home), fleetBody(mint(t, ids.Home), projectSpec("tool", cloneSpec(linked, "")))))
+	expect(t, resp, envelope.Unavailable, envelope.CodeSourceUnreadable)
+	if got := snapshot(t, fresh); len(withoutBookkeeping(got)) != 0 {
+		t.Errorf("the home holds %v", got)
+	}
+}
+
+// A command that finds an entry at the home's top level that the specification
+// does not name leaves it alone and says so in its response, and a replay
+// says so again; a home with none has no such member.
+func TestAnUnknownHomeEntryIsLeftAloneAndNamedInTheResponse(t *testing.T) {
+	home := newHome(t)
+	if err := os.WriteFile(filepath.Join(home, "notes.txt"), []byte("mine"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	req := request(t, mint(t, ids.Home), hiveBody("Hive"))
+	for _, attempt := range []string{"first", "replay"} {
+		resp := send(t, home, req)
+		if resp.Status != envelope.Ok {
+			t.Fatalf("%s: %s: %+v", attempt, resp.Status, resp.Error)
+		}
+		if resp.Replayed != (attempt == "replay") {
+			t.Errorf("%s: replayed %v", attempt, resp.Replayed)
+		}
+		if got := resp.Body["unknown_entries"]; !reflect.DeepEqual(got, []any{"notes.txt"}) {
+			t.Errorf("%s: unknown_entries %v", attempt, got)
+		}
+	}
+	if data, err := os.ReadFile(filepath.Join(home, "notes.txt")); err != nil || string(data) != "mine" {
+		t.Errorf("the unknown entry was touched: %q %v", data, err)
+	}
+
+	plain := send(t, newHome(t), request(t, mint(t, ids.Home), hiveBody("Hive")))
+	if plain.Status != envelope.Ok {
+		t.Fatalf("%s: %+v", plain.Status, plain.Error)
+	}
+	if got, ok := plain.Body["unknown_entries"]; ok {
+		t.Errorf("a home with no unknown entry names %v", got)
+	}
+}

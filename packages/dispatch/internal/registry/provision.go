@@ -28,12 +28,16 @@ func provision(c *cli.Call) (*cli.Result, error) {
 	if p.now, err = recordedAt(c); err != nil {
 		return nil, err
 	}
-	if len(c.Home.Unknown) > 0 {
-		fmt.Fprintf(c.Stderr, "hive-fleet provision: the home holds entries this specification does not name, left alone: %v\n", c.Home.Unknown)
-	}
 	body, err := p.run(c.Request.Body)
 	if err != nil {
 		return nil, err
+	}
+	if len(c.Home.Unknown) > 0 {
+		unknown := make([]any, len(c.Home.Unknown))
+		for i, name := range c.Home.Unknown {
+			unknown[i] = name
+		}
+		body["unknown_entries"] = unknown
 	}
 	return &cli.Result{Body: body, Records: p.records, Receipts: p.receipts}, nil
 }
@@ -221,6 +225,8 @@ func (p *provisioner) project(wsID string, spec map[string]any, existing []map[s
 // project, or finds it. The clone is idempotent on its physical Git common
 // directory, compared by file identity and never by the spelling of the
 // path; registered under another project it is a conflict with already_exists.
+// A clone found keeps the main working tree its record names; one created needs
+// Git to name it.
 func (p *provisioner) clone(projectID, wsID string, spec map[string]any, known []map[string]any, at string) (map[string]any, error) {
 	path, _ := spec["worktree_root"].(string)
 	remote, _ := spec["remote_name"].(string)
@@ -248,6 +254,9 @@ func (p *provisioner) clone(projectID, wsID string, spec map[string]any, known [
 		}
 		p.clones = append(p.clones, met)
 		return created(p.fresh[met.record["clone_id"].(string)], met.record), nil
+	}
+	if facts.worktreeRoot == "" {
+		return nil, envelope.Common(envelope.CodeSourceUnreadable, at+" is in a repository whose main working tree Git cannot name")
 	}
 	id := p.mint(ids.Clone)
 	origin := map[string]any{"kind": "none"}

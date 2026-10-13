@@ -28,15 +28,18 @@ var gitConfig = []string{"GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_N
 // maxGitOutput bounds what the operation reads of Git's answer.
 const maxGitOutput = 1 << 20
 
-// The oldest Git that knows the options a clone is read with.
+// The oldest Git that knows every option a clone is read with: the last of
+// them to come, -z for git worktree list, came with Git 2.36.
 const (
 	minGitMajor = 2
-	minGitMinor = 38
+	minGitMinor = 36
 )
 
 // What is read of a clone: where its Git common directory and its main working
 // tree are, as physical paths with forward slashes, its object format, and the
-// url of the named remote where one was named.
+// url of the named remote where one was named. The main working tree is "" where
+// Git cannot name it: from a linked working tree of a repository whose Git
+// directory is kept apart from its main working tree.
 type cloneFacts struct {
 	commonDir    string
 	worktreeRoot string
@@ -87,7 +90,8 @@ func readClone(path, remote, at string) (*cloneFacts, error) {
 	// lists is the main one, but Git names the common directory there when the
 	// Git directory is kept apart from the working tree, as it is for a
 	// submodule; such a candidate is no working tree, and then the tree the path
-	// lies in is the main one if its Git directory is the common directory.
+	// lies in is the main one if its Git directory is the common directory, and
+	// otherwise Git cannot name it.
 	out, code, err = git(dir, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
 		return nil, err
@@ -111,9 +115,6 @@ func readClone(path, remote, at string) (*cloneFacts, error) {
 			return nil, err
 		}
 		break
-	}
-	if facts.worktreeRoot == "" {
-		return nil, envelope.Common(envelope.CodeSourceUnreadable, at+" is in a repository whose main working tree cannot be found")
 	}
 
 	if remote == "" {
