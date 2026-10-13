@@ -342,10 +342,10 @@ func TestTheMakefileHasEveryTargetAndExecutable(t *testing.T) {
 	set := read(t, repo(t))
 	built := map[string]bool{}
 	for _, m := range buildsExecutable.FindAllStringSubmatch(makeDryRun(t, "build"), -1) {
-		if m[1] != m[2] {
+		if strings.TrimSuffix(m[1], ".exe") != m[2] {
 			t.Errorf("the build writes dist/%s from cmd/%s", m[1], m[2])
 		}
-		built[m[1]] = true
+		built[m[2]] = true
 	}
 	for _, p := range set.All() {
 		makeDryRun(t, p.TestTarget) // fails where make has no such target
