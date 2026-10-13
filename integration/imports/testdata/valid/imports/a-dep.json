@@ -1,0 +1,40 @@
+{
+  "schema": "hive.import",
+  "schema_version": "1.0",
+  "import_id": "a-dep",
+  "kind": "dependency",
+  "owner": "dispatch",
+  "recorded_on": "2026-01-03",
+  "upstream": {
+    "name": "Dependency",
+    "repository": "https://example.invalid/dep",
+    "revision": "fedcba9876543210fedcba9876543210fedcba98",
+    "module": {
+      "path": "example.invalid/dep",
+      "version": "v1.2.3"
+    }
+  },
+  "licence": {
+    "spdx": "MIT",
+    "copyright": [
+      "Copyright (c) 2019 Dependency Author",
+      "Copyright (c) 2021 Another Author\nSecond line of the notice"
+    ],
+    "files": [
+      {
+        "path": "packages/dispatch/dep-licence.txt",
+        "digest": "sha256:39ec1d6f688c03ff630c24404fd836bcf11717accf708618f5729b5b14d2f515",
+        "bytes": 129
+      }
+    ]
+  },
+  "portions": [],
+  "retained_tests": [],
+  "transitive": [],
+  "excluded": [],
+  "local_changes": "None.",
+  "audit": {
+    "audited_on": "2026-01-01",
+    "statement": "The module and its licence were examined."
+  }
+}
