@@ -237,10 +237,9 @@ func buildCallee(root, out string) error {
 
 // input is what a run reads on its standard input.
 type input struct {
-	// bytes are written to a pipe and the pipe is closed.
+	// bytes are written to a pipe and the pipe is closed; nil is the null
+	// device.
 	bytes []byte
-	// file names a file the run reads instead.
-	file string
 }
 
 // ran is what one run of a program left: how it ended and its two outputs.
@@ -264,13 +263,9 @@ func start(t testing.TB, program string, args []string, in input) ran {
 		Stdout:  exec.Pipe(),
 		Stderr:  exec.Pipe(),
 	}
-	switch {
-	case in.file != "":
-		spec.Stdin = exec.File(in.file)
-	case in.bytes != nil:
+	spec.Stdin = exec.Null()
+	if in.bytes != nil {
 		spec.Stdin = exec.Pipe()
-	default:
-		spec.Stdin = exec.Null()
 	}
 	run, err := exec.Start(spec)
 	if err != nil {

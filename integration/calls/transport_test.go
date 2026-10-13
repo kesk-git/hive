@@ -18,8 +18,8 @@ import (
 // fromDispatch is the caller of the transport tests: a package's command.
 var fromDispatch = asPackage{"dispatch", "hive-dispatch"}
 
-// document is the raw output of a call as the contract fixes it: one
-// document followed by a line feed.
+// isOneDocument says whether the raw output of a call is what the contract
+// fixes a response to be: one document followed by one line feed.
 func isOneDocument(raw []byte) bool {
 	return len(raw) > 0 && raw[len(raw)-1] == '\n' && bytes.Count(raw, []byte("\n")) == 1
 }
