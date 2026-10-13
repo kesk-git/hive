@@ -315,6 +315,9 @@ type call struct {
 	operation string
 	home      string
 	req       request
+	// requestPath names an existing file that holds the request, which the
+	// call then sends without writing its own; req supplies the identity.
+	requestPath string
 	// stdin sends the request on standard input instead of in a file.
 	stdin bool
 	// responseFile asks for the response in a file instead of on standard
@@ -332,9 +335,12 @@ func (c call) run(t testing.TB) reply {
 		args = append(args, "--home", c.home)
 	}
 	var in input
-	if c.stdin {
+	switch {
+	case c.requestPath != "":
+		args = append(args, "--request-file", c.requestPath)
+	case c.stdin:
 		in.bytes = c.req.data
-	} else {
+	default:
 		path := filepath.Join(dir, "request.json")
 		if err := os.WriteFile(path, c.req.data, 0o600); err != nil {
 			t.Fatal(err)
@@ -554,4 +560,44 @@ func wantFailure(t testing.TB, r reply, requestID string, exit int, status, code
 	if resp.Body != nil {
 		t.Errorf("a %s response carries a body: %v", status, resp.Body)
 	}
+}
+
+var oversize struct {
+	sync.Mutex
+	files map[int64]string
+}
+
+// oversizeFile is a file of exactly size bytes that is no request, made once
+// for all tests that send a request over a command's limit.
+func oversizeFile(t testing.TB, size int64) string {
+	t.Helper()
+	oversize.Lock()
+	defer oversize.Unlock()
+	if path, ok := oversize.files[size]; ok {
+		return path
+	}
+	path := filepath.Join(workRoot, fmt.Sprintf("oversize-%d", size))
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chunk := bytes.Repeat([]byte("x"), 1<<20)
+	for left := size; left > 0; {
+		n := int64(len(chunk))
+		if left < n {
+			n = left
+		}
+		if _, err := f.Write(chunk[:n]); err != nil {
+			t.Fatal(err)
+		}
+		left -= n
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if oversize.files == nil {
+		oversize.files = map[int64]string{}
+	}
+	oversize.files[size] = path
+	return path
 }
