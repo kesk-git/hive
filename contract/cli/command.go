@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"runtime/debug"
 	"slices"
 	"time"
 	"unicode/utf8"
@@ -45,7 +46,8 @@ type Executable struct {
 	// Version is the implementation version, one line of text.
 	Version string
 	// SourceRevision is the repository revision the executable was built
-	// from, where known.
+	// from, where known. Left empty, it is the vcs.revision setting of the
+	// build, and a build that carries none leaves it out.
 	SourceRevision string
 	// Commands are the commands the executable owns, the one named Name
 	// among them.
@@ -339,6 +341,26 @@ func (c *Command) operation(name string) *Operation {
 	return nil
 }
 
+// readBuildInfo reads the build settings of the running executable.
+var readBuildInfo = debug.ReadBuildInfo
+
+// sourceRevision is the revision the executable reports in capabilities.
+func (e *Executable) sourceRevision() string {
+	if e.SourceRevision != "" {
+		return e.SourceRevision
+	}
+	info, ok := readBuildInfo()
+	if !ok {
+		return ""
+	}
+	for _, setting := range info.Settings {
+		if setting.Key == "vcs.revision" {
+			return setting.Value
+		}
+	}
+	return ""
+}
+
 // Capabilities is the declaration of the command, as its capabilities
 // operation answers it.
 func (e *Executable) Capabilities(c *Command) *envelope.Capabilities {
@@ -348,7 +370,7 @@ func (e *Executable) Capabilities(c *Command) *envelope.Capabilities {
 		Executable:            e.Name,
 		ContractVersion:       envelope.ContractVersion,
 		ImplementationVersion: e.Version,
-		SourceRevision:        e.SourceRevision,
+		SourceRevision:        e.sourceRevision(),
 		Limits:                c.Limits.Resolved(),
 		Operations:            make([]envelope.OperationDecl, 0, len(c.Operations)),
 	}
