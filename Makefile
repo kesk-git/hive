@@ -22,7 +22,7 @@ endef
 # main package exists, and otherwise says that it is not there yet.
 define build-exe
 @if [ -n "$$(find packages/$(1)/cmd/$(2) -name '*.go' -print -quit 2>/dev/null)" ]; then \
-	CGO_ENABLED=0 $(GO) build -trimpath -o dist/$(2) ./packages/$(1)/cmd/$(2); \
+	CGO_ENABLED=0 $(GO) build -trimpath -o dist/$(2)$(shell $(GO) env GOEXE) ./packages/$(1)/cmd/$(2); \
 else \
 	echo "build: $(2) is not there yet"; \
 fi
@@ -67,8 +67,14 @@ test-word:
 test-ui:
 	$(call test-dir,packages/ui)
 
+# test-integration is one run of the Go program under
+# integration/testcmd/testintegration/, which builds the test-only callee of
+# integration/testcmd/ into dist/callee/ and starts the tests with dist/, where
+# `make build` left the seven executables, and dist/callee/ ahead of the rest
+# of the search path. It does not build the seven executables: the tests fail,
+# saying so, when they are absent or are not found first.
 test-integration:
-	$(call test-dir,integration/calls)
+	$(GO) run ./integration/testcmd/testintegration
 
 test-distribution:
 	$(call test-dir,integration/distribution)
