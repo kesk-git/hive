@@ -5,8 +5,10 @@ import (
 	"debug/elf"
 	"debug/macho"
 	"debug/pe"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 )
@@ -99,12 +101,7 @@ func ImportedLibraries(path, goos string) ([]string, error) {
 		}
 		return libs, nil
 	case "darwin":
-		f, err := macho.Open(path)
-		if err != nil {
-			return nil, fmt.Errorf("it is not a Mach-O executable: %v", err)
-		}
-		defer f.Close()
-		return f.ImportedLibraries()
+		return machoLibraries(path, runtime.GOARCH)
 	case "windows":
 		f, err := pe.Open(path)
 		if err != nil {
@@ -125,6 +122,62 @@ func ImportedLibraries(path, goos string) ([]string, error) {
 		return libs, nil
 	}
 	return nil, fmt.Errorf("%q is not one of the three platforms", goos)
+}
+
+// machoLibraries reads the libraries of a Mach-O executable, thin or
+// universal. A universal file holds one slice for each architecture; the
+// libraries are read from the slice of goarch.
+func machoLibraries(path, goarch string) ([]string, error) {
+	fat, err := macho.OpenFat(path)
+	if err == nil {
+		defer fat.Close()
+		cpus := make([]macho.Cpu, len(fat.Arches))
+		for i, a := range fat.Arches {
+			cpus[i] = a.Cpu
+		}
+		i, err := SelectSlice(cpus, goarch)
+		if err != nil {
+			return nil, err
+		}
+		return fat.Arches[i].File.ImportedLibraries()
+	}
+	if !errors.Is(err, macho.ErrNotFat) {
+		return nil, fmt.Errorf("it is not a Mach-O executable: %v", err)
+	}
+	f, err := macho.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("it is not a Mach-O executable: %v", err)
+	}
+	defer f.Close()
+	return f.ImportedLibraries()
+}
+
+// SelectSlice says which slice of a universal Mach-O file belongs to the
+// architecture goarch names, given the CPU type of each slice, and returns its
+// index. Only the CPU type is compared, never the sub-type: the slice of the
+// system's own executables on Apple silicon may be arm64e, a sub-type of the
+// arm64 CPU type. When no slice matches, the error names the architectures
+// the file holds.
+func SelectSlice(cpus []macho.Cpu, goarch string) (int, error) {
+	var want macho.Cpu
+	switch goarch {
+	case "arm64":
+		want = macho.CpuArm64
+	case "amd64":
+		want = macho.CpuAmd64
+	default:
+		return 0, fmt.Errorf("no Mach-O slice is read for the architecture %q", goarch)
+	}
+	for i, c := range cpus {
+		if c == want {
+			return i, nil
+		}
+	}
+	names := make([]string, len(cpus))
+	for i, c := range cpus {
+		names[i] = c.String()
+	}
+	return 0, fmt.Errorf("the universal file holds no slice for %s (%s); it holds [%s]", goarch, want, strings.Join(names, ", "))
 }
 
 // The libraries of each platform's own that an executable may need. Windows

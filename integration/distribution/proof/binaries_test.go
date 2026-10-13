@@ -1,6 +1,7 @@
 package proof_test
 
 import (
+	"debug/macho"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -152,5 +153,53 @@ func TestImportedLibrariesOfADynamicSystemExecutable(t *testing.T) {
 	}
 	if runtime.GOOS == "linux" && proof.LibraryAllowed("linux", "hive-pool", "(a dynamic loader)") {
 		t.Errorf("a dynamic loader is accepted for an executable that must be static")
+	}
+}
+
+// The slice of a universal Mach-O file that is read is the one of the host's
+// architecture, matched on the CPU type. It catches a universal file read as
+// a thin one (an index taken without looking at the architectures), and the
+// wrong slice taken (the first one, or an architecture other than the host's).
+// The slice with the CPU type of arm64 is found whatever its sub-type, and no
+// match is an error that names the architectures the file holds. The real
+// read of /bin/ls on macOS is the test above.
+func TestSelectSliceOfAUniversalFile(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		cpus  []macho.Cpu
+		arch  string
+		index int
+		fails []string
+	}{
+		{"arm64 host, amd64 slice first", []macho.Cpu{macho.CpuAmd64, macho.CpuArm64}, "arm64", 1, nil},
+		{"arm64 host, arm64 slice first", []macho.Cpu{macho.CpuArm64, macho.CpuAmd64}, "arm64", 0, nil},
+		{"amd64 host, arm64 slice first", []macho.Cpu{macho.CpuArm64, macho.CpuAmd64}, "amd64", 1, nil},
+		{"amd64 host, amd64 slice first", []macho.Cpu{macho.CpuAmd64, macho.CpuArm64}, "amd64", 0, nil},
+		{"one slice, the host's", []macho.Cpu{macho.CpuArm64}, "arm64", 0, nil},
+		{"three slices, the host's last", []macho.Cpu{macho.Cpu386, macho.CpuAmd64, macho.CpuArm64}, "arm64", 2, nil},
+		{"no slice for the host", []macho.Cpu{macho.CpuAmd64}, "arm64", 0, []string{"arm64", macho.CpuAmd64.String()}},
+		{"no slice at all", nil, "amd64", 0, []string{"amd64", "[]"}},
+		{"an architecture that has no slice read", []macho.Cpu{macho.CpuAmd64, macho.CpuArm64}, "riscv64", 0, []string{"riscv64"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			i, err := proof.SelectSlice(c.cpus, c.arch)
+			if c.fails != nil {
+				if err == nil {
+					t.Fatalf("slice %d taken, want an error", i)
+				}
+				for _, w := range c.fails {
+					if !strings.Contains(err.Error(), w) {
+						t.Errorf("%q does not name %q", err, w)
+					}
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if i != c.index {
+				t.Errorf("slice %d taken, want %d: the wrong slice is read", i, c.index)
+			}
+		})
 	}
 }
