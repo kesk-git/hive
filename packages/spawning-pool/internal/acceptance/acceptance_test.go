@@ -1,4 +1,4 @@
-package word
+package acceptance
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ import (
 // declaration is the package's own declaration.
 func declaration(t testing.TB) *declare.Package {
 	t.Helper()
-	data, err := os.ReadFile("hive-package.json")
+	data, err := os.ReadFile(filepath.Join("..", "..", "hive-package.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +81,7 @@ func deliver(p *declare.Package) (string, error) {
 		return "", err
 	}
 	build := exec.Command("go", "build", "-o", filepath.Join(dir, p.Executable+suffix()), "./cmd/"+p.Executable)
+	build.Dir = filepath.Join("..", "..")
 	build.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, err := build.CombinedOutput(); err != nil {
 		return dir, fmt.Errorf("building %s: %v\n%s", p.Executable, err, out)

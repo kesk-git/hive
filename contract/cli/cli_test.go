@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -112,6 +113,48 @@ func TestVersionAndCapabilities(t *testing.T) {
 	// The response is the executable's own Capabilities, exactly.
 	if _, err := h.exe.Capabilities(h.exe.command("hive-fleet")).Encode(); err != nil {
 		t.Error(err)
+	}
+}
+
+// An executable that sets no source revision reports the revision its build
+// carries, and one whose build carries none leaves the field out.
+func TestCapabilitiesTakeTheBuildRevision(t *testing.T) {
+	build := strings.Repeat("cd", 20)
+	defer func(f func() (*debug.BuildInfo, bool)) { readBuildInfo = f }(readBuildInfo)
+	h := newHarness(t)
+	h.exe.SourceRevision = ""
+	for _, c := range []struct {
+		info *debug.BuildInfo
+		ok   bool
+		want string
+	}{
+		{&debug.BuildInfo{Settings: []debug.BuildSetting{{Key: "vcs", Value: "git"}, {Key: "vcs.revision", Value: build}}}, true, build},
+		{&debug.BuildInfo{Settings: []debug.BuildSetting{{Key: "vcs", Value: "git"}}}, true, ""},
+		{nil, false, ""},
+	} {
+		readBuildInfo = func() (*debug.BuildInfo, bool) { return c.info, c.ok }
+		code, out, _ := h.run("hive-fleet", nil, "capabilities")
+		resp, err := envelope.AcceptCapabilities(out, code)
+		if err != nil {
+			t.Fatal(err)
+		}
+		caps, err := envelope.DecodeCapabilities(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if caps.SourceRevision != c.want || strings.Contains(string(out), "source_revision") != (c.want != "") {
+			t.Errorf("want %q, got %q in %s", c.want, caps.SourceRevision, out)
+		}
+	}
+	h.exe.SourceRevision = strings.Repeat("ab", 20)
+	readBuildInfo = func() (*debug.BuildInfo, bool) {
+		return &debug.BuildInfo{Settings: []debug.BuildSetting{{Key: "vcs.revision", Value: build}}}, true
+	}
+	code, out, _ := h.run("hive-fleet", nil, "capabilities")
+	if resp, err := envelope.AcceptCapabilities(out, code); err != nil {
+		t.Fatal(err)
+	} else if caps, err := envelope.DecodeCapabilities(resp.Body); err != nil || caps.SourceRevision != h.exe.SourceRevision {
+		t.Errorf("a set revision is overridden: %+v, %v", caps, err)
 	}
 }
 

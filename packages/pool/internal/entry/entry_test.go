@@ -16,10 +16,6 @@ import (
 	"github.com/kesk-git/hive/contract/ids"
 )
 
-// root is the repository, three directories above the internal package of a
-// package.
-func root() string { return filepath.Join("..", "..", "..", "..") }
-
 // invoke runs the executable as the command named by argv0 and returns its
 // standard output and exit code.
 func invoke(t testing.TB, argv0 string, stdin []byte, args ...string) (string, int) {
@@ -62,14 +58,19 @@ func TestTheExecutableAgreesWithTheDeclaration(t *testing.T) {
 	if err := e.Check(); err != nil {
 		t.Fatal(err)
 	}
-	set, problems := declare.Read(os.DirFS(root()))
-	if err := problems.Err(); err != nil {
+	data, err := os.ReadFile(filepath.Join("..", "..", "hive-package.json"))
+	if err != nil {
 		t.Fatal(err)
 	}
+	p, err := declare.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := &declare.Set{Packages: []*declare.Package{p}}
 	if ps := set.Agree(e); len(ps) != 0 {
 		t.Fatal(ps)
 	}
-	if p := set.Lookup(e.Package); p == nil || p.Executable != e.Name {
+	if p.Name != e.Package || p.Executable != e.Name {
 		t.Fatalf("%s is not the executable of %s", e.Name, e.Package)
 	}
 }
