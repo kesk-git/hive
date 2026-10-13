@@ -9,7 +9,11 @@
 // program is started with exactly the path it is given, and with a home of the
 // caller's.
 //
-// Usage: runwith -path <search path> -home <directory> [-dir <directory>] <program> [argument ...]
+// A program is given nothing of this process's environment but what is named:
+// each -env name=value, which may be repeated, sets one variable the program
+// is started with, besides the search path and the home.
+//
+// Usage: runwith -path <search path> -home <directory> [-dir <directory>] [-env name=value ...] <program> [argument ...]
 package main
 
 import (
@@ -19,18 +23,34 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/kesk-git/hive/contract/exec"
 )
 
+// envFlag collects the repeated -env name=value flags.
+type envFlag []string
+
+func (e *envFlag) String() string { return strings.Join(*e, " ") }
+
+func (e *envFlag) Set(v string) error {
+	if name, _, ok := strings.Cut(v, "="); !ok || name == "" {
+		return fmt.Errorf("%q is not name=value", v)
+	}
+	*e = append(*e, v)
+	return nil
+}
+
 func main() {
+	var extra envFlag
+	flag.Var(&extra, "env", "a variable the program is started with, as name=value; may be repeated")
 	path := flag.String("path", "", "the search path of the program")
 	home := flag.String("home", "", "the home of the program")
 	dir := flag.String("dir", "", "the working directory of the program; this process's own when empty")
 	flag.Parse()
 	if flag.NArg() == 0 || *path == "" || *home == "" {
-		fmt.Fprintln(os.Stderr, "usage: runwith -path <search path> -home <directory> [-dir <directory>] <program> [argument ...]")
+		fmt.Fprintln(os.Stderr, "usage: runwith -path <search path> -home <directory> [-dir <directory>] [-env name=value ...] <program> [argument ...]")
 		os.Exit(2)
 	}
 	if *dir == "" {
@@ -53,10 +73,19 @@ func main() {
 	for k, v := range vars {
 		os.Setenv(k, v)
 	}
+	// The named variables are set here and passed on by name, as the program's
+	// own configuration; contract/exec passes nothing else.
+	var config []string
+	for _, kv := range extra {
+		name, value, _ := strings.Cut(kv, "=")
+		os.Setenv(name, value)
+		config = append(config, name)
+	}
 	run, err := exec.Start(exec.Spec{
 		Program: exec.Program{Kind: exec.Project, Name: flag.Arg(0)},
 		Args:    flag.Args()[1:],
 		Dir:     *dir,
+		Config:  config,
 		Stdin:   exec.Null(), Stdout: exec.Pipe(), Stderr: exec.Pipe(),
 	})
 	if err != nil {

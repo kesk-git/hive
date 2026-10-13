@@ -1,7 +1,7 @@
 // Command probe reports which of the program names it is given it can find on
 // its own search path, and the search path itself, and starts nothing. The
 // tests run it under the restricted search path of the integration run to show
-// what that path reaches.
+// what that path reaches, and the environment it was started with.
 package main
 
 import (
@@ -27,6 +27,6 @@ func main() {
 			}
 		}
 	}
-	out, _ := json.Marshal(map[string]any{"path": path, "found": found})
+	out, _ := json.Marshal(map[string]any{"path": path, "found": found, "environ": os.Environ()})
 	os.Stdout.Write(append(out, '\n'))
 }

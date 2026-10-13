@@ -49,6 +49,21 @@ func BuildFakes(t testing.TB, dir string) {
 	}
 }
 
+// Callees are the names of the test-only callees of integration/testcmd/ that
+// the integration tests start.
+var Callees = []string{"hive-callee", "hive-callee-small"}
+
+// BuildCallees builds the test-only callee of ./integration/testcmd, without
+// the C toolchain and with paths trimmed, into dir once under each of the
+// names of Callees, as `make test-integration` does. A callee is an
+// executable the test builds, never a script.
+func BuildCallees(t testing.TB, dir string) {
+	t.Helper()
+	for _, name := range Callees {
+		Build(t, "integration/testcmd", filepath.Join(dir, name+Suffix()), runtime.GOOS, runtime.GOARCH, true)
+	}
+}
+
 // GitDir is the directory of the real Git, found once on the search path the
 // test was started with.
 func GitDir() (string, error) {
@@ -65,8 +80,8 @@ func GitDir() (string, error) {
 }
 
 // Restricted is the world of the integration run: a search path of the
-// artefact's bin/, the directory of the recorded fakes and Git's directory,
-// and a home of the run's own.
+// artefact's bin/, the directory of the recorded fakes, which also holds the
+// test-only callees, and Git's directory, and a home of the run's own.
 type Restricted struct {
 	Bin, Fakes, Git string
 	Home            string
@@ -82,6 +97,7 @@ func NewRestricted(t testing.TB, artefact string) Restricted {
 	}
 	r := Restricted{Bin: filepath.Join(artefact, "bin"), Fakes: t.TempDir(), Git: git, Home: t.TempDir()}
 	BuildFakes(t, r.Fakes)
+	BuildCallees(t, r.Fakes)
 	return r
 }
 
@@ -95,7 +111,16 @@ func (r Restricted) Path() string {
 // and its exit code. Only the programs on the search path can be found.
 func (r Restricted) Run(t testing.TB, dir, program string, args ...string) (string, int, error) {
 	t.Helper()
-	return Launch(t, r.Path(), r.Home, dir, program, args...)
+	return LaunchWith(t, r.Path(), r.Home, nil, dir, program, args...)
+}
+
+// Environment is what the integration tests are told besides the search path
+// and the home: the directory of the seven executables, which is the
+// artefact's bin/, and the directory of the test-only callees, which is the
+// directory of the fakes. The tests find the executables and the callees in
+// these two directories, not in dist/.
+func (r Restricted) Environment() []string {
+	return []string{"HIVE_TEST_EXECUTABLES_DIR=" + r.Bin, "HIVE_TEST_CALLEES_DIR=" + r.Fakes}
 }
 
 // Launch starts the program, by its bare name, from dir, with exactly the
@@ -107,6 +132,13 @@ func (r Restricted) Run(t testing.TB, dir, program string, args ...string) (stri
 // the toolchain's directory, which `go run` puts first, off the program's path.
 func Launch(t testing.TB, path, home, dir, program string, args ...string) (string, int, error) {
 	t.Helper()
+	return LaunchWith(t, path, home, nil, dir, program, args...)
+}
+
+// LaunchWith is Launch with the variables given, each as name=value, which the
+// program is also started with and nothing else of the test's environment.
+func LaunchWith(t testing.TB, path, home string, env []string, dir, program string, args ...string) (string, int, error) {
+	t.Helper()
 	// The launcher is built and started by go, which finds the program on this
 	// path; go itself is found on the path the test was started with.
 	t.Setenv("PATH", path)
@@ -115,10 +147,14 @@ func Launch(t testing.TB, path, home, dir, program string, args ...string) (stri
 	if err != nil {
 		return "", 0, err
 	}
-	launch := append([]string{
+	launch := []string{
 		"github.com/kesk-git/hive/integration/distribution/cmd/runwith",
-		"-path", path, "-home", home, "-dir", dir, program,
-	}, args...)
+		"-path", path, "-home", home, "-dir", dir,
+	}
+	for _, kv := range env {
+		launch = append(launch, "-env", kv)
+	}
+	launch = append(append(launch, program), args...)
 	return GoProgram(t, root, launch...)
 }
 
@@ -140,7 +176,7 @@ func (r Restricted) Integration(t testing.TB) (string, error) {
 	if _, err := Go(t, "test", "-c", "-o", filepath.ToSlash(filepath.Join(r.Fakes, name+Suffix())), "./integration/calls"); err != nil {
 		return "", err
 	}
-	out, code, err := r.Run(t, filepath.Join(root, "integration", "calls"), name, "-test.count=1")
+	out, code, err := LaunchWith(t, r.Path(), r.Home, r.Environment(), filepath.Join(root, "integration", "calls"), name, "-test.count=1")
 	if err != nil {
 		return out, err
 	}

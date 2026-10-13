@@ -171,6 +171,82 @@ func TestFakesAreRecordedExecutables(t *testing.T) {
 	}
 }
 
+// Each test-only callee the integration tests start is an executable the test
+// built from Go and placed in the directory of the fakes, under both names,
+// where the run's search path finds it. It catches a callee that is missing, a
+// script, or one that is not in the directory the run names for it.
+func TestCalleesAreExecutablesInTheFakesDirectory(t *testing.T) {
+	r, _ := restricted(t)
+	for _, name := range harness.Callees {
+		file := filepath.Join(r.Fakes, name+harness.Suffix())
+		fi, err := os.Stat(file)
+		if err != nil || !fi.Mode().IsRegular() {
+			t.Errorf("%s is not a file in the fakes directory: %v", name, err)
+			continue
+		}
+		if runtime.GOOS != "windows" && fi.Mode().Perm()&0o111 == 0 {
+			t.Errorf("%s is not executable: %v", name, fi.Mode())
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !executableMagic(runtime.GOOS, data) {
+			t.Errorf("%s does not begin with the header of a %s executable: %q", name, runtime.GOOS, data[:min(len(data), 4)])
+		}
+	}
+	if dir := listed(t, []string{r.Bin, r.Fakes, r.Git}, "hive-callee"); dir != r.Fakes {
+		t.Errorf("hive-callee is found in %q, not in the fakes %q", dir, r.Fakes)
+	}
+}
+
+// The two variables that name the directories of the executables and of the
+// callees reach the program the launcher starts, with the artefact's bin/ and
+// the fakes directory as their values, and nothing else of the test's
+// environment does. The probe prints the environment it was started with.
+func TestIntegrationVariablesReachTheChild(t *testing.T) {
+	r, root := restricted(t)
+	harness.Build(t, "integration/distribution/testdata/probe", filepath.Join(r.Fakes, "integration-probe"+harness.Suffix()), runtime.GOOS, runtime.GOARCH, true)
+	t.Setenv("HIVE_TEST_LEAK", "must-not-reach-the-child")
+
+	out, code, err := harness.LaunchWith(t, r.Path(), r.Home, r.Environment(), root, "integration-probe")
+	if err != nil || code != 0 {
+		t.Fatalf("the probe: code %d, %v\n%s", code, err, out)
+	}
+	var report struct {
+		Environ []string `json:"environ"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &report); err != nil {
+		t.Fatalf("the probe's report: %v\n%s", err, out)
+	}
+	got := map[string]string{}
+	for _, kv := range report.Environ {
+		k, v, _ := strings.Cut(kv, "=")
+		got[k] = v
+	}
+	if got["HIVE_TEST_EXECUTABLES_DIR"] != r.Bin {
+		t.Errorf("HIVE_TEST_EXECUTABLES_DIR is %q, want the artefact's bin/ %q", got["HIVE_TEST_EXECUTABLES_DIR"], r.Bin)
+	}
+	if got["HIVE_TEST_CALLEES_DIR"] != r.Fakes {
+		t.Errorf("HIVE_TEST_CALLEES_DIR is %q, want the fakes directory %q", got["HIVE_TEST_CALLEES_DIR"], r.Fakes)
+	}
+	if v, ok := got["HIVE_TEST_LEAK"]; ok {
+		t.Errorf("a variable the launcher was not told to pass reached the child: HIVE_TEST_LEAK=%q", v)
+	}
+	if got["PATH"] != r.Path() {
+		t.Errorf("the child's search path is %q, want exactly %q", got["PATH"], r.Path())
+	}
+
+	// A launch with no variable gives the child none of them.
+	out, code, err = r.Run(t, root, "integration-probe")
+	if err != nil || code != 0 {
+		t.Fatalf("the probe: code %d, %v\n%s", code, err, out)
+	}
+	if strings.Contains(out, "HIVE_TEST_") {
+		t.Errorf("a plain run gives the child a test variable:\n%s", out)
+	}
+}
+
 // The integration tests pass when run, compiled, with a search path that holds
 // only the artefact's bin/, the recorded fakes and the real Git, in a home of
 // their own. The tests are in integration/calls, which is another lane's: while
