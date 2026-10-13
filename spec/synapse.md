@@ -1,10 +1,10 @@
 # Synapse workflow contract
 
-Owner: `synapse`. This file carries the behavioural obligations and acceptance cases of the design's [local gate](../docs/design.md#synapse-on-the-operators-machine-with-configured-reviewers), for stage 5's plugin route and the later native route. It adds no executable or record schema; stage 5 defines those interfaces. `test-synapse` proves the cases against recorded executors, with route qualification separately proving the installed plugin's capabilities.
+Owner: `synapse`. This file carries the behavioural obligations and acceptance cases of the design's [local gate](../docs/design.md#synapse-on-the-operators-machine-with-both-reviewers), for stage 5's plugin route and the later native route. It adds no executable or record schema; stage 5 defines those interfaces. `test-synapse` proves the cases against recorded executors, with route qualification separately proving the installed plugin's capabilities.
 
-## Reviewer roles
+## Reviewer evidence
 
-Review policy names the [dispatch matrix](dispatch.md#dispatch-matrix)'s configured reviewer roles, resolved for class 2, not a vendor or model catalogue. Every configured reviewer runs on the operator's machine and retains separate session and result receipts at the required head. Reviewer count and vendor membership follow the effective gate entry; same-vendor roles are allowed. A configured route qualifies the results its effective gate actually requires against the installed plugin's output; a count alone cannot prove role identity or completeness. Missing or substituted results hold the route. `test-synapse` proves a matching role set passes, a missing role holds, and changing the configured role set never counts a missing required result as a pass.
+Reviewer identity and required results remain those of the design’s [Checks and review contracts](../docs/design.md#checks-and-review-contracts). Each required result retains its own session and head-bound receipt; a missing result cannot pass.
 
 ## Review rounds and rulings
 
