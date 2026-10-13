@@ -81,7 +81,9 @@ Hive's own test contract holds these rows, and by rule 1 a change to a build fil
 | `check` | `make check` | `check` | `**/*.go`, `spec/schemas/**` | 60 | `built` |
 | `test-contract` | `make test-contract` | `check` | `contract/**`, `spec/**`, `**/*.go`, `packages/*/hive-package.json` | 300 | `built` |
 | `test-pool`, `test-spawning-pool`, `test-word` | `make test-<package>` | `check` | `packages/<package>/**`, `contract/**`, `spec/**` | 300 each | `built` |
-| `test-dispatch`, `test-shadow`, `test-synapse`, `test-ui`, four rows | `make test-<package>` | `check` | `packages/<package>/**`, `contract/**`, `spec/**` | 300 each | `not-built` |
+| `test-dispatch` | `make test-dispatch` | `check` | `packages/dispatch/**`, `contract/**`, `spec/**` | 300 | `built` |
+| `test-shadow` | `make test-shadow` | `check` | `packages/shadow/**`, `contract/**`, `spec/**` | 300 | `built` |
+| `test-synapse`, `test-ui`, two rows | `make test-<package>` | `check` | `packages/<package>/**`, `contract/**`, `spec/**` | 300 each | `not-built` |
 | `build` | `make build` | `check` | `**/*.go`, `spec/schemas/**` | 120 | `built` |
 | `test-integration` | `make test-integration` | `check` until measured | `**` | 300 | `not-built` |
 | `test-distribution` | `make test-distribution` | `long`, needing the whole machine, on all three platforms | `**` | 900 | `not-built` |
