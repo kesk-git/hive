@@ -86,7 +86,7 @@ Hive's own test contract holds these rows, and by rule 1 a change to a build fil
 | `test-synapse` | `make test-synapse` | `check` | `packages/synapse/**`, `contract/**`, `spec/**` | 300 | `built` |
 | `test-ui` | `make test-ui` | `check` | `packages/ui/**`, `contract/**`, `spec/**` | 300 | `built` |
 | `build` | `make build` | `check` | `**/*.go`, `spec/schemas/**` | 120 | `built` |
-| `test-integration` | `make test-integration` | `check` until measured | `**` | 300 | `not-built` |
+| `test-integration` | `make test-integration` | `check` | `integration/calls/**`, `integration/testcmd/**`, `dist/hive-*`, `packages/**`, `contract/**`, `spec/**` | 120 | `built` |
 | `test-distribution` | `make test-distribution` | `long`, needing the whole machine, on all three platforms | `**` | 900 | `not-built` |
 | `check-imports` | `make check-imports` | `check` | `**` | 60 | `not-built` |
 | `windows`, `linux` | the workflow's `make test` on each | `long`, on that platform | `**` | 900 | `not-built` |
