@@ -2,12 +2,14 @@ package pool
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/canon"
@@ -50,11 +52,38 @@ func suffix() string {
 // returns the directory.
 func delivered(t testing.TB, p *declare.Package) string {
 	t.Helper()
-	dir := t.TempDir()
+	once.Do(func() { dir, failure = deliver(p) })
+	if failure != nil {
+		t.Fatal(failure)
+	}
+	return dir
+}
+
+var (
+	once    sync.Once
+	dir     string
+	failure error
+)
+
+// TestMain removes the delivered directory, built once for all the tests.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if dir != "" {
+		os.RemoveAll(dir)
+	}
+	os.Exit(code)
+}
+
+// deliver builds the executable and its links into a new directory.
+func deliver(p *declare.Package) (string, error) {
+	dir, err := os.MkdirTemp("", "hive-delivered-")
+	if err != nil {
+		return "", err
+	}
 	build := exec.Command("go", "build", "-o", filepath.Join(dir, p.Executable+suffix()), "./cmd/"+p.Executable)
 	build.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("building %s: %v\n%s", p.Executable, err, out)
+		return dir, fmt.Errorf("building %s: %v\n%s", p.Executable, err, out)
 	}
 	for _, c := range p.Commands {
 		if c.Name == p.Executable {
@@ -62,17 +91,16 @@ func delivered(t testing.TB, p *declare.Package) string {
 		}
 		link := filepath.Join(dir, c.Name+suffix())
 		if runtime.GOOS == "windows" {
-			err := os.Link(filepath.Join(dir, p.Executable+suffix()), link)
-			if err != nil {
-				t.Fatal(err)
+			if err := os.Link(filepath.Join(dir, p.Executable+suffix()), link); err != nil {
+				return dir, err
 			}
 			continue
 		}
 		if err := os.Symlink(p.Executable, link); err != nil {
-			t.Fatal(err)
+			return dir, err
 		}
 	}
-	return dir
+	return dir, nil
 }
 
 // run starts the program under the name it is called by and returns its
