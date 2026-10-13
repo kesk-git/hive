@@ -27,7 +27,7 @@ hive-<command> --version
 - `--version` prints the implementation version as one line of text and exits 0. It is the only invocation that answers without a response document.
 - Standard error carries diagnostics for a person. It is never parsed, and nothing in it is part of the contract. Like every log, it carries no value.
 
-A command may accept flags or positional arguments as a convenience for a person at a terminal, such as the design's `hive-assimilate <task-id> <harvest-url>`. Such a form builds the same request, which is then validated and handled exactly as a request read from a file. Calls between packages always send the request document.
+No command offers a short form, for a person at a terminal or for any caller: the request document is the one form, as [decision 8](decisions.md#8-requests-never-travel-as-arguments-and-the-home-is-always-named) states, and no flag or positional argument beyond those of the invocation above builds a request. A shape the design writes, such as `hive-assimilate <task-id> <harvest-url>`, names for illustration the identities the request document carries, and is not a command line. Calls between packages always send the request document.
 
 ## The request
 
