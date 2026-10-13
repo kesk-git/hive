@@ -24,10 +24,11 @@ import (
 )
 
 // What the tests of this package are, on each of the three platforms. They
-// start the seven executables that `make build` leaves in dist/, each under
-// every command name of its package, and the test-only callee of
-// integration/testcmd/, which `make test-integration` builds into dist/callee/;
-// every start goes through the one process-execution path of contract/exec,
+// start the seven executables, each under every command name of its package,
+// and the test-only callee of integration/testcmd/. The executables are the
+// ones `make build` leaves in dist/ and the callee the one `make
+// test-integration` builds into dist/callee/, unless the run names other
+// directories (see callDirs); every start goes through the one process-execution path of contract/exec,
 // and every program is found by name on the search path the tests were
 // started with, by its lookup rules. They expect the same on macOS, Windows and
 // Linux: the same exit codes, the same responses, the same sizes. Only the
@@ -127,11 +128,12 @@ func declarations(t testing.TB) map[string]*declare.Package {
 }
 
 // stage checks, once for all tests, that the programs the tests start are the
-// ones `make test-integration` set up, and gives every executable its other
-// command names in dist/, beside it, as the delivered bin/ directory has them.
-// The seven executables are not built here: they are the ones `make build` left
-// in dist/, and a test that cannot find one fails and says so. It returns the
-// directory of the executables.
+// ones the run set up, and gives every executable the command names it lacks
+// in the directory of the executables, beside it, as the delivered bin/
+// directory has them; a directory that holds them all is not written to. The
+// seven executables are not built here: they are the ones in that directory,
+// which is dist/ unless the run names another, and a test that cannot find one
+// fails and says so. It returns the directory of the executables.
 func stage(t testing.TB) string {
 	t.Helper()
 	staged.Do(func() {
@@ -169,7 +171,7 @@ func stageAll(t testing.TB) error {
 	for _, name := range []string{calleeExe, calleeSmallName} {
 		exe := filepath.Join(calleeDir, name+suffix())
 		if fi, err := os.Stat(exe); err != nil || !fi.Mode().IsRegular() {
-			return fmt.Errorf("the test callee %s is not built: run `make test-integration`, which builds it into %s (%s)", name, calleeDir, exe)
+			return fmt.Errorf("the test callee %s is not built: run `make test-integration`, which builds it into dist/callee/, or build it into %s (%s)", name, calleeDir, exe)
 		}
 		if err := requireFoundIn(name, exe); err != nil {
 			return err
@@ -178,21 +180,20 @@ func stageAll(t testing.TB) error {
 	return nil
 }
 
-// link gives exe another name: the executable itself under its own name, and
-// every other command name a link to it, as the delivered bin/ directory does.
-// A name that already leads to exe is kept; any other is replaced, so that a
-// link left by an earlier build of the executable is never what runs.
+// link gives exe another name when the directory lacks it: the executable
+// itself under its own name, and every other command name a link to it, as the
+// delivered bin/ directory does. A name that is present is never replaced or
+// written: it must be exe, or lead to it, otherwise it is an error, so that a
+// file left by an earlier build, or a different program of that name, is never
+// what runs.
 func link(exe, name string) error {
-	if exe == name {
-		return nil
-	}
 	if _, err := os.Lstat(name); err == nil {
-		if sameFile(name, exe) {
-			return nil
+		if !sameFile(name, exe) {
+			return fmt.Errorf("%s is present but is not the executable %s or a link to it", name, exe)
 		}
-		if err := os.Remove(name); err != nil {
-			return err
-		}
+		return nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
 	}
 	if runtime.GOOS == "windows" {
 		return os.Link(exe, name)

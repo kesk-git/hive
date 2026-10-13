@@ -10,19 +10,52 @@ import (
 // The search path of these tests is the one the test binary was started with.
 // contract/exec reads it once, when it is loaded, and finds every program by
 // it; the package exports no way to change it and the tests reach for none.
-// `make test-integration` is therefore what makes the tests possible: it builds
-// the test-only callee into dist/callee/ and starts the tests with dist/, the
-// directory of the seven built executables, and dist/callee/ first on the
-// search path, as a real installation has its bin/ directory on it. The tests
-// start nothing that is not found there by name, and fail, saying so, when
-// the search path they were given is not that one.
+// The run that starts them is therefore what makes the tests possible: it
+// puts the directory of the seven executables and the directory of the
+// test-only callees on the search path, and tells the tests where they are.
+// `make test-integration` builds the callees into dist/callee/ and starts the
+// tests with dist/, the directory of the seven built executables, and
+// dist/callee/ first on the search path, as a real installation has its bin/
+// directory on it. The proof of the distribution starts them with the
+// artefact's bin/ and a directory of the callees instead, and names both in
+// the two variables below. The tests start nothing that is not found there by
+// name, and fail, saying so, when the search path they were given does not
+// hold the directories in force.
 
-// callDirs are the two directories `make test-integration` places ahead on the
-// search path: the directory of the seven executables, and the callee's.
+// The two variables that name the directories in force. An unset or empty
+// variable leaves the directory of `make test-integration`; a set one must be
+// the absolute path of an existing directory.
+const (
+	executablesEnv = "HIVE_TEST_EXECUTABLES_DIR"
+	calleesEnv     = "HIVE_TEST_CALLEES_DIR"
+)
+
+// callDirs are the two directories the run places on the search path: the
+// directory of the seven executables, and the callee's. They are the ones the
+// variables name, and <repo>/dist and <repo>/dist/callee where one is unset.
 func callDirs(t testing.TB) (dist, calleeDir string) {
 	t.Helper()
-	dist = filepath.Join(repoRoot(t), "dist")
-	return dist, filepath.Join(dist, "callee")
+	dist = dirFrom(t, executablesEnv, filepath.Join(repoRoot(t), "dist"))
+	calleeDir = dirFrom(t, calleesEnv, filepath.Join(repoRoot(t), "dist", "callee"))
+	return dist, calleeDir
+}
+
+// dirFrom is the directory the variable names, or def when it is unset or
+// empty. A value that is not the absolute path of an existing directory fails
+// the test.
+func dirFrom(t testing.TB, name, def string) string {
+	t.Helper()
+	v := os.Getenv(name)
+	if v == "" {
+		return def
+	}
+	if !filepath.IsAbs(v) {
+		t.Fatalf("%s is %q: it must be the absolute path of an existing directory", name, v)
+	}
+	if fi, err := os.Stat(v); err != nil || !fi.IsDir() {
+		t.Fatalf("%s is %q: it must be the absolute path of an existing directory", name, v)
+	}
+	return v
 }
 
 // searchDirs are the entries of the search path this process was started
@@ -45,9 +78,9 @@ func sameFile(a, b string) bool {
 	return os.SameFile(fa, fb)
 }
 
-// requireOnPath fails unless the directory of the built executables and the
-// callee's are both on the search path, so that a run that was not started by
-// `make test-integration` fails loudly here and says what to run. They need
+// requireOnPath fails unless the directory of the executables and the callee's
+// are both on the search path, so that a run that was not started with them
+// on it fails loudly here and says what to run. They need
 // not be the first two entries: the Go tool puts the directory of a toolchain
 // it switched to ahead of the path it was given. That nothing ahead of them
 // shadows a program is what requireFoundIn checks, name by name.
@@ -61,7 +94,7 @@ func requireOnPath(dist, calleeDir string) error {
 			}
 		}
 		if !found {
-			return fmt.Errorf("%s is not on the search path %q; run `make build`, then `make test-integration`, which starts the tests with it on the path", dir, os.Getenv("PATH"))
+			return fmt.Errorf("%s is not on the search path %q; run `make build`, then `make test-integration`, which starts the tests with it on the path, or name the directories in %s and %s", dir, os.Getenv("PATH"), executablesEnv, calleesEnv)
 		}
 	}
 	return nil
