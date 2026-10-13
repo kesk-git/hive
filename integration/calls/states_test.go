@@ -86,7 +86,7 @@ func TestDeclaredCallsExitStatesRepeatAndSize(t *testing.T) {
 			t.Run("refused", func(t *testing.T) {
 				req := newRequest(from, command, operation, nextRequest(), map[string]any{})
 				r := call{program: command, operation: operation, home: home, req: req}.run(t)
-				refusedByState(t, r, req.id, callee, command, operation, state)
+				refusedByState(t, r, req.id, callee, command, operation, state, false)
 			})
 
 			t.Run("too_large", func(t *testing.T) {
@@ -104,10 +104,10 @@ func TestDeclaredCallsExitStatesRepeatAndSize(t *testing.T) {
 				req := newRequest(from, command, operation, nextRequest(), map[string]any{})
 				first := call{program: command, operation: operation, home: home, req: req}.run(t)
 				second := call{program: command, operation: operation, home: home, req: req, stdin: true, responseFile: true}.run(t)
-				refusedByState(t, first, req.id, callee, command, operation, state)
-				refusedByState(t, second, req.id, callee, command, operation, state)
-				if first.resp.Status != second.resp.Status || first.resp.Error.Code != second.resp.Error.Code {
-					t.Errorf("the repeated request was answered %s %s, the first %s %s", second.resp.Status, second.resp.Error.Code, first.resp.Status, first.resp.Error.Code)
+				refusedByState(t, first, req.id, callee, command, operation, state, false)
+				refusedByState(t, second, req.id, callee, command, operation, state, true)
+				if first.resp.Status != second.resp.Status || errorCode(first.resp) != errorCode(second.resp) {
+					t.Errorf("the repeated request was answered %s %q, the first %s %q", second.resp.Status, errorCode(second.resp), first.resp.Status, errorCode(first.resp))
 				}
 			})
 
@@ -118,7 +118,7 @@ func TestDeclaredCallsExitStatesRepeatAndSize(t *testing.T) {
 					wantTooLarge(t, r, "request", limit)
 					return
 				}
-				refusedByState(t, r, req.id, callee, command, operation, state)
+				refusedByState(t, r, req.id, callee, command, operation, state, false)
 				if bytes.Contains(r.raw, []byte(pattern(64))) {
 					t.Error("the refusal echoes the first bytes of the request's record")
 				}
@@ -132,9 +132,10 @@ func TestDeclaredCallsExitStatesRepeatAndSize(t *testing.T) {
 // refusedByState fails the test unless the call was answered as the state the
 // callee declares for the operation says: unsupported_operation for an
 // operation declared and not built, operation_parked for one parked. An
-// operation the callee has built is not refused, and what it answers to a
-// request of this kind is its own stage's to prove.
-func refusedByState(t testing.TB, r reply, requestID string, callee *declare.Package, command, operation string, state envelope.OperationState) {
+// operation the callee has built is not refused: its answer must be a complete
+// response a caller accepts, and what the response says is its own stage's to
+// prove. A repeated request (repeat) may be answered as a replay.
+func refusedByState(t testing.TB, r reply, requestID string, callee *declare.Package, command, operation string, state envelope.OperationState, repeat bool) {
 	t.Helper()
 	switch state {
 	case envelope.Unsupported:
@@ -142,6 +143,14 @@ func refusedByState(t testing.TB, r reply, requestID string, callee *declare.Pac
 	case envelope.Parked:
 		wantRefusal(t, r, requestID, callee, command, operation, "operation_parked")
 	default:
-		t.Logf("%s %s is built: its proof is its stage's", command, operation)
+		wantAccepted(t, r, requestID, callee, command, operation, repeat)
 	}
+}
+
+// errorCode is the code of the response's error, empty when it has none.
+func errorCode(resp *envelope.Response) string {
+	if resp.Error == nil {
+		return ""
+	}
+	return resp.Error.Code
 }

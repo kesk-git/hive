@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/kesk-git/hive/contract/declare"
 	"github.com/kesk-git/hive/contract/envelope"
@@ -160,7 +161,7 @@ func proveOperation(t *testing.T, from asPackage, callee *declare.Package, comma
 	case envelope.Parked:
 		wantRefusal(t, r, req.id, callee, command, operation, "operation_parked")
 	default:
-		t.Logf("%s %s is built: its call is proved by the stage that built it", command, operation)
+		wantAccepted(t, r, req.id, callee, command, operation, false)
 	}
 
 	other := newRequest(from, "hive-other", operation, nextRequest(), map[string]any{})
@@ -186,6 +187,42 @@ func wantRefusal(t testing.TB, r reply, requestID string, callee *declare.Packag
 	}
 	if len(resp.Receipts) != 0 || resp.Replayed {
 		t.Errorf("a refusal that leaves nothing carries %d receipts, replayed %v", len(resp.Receipts), resp.Replayed)
+	}
+	if !isOneDocument(r.raw) {
+		t.Error("the response is not one document followed by a line feed")
+	}
+}
+
+// wantAccepted fails the test unless the call ended with a complete response
+// a caller accepts for an operation the callee has built, whatever its
+// status: it answers the request's identity, command and operation, is written
+// by the callee's package and command at a time, is a replay only where one is
+// allowed, and carries receipts only where its status may leave them. What the
+// operation's body says is its own stage's to prove.
+func wantAccepted(t testing.TB, r reply, requestID string, callee *declare.Package, command, operation string, mayReplay bool) {
+	t.Helper()
+	resp := r.must(t)
+	if resp.RequestID != requestID {
+		t.Errorf("request_id = %q, want %q", resp.RequestID, requestID)
+	}
+	if resp.Command != command || resp.Operation != operation {
+		t.Errorf("the response is for %s %s, want %s %s", resp.Command, resp.Operation, command, operation)
+	}
+	if resp.Responder.Package != callee.Name || resp.Responder.Command != command {
+		t.Errorf("responder = %+v, want package %s, command %s", resp.Responder, callee.Name, command)
+	}
+	if _, err := time.Parse(time.RFC3339Nano, resp.CompletedAt); err != nil {
+		t.Errorf("completed_at = %q: %v", resp.CompletedAt, err)
+	}
+	if resp.Replayed && !mayReplay {
+		t.Error("a first answer is marked as a replay")
+	}
+	switch resp.Status {
+	case envelope.Ok, envelope.Refused, envelope.Held, envelope.Unknown:
+	default:
+		if len(resp.Receipts) != 0 {
+			t.Errorf("a %s response carries %d receipts", resp.Status, len(resp.Receipts))
+		}
 	}
 	if !isOneDocument(r.raw) {
 		t.Error("the response is not one document followed by a line feed")
