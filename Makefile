@@ -22,7 +22,7 @@ endef
 # main package exists, and otherwise says that it is not there yet.
 define build-exe
 @if [ -n "$$(find packages/$(1)/cmd/$(2) -name '*.go' -print -quit 2>/dev/null)" ]; then \
-	CGO_ENABLED=0 $(GO) build -trimpath -o dist/$(2)$$($(GO) env GOEXE) ./packages/$(1)/cmd/$(2); \
+	CGO_ENABLED=0 $(GO) build -trimpath -o dist/$(2)$(shell $(GO) env GOEXE) ./packages/$(1)/cmd/$(2); \
 else \
 	echo "build: $(2) is not there yet"; \
 fi
