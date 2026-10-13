@@ -1,0 +1,333 @@
+package entry
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/kesk-git/hive/contract/canon"
+	"github.com/kesk-git/hive/contract/clock"
+	"github.com/kesk-git/hive/contract/declare"
+	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/ids"
+)
+
+// The package, its executable and the path of its main package, relative to
+// the repository root.
+const (
+	packageName = "synapse"
+	executable  = "hive-synapse"
+	mainPackage = "./packages/synapse/cmd/hive-synapse"
+)
+
+// A name no command of this package has, and the name of a command another
+// package owns.
+var foreign = []string{"hive-nothing", "hive-state"}
+
+var (
+	buildOnce sync.Once
+	buildDir  string
+	buildErr  error
+)
+
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if buildDir != "" {
+		os.RemoveAll(buildDir)
+	}
+	os.Exit(code)
+}
+
+// program is the file name a command name is started under.
+func program(name string) string {
+	if runtime.GOOS == "windows" {
+		return name + ".exe"
+	}
+	return name
+}
+
+// goTool finds the go command that runs this test.
+func goTool() (string, error) {
+	if path, err := exec.LookPath("go"); err == nil {
+		return path, nil
+	}
+	path := filepath.Join(runtime.GOROOT(), "bin", program("go"))
+	if _, err := os.Stat(path); err != nil {
+		return "", errors.New("the go command is not found")
+	}
+	return path, nil
+}
+
+// declared is the package's declaration: each command it owns with the
+// operations it lists.
+func declared(t testing.TB) []declare.Command {
+	t.Helper()
+	set := ownSet(t)
+	p := set.Lookup(packageName)
+	if p == nil {
+		t.Fatalf("%s is not a declared package", packageName)
+	}
+	return p.Commands
+}
+
+// bin builds the executable once into a temporary directory and links every
+// command name of the package to it, and returns the directory. The links
+// are what spec/distribution.md fixes: on macOS and Linux a relative
+// symbolic link in the same directory; on Windows a hard link named
+// <name>.exe, or a copy where the file system cannot link.
+func bin(t testing.TB) string {
+	t.Helper()
+	buildOnce.Do(func() {
+		buildDir, buildErr = os.MkdirTemp("", executable+"-test")
+		if buildErr != nil {
+			return
+		}
+		var goBin string
+		if goBin, buildErr = goTool(); buildErr != nil {
+			return
+		}
+		cmd := exec.Command(goBin, "build", "-o", filepath.Join(buildDir, program(executable)), mainPackage)
+		cmd.Dir = "../../../.."
+		cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			buildErr = fmt.Errorf("building %s: %v\n%s", mainPackage, err, out)
+			return
+		}
+		for _, name := range append(commandNames(t), foreign...) {
+			if name == executable {
+				continue
+			}
+			if buildErr = link(buildDir, name); buildErr != nil {
+				return
+			}
+		}
+	})
+	if buildErr != nil {
+		t.Fatal(buildErr)
+	}
+	return buildDir
+}
+
+func commandNames(t testing.TB) []string {
+	var names []string
+	for _, c := range declared(t) {
+		names = append(names, c.Name)
+	}
+	return names
+}
+
+// link makes name a link to the executable in dir.
+func link(dir, name string) error {
+	target := filepath.Join(dir, program(executable))
+	path := filepath.Join(dir, program(name))
+	if runtime.GOOS != "windows" {
+		return os.Symlink(program(executable), path)
+	}
+	if err := os.Link(target, path); err == nil {
+		return nil
+	}
+	data, err := os.ReadFile(target)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o755)
+}
+
+// invoke starts the program under the command name, with the arguments and
+// the standard input, and returns its exit code and standard output.
+func invoke(t testing.TB, name string, stdin []byte, args ...string) (int, []byte) {
+	t.Helper()
+	cmd := exec.Command(filepath.Join(bin(t), program(name)), args...)
+	cmd.Stdin = bytes.NewReader(stdin)
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	err := cmd.Run()
+	var exit *exec.ExitError
+	if err != nil && !errors.As(err, &exit) {
+		t.Fatalf("%s %v: %v", name, args, err)
+	}
+	return cmd.ProcessState.ExitCode(), stdout.Bytes()
+}
+
+// request is a valid request for the operation of the command, in the scope
+// of a home, with an empty body, and the request_id it carries.
+func request(t testing.TB, command, operation string) ([]byte, string) {
+	t.Helper()
+	mint := func(p ids.Prefix) string {
+		id, err := ids.Mint(clock.System{}, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	requestID := mint(ids.Request)
+	issued, err := clock.Stamp(clock.System{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := canon.Encode(map[string]any{
+		"schema": "hive.request", "schema_version": "1.0",
+		"command": command, "operation": operation, "operation_version": "1.0",
+		"request_id": requestID, "correlation_id": mint(ids.Correlation),
+		"issued_at": issued, "caller": map[string]any{"kind": "test"},
+		"scope_level": "hive", "home_id": mint(ids.Home),
+		"authority": map[string]any{"kind": "none"},
+		"body":      map[string]any{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(out, '\n'), requestID
+}
+
+// Every command name the package owns answers capabilities, as the command
+// it was started under, with the operations its declaration lists and
+// the package's executable.
+func TestEveryCommandNameAnswersCapabilities(t *testing.T) {
+	for _, c := range declared(t) {
+		t.Run(c.Name, func(t *testing.T) {
+			code, out := invoke(t, c.Name, nil, "capabilities")
+			resp, err := envelope.AcceptCapabilities(out, code)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.Status != envelope.Ok || code != 0 {
+				t.Fatalf("status %s, exit %d", resp.Status, code)
+			}
+			if resp.Command != c.Name || resp.Responder.Command != c.Name || resp.Responder.Package != packageName {
+				t.Errorf("answered as %s by %s of %s", resp.Command, resp.Responder.Command, resp.Responder.Package)
+			}
+			caps, err := envelope.DecodeCapabilities(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if caps.Command != c.Name || caps.Package != packageName || caps.Executable != executable {
+				t.Errorf("declares %s of %s in %s", caps.Command, caps.Package, caps.Executable)
+			}
+			var ops []string
+			for _, op := range caps.Operations {
+				ops = append(ops, op.Name)
+				if op.State != envelope.Unsupported || op.Reason == "" {
+					t.Errorf("%s is %s (%q), and no operation is built yet", op.Name, op.State, op.Reason)
+				}
+			}
+			if want := slices.Sorted(slices.Values(c.Operations)); !slices.Equal(slices.Sorted(slices.Values(ops)), want) {
+				t.Errorf("operations %v; the declaration lists %v", ops, want)
+			}
+		})
+	}
+}
+
+// An operation a command does not declare is a usage error, exit 2.
+func TestAnUnknownOperationIsRefused(t *testing.T) {
+	for _, c := range declared(t) {
+		t.Run(c.Name, func(t *testing.T) {
+			code, out := invoke(t, c.Name, nil, "burn", "--home", t.TempDir())
+			if code != envelope.Usage.ExitCode() {
+				t.Fatalf("exit %d, want %d", code, envelope.Usage.ExitCode())
+			}
+			resp, err := envelope.AcceptResponse(out, code, "req_00000000000000000000000000")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.Status != envelope.Usage || resp.Error.Code != envelope.CodeUnknownOperation || resp.Command != c.Name {
+				t.Errorf("%s %s by %s", resp.Status, resp.Error.Code, resp.Command)
+			}
+		})
+	}
+}
+
+// An operation the declaration lists and the build has not reached is
+// refused with unsupported_operation, exit 4, and echoes the request.
+func TestADeclaredOperationNotBuiltIsRefused(t *testing.T) {
+	for _, c := range declared(t) {
+		for _, operation := range c.Operations {
+			t.Run(c.Name+" "+operation, func(t *testing.T) {
+				req, requestID := request(t, c.Name, operation)
+				code, out := invoke(t, c.Name, req, operation, "--home", t.TempDir())
+				if code != envelope.Refused.ExitCode() {
+					t.Fatalf("exit %d, want %d", code, envelope.Refused.ExitCode())
+				}
+				resp, err := envelope.AcceptResponse(out, code, requestID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if resp.Status != envelope.Refused || resp.Error.Code != envelope.CodeUnsupportedOperation || resp.Operation != operation || len(resp.Receipts) != 0 {
+					t.Errorf("%s %s of %s with %d receipts", resp.Status, resp.Error.Code, resp.Operation, len(resp.Receipts))
+				}
+			})
+		}
+	}
+}
+
+// A name the executable does not own exits 2, whether it is another
+// package's command or none at all.
+func TestANameNotOwnedExitsTwo(t *testing.T) {
+	for _, name := range foreign {
+		t.Run(name, func(t *testing.T) {
+			code, out := invoke(t, name, nil, "capabilities")
+			if code != envelope.Usage.ExitCode() {
+				t.Fatalf("exit %d, want %d", code, envelope.Usage.ExitCode())
+			}
+			resp, err := envelope.AcceptResponse(out, code, "req_00000000000000000000000000")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.Status != envelope.Usage || resp.Error.Code != envelope.CodeUsage {
+				t.Errorf("%s %s", resp.Status, resp.Error.Code)
+			}
+		})
+	}
+}
+
+// Every command name but the executable's own is a link to the executable:
+// a relative symbolic link in the same directory on macOS and Linux, and on
+// Windows a hard link or a byte-identical copy named <name>.exe.
+func TestTheLinkNamesLinkToTheExecutable(t *testing.T) {
+	dir := bin(t)
+	want, err := os.ReadFile(filepath.Join(dir, program(executable)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range commandNames(t) {
+		if name == executable {
+			continue
+		}
+		path := filepath.Join(dir, program(name))
+		if runtime.GOOS == "windows" {
+			if got, err := os.ReadFile(path); err != nil || !bytes.Equal(got, want) {
+				t.Errorf("%s is neither a hard link to nor a copy of %s (%v)", filepath.Base(path), program(executable), err)
+			}
+			continue
+		}
+		if target, err := os.Readlink(path); err != nil || target != program(executable) || strings.ContainsRune(target, filepath.Separator) {
+			t.Errorf("%s links to %q (%v); want the relative name %q", name, target, err, program(executable))
+		}
+	}
+}
+
+// --version prints the implementation version as one line, under every
+// name, and exits 0.
+func TestVersionPrintsOneLine(t *testing.T) {
+	var first string
+	for _, name := range commandNames(t) {
+		code, out := invoke(t, name, nil, "--version")
+		line := string(out)
+		if code != 0 || !strings.HasSuffix(line, "\n") || strings.TrimSuffix(line, "\n") == "" || strings.Count(line, "\n") != 1 {
+			t.Errorf("%s --version: exit %d, output %q", name, code, line)
+		}
+		if first == "" {
+			first = line
+		} else if line != first {
+			t.Errorf("%s reports %q, not %q", name, line, first)
+		}
+	}
+}
