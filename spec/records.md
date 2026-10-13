@@ -101,7 +101,7 @@ A mutation that changes more than one record of a store is one transaction.
 
 1. The owner validates every body of the transaction, the records, the receipts, the events and the outcome, with the no-value check, before the intent's temporary file exists: the intent carries every body and is the first place their bytes reach disk.
 2. Take the store's lock.
-3. Check every expected revision, and that every record to be created is absent.
+3. Under that lock, compare every expected record revision, including the revision from which an edited body was read, and check that every record to be created is absent. A mismatch is `revision_conflict` before any mutation, not permission to overwrite a newer body. The Pool’s [atomic revision guard and concurrent-body acceptance case](pool.md#the-store) apply. Source: [upstream tasks-axi/issues/73](https://github.com/kunchenguid/tasks-axi/issues/73).
 4. Write the **intent** to `tx/<request_id>.json`, a record of schema [`hive.tx-intent`](schemas/tx-intent.v1.schema.json): every record to be written, with its expected revision and the digest of its new content, and every receipt and event to be written. The entry of a record being created has no revision to expect and instead states that the record is expected to be absent. Flush it.
 5. Write the records, then the receipts, then append the events.
 6. When the transaction carries an outcome, write it to `requests/<request_id>.json`. A transaction committed before an effect outside Hive carries none: it writes its records and receipts, leaves the request without an outcome, and the request stays open.
