@@ -2,6 +2,10 @@
 
 Owner: `synapse`. This file carries the behavioural obligations and acceptance cases of the design's [local gate](../docs/design.md#synapse-on-the-operators-machine-with-both-reviewers), for stage 5's plugin route and the later native route. It adds no executable or record schema; stage 5 defines those interfaces. `test-synapse` proves the cases against recorded executors, with route qualification separately proving the installed plugin's capabilities.
 
+## Reviewer roles
+
+Review policy names the [dispatch matrix](dispatch.md#dispatch-matrix)'s two reviewer roles, resolved for class 2, not a vendor or model catalogue. Both run on the operator's machine and retain separate session and result receipts at the required head. The standing rule requires different vendors, suspendable by a recorded temporary rule without removing either review. A configured route qualifies the results its effective gate actually requires against the installed plugin's output; a count alone cannot prove role identity or completeness. Missing or substituted results hold the route. `test-synapse` proves a matching role set passes, a missing role holds, and a diversity suspension does not erase a result obligation.
+
 ## Review rounds and rulings
 
 The review and fix loop has one fix writer. Review rounds are uncapped. From round 3, review covers the delta since the last reviewed head and any production-correctness or security defect anywhere; coverage, wording, simplification and documentation findings become Hunt notes. An approve with zero blockers ends the review loop unless the fix touched production code, which requires review at its new head. Required checks and the other readiness obligations still stand. Fix-turn budgets and escalation can hold or park work but cannot make a defect pass or impose a review-round cap.
