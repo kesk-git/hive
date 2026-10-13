@@ -1,0 +1,52 @@
+call os StartProcess
+call syscall StartProcess
+call syscall ForkExec
+call syscall Exec
+call syscall CreateProcess
+call syscall CreateProcessAsUser
+call syscall SYS_FORK
+call syscall SYS_VFORK
+call syscall SYS_EXECVE
+call syscall SYS_EXECVEAT
+call syscall SYS_CLONE
+call syscall SYS_CLONE3
+call syscall SYS_POSIX_SPAWN
+call golang.org/x/sys/windows CreateProcess
+call golang.org/x/sys/windows CreateProcessAsUser
+call golang.org/x/sys/windows CreateProcessWithLogonW
+call golang.org/x/sys/windows CreateProcessWithTokenW
+call golang.org/x/sys/windows ShellExecute
+call golang.org/x/sys/windows ShellExecuteEx
+call golang.org/x/sys/unix ForkExec
+call golang.org/x/sys/unix Exec
+call golang.org/x/sys/unix Execve
+call golang.org/x/sys/unix Execveat
+call golang.org/x/sys/unix PosixSpawn
+call golang.org/x/sys/unix Fork
+call golang.org/x/sys/unix Vfork
+call golang.org/x/sys/unix SYS_FORK
+call golang.org/x/sys/unix SYS_VFORK
+call golang.org/x/sys/unix SYS_EXECVE
+call golang.org/x/sys/unix SYS_CLONE
+call golang.org/x/sys/unix SYS_CLONE3
+name CreateProcessA
+name CreateProcessW
+name CreateProcessAsUserA
+name CreateProcessAsUserW
+name CreateProcessWithLogonW
+name CreateProcessWithTokenW
+name ShellExecuteA
+name ShellExecuteW
+name ShellExecuteExA
+name ShellExecuteExW
+name WinExec
+name posix_spawn
+name posix_spawnp
+name execve
+name execv
+name execvp
+name execl
+name execlp
+name execle
+name fexecve
+name execveat

@@ -1,0 +1,1 @@
+{"import_id":"go-keyring","kind":"dependency","upstream":{"module":{"path":"github.com/zalando/go-keyring","version":"v0.0.0"}},"local_changes":"None.","audit":{"statement":"The session bus client starts a process, dbus-launch, when it finds no session bus; the Linux adapter calls into it only where the address is already known."}}

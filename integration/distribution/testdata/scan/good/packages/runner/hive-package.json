@@ -1,0 +1,1 @@
+{"name":"runner","executes":{"core":["git"],"transitional":[],"optional":[],"project":true},"platform":[{"name":"security","reason":"the keychain tool"}],"calls":["callee"],"commands":[{"name":"hive-runner"}]}
