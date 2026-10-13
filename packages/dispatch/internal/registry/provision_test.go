@@ -534,6 +534,48 @@ func TestACrashBeforeAnyRecordReachedDiskRollsForward(t *testing.T) {
 	}
 }
 
+// A request under a new request_id that finds the home's lock held by a crashed
+// provisioning of the same home plans against the home as the completed
+// transaction left it: it finds every identity, created false, and is no
+// conflict with the records it would otherwise create again.
+func TestARequestAfterACrashedProvisioningFindsWhatTheLockCompleted(t *testing.T) {
+	isolateGit(t)
+	home := newHome(t)
+	homeID := mint(t, ids.Home)
+	body := fleetBody(mint(t, ids.Home), projectSpec("tool", cloneSpec(newClone(t, ""), "")))
+
+	e := entry.Executable()
+	crashed := false
+	e.Fault = func(step string) error {
+		if crashed || !strings.HasPrefix(step, "create ") || strings.Contains(step, "/tx/") {
+			return nil
+		}
+		crashed = true
+		return errors.New("test: the process crashed here")
+	}
+	expect(t, sendWith(t, e, home, request(t, homeID, body)), envelope.Unknown, envelope.CodeOutcomeUnknown)
+	if !crashed {
+		t.Fatal("the fault was never reached")
+	}
+	if _, err := os.Stat(filepath.Join(home, "home.json")); err == nil {
+		t.Fatal("the crash came after a record reached disk")
+	}
+
+	again := send(t, home, request(t, homeID, body))
+	if again.Status != envelope.Ok {
+		t.Fatalf("%s: %+v", again.Status, again.Error)
+	}
+	if got := marks(t, again.Body); !reflect.DeepEqual(got, all(false, 4)) {
+		t.Errorf("marks %v", got)
+	}
+	if got := records(t, again.Body)[0]["home_id"]; got != homeID {
+		t.Errorf("the home is %v, not %s", got, homeID)
+	}
+	if len(again.Receipts) != 0 {
+		t.Errorf("%d receipts for a request that created nothing", len(again.Receipts))
+	}
+}
+
 // withoutBookkeeping is the snapshot without what the harness keeps for every
 // command: the lock and the directories of the store.
 func withoutBookkeeping(snap map[string]string) map[string]string {

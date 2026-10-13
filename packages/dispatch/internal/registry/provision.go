@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/kesk-git/hive/contract/canon"
@@ -15,7 +16,8 @@ import (
 // It reads everything it needs, the clones included, and decides what is to be
 // created before it writes anything: the records and receipts it returns are
 // the one transaction the harness commits with the recorded outcome, so that a
-// request which fails leaves nothing and one which succeeds leaves all.
+// request which fails leaves nothing and one which succeeds leaves all. The
+// home it plans against is the one it reads under the store's lock.
 func provision(c *cli.Call) (*cli.Result, error) {
 	if c.Request.Scope.Level != envelope.ScopeHive {
 		return nil, envelope.Common(envelope.CodeScopeMismatch, "provisioning creates the scope it works in, so its request carries scope_level hive")
@@ -24,7 +26,11 @@ func provision(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, envelope.Common(envelope.CodeInternal, err.Error())
 	}
-	p := &provisioner{call: c, reg: reg, rd: &reader{c.Home, reg}, homeID: c.Request.HomeID, fresh: map[string]bool{}}
+	home, err := lockedHome(c.Home.Dir, c.Request.HomeID)
+	if err != nil {
+		return nil, err
+	}
+	p := &provisioner{call: c, reg: reg, locked: home, rd: &reader{home, reg}, homeID: c.Request.HomeID, fresh: map[string]bool{}}
 	if p.now, err = recordedAt(c); err != nil {
 		return nil, err
 	}
@@ -32,9 +38,9 @@ func provision(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(c.Home.Unknown) > 0 {
-		unknown := make([]any, len(c.Home.Unknown))
-		for i, name := range c.Home.Unknown {
+	if len(home.Unknown) > 0 {
+		unknown := make([]any, len(home.Unknown))
+		for i, name := range home.Unknown {
 			unknown[i] = name
 		}
 		body["unknown_entries"] = unknown
@@ -42,11 +48,34 @@ func provision(c *cli.Call) (*cli.Result, error) {
 	return &cli.Result{Body: body, Records: p.records, Receipts: p.receipts}, nil
 }
 
+// lockedHome reads the home again. The harness read it before it took the
+// store's lock, and a transaction the lock completed, or another provisioning
+// that held the lock first, may since have given it its identity record, which
+// must then be the identity the request names.
+func lockedHome(dir, homeID string) (*store.Home, error) {
+	home, err := store.CheckHome(dir)
+	switch {
+	case errors.Is(err, store.ErrUnsupportedVersion):
+		return nil, envelope.Common(envelope.CodeUnsupportedVersion, err.Error())
+	case errors.Is(err, store.ErrRecordMalformed), errors.Is(err, store.ErrLayout):
+		return nil, envelope.Common(envelope.CodeRecordMalformed, err.Error())
+	case errors.Is(err, store.ErrInsideRepository):
+		return nil, envelope.Common(envelope.CodeHomeInsideRepository, "a home is never inside a Git working tree")
+	case err != nil:
+		return nil, envelope.Common(envelope.CodeIOFailure, err.Error())
+	case home.HomeID != "" && home.HomeID != homeID:
+		return nil, envelope.Common(envelope.CodeHomeMismatch, "the request names another home than the one the command was pointed at")
+	}
+	return home, nil
+}
+
 // provisioner is one provisioning in hand: the records and receipts it will
 // write, in order.
 type provisioner struct {
-	call   *cli.Call
-	reg    *schema.Registry
+	call *cli.Call
+	reg  *schema.Registry
+	// locked is the home as read under the store's lock.
+	locked *store.Home
 	rd     *reader
 	homeID string
 	// now is the one time at which every record of the request is written.
@@ -124,7 +153,7 @@ func created(isNew bool, record map[string]any) map[string]any {
 // fleet its parent, is held to: a request that would change it is a conflict
 // with already_exists and nothing is written.
 func (p *provisioner) home(role, name, parentID string) (map[string]any, bool, error) {
-	if p.call.Home.HomeID != "" {
+	if p.locked.HomeID != "" {
 		rec, err := p.rd.read(homeKind, p.homeID)
 		if err != nil {
 			return nil, false, err
@@ -158,7 +187,7 @@ func (p *provisioner) home(role, name, parentID string) (map[string]any, bool, e
 // workspace is idempotent on its slug: the one the existing home names must
 // have the slug of the request, and a workspace's slug is fixed.
 func (p *provisioner) workspace(id string, spec map[string]any, parentID string) (map[string]any, bool, error) {
-	if p.call.Home.HomeID != "" {
+	if p.locked.HomeID != "" {
 		rec, err := p.rd.read(workspaceKind, id)
 		if err != nil {
 			return nil, false, err
