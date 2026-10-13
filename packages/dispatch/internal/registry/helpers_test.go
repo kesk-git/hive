@@ -2,11 +2,11 @@ package registry_test
 
 import (
 	"bytes"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/canon"
@@ -49,7 +49,12 @@ type provisioning struct {
 // home the command is pointed at, with the body.
 func request(t testing.TB, homeID string, body map[string]any) provisioning {
 	t.Helper()
-	requestID := mint(t, ids.Request)
+	return requestAs(t, mint(t, ids.Request), homeID, body)
+}
+
+// requestAs is request under the request_id given.
+func requestAs(t testing.TB, requestID, homeID string, body map[string]any) provisioning {
+	t.Helper()
 	issued, err := clock.Stamp(clock.System{})
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +78,13 @@ func request(t testing.TB, homeID string, body map[string]any) provisioning {
 // home, and returns the response as the command would have written it.
 func send(t testing.TB, home string, p provisioning) *envelope.Response {
 	t.Helper()
-	e := entry.Executable()
+	return sendWith(t, entry.Executable(), home, p)
+}
+
+// sendWith is send through the executable given, which a test may have set a
+// fault on.
+func sendWith(t testing.TB, e *cli.Executable, home string, p provisioning) *envelope.Response {
+	t.Helper()
 	var fleet *cli.Command
 	for _, c := range e.Commands {
 		if c.Name == "hive-fleet" {
@@ -104,9 +115,8 @@ func newHome(t testing.TB) string {
 	return dir
 }
 
-// git runs Git in dir for a test, away from the machine's configuration.
-func git(t testing.TB, dir string, args ...string) string {
-	t.Helper()
+// tryGit runs Git in dir for a test, away from the machine's configuration.
+func tryGit(dir string, args ...string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
@@ -116,9 +126,17 @@ func git(t testing.TB, dir string, args ...string) string {
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	if err := cmd.Run(); err != nil {
-		t.Fatalf("git %v in %s: %v\n%s", args, dir, err, out.String())
+		return fmt.Errorf("git %v in %s: %v\n%s", args, dir, err, out.String())
 	}
-	return strings.TrimSpace(out.String())
+	return nil
+}
+
+// git is tryGit for a command that must succeed.
+func git(t testing.TB, dir string, args ...string) {
+	t.Helper()
+	if err := tryGit(dir, args...); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // newClone makes a Git repository with one commit and returns its top level, as
