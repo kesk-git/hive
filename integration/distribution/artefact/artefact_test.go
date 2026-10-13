@@ -178,3 +178,29 @@ func TestAssembleReplacesTheDirectory(t *testing.T) {
 		t.Error(p)
 	}
 }
+
+// dist/ holds each executable under the name of its platform, with .exe on
+// Windows and without a suffix elsewhere; an executable under the other
+// platform's name is not the one the build made, and the assembly names the
+// file it wants.
+func TestAssembleReadsDistUnderThePlatformsNames(t *testing.T) {
+	cases := []struct{ goos, from, to string }{
+		{"windows", "hive-ui.exe", "hive-ui"},
+		{"linux", "hive-ui", "hive-ui.exe"},
+		{"darwin", "hive-ui", "hive-ui.exe"},
+	}
+	for _, c := range cases {
+		t.Run(c.goos, func(t *testing.T) {
+			root := fixture.Root(t)
+			dist := fixture.Dist(t, root, c.goos)
+			if err := os.Rename(filepath.Join(dist, c.from), filepath.Join(dist, c.to)); err != nil {
+				t.Fatal(err)
+			}
+			executables, _, _ := proof.Declared(root)
+			_, err := artefact.Assemble(artefact.Options{Root: root, Dist: dist, GOOS: c.goos, GOARCH: "amd64", Inspect: fixture.Good(executables, c.goos, "amd64")})
+			if err == nil || !strings.Contains(err.Error(), c.from+" is not in") {
+				t.Errorf("error %v, want one that names %s", err, c.from)
+			}
+		})
+	}
+}

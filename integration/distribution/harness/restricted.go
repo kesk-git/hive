@@ -92,19 +92,34 @@ func (r Restricted) Path() string {
 
 // Run starts the program, by its bare name, with the arguments, from dir,
 // under the search path and the home of the run, and returns what it printed
-// and its exit code. Only the programs on the search path can be found: the
-// program is started by a launcher of the repository through contract/exec.
+// and its exit code. Only the programs on the search path can be found.
 func (r Restricted) Run(t testing.TB, dir, program string, args ...string) (string, int, error) {
+	t.Helper()
+	return Launch(t, r.Path(), r.Home, dir, program, args...)
+}
+
+// Launch starts the program, by its bare name, from dir, with exactly the
+// search path and the home given, and returns what it printed and its exit
+// code. contract/exec reads its search path once, when a process loads it, so
+// a test cannot start by a bare name a program that its own path does not
+// hold; Launch starts a launcher of the repository with `go run`, under the
+// path, and the launcher starts the program through contract/exec and takes
+// the toolchain's directory, which `go run` puts first, off the program's path.
+func Launch(t testing.TB, path, home, dir, program string, args ...string) (string, int, error) {
 	t.Helper()
 	// The launcher is built and started by go, which finds the program on this
 	// path; go itself is found on the path the test was started with.
-	t.Setenv("PATH", r.Path())
+	t.Setenv("PATH", path)
 	t.Setenv("CGO_ENABLED", "0")
+	root, err := proof.RepoRoot()
+	if err != nil {
+		return "", 0, err
+	}
 	launch := append([]string{
 		"github.com/kesk-git/hive/integration/distribution/cmd/runwith",
-		"-path", r.Path(), "-home", r.Home, program,
+		"-path", path, "-home", home, "-dir", dir, program,
 	}, args...)
-	return GoProgram(t, dir, launch...)
+	return GoProgram(t, root, launch...)
 }
 
 // Integration compiles the integration tests of ./integration/calls, places the

@@ -9,7 +9,7 @@
 // program is started with exactly the path it is given, and with a home of the
 // caller's.
 //
-// Usage: runwith -path <search path> -home <directory> <program> [argument ...]
+// Usage: runwith -path <search path> -home <directory> [-dir <directory>] <program> [argument ...]
 package main
 
 import (
@@ -27,14 +27,18 @@ import (
 func main() {
 	path := flag.String("path", "", "the search path of the program")
 	home := flag.String("home", "", "the home of the program")
+	dir := flag.String("dir", "", "the working directory of the program; this process's own when empty")
 	flag.Parse()
 	if flag.NArg() == 0 || *path == "" || *home == "" {
-		fmt.Fprintln(os.Stderr, "usage: runwith -path <search path> -home <directory> <program> [argument ...]")
+		fmt.Fprintln(os.Stderr, "usage: runwith -path <search path> -home <directory> [-dir <directory>] <program> [argument ...]")
 		os.Exit(2)
 	}
-	dir, err := os.Getwd()
-	if err != nil {
-		fail(err)
+	if *dir == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			fail(err)
+		}
+		*dir = wd
 	}
 	// What the program is started with: contract/exec builds its environment
 	// from this process's, by name.
@@ -52,7 +56,7 @@ func main() {
 	run, err := exec.Start(exec.Spec{
 		Program: exec.Program{Kind: exec.Project, Name: flag.Arg(0)},
 		Args:    flag.Args()[1:],
-		Dir:     dir,
+		Dir:     *dir,
 		Stdin:   exec.Null(), Stdout: exec.Pipe(), Stderr: exec.Pipe(),
 	})
 	if err != nil {

@@ -137,13 +137,11 @@ func Assemble(o Options) (string, error) {
 	var infos []Executable
 	sources := map[string]string{}
 	for _, e := range execs {
+		// dist/ holds each executable under the name of the platform: with the
+		// .exe suffix on Windows and without one on macOS and Linux.
 		src := filepath.Join(o.Dist, e+sfx)
-		if _, err := os.Stat(src); err != nil {
-			if alt := filepath.Join(o.Dist, e); sfx != "" && fileExists(alt) {
-				src = alt
-			} else {
-				return "", fmt.Errorf("%s is not in %s: run `make build` first (%v)", e+sfx, o.Dist, err)
-			}
+		if !fileExists(src) {
+			return "", fmt.Errorf("%s is not in %s: run `make build` first", e+sfx, o.Dist)
 		}
 		sources[e] = src
 		info, err := o.Inspect.Inspect(e, src)
