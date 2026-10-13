@@ -215,8 +215,14 @@ func TestEveryCommandNameAnswersCapabilities(t *testing.T) {
 			var ops []string
 			for _, op := range caps.Operations {
 				ops = append(ops, op.Name)
+				if c.Name == "hive-fleet" && op.Name == "provision" {
+					if op.State != envelope.Supported || !op.Mutates {
+						t.Errorf("%s is %s, and it is the one operation built", op.Name, op.State)
+					}
+					continue
+				}
 				if op.State != envelope.Unsupported || op.Reason == "" {
-					t.Errorf("%s is %s (%q), and no operation is built yet", op.Name, op.State, op.Reason)
+					t.Errorf("%s is %s (%q), and no other operation is built yet", op.Name, op.State, op.Reason)
 				}
 			}
 			if want := slices.Sorted(slices.Values(c.Operations)); !slices.Equal(slices.Sorted(slices.Values(ops)), want) {
@@ -245,11 +251,14 @@ func TestAnUnknownOperationIsRefused(t *testing.T) {
 	}
 }
 
-// An operation the declaration lists and the build has not reached is
-// refused with unsupported_operation, exit 4, and echoes the request.
+// An operation the declaration lists and the build has not reached, every
+// one but hive-fleet provision, is refused with unsupported_operation, exit 4, and echoes the request.
 func TestADeclaredOperationNotBuiltIsRefused(t *testing.T) {
 	for _, c := range declared(t) {
 		for _, operation := range c.Operations {
+			if c.Name == "hive-fleet" && operation == "provision" {
+				continue // built: the registry package's tests prove it
+			}
 			t.Run(c.Name+" "+operation, func(t *testing.T) {
 				req, requestID := request(t, c.Name, operation)
 				code, out := invoke(t, c.Name, req, operation, "--home", t.TempDir())
