@@ -36,12 +36,13 @@ type Outcome struct {
 }
 
 // Handle runs one operation invocation through the whole harness and
-// returns its outcome, whose response is complete and encoded. A convenience
-// form that builds a request from a person's arguments hands it here, so it
-// is validated and handled exactly as a request read from a file. Handle
-// never returns an error for what the contract turns into a status; the
-// error it does return is one the executable cannot answer at all, which
-// Main reports on standard error and ends with exit code 1.
+// returns its outcome, whose response is complete and encoded. The request
+// document is the only form: Main hands Handle the one it read, and a
+// package's tests may hand it one directly, past Main's Check and its read,
+// so Handle validates and handles it whole whoever calls. Handle never
+// returns an error for what the contract turns into a status; the error it
+// does return is one the executable cannot answer at all, which Main
+// reports on standard error and ends with exit code 1.
 func (e *Executable) Handle(inv Invocation) (*Outcome, error) {
 	if inv.Command == nil {
 		return nil, errors.New("cli: the invocation names no command")
