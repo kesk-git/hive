@@ -3,18 +3,12 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/kesk-git/hive/contract/cli"
-	"github.com/kesk-git/hive/packages/dispatch"
+	"github.com/kesk-git/hive/packages/dispatch/internal/entry"
 )
 
 func main() {
-	e, err := dispatch.Executable()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	os.Exit(cli.Run(e))
+	os.Exit(cli.Run(entry.Executable()))
 }

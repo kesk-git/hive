@@ -1,4 +1,4 @@
-package dispatch
+package entry
 
 import (
 	"bytes"
@@ -13,24 +13,21 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/kesk-git/hive/contract/canon"
-	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/declare"
 	"github.com/kesk-git/hive/contract/envelope"
-	"github.com/kesk-git/hive/contract/ids"
 )
 
 // The package, its executable and the path of its main package, relative to
-// this directory.
+// the repository root.
 const (
-	packageName = "dispatch"
-	executable  = "hive-dispatch"
-	mainPackage = "./cmd/hive-dispatch"
+	packageName = "shadow"
+	executable  = "hive-shadow"
+	mainPackage = "./packages/shadow/cmd/hive-shadow"
 )
 
 // A name no command of this package has, and the name of a command another
 // package owns.
-var foreign = []string{"hive-nothing", "hive-state"}
+var foreign = []string{"hive-nothing", "hive-fleet"}
 
 var (
 	buildOnce sync.Once
@@ -70,10 +67,7 @@ func goTool() (string, error) {
 // operations it lists.
 func declared(t testing.TB) []declare.Command {
 	t.Helper()
-	set, problems := declare.Read(os.DirFS("../.."))
-	if err := problems.Err(); err != nil {
-		t.Fatal(err)
-	}
+	set := ownSet(t)
 	p := set.Lookup(packageName)
 	if p == nil {
 		t.Fatalf("%s is not a declared package", packageName)
@@ -98,6 +92,7 @@ func bin(t testing.TB) string {
 			return
 		}
 		cmd := exec.Command(goBin, "build", "-o", filepath.Join(buildDir, program(executable)), mainPackage)
+		cmd.Dir = "../../../.."
 		cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			buildErr = fmt.Errorf("building %s: %v\n%s", mainPackage, err, out)
@@ -159,37 +154,6 @@ func invoke(t testing.TB, name string, stdin []byte, args ...string) (int, []byt
 	return cmd.ProcessState.ExitCode(), stdout.Bytes()
 }
 
-// request is a valid request for the operation of the command, in the scope
-// of a home, with an empty body, and the request_id it carries.
-func request(t testing.TB, command, operation string) ([]byte, string) {
-	t.Helper()
-	mint := func(p ids.Prefix) string {
-		id, err := ids.Mint(clock.System{}, p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return id
-	}
-	requestID := mint(ids.Request)
-	issued, err := clock.Stamp(clock.System{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	out, err := canon.Encode(map[string]any{
-		"schema": "hive.request", "schema_version": "1.0",
-		"command": command, "operation": operation, "operation_version": "1.0",
-		"request_id": requestID, "correlation_id": mint(ids.Correlation),
-		"issued_at": issued, "caller": map[string]any{"kind": "test"},
-		"scope_level": "hive", "home_id": mint(ids.Home),
-		"authority": map[string]any{"kind": "none"},
-		"body":      map[string]any{},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return append(out, '\n'), requestID
-}
-
 // Every command name the package owns answers capabilities, as the command
 // it was started under, with the operations its declaration lists and
 // the package's executable.
@@ -244,29 +208,6 @@ func TestAnUnknownOperationIsRefused(t *testing.T) {
 				t.Errorf("%s %s by %s", resp.Status, resp.Error.Code, resp.Command)
 			}
 		})
-	}
-}
-
-// An operation the declaration lists and the build has not reached is
-// refused with unsupported_operation, exit 4, and echoes the request.
-func TestADeclaredOperationNotBuiltIsRefused(t *testing.T) {
-	for _, c := range declared(t) {
-		for _, operation := range c.Operations {
-			t.Run(c.Name+" "+operation, func(t *testing.T) {
-				req, requestID := request(t, c.Name, operation)
-				code, out := invoke(t, c.Name, req, operation, "--home", t.TempDir())
-				if code != envelope.Refused.ExitCode() {
-					t.Fatalf("exit %d, want %d", code, envelope.Refused.ExitCode())
-				}
-				resp, err := envelope.AcceptResponse(out, code, requestID)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if resp.Status != envelope.Refused || resp.Error.Code != envelope.CodeUnsupportedOperation || resp.Operation != operation || len(resp.Receipts) != 0 {
-					t.Errorf("%s %s of %s with %d receipts", resp.Status, resp.Error.Code, resp.Operation, len(resp.Receipts))
-				}
-			})
-		}
 	}
 }
 
