@@ -8,7 +8,7 @@ LICENSE                              added by its own change, before any import
 NOTICE                               third-party notices, generated from imports/
 .gitattributes                       line feeds kept in every checkout, on every platform
 .github/
-  workflows/                         the one workflow that runs make test on GitHub's hosted Windows and Linux runners, for every Harvest head and every night
+  workflows/                         the one workflow that runs make test on GitHub's hosted Windows and Linux runners, on main, on its nightly schedule and on demand at the head landing a Target's last Prey
 .claude/
   settings.json                      repository configuration for Claude Code: includeCoAuthoredBy and attribution.sessionUrl, both false, keep AI co-author and session trailers off
 .no-mistakes.yaml                    repository configuration for the validation pipeline: holds the fixed gate command, `make check` and every built target, so no model chooses what runs; a change that makes a target built adds it there in the same change

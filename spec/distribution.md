@@ -32,6 +32,14 @@ A Hive without the exception present is whole. It is not checked at start, and i
 
 A project's own validation commands are a third thing: they belong to the project, run in the environment the project supplies, and may need whatever the project needs. They are declared as `project` and are never part of Hive's distribution.
 
+## Plug-in boundary
+
+The core carries no tool server and no third-party skill. The operator may plug them into Claude Code or Codex using the harness's own configuration, outside Hive's records. Hive configures, records, launches and vouches for none of those additions. A server must sign in by itself under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none); a resident server requiring an environment token is refused, since Tendril runs short-lived invocations only.
+
+Desktop control, live-browser-session attachment, bot-detection evasion and swarm frameworks are refused. The optional browser stack remains a selected feature outside the core and must not enable these classes.
+
+Prove the core artefact contains neither a server nor a third-party skill; a harness-configured self-signing server changes no Hive record; a resident token-in-environment server is refused before launch; and each of the four classes is refused. These proofs enter `test-distribution` for the artefact and `test-dispatch` for launch qualification when that route is built.
+
 ## The artefact
 
 The build produces one directory per platform:
@@ -221,3 +229,13 @@ The operation that made the run maps its result to the [command contract's exit 
 7. The repository holds a build file of another toolchain.
 
 A passing run is evidence about the artefact and the platform it ran against. It is not a claim that any installation already runs it.
+
+## Identity and resident compatibility
+
+**Packaged build identity.** Qualify the identity emitted by the packaged executable itself against its manifest and source revision. A source archive can omit the metadata a build-info fallback reads; missing identity is reported as unknown, never silently labelled an intentional development build. A release with unknown identity does not qualify, and a deliberate development build declares that status explicitly. Acceptance: build a release from an archive without VCS metadata and verify its embedded identity, or expose unknown and refuse release qualification; exercise a deliberately marked development build separately. An already-present fallback alone cannot make the metadata-free archive pass. Sources: [upstream no-mistakes/issues/1446](https://github.com/kunchenguid/no-mistakes/issues/1446).
+
+**Resident and client compatibility.** A client reuses a resident only after a verified protocol/capability handshake. Version inequality alone authorizes neither replacement nor downgrade. One guarded update owner controls any necessary replacement and preserves every active review, its drafts, routing and pending submissions; an incompatible resident remains a named block until that operation is safe. Acceptance: older and newer compatible clients reuse one resident without replacing it, two incompatible clients cannot race replacement or oscillate versions, and an authorized replacement preserves all active reviews and their pending work. Sources: [upstream lavish-axi/pull/416](https://github.com/kunchenguid/lavish-axi/pull/416), [upstream lavish-axi/issues/415](https://github.com/kunchenguid/lavish-axi/issues/415).
+
+## Complete execution evidence
+
+**Exit, result and output drain.** The execution boundary records process termination, protocol-result completeness and output-drain outcome separately. A complete bound result is preserved when a descendant holds output open; bounded drain and descendant cleanup report the transport problem without discarding completed evidence. Missing, partial or contradictory results remain unknown, and an exit code alone cannot supply them. Acceptance: a child emits a complete result and exits while a descendant retains an output handle; drain and owned-descendant cleanup finish within bounds and retain the result with a drain-failure receipt; partial output and an incompatible exit/result pair never pass. Sources: [upstream no-mistakes/issues/1444](https://github.com/kunchenguid/no-mistakes/issues/1444).
