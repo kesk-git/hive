@@ -13,7 +13,7 @@
 //	hive-callee-small  a request and a response limit of 1,048,576 bytes,
 //	                   below the record the size proof sends
 //
-// Both own the same four operations, whose bodies are open objects:
+// Both own the same five operations, whose bodies are open objects:
 //
 //	echo    read-only; answers the string `record` it was sent
 //	expand  read-only; answers a record of `bytes` bytes, from a request that
@@ -22,6 +22,9 @@
 //	        state the harness does not itself reach
 //	put     mutating; writes the record `name` with the `record` it was sent
 //	        and one receipt, and answers the record, to prove replay
+//	grow    mutating; writes the record `name` and one receipt, and answers a
+//	        record of `bytes` bytes, from a request that is small, to prove
+//	        that a response too large to return leaves nothing behind
 //
 // It claims the package name of a store the home table gives, shadow, because
 // a store opens for no other name; it writes into the home it is pointed at
@@ -85,6 +88,7 @@ func operations() []*cli.Operation {
 		{OperationDecl: declared("expand", false), Handle: expand},
 		{OperationDecl: declared("state", false), Handle: state},
 		{OperationDecl: declared("put", true), Handle: put},
+		{OperationDecl: declared("grow", true), Handle: grow},
 	}
 }
 
@@ -153,12 +157,28 @@ var nameForm = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 // put writes the record body.name, which must not exist, holding body.record,
 // with one receipt, and answers the record.
 func put(c *cli.Call) (*cli.Result, error) {
+	rec, _ := c.Request.Body["record"].(string)
+	return write(c, rec, rec)
+}
+
+// grow writes the record body.name, which must not exist, with one receipt,
+// and answers a record of body.bytes bytes: pattern(n).
+func grow(c *cli.Call) (*cli.Result, error) {
+	n, ok := c.Request.Body["bytes"].(int64)
+	if !ok || n < 0 || n > maxExpand {
+		return nil, invalid("body.bytes is a whole number from 0 to %d", maxExpand)
+	}
+	return write(c, "", pattern(int(n)))
+}
+
+// write is the one write of put and grow: the record named by body.name,
+// holding stored, one receipt, and the answer record.
+func write(c *cli.Call, stored, answer string) (*cli.Result, error) {
 	name, ok := c.Request.Body["name"].(string)
 	if !ok || !nameForm.MatchString(name) || len(name) > 64 {
 		return nil, invalid("body.name is a lowercase word of letters, digits and hyphens")
 	}
-	rec, _ := c.Request.Body["record"].(string)
-	content, err := canon.Encode(map[string]any{"schema": "shadow.callee", "schema_version": "1.0", "name": name, "record": rec})
+	content, err := canon.Encode(map[string]any{"schema": "shadow.callee", "schema_version": "1.0", "name": name, "record": stored})
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +187,7 @@ func put(c *cli.Call) (*cli.Result, error) {
 		return nil, err
 	}
 	return &cli.Result{
-		Body:     map[string]any{"wrote": name, "record": rec},
+		Body:     map[string]any{"wrote": name, "record": answer},
 		Records:  []store.RecordWrite{{Path: store.RecordPath(pkg, "callee", name), Content: content, Expected: 0}},
 		Receipts: []envelope.Receipt{receipt},
 	}, nil

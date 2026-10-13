@@ -443,8 +443,13 @@ func newHome(t testing.TB) string {
 	return dir
 }
 
-// snapshot lists every entry under dir with a digest of its content, so that
-// two snapshots differ when anything was written, replaced or removed.
+// snapshot lists every file under dir with a digest of its content, so that
+// two snapshots differ when a record, a receipt, a recorded outcome or an event
+// was written, replaced or removed. The lock files under locks/ and the
+// directories a store makes when a mutating command first opens it hold no
+// record, and are not listed: a command that ends with anything but ok has
+// changed nothing when no file of data differs (spec/commands.md, Exit and
+// error states).
 func snapshot(t testing.TB, dir string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
@@ -453,15 +458,15 @@ func snapshot(t testing.TB, dir string) map[string]string {
 			return err
 		}
 		rel, _ := filepath.Rel(dir, path)
-		if d.IsDir() {
-			out[filepath.ToSlash(rel)+"/"] = ""
+		rel = filepath.ToSlash(rel)
+		if d.IsDir() || rel == "locks" || strings.HasPrefix(rel, "locks/") {
 			return nil
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		out[filepath.ToSlash(rel)] = fmt.Sprintf("%x", sha256.Sum256(data))
+		out[rel] = fmt.Sprintf("%x", sha256.Sum256(data))
 		return nil
 	})
 	if err != nil {
@@ -508,4 +513,45 @@ func pattern(n int) string {
 func sameRecord(got any, n int) bool {
 	s, ok := got.(string)
 	return ok && len(s) == n && bytes.Equal([]byte(s), []byte(pattern(n)))
+}
+
+// parseObject reads a document as a JSON object.
+func parseObject(t testing.TB, data []byte) map[string]any {
+	t.Helper()
+	v, err := canon.Parse(data)
+	obj, ok := v.(map[string]any)
+	if err != nil || !ok {
+		t.Fatalf("not an object: %v", err)
+	}
+	return obj
+}
+
+// encodeObject writes an object as a document: canonical, one line feed.
+func encodeObject(t testing.TB, obj map[string]any) []byte {
+	t.Helper()
+	out, err := canon.Encode(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(out, '\n')
+}
+
+// wantFailure fails the test unless the call ended with a complete response of
+// the exit code, status and code given, that echoes the request, carries no
+// body and no partial result.
+func wantFailure(t testing.TB, r reply, requestID string, exit int, status, code string) {
+	t.Helper()
+	resp := r.must(t)
+	if r.result.Code != int64(exit) || string(resp.Status) != status {
+		t.Fatalf("exit code %d, status %q; want %d, %s", r.result.Code, resp.Status, exit, status)
+	}
+	if resp.Error == nil || resp.Error.Code != code {
+		t.Fatalf("error = %+v, want code %s", resp.Error, code)
+	}
+	if resp.RequestID != requestID {
+		t.Errorf("request_id = %q, want %q", resp.RequestID, requestID)
+	}
+	if resp.Body != nil {
+		t.Errorf("a %s response carries a body: %v", status, resp.Body)
+	}
 }
