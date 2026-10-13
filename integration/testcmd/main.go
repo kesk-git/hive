@@ -1,10 +1,10 @@
 // Command hive-callee is the test-only callee of the cross-package call proof
 // (spec/test-targets.md, test-integration). It is no part of Hive: it is
-// built by the tests under integration/calls/, from this source, and started
-// by them through the one process-execution path, so that the transport of
-// the command contract (the request and response envelopes, every exit
-// state, replay and the size limits) is proved end to end where no real
-// operation exists yet.
+// built by `make test-integration`, from this source, and started by the
+// tests under integration/calls/ through the one process-execution path, so
+// that the transport of the command contract (the request and response
+// envelopes, every exit state, replay and the size limits) is proved end to
+// end where no real operation exists yet.
 //
 // It is an executable of the contract library's own harness, as every
 // package's is, and acts as the command name it was started under:

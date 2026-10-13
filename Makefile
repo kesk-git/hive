@@ -67,25 +67,14 @@ test-word:
 test-ui:
 	$(call test-dir,packages/ui)
 
-# test-integration builds the test-only callee of integration/testcmd/ from Go
-# into dist/callee/, under both its command names, and starts the tests with
-# dist/, where `make build` left the seven executables, and dist/callee/ ahead
-# of the rest of the search path, which the platform's own list syntax
-# separates by ; on Windows and by : elsewhere. contract/exec reads that path once, when the test
-# binary loads, so no test changes it. It does not build the seven executables:
-# the tests fail, saying so, when they are absent or are not found first.
+# test-integration is one run of the Go program under
+# integration/testcmd/testintegration/, which builds the test-only callee of
+# integration/testcmd/ into dist/callee/ and starts the tests with dist/, where
+# `make build` left the seven executables, and dist/callee/ ahead of the rest
+# of the search path. It does not build the seven executables: the tests fail,
+# saying so, when they are absent or are not found first.
 test-integration:
-	@if [ -z "$$(find integration/calls -name '*_test.go' -print -quit 2>/dev/null)" ]; then \
-		echo "$@: nothing to run: integration/calls holds no test" >&2; \
-		exit 1; \
-	fi
-	@if [ "$$($(GO) env GOHOSTOS)" = windows ]; then exe=.exe; sep=';'; else exe=; sep=':'; fi; \
-	root="$$($(GO) list -m -f '{{.Dir}}')" || exit 1; \
-	rm -rf "$$root/dist/callee" && mkdir -p "$$root/dist/callee" || exit 1; \
-	for name in hive-callee hive-callee-small; do \
-		CGO_ENABLED=0 $(GO) build -trimpath -o "$$root/dist/callee/$$name$$exe" ./integration/testcmd || exit 1; \
-	done; \
-	PATH="$$root/dist$$sep$$root/dist/callee$$sep$$PATH" $(GO) test -count=1 ./integration/calls/...
+	$(GO) run ./integration/testcmd/testintegration
 
 test-distribution:
 	$(call test-dir,integration/distribution)
