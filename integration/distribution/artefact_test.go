@@ -33,3 +33,45 @@ func TestArtefactMatchesTheContract(t *testing.T) {
 		t.Error(p)
 	}
 }
+
+// The identity the manifest states is the one the executables carry: the Go
+// release, the platform, the revision and the versions of the source. It
+// catches a manifest that states what the assembler assumed instead of what
+// the executables hold, and an executable built from a modified tree.
+func TestArtefactIdentityIsTheExecutables(t *testing.T) {
+	root, err := proof.RepoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := proof.FindArtefact(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executables, links, err := proof.Declared(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range proof.Identity(dir, proof.Want{Root: root, GOOS: runtime.GOOS, Executables: executables, Links: links}) {
+		t.Error(p)
+	}
+}
+
+// No executable of the artefact needs a library beyond the platform's own or
+// was built with the C toolchain involved.
+func TestArtefactExecutablesAreSelfContained(t *testing.T) {
+	root, err := proof.RepoRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, err := proof.FindArtefact(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	executables, links, err := proof.Declared(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range proof.Binaries(dir, proof.Want{Root: root, GOOS: runtime.GOOS, Executables: executables, Links: links}) {
+		t.Error(p)
+	}
+}
