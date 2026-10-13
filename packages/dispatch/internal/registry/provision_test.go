@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
 	"github.com/kesk-git/hive/packages/dispatch/internal/entry"
@@ -544,4 +545,109 @@ func withoutBookkeeping(snap map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+// The top level recorded for a clone is its working tree, never the directory
+// Git keeps apart from it: a repository made with a separate Git directory and
+// a submodule are named by the path of either their working tree or, for a
+// linked worktree, another tree of theirs.
+func TestAClonesRecordedTopLevelIsItsWorkingTree(t *testing.T) {
+	isolateGit(t)
+	base := physical(t, t.TempDir())
+	git(t, base, "init", "--quiet", "--separate-git-dir="+filepath.Join(base, "meta"), "work")
+	separate := filepath.Join(base, "work")
+	git(t, separate, "commit", "--quiet", "--allow-empty", "-m", "start")
+
+	super := newClone(t, "")
+	git(t, super, "-c", "protocol.file.allow=always", "submodule", "--quiet", "add", separate, "sub")
+	submodule := filepath.Join(super, "sub")
+
+	for name, c := range map[string]struct{ path, want string }{
+		"a separate git directory": {separate, separate},
+		"a submodule":              {submodule, submodule},
+	} {
+		resp := send(t, newHome(t), request(t, mint(t, ids.Home), fleetBody(mint(t, ids.Home), projectSpec("tool", cloneSpec(filepath.ToSlash(c.path), "")))))
+		if resp.Status != envelope.Ok {
+			t.Fatalf("%s: %s: %+v", name, resp.Status, resp.Error)
+		}
+		clone := object(t, list(t, list(t, resp.Body, "projects")[0], "clones")[0], "record")
+		if clone["worktree_root"] != filepath.ToSlash(c.want) {
+			t.Errorf("%s: the top level is %v, not %s", name, clone["worktree_root"], c.want)
+		}
+	}
+}
+
+// What Git reports of a clone is recorded as it is: a remote url that ends in a
+// newline keeps it.
+func TestACloneRecordsItsRemoteUrlWholeToTheByte(t *testing.T) {
+	isolateGit(t)
+	url := "https://example.test/acme/tool.git\n"
+	clone := newClone(t, "")
+	git(t, clone, "config", "remote.origin.url", url)
+	resp := send(t, newHome(t), request(t, mint(t, ids.Home), fleetBody(mint(t, ids.Home), projectSpec("tool", cloneSpec(clone, "origin")))))
+	if resp.Status != envelope.Ok {
+		t.Fatalf("%s: %+v", resp.Status, resp.Error)
+	}
+	rec := object(t, list(t, list(t, resp.Body, "projects")[0], "clones")[0], "record")
+	if got := object(t, rec, "origin")["url"]; got != url {
+		t.Errorf("origin url %q, not %q", got, url)
+	}
+}
+
+// Every entry for a record the invocation created reads created, however many
+// times the request names it.
+func TestARecordCreatedHereIsMarkedCreatedWhereverTheRequestNamesIt(t *testing.T) {
+	isolateGit(t)
+	clone := newClone(t, "")
+	linked := filepath.Join(t.TempDir(), "linked")
+	git(t, clone, "worktree", "add", "--quiet", "-b", "side", linked)
+	resp := send(t, newHome(t), request(t, mint(t, ids.Home), fleetBody(mint(t, ids.Home),
+		projectSpec("tool", cloneSpec(clone, ""), cloneSpec(filepath.ToSlash(linked), "")),
+		projectSpec("tool", cloneSpec(clone, "")))))
+	if resp.Status != envelope.Ok {
+		t.Fatalf("%s: %+v", resp.Status, resp.Error)
+	}
+	if got := marks(t, resp.Body); !reflect.DeepEqual(got, all(true, len(got))) || len(got) != 7 {
+		t.Errorf("marks %v", got)
+	}
+	if len(resp.Receipts) != 4 {
+		t.Errorf("%d receipts for one home, workspace, project and clone", len(resp.Receipts))
+	}
+}
+
+// The request always carries scope_level hive: a request at any other scope is
+// refused whole, however it names things, and writes nothing.
+func TestAProvisioningRequestAtAnotherScopeIsRefused(t *testing.T) {
+	isolateGit(t)
+	home := newHome(t)
+	homeID := mint(t, ids.Home)
+	first := send(t, home, request(t, homeID, fleetBody(mint(t, ids.Home), projectSpec("tool"))))
+	if first.Status != envelope.Ok {
+		t.Fatalf("%s: %+v", first.Status, first.Error)
+	}
+	wsID := object(t, first.Body, "workspace", "record")["workspace_id"].(string)
+	projectID := list(t, first.Body, "projects")[0]["record"].(map[string]any)["project_id"].(string)
+	before := withoutOutcomes(snapshot(t, home))
+
+	for name, scope := range map[string]map[string]any{
+		"workspace": {"scope_level": "workspace", "workspace_id": wsID},
+		"project":   {"scope_level": "project", "workspace_id": wsID, "project_id": projectID},
+	} {
+		p := request(t, homeID, fleetBody(mint(t, ids.Home), projectSpec("sibling")))
+		parsed, err := canon.Parse(p.data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := parsed.(map[string]any)
+		for k, v := range scope {
+			m[k] = v
+		}
+		if p.data, err = canon.Encode(m); err != nil {
+			t.Fatal(err)
+		}
+		expect(t, send(t, home, p), envelope.Refused, envelope.CodeScopeMismatch)
+		if !reflect.DeepEqual(withoutOutcomes(snapshot(t, home)), before) {
+			t.Errorf("%s: the home changed", name)
+		}
+	}
 }

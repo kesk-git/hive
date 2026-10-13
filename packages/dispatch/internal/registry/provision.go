@@ -17,11 +17,14 @@ import (
 // the one transaction the harness commits with the recorded outcome, so that a
 // request which fails leaves nothing and one which succeeds leaves all.
 func provision(c *cli.Call) (*cli.Result, error) {
+	if c.Request.Scope.Level != envelope.ScopeHive {
+		return nil, envelope.Common(envelope.CodeScopeMismatch, "provisioning creates the scope it works in, so its request carries scope_level hive")
+	}
 	reg, err := schema.Embedded()
 	if err != nil {
 		return nil, envelope.Common(envelope.CodeInternal, err.Error())
 	}
-	p := &provisioner{call: c, reg: reg, rd: &reader{c.Home, reg}, homeID: c.Request.HomeID}
+	p := &provisioner{call: c, reg: reg, rd: &reader{c.Home, reg}, homeID: c.Request.HomeID, fresh: map[string]bool{}}
 	if p.now, err = recordedAt(c); err != nil {
 		return nil, err
 	}
@@ -47,6 +50,9 @@ type provisioner struct {
 
 	records  []store.RecordWrite
 	receipts []envelope.Receipt
+	// fresh are the identifiers of the records this invocation created, whichever
+	// number of times the request names them.
+	fresh map[string]bool
 	// clones are the clones met so far in this request, created or found, with
 	// the project each belongs to, so that a clone named twice is one.
 	clones []*cloneEntry
@@ -174,7 +180,6 @@ func (p *provisioner) workspace(id string, spec map[string]any, parentID string)
 // returned.
 func (p *provisioner) project(wsID string, spec map[string]any, existing []map[string]any, index int) (map[string]any, []map[string]any, error) {
 	var rec map[string]any
-	isNew := false
 	for _, e := range existing {
 		if e["workspace_id"] == wsID && e["slug"] == spec["slug"] {
 			rec = e
@@ -192,7 +197,6 @@ func (p *provisioner) project(wsID string, spec map[string]any, existing []map[s
 			return nil, nil, err
 		}
 		existing = append(existing, rec)
-		isNew = true
 	}
 	clones := []any{}
 	list, _ := spec["clones"].([]any)
@@ -208,7 +212,7 @@ func (p *provisioner) project(wsID string, spec map[string]any, existing []map[s
 		}
 		clones = append(clones, entry)
 	}
-	entry := created(isNew, rec)
+	entry := created(p.fresh[rec["project_id"].(string)], rec)
 	entry["clones"] = clones
 	return entry, existing, nil
 }
@@ -243,7 +247,7 @@ func (p *provisioner) clone(projectID, wsID string, spec map[string]any, known [
 			return nil, envelope.Common(envelope.CodeAlreadyExists, at+" is a clone already registered under another project; a clone's common directory stays with its project")
 		}
 		p.clones = append(p.clones, met)
-		return created(false, met.record), nil
+		return created(p.fresh[met.record["clone_id"].(string)], met.record), nil
 	}
 	id := p.mint(ids.Clone)
 	origin := map[string]any{"kind": "none"}
@@ -304,6 +308,7 @@ func (p *provisioner) write(k kind, id string, rec map[string]any, receiptKind s
 	if err != nil {
 		return nil, envelope.Common(envelope.CodeInternal, err.Error())
 	}
+	p.fresh[id] = true
 	p.records = append(p.records, w)
 	p.receipts = append(p.receipts, receipt)
 	return stored.(map[string]any), nil

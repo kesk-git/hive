@@ -28,9 +28,11 @@ var gitConfig = []string{"GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM", "GIT_CONFIG_N
 // maxGitOutput bounds what the operation reads of Git's answer.
 const maxGitOutput = 1 << 20
 
-// exitUsage is the exit code of a Git that does not know an option it was
-// given.
-const exitUsage = 129
+// The oldest Git that knows the options a clone is read with.
+const (
+	minGitMajor = 2
+	minGitMinor = 38
+)
 
 // What is read of a clone: where its Git common directory and its main working
 // tree are, as physical paths with forward slashes, its object format, and the
@@ -53,32 +55,39 @@ func readClone(path, remote, at string) (*cloneFacts, error) {
 	}
 	notAClone := envelope.Common(envelope.CodeSourceUnreadable, at+" is not inside a Git repository that Git can read")
 
-	// The common directory and the object format, in the order asked.
-	out, code, err := git(dir, "rev-parse", "--path-format=absolute", "--git-common-dir", "--show-object-format")
-	if err != nil {
-		return nil, err
-	}
-	switch {
-	case code == exitUsage:
-		return nil, envelope.Fail(envelope.Unavailable, envelope.CodeDependencyUnusable, "the git found does not know the options provisioning reads a clone with; Git 2.38 or later is needed")
-	case code != 0:
-		return nil, notAClone
-	}
-	lines := strings.Split(strings.TrimRight(string(out), "\r\n"), "\n")
-	if len(lines) != 2 {
-		return nil, envelope.Common(envelope.CodeSourceUnreadable, "git gave an answer for "+at+" that cannot be read")
-	}
-	facts := &cloneFacts{objectFormat: strings.TrimRight(lines[1], "\r")}
-	if facts.objectFormat != "sha1" && facts.objectFormat != "sha256" {
-		return nil, envelope.Common(envelope.CodeSourceUnreadable, "git named an object format for "+at+" that is neither sha1 nor sha256")
-	}
-	if facts.commonDir, err = physicalPath(strings.TrimRight(lines[0], "\r"), at); err != nil {
+	if err := checkGit(dir); err != nil {
 		return nil, err
 	}
 
-	// The top level of the main working tree: the first of the working trees
-	// Git lists, which is the main one whichever of them the path lies in. A
-	// repository with none is bare, and a bare repository is no clone.
+	// The object format and the common directory, in the order asked. The
+	// object format is one fixed line, so that what follows it is the path
+	// whole, less the one newline Git ends its answer with.
+	out, code, err := git(dir, "rev-parse", "--show-object-format", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return nil, err
+	}
+	if code != 0 {
+		return nil, notAClone
+	}
+	format, rest, found := strings.Cut(string(out), "\n")
+	if !found || (format != "sha1" && format != "sha256") {
+		return nil, envelope.Common(envelope.CodeSourceUnreadable, "git named an object format for "+at+" that is neither sha1 nor sha256")
+	}
+	facts := &cloneFacts{objectFormat: format}
+	commonDir, ok := strings.CutSuffix(rest, "\n")
+	if !ok {
+		return nil, envelope.Common(envelope.CodeSourceUnreadable, "git gave an answer for "+at+" that cannot be read")
+	}
+	if facts.commonDir, err = physicalPath(commonDir, at); err != nil {
+		return nil, err
+	}
+
+	// The top level of the main working tree. A repository with no working tree
+	// is bare, and a bare repository is no clone. The first working tree Git
+	// lists is the main one, but Git names the common directory there when the
+	// Git directory is kept apart from the working tree, as it is for a
+	// submodule; such a candidate is no working tree, and then the tree the path
+	// lies in is the main one if its Git directory is the common directory.
 	out, code, err = git(dir, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
 		return nil, err
@@ -90,20 +99,33 @@ func readClone(path, remote, at string) (*cloneFacts, error) {
 	if root == "" || bare {
 		return nil, envelope.Common(envelope.CodeSourceUnreadable, at+" is in a repository with no working tree")
 	}
-	if facts.worktreeRoot, err = physicalPath(root, at); err != nil {
-		return nil, err
+	for _, candidate := range []string{root, dir} {
+		top, found, err := topLevelOf(candidate, facts.commonDir)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			continue
+		}
+		if facts.worktreeRoot, err = physicalPath(top, at); err != nil {
+			return nil, err
+		}
+		break
+	}
+	if facts.worktreeRoot == "" {
+		return nil, envelope.Common(envelope.CodeSourceUnreadable, at+" is in a repository whose main working tree cannot be found")
 	}
 
 	if remote == "" {
 		return facts, nil
 	}
-	out, code, err = git(dir, "config", "--get", "remote."+remote+".url")
+	out, code, err = git(dir, "config", "--get", "-z", "remote."+remote+".url")
 	if err != nil {
 		return nil, err
 	}
 	switch code {
 	case 0:
-		facts.remoteURL = strings.TrimRight(string(out), "\r\n")
+		facts.remoteURL = strings.TrimSuffix(string(out), "\x00")
 		facts.hasRemote = facts.remoteURL != ""
 	case 1:
 	default:
@@ -130,6 +152,49 @@ func mainWorktree(out []byte) (root string, bare bool) {
 		}
 	}
 	return root, bare
+}
+
+// checkGit says whether the Git found is one that knows the options a clone is
+// read with, by the version it reports: a Git that does not is unavailable.
+func checkGit(dir string) error {
+	tooOld := envelope.Fail(envelope.Unavailable, envelope.CodeDependencyUnusable, fmt.Sprintf("the git found is older than %d.%d, which provisioning needs to read a clone", minGitMajor, minGitMinor))
+	out, code, err := git(dir, "version")
+	if err != nil {
+		return err
+	}
+	var major, minor int
+	if _, err := fmt.Sscanf(string(out), "git version %d.%d", &major, &minor); code != 0 || err != nil {
+		return tooOld
+	}
+	if major < minGitMajor || (major == minGitMajor && minor < minGitMinor) {
+		return tooOld
+	}
+	return nil
+}
+
+// topLevelOf is the top level of the working tree that dir lies in, when that
+// tree's Git directory is the common directory: the main working tree.
+func topLevelOf(dir, commonDir string) (string, bool, error) {
+	top, found, err := gitPath(dir, "--show-toplevel")
+	if err != nil || !found {
+		return "", false, err
+	}
+	gitDir, found, err := gitPath(dir, "--absolute-git-dir")
+	if err != nil || !found || !sameDirectory(gitDir, commonDir) {
+		return "", false, err
+	}
+	return top, true, nil
+}
+
+// gitPath is the one path that rev-parse prints for the option, less the
+// newline Git ends its answer with. It is not found where Git has none to give.
+func gitPath(dir, option string) (string, bool, error) {
+	out, code, err := git(dir, "rev-parse", option)
+	if err != nil || code != 0 {
+		return "", false, err
+	}
+	path, ok := strings.CutSuffix(string(out), "\n")
+	return path, ok, nil
 }
 
 // git runs Git in dir through the one process-execution path and returns its
