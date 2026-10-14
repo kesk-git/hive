@@ -147,6 +147,9 @@ func holdQuestion(c *cli.Call) (*cli.Result, error) {
 	if found, err := exists(c, "decision-round", roundID); err != nil || (found && newRound) {
 		return nil, existsOr(err, "decision round")
 	}
+	if err := checkSubjectOrigin(c, asMap(qb["origin"])); err != nil {
+		return nil, err
+	}
 	rounds, omitted, err := poolstore.LoadAll(c.Store, "decision-round")
 	if err != nil {
 		return nil, poolstore.Failure("the decision rounds", err)
@@ -254,9 +257,6 @@ func holdQuestion(c *cli.Call) (*cli.Result, error) {
 			Attachments: readAttachments(asList(rb["attachments"])), Complete: rb["complete"] == true,
 			State: RoundOpen, OpenedAt: now, CreatedAt: now, UpdatedAt: now,
 		}
-		if round.Origin == nil {
-			round.Origin = asMap(copyTree(qb["origin"]))
-		}
 		round.IncompleteReason, _ = rb["incomplete_reason"].(string)
 	} else {
 		if round, err = ParseRound(joined.Data); err != nil {
@@ -276,6 +276,41 @@ func holdQuestion(c *cli.Call) (*cli.Result, error) {
 		return nil, err
 	}
 	return b.stage(map[string]any{"question": finalQuestion, "round": finalRound, "hold": hold, "item": itemRecord})
+}
+
+// subjectOf is the subject a question's origin names, the durable key of a
+// second-miss question (spec/pool.md, Generated knowledge): an origin of kind
+// rule whose ref is a pool.subject. ok is false for any other origin.
+func subjectOf(origin map[string]any) (id string, ok bool) {
+	ref := asMap(origin["ref"])
+	if origin["kind"] != "rule" || ref["schema"] != "pool.subject" {
+		return "", false
+	}
+	id, _ = ref["id"].(string)
+	return id, id != ""
+}
+
+// checkSubjectOrigin refuses, with already_exists naming the earlier question,
+// a question whose origin names a subject that a stored question already names,
+// whatever the held item, decision item or round of either.
+func checkSubjectOrigin(c *cli.Call, origin map[string]any) error {
+	subject, ok := subjectOf(origin)
+	if !ok {
+		return nil
+	}
+	questions, omitted, err := poolstore.LoadAll(c.Store, "question")
+	if err != nil {
+		return poolstore.Failure("the questions", err)
+	}
+	if len(omitted) > 0 {
+		return malformed("question " + omitted[0].ID)
+	}
+	for _, q := range questions {
+		if earlier, ok := subjectOf(asMap(q.Data["origin"])); ok && earlier == subject {
+			return envelope.Common(envelope.CodeAlreadyExists, "an earlier question already names that subject in its origin").With("question_id", q.ID)
+		}
+	}
+	return nil
 }
 
 // addDecisionItem adds the decision item of a question with its own scope, in

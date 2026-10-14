@@ -881,21 +881,43 @@ func TestEachRefusalOfReviseQuestion(t *testing.T) {
 	})
 }
 
-// A hive-word hold-question handoff sent again against the executable as the
-// registrations produce it, with no setting of the test's own, returns the
-// outcome recorded of the first with replayed true.
-func TestARetriedHandoffAgainstTheDeliveredExecutableIsReplayed(t *testing.T) {
+// A second question whose origin names the subject of an earlier one is
+// refused with already_exists naming the earlier question, whether it holds
+// the same item, a decision item of its own or joins the earlier round, and
+// writes nothing.
+func TestASecondQuestionOnOneSubjectOriginIsRefused(t *testing.T) {
 	h := newHome(t)
+	subject := map[string]any{"kind": "rule", "ref": map[string]any{"schema": "pool.subject", "id": "subject-one"}}
+	about := func(held string) map[string]any {
+		q := ask(t, held)
+		q["origin"] = subject
+		return q
+	}
 	item := h.item()
-	id := mint(t, ids.Request)
-	got := h.ok(h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id}))
-	h.unchanged(func() {
-		again := h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id})
-		if again.Status != envelope.Ok || !again.Replayed {
-			t.Fatalf("status %s, replayed %v, error %+v", again.Status, again.Replayed, again.Error)
-		}
-		if rec(again.Body, "question")["question_id"] != rec(got, "question")["question_id"] {
-			t.Errorf("the replay gave the identities of the retry")
-		}
-	})
+	first := h.ok(h.send("hold-question", holdBody(t, about(item), newRound(t)), sent{}))
+	earlier := rec(first, "question")["question_id"]
+
+	newItem := about("")
+	delete(newItem, "held_task_id")
+	newItem["new_item"] = map[string]any{"title": "A decision"}
+	for name, body := range map[string]map[string]any{
+		"on the same held item":  holdBody(t, about(item), newRound(t)),
+		"on another held item":   holdBody(t, about(h.item()), newRound(t)),
+		"on a new decision item": holdBody(t, newItem, newRound(t)),
+		"in the earlier round":   holdBody(t, about(h.item()), joined(rec(first, "round")["decision_round_id"].(string))),
+	} {
+		t.Run(name, func(t *testing.T) {
+			h.unchanged(func() {
+				resp := h.send("hold-question", body, sent{})
+				refused(t, resp, envelope.Conflict, envelope.CodeAlreadyExists)
+				if resp.Error.Detail["question_id"] != earlier {
+					t.Errorf("the refusal names %v, not the earlier question %v", resp.Error.Detail["question_id"], earlier)
+				}
+			})
+		})
+	}
+
+	other := ask(t, h.item())
+	other["origin"] = map[string]any{"kind": "rule", "ref": map[string]any{"schema": "pool.subject", "id": "subject-two"}}
+	h.ok(h.send("hold-question", holdBody(t, other, newRound(t)), sent{}))
 }
