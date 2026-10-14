@@ -26,9 +26,14 @@ func invalid(format string, args ...any) error {
 var (
 	dateRe          = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 	depReasonEdgeRe = regexp.MustCompile(`(?:^|` + item.Ws + `)` + depMarker + `:` + item.Ws)
+	depTypeRe       = regexp.MustCompile(`^` + depMarker + `$`)
 )
 
-func hasLineEnd(s string) bool { return strings.ContainsAny(s, "\r\n") }
+// lineEnds are the characters the grammar ends a line at: a value holding one
+// would be cut in two when written.
+const lineEnds = "\r\n\u2028\u2029"
+
+func hasLineEnd(s string) bool { return strings.ContainsAny(s, lineEnds) }
 
 // CheckID refuses an identifier the grammar would not read back.
 func CheckID(id string) error {
@@ -57,7 +62,7 @@ func NormalizeTitle(title string) (string, error) {
 // NormalizeTagValue is the value of a kind or repo tag trimmed, or "" when it
 // is blank. It must be one line without parentheses. field names the tag.
 func NormalizeTagValue(value, field string) (string, error) {
-	if strings.ContainsAny(value, "()\r\n") {
+	if strings.ContainsAny(value, "()"+lineEnds) {
 		return "", invalid("Task %s must be a single line without parentheses", field)
 	}
 	return trim(value), nil
@@ -120,7 +125,7 @@ func NormalizeDate(value, field string) (string, error) {
 // NormalizeHold checks a hold: a reason on one line without parentheses, a kind
 // from the legacy words if it has one, and a date if it has one.
 func NormalizeHold(h Hold) (Hold, error) {
-	if strings.ContainsAny(h.Reason, "()\r\n") {
+	if strings.ContainsAny(h.Reason, "()"+lineEnds) {
 		return Hold{}, invalid("Task hold reason must be a single line without parentheses")
 	}
 	reason := trim(h.Reason)
@@ -162,9 +167,12 @@ func NormalizeDepReason(reason string) (string, error) {
 	return trimmed, nil
 }
 
-// NormalizeDep checks an edge of the task ownerID: a valid identifier that is
-// not the task itself, and a reason that normalizes.
+// NormalizeDep checks an edge of the task ownerID: a dependency type, a valid
+// identifier that is not the task itself, and a reason that normalizes.
 func NormalizeDep(ownerID string, d Dep) (Dep, error) {
+	if !depTypeRe.MatchString(d.Type) {
+		return Dep{}, invalid("Task dependency type must be blocked-by, parent or discovered-from")
+	}
 	reason, err := NormalizeDepReason(d.Reason)
 	if err != nil {
 		return Dep{}, err

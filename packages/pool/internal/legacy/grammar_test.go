@@ -97,9 +97,10 @@ func TestImportRecordNamesTheTranslation(t *testing.T) {
 // 9401ff899c0d1d8ae6b4fd8727b9025abda2032c; see imports/tasks-axi.json.
 //
 // test/backends/markdown-grammar.test.ts, describe "markdown grammar". The
-// upstream's two sample backlogs are not copied: backlog.md and
-// checkbox-in-flight.md under testdata/legacy re-express them (FIXTURE and
-// FIRSTMATE_FIXTURE of its test/helpers.ts) with invented identifiers, and the
+// upstream's two sample backlogs are re-expressed, not copied: backlog.md and
+// checkbox-in-flight.md under testdata/legacy (FIXTURE and FIRSTMATE_FIXTURE of
+// its test/helpers.ts, recorded as translated portions) with invented
+// identifiers, and the
 // third sample, MULTI_REASON_FIXTURE, is written out in its test. Hosts,
 // identifiers and dates are Hive's; the behaviour tested is the upstream's.
 //
@@ -590,6 +591,23 @@ func TestRenderHold(t *testing.T) {
 	want := []string{"- [ ] held-q1 - wait for launch (hold: load clears) (hold-kind: load) (hold-until: 2999-01-01)"}
 	if got := RenderTaskLines(task); !reflect.DeepEqual(got, want) {
 		t.Errorf("lines = %q, want %q", got, want)
+	}
+}
+
+// A blank kind tag overrides the kind a leading word would imply, and rendering
+// the entry again keeps the override.
+func TestEmptyKindOverrideSurvivesRender(t *testing.T) {
+	for _, word := range []string{"SHIP", "SCOUT", "DOCS-ONLY", "PERSISTENT SECONDMATE"} {
+		src := "## Queued\n- [ ] a - " + word + " work (kind: )\n"
+		b := mustParse(t, src)
+		if got := taskByID(t, b, "a"); got.Kind != "" {
+			t.Fatalf("%s: kind = %q, want the empty override", word, got.Kind)
+		}
+		markAllDirty(b)
+		out := render(b)
+		if got := taskByID(t, mustParse(t, out), "a"); got.Kind != "" {
+			t.Errorf("%s: kind after a canonical render = %q, want the empty override\n%s", word, got.Kind, out)
+		}
 	}
 }
 

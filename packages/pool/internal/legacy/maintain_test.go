@@ -262,6 +262,8 @@ func TestNormalizeTitle(t *testing.T) {
 	for what, title := range map[string]string{
 		"two lines":     "a\nb",
 		"carriage ret.": "a\rb",
+		"line sep.":     "a\u2028b",
+		"paragraph sep": "a\u2029b",
 		"empty":         "",
 		"blank":         " \t ",
 		"ends in a tag": "work (repo: app)",
@@ -284,7 +286,7 @@ func TestNormalizeTagValue(t *testing.T) {
 	if got, err := NormalizeTagValue("   ", "repo"); err != nil || got != "" {
 		t.Errorf("a blank value = %q, %v; want none", got, err)
 	}
-	for _, v := range []string{"a(b", "a)b", "a\nb"} {
+	for _, v := range []string{"a(b", "a)b", "a\nb", "a\u2028b", "a\u2029b"} {
 		_, err := NormalizeTagValue(v, "repo")
 		wantInvalid(t, v, err)
 	}
@@ -345,6 +347,7 @@ func TestNormalizePriorityDateAndHold(t *testing.T) {
 		"empty reason": {Reason: "  "},
 		"parenthesis":  {Reason: "a (b)"},
 		"two lines":    {Reason: "a\nb"},
+		"line sep.":    {Reason: "a\u2028b"},
 		"unknown kind": {Reason: "a", Kind: "later"},
 		"bad date":     {Reason: "a", Until: "tomorrow"},
 	} {
@@ -365,6 +368,10 @@ func TestNormalizeDep(t *testing.T) {
 		"itself":         {Type: "blocked-by", ID: "me-1"},
 		"bad id":         {Type: "blocked-by", ID: "not an id"},
 		"two lines":      {Type: "blocked-by", ID: "o", Reason: "a\nb"},
+		"line sep.":      {Type: "blocked-by", ID: "o", Reason: "a\u2028b"},
+		"para. sep.":     {Type: "blocked-by", ID: "o", Reason: "a\u2029b"},
+		"unknown type":   {Type: "blocks", ID: "o"},
+		"no type":        {ID: "o"},
 		"marker":         {Type: "blocked-by", ID: "o", Reason: "x blocked-by: y"},
 		"leading marker": {Type: "blocked-by", ID: "o", Reason: "parent: y"},
 		"marker at tab":  {Type: "blocked-by", ID: "o", Reason: "x\tdiscovered-from: y"},

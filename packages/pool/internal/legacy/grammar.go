@@ -39,9 +39,6 @@ const (
 // file writes them.
 var HoldKinds = []string{"captain", "external", "load", "parked", "future"}
 
-// DepTypes are the words that introduce a dependency edge.
-var DepTypes = []string{"blocked-by", "parent", "discovered-from"}
-
 // Dep is one dependency edge with the free-text reason that may follow it.
 type Dep struct {
 	Type   string
@@ -499,7 +496,7 @@ func BuildProse(t *Task) string {
 	if t.Repo != "" {
 		parts = append(parts, "(repo: "+t.Repo+")")
 	}
-	if t.Kind != "" && LeadingKind(t.Title) != t.Kind {
+	if LeadingKind(t.Title) != t.Kind {
 		parts = append(parts, "(kind: "+t.Kind+")")
 	}
 	if t.Priority != nil {

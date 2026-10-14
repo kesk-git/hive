@@ -54,6 +54,20 @@
         "src/backends/markdown-grammar.ts"
       ],
       "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/testdata/legacy/backlog.md",
+      "upstream_paths": [
+        "test/fixtures/backlog.md"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/testdata/legacy/checkbox-in-flight.md",
+      "upstream_paths": [
+        "test/fixtures/firstmate-backlog.md"
+      ],
+      "disposition": "translated"
     }
   ],
   "retained_tests": [
@@ -219,10 +233,6 @@
       "reason": "It reads a file of a private machine and skips without it; nothing to carry."
     },
     {
-      "upstream_path": "test/fixtures/backlog.md, test/fixtures/firstmate-backlog.md",
-      "reason": "Not copied. Re-expressed as Hive fixtures under packages/pool/testdata/legacy/ with invented identifiers and wording."
-    },
-    {
       "upstream_path": "test/helpers.ts, test/fixtures/module-trace-hook.mjs, test/fixtures/module-trace-register.mjs",
       "reason": "Test helpers and tooling of the TypeScript test runner and the version fast path."
     },
@@ -235,9 +245,9 @@
       "reason": "Documentation; none is quoted."
     }
   ],
-  "local_changes": "The grammar, its byte-exact round trip, the normalization of titles, tags, links, holds, dates and dependency reasons, the archive lookup, the recognition of pull request URLs and the legacy identifier are the upstream's behaviour, re-expressed in Go. Hive changes: the parse reads bytes and keeps them (a file that is not UTF-8 round-trips); the JavaScript white space and line terminators the upstream's patterns relied on are written out, since Go's differ; the trailing dependency edge, which the upstream matches with a look-ahead, is matched by hand with the same result; the public-followup marker is kept as body text and never decoded, so the grammar refuses nothing; an archive file is read with the same grammar and its entries resolve by identifier, the state of an archived entry coming from its bullet; nothing is pruned, written or locked; the two groups of tests are carried as Go tests with Hive hosts, dates and identifiers, and the sample backlogs are Hive's own fixtures. Verified against the upstream's compiled parser on generated documents outside the repository.",
+  "local_changes": "The grammar, its byte-exact round trip, the normalization of titles, tags, links, holds, dates and dependency reasons, the archive lookup, the recognition of pull request URLs and the legacy identifier are the upstream's behaviour, re-expressed in Go. Hive changes: the parse reads bytes and keeps them (a file that is not UTF-8 round-trips); the JavaScript white space and line terminators the upstream's patterns relied on are written out, since Go's differ; the trailing dependency edge, which the upstream matches with a look-ahead, is matched by hand with the same result; the public-followup marker is kept as body text and never decoded, so the grammar refuses nothing; an archive file is read with the same grammar and its entries resolve by identifier, the state of an archived entry coming from its bullet; nothing is pruned, written or locked; the two groups of tests are carried as Go tests with Hive hosts, dates and identifiers, and the two sample backlogs are re-expressed as Go-side fixtures with Hive's identifiers and wording, recorded as translated portions. Verified against the upstream's compiled parser on generated documents outside the repository.",
   "audit": {
     "audited_on": "2026-10-14",
-    "statement": "The upstream was read at revision 9401ff899c0d1d8ae6b4fd8727b9025abda2032c (tag tasks-axi-v0.2.6), read-only. Its root LICENSE is 1,065 bytes with digest sha256:945016bd37e1ba7211622ef60ee1d23ab727896ba7710edd21e8fbe983863969, MIT, with the one notice Copyright (c) 2026 Kun Chen, and is kept unchanged. No file under its src/ or test/ carries a copyright or licence header, and it has no NOTICE file. The two sample backlogs were re-expressed as Hive fixtures with invented identifiers, so no fixture is taken. No portion embeds text from a third source: the upstream's comments cite a design report of its own, which is not copied. The two runtime libraries are replaced and nothing of them is taken; the development dependencies are compiled into nothing, and the licence files of neither were read."
+    "statement": "The upstream was read at revision 9401ff899c0d1d8ae6b4fd8727b9025abda2032c (tag tasks-axi-v0.2.6), read-only. Its root LICENSE is 1,065 bytes with digest sha256:945016bd37e1ba7211622ef60ee1d23ab727896ba7710edd21e8fbe983863969, MIT, with the one notice Copyright (c) 2026 Kun Chen, and is kept unchanged. No file under its src/ or test/ carries a copyright or licence header, and it has no NOTICE file. The two sample backlogs were re-expressed as Hive fixtures with invented identifiers and are recorded as translated portions; no fixture is copied byte for byte. No portion embeds text from a third source: the upstream's comments cite a design report of its own, which is not copied. The two runtime libraries are replaced and nothing of them is taken; the development dependencies are compiled into nothing, and the licence files of neither were read."
   }
 }
