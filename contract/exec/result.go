@@ -89,7 +89,7 @@ func (r Result) External(p Program, mayHaveHadEffect bool) (code int64, failure 
 	if mayHaveHadEffect {
 		return 0, envelope.Common(envelope.CodeOutcomeUnknown, p.Name+" "+r.reason()+" and gave no result; reconcile before any retry").Because(detail)
 	}
-	return 0, unavailable(p.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, p.Name+" "+r.reason()+" and gave no result").Because(detail)
+	return 0, unavailable(p.Kind, envelope.CodeDependencyUnusable, envelope.CodePlatformUtilityUnusable, p.Name+" "+r.reason()+" and gave no result").Because(detail)
 }
 
 // reason is how a run that gave no result ended, in a fixed phrase that holds
