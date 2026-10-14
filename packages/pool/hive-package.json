@@ -156,7 +156,7 @@
     },
     {
       "kind": "pool.rule.recorded",
-      "asserts": "A ruling was recorded verbatim with its subject, scope, authority, rule line and effective time."
+      "asserts": "A ruling was recorded verbatim with its kind, subject, scope, authority and effective time, and an operating rule with its tier and rule line, a product rule with none."
     },
     {
       "kind": "pool.rule.amended",
