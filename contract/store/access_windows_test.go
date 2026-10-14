@@ -15,9 +15,11 @@ import (
 	"github.com/kesk-git/hive/contract/internal/testsupport"
 )
 
-// On Windows the helpers of the package access import the store, so the tests
-// of the store, which an import of that package would put in a cycle, keep
-// these three.
+// On Windows the package access imports the store, so the store's own tests
+// cannot import it without an import cycle Go refuses. newHome, secureHome and
+// hasMode stand in for its helpers here as short wrappers over the store's own
+// SecureDir and CheckOwnerOnly, so the logic is still in one place; they are
+// not copies of it.
 //
 // newHome makes an empty home under a temporary directory, which the test
 // removes.

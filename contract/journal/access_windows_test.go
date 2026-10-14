@@ -3,19 +3,12 @@
 package journal
 
 import (
-	"io/fs"
 	"path/filepath"
 	"syscall"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/internal/testsupport/access"
-	"github.com/kesk-git/hive/contract/store"
 )
-
-// isOwnerOnly reports whether the entry at path is open to its owner only.
-func isOwnerOnly(info fs.FileInfo, path string) bool {
-	return store.CheckOwnerOnly(path) == nil
-}
 
 // closeToOthers makes the home at dir open to its owner only again.
 func closeToOthers(t testing.TB, dir string) {

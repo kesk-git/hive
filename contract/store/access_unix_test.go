@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/kesk-git/hive/contract/internal/testsupport"
 	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 )
 
@@ -16,13 +17,8 @@ var (
 	secureHome = access.SecureHome
 	hasMode    = access.HasMode
 	newHome    = access.EmptyHome
+	grantGroup = testsupport.GrantOthers
 )
-
-// grantGroup opens the entry at path to its group, as mode says.
-func grantGroup(t testing.TB, path string, mode os.FileMode) {
-	t.Helper()
-	os.Chmod(path, mode)
-}
 
 // symlink makes link a symbolic link to target.
 func symlink(t testing.TB, target, link string) {

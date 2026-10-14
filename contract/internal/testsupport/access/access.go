@@ -4,8 +4,9 @@
 // sets and checks. It is a package of its own, beneath testsupport, only
 // because on Windows it imports the store: were it part of testsupport, which
 // the tests of the store import, they would form an import cycle that Go
-// refuses. For the same reason the tests of the store on Windows keep their
-// own copies of these helpers; everywhere else they use these.
+// refuses. For the same reason the store's own tests on Windows cannot import
+// it: they keep short wrappers over the store's own SecureDir and
+// CheckOwnerOnly, not copies of these helpers, and everywhere else use these.
 package access
 
 import (

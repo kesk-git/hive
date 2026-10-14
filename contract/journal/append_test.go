@@ -12,6 +12,7 @@ import (
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 	"github.com/kesk-git/hive/contract/store"
 )
 
@@ -74,12 +75,12 @@ func TestAppendSequence(t *testing.T) {
 	}
 	// The journal's files are the owner's only, and the lock is where the
 	// specification puts it.
-	for _, p := range []string{filepath.Join(home, journalDir), filepath.Join(home, journalDir, first)} {
+	for p, mode := range map[string]os.FileMode{filepath.Join(home, journalDir): dirMode, filepath.Join(home, journalDir, first): fileMode} {
 		info, err := os.Stat(p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !isOwnerOnly(info, p) {
+		if !access.HasMode(info, p, mode) {
 			t.Errorf("%s is open beyond its owner: %v", p, info.Mode())
 		}
 	}

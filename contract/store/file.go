@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"testing"
 
 	"github.com/kesk-git/hive/contract/canon"
+	"github.com/kesk-git/hive/contract/internal/flushseam"
 )
 
 // tempSuffix ends the name of every temporary file, which sits in the store's
@@ -211,36 +211,16 @@ func (s *Store) syncChain(rel string) error {
 	}
 }
 
-// skipFlush is true only in a test binary that has asked, through SkipFlush,
-// for the real flush to be left out.
-var skipFlush bool
-
 // Flush flushes the open file f to the medium, as the writes of a record and
 // of a journal segment do before they go on. It is the one place the store
-// and the journal ask the file system to flush a file. A test binary may turn
-// the real flush off with SkipFlush, and every step around it stays.
+// and the journal ask the file system to flush a file; a test binary may turn
+// the real flush off through contract/internal/flushseam, and every step
+// around it stays.
 func Flush(f *os.File) error {
-	if skipFlush {
+	if flushseam.Skipped() {
 		return nil
 	}
 	return f.Sync()
-}
-
-// SkipFlush turns the real flush off for the rest of a test binary: Flush and
-// SyncDir return without asking the file system to flush, and every step they
-// report stays. A test's TestMain calls it, so that no executable can: it
-// takes the *testing.M that only a test binary has. No test can observe a
-// flush reaching the medium, which on macOS costs milliseconds a call, and the
-// recovery tests prove the order of the writes through the steps.
-func SkipFlush(m *testing.M) { skipFlush = true }
-
-// RealFlush turns the real flush back on until the end of the test t, for the
-// one test of a package that runs it.
-func RealFlush(t testing.TB) {
-	t.Helper()
-	was := skipFlush
-	skipFlush = false
-	t.Cleanup(func() { skipFlush = was })
 }
 
 // syncDir flushes a directory of the home, as SyncDir does for the store.
