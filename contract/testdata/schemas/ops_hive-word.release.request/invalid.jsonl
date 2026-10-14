@@ -1,0 +1,12 @@
+{"name":"evidence-item-missing-id","base":"with-evidence.json","edits":[{"op":"remove","path":"/evidence/0/id"}]}
+{"name":"evidence-item-record-revision-zero","base":"with-evidence.json","edits":[{"op":"replace","path":"/evidence/0/record_revision","value":0}]}
+{"name":"evidence-item-schema-uppercase","base":"with-evidence.json","edits":[{"op":"replace","path":"/evidence/0/schema","value":"Pool.item"}]}
+{"name":"evidence-item-unknown-member","base":"with-evidence.json","edits":[{"op":"add","path":"/evidence/0/kind","value":"item-archived"}]}
+{"name":"evidence-not-an-array","base":"with-evidence.json","edits":[{"op":"replace","path":"/evidence","value":"task_01jc7d8e9f0g1h2j3k4m5n6p7f"}]}
+{"name":"missing-note","base":"with-evidence.json","edits":[{"op":"remove","path":"/note"}]}
+{"name":"missing-question-id","base":"with-evidence.json","edits":[{"op":"remove","path":"/question_id"}]}
+{"name":"note-empty","base":"with-evidence.json","edits":[{"op":"replace","path":"/note","value":""}]}
+{"name":"note-not-a-string","base":"with-evidence.json","edits":[{"op":"replace","path":"/note","value":["x"]}]}
+{"name":"question-id-wrong-prefix","base":"with-evidence.json","edits":[{"op":"replace","path":"/question_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7q"}]}
+{"name":"unknown-member","base":"with-evidence.json","edits":[{"op":"add","path":"/requested_by","value":{"command":"hive-word","kind":"package","package":"word"}}]}
+{"name":"unknown-member-answer-sequence","base":"with-evidence.json","edits":[{"op":"add","path":"/answer_sequence","value":1}]}

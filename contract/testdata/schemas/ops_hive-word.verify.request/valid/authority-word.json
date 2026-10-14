@@ -1,0 +1,13 @@
+{
+  "subject": {
+    "kind": "authority",
+    "authority": {
+      "kind": "word",
+      "ref": {
+        "schema": "pool.question",
+        "id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+        "record_revision": 2
+      }
+    }
+  }
+}

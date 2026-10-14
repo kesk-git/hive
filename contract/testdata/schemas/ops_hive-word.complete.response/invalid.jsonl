@@ -1,0 +1,10 @@
+{"name":"hold-not-an-object","base":"hold-released.json","edits":[{"op":"replace","path":"/hold","value":[]}]}
+{"name":"hold-released-without-released-at","base":"hold-released.json","edits":[{"op":"remove","path":"/hold/released_at"}]}
+{"name":"missing-hold","base":"hold-released.json","edits":[{"op":"remove","path":"/hold"}]}
+{"name":"missing-question","base":"hold-released.json","edits":[{"op":"remove","path":"/question"}]}
+{"name":"missing-round","base":"hold-released.json","edits":[{"op":"remove","path":"/round"}]}
+{"name":"question-missing-disposition","base":"hold-released.json","edits":[{"op":"remove","path":"/question/disposition"}]}
+{"name":"question-schema-wrong-const","base":"hold-released.json","edits":[{"op":"replace","path":"/question/schema","value":"pool.hold"}]}
+{"name":"question-state-unknown","base":"hold-released.json","edits":[{"op":"replace","path":"/question/state","value":"closed"}]}
+{"name":"round-closed-without-closed-at","base":"hold-released.json","edits":[{"op":"remove","path":"/round/closed_at"}]}
+{"name":"unknown-member","base":"hold-released.json","edits":[{"op":"add","path":"/receipts","value":[]}]}

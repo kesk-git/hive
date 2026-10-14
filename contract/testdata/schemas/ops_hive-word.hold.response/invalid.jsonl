@@ -1,0 +1,17 @@
+{"name":"card-id-wrong-prefix","base":"work-item.json","edits":[{"op":"replace","path":"/card_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7s"}]}
+{"name":"decision-round-id-wrong-prefix","base":"work-item.json","edits":[{"op":"replace","path":"/decision_round_id","value":"q_01jc7d8e9f0g1h2j3k4m5n6p7r"}]}
+{"name":"hold-id-wrong-prefix","base":"work-item.json","edits":[{"op":"replace","path":"/hold_id","value":"card_01jc7d8e9f0g1h2j3k4m5n6p7m"}]}
+{"name":"hold-kind-unknown","base":"work-item.json","edits":[{"op":"replace","path":"/hold/kind","value":"chat"}]}
+{"name":"item-missing-title","base":"work-item.json","edits":[{"op":"remove","path":"/item/title"}]}
+{"name":"missing-card-id","base":"work-item.json","edits":[{"op":"remove","path":"/card_id"}]}
+{"name":"missing-decision-round-id","base":"work-item.json","edits":[{"op":"remove","path":"/decision_round_id"}]}
+{"name":"missing-hold","base":"work-item.json","edits":[{"op":"remove","path":"/hold"}]}
+{"name":"missing-hold-id","base":"work-item.json","edits":[{"op":"remove","path":"/hold_id"}]}
+{"name":"missing-item","base":"work-item.json","edits":[{"op":"remove","path":"/item"}]}
+{"name":"missing-question","base":"work-item.json","edits":[{"op":"remove","path":"/question"}]}
+{"name":"missing-question-id","base":"work-item.json","edits":[{"op":"remove","path":"/question_id"}]}
+{"name":"missing-round","base":"work-item.json","edits":[{"op":"remove","path":"/round"}]}
+{"name":"question-id-wrong-prefix","base":"work-item.json","edits":[{"op":"replace","path":"/question_id","value":"dr_01jc7d8e9f0g1h2j3k4m5n6p7q"}]}
+{"name":"question-schema-wrong-const","base":"work-item.json","edits":[{"op":"replace","path":"/question/schema","value":"pool.hold"}]}
+{"name":"round-not-an-object","base":"work-item.json","edits":[{"op":"replace","path":"/round","value":[]}]}
+{"name":"unknown-member","base":"work-item.json","edits":[{"op":"add","path":"/receipts","value":[]}]}

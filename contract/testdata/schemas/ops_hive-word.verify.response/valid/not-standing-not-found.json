@@ -1,0 +1,10 @@
+{
+  "verified_at": "2026-10-12T10:30:00.000Z",
+  "stands": false,
+  "reasons": [
+    "not-found",
+    "out-of-scope"
+  ],
+  "holds": [],
+  "questions": []
+}
