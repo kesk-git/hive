@@ -1,0 +1,23 @@
+{
+  "text": "# Backlog\n\n## Queued\n- alpha-1 Draft the vendor note (repo: vendor-kit) (priority: 2)\n  Keep it to one page.\n\nRemember to review this weekly.\n## Done\n- alpha-3 Ship the kit (done 2026-10-01)\n- alpha-2 Chase the audit (done 2026-10-12)\n",
+  "digest": "sha256:de3285cfc2e35ddc77249b830dcd8800c8edbb1483ee651f8a527b18de774e14",
+  "bytes": 235,
+  "exact": false,
+  "items": [
+    {
+      "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+      "legacy_id": "alpha-1",
+      "form": "verbatim"
+    },
+    {
+      "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7h",
+      "legacy_id": "alpha-3",
+      "form": "verbatim"
+    },
+    {
+      "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7g",
+      "legacy_id": "alpha-2",
+      "form": "rendered"
+    }
+  ]
+}

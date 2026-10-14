@@ -1,0 +1,85 @@
+{
+  "schema": "pool.migration",
+  "schema_version": "1.0",
+  "record_revision": 1,
+  "migration_id": "migr_01jc7d8e9f0g1h2j3k4m5n6p7k",
+  "scope_level": "workspace",
+  "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+  "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+  "source": {
+    "path": "C:/legacy/BACKLOG.md",
+    "digest": "sha256:25a345a3f87f7f2ac4ce01e882c34d6bb69032f4cc3572e51ba244b83073df5f",
+    "bytes": 219,
+    "text": "# Fleet\r\n\r\n## In flight (today)\r\n- fleet-1 PERSISTENT SECONDMATE keeps the night watch\r\n- beta-1 Compare the quotes (since 2026-09-30)\r\n- beta-1 Compare the quotes again\r\n## Notes\r\n- loose bullet without an identifier\r\n",
+    "read_at": "2026-10-12T09:00:00.000Z"
+  },
+  "zone": "Etc/GMT+3",
+  "preamble": [
+    "# Fleet\r",
+    ""
+  ],
+  "sections": [
+    {
+      "header": "## In flight (today)",
+      "state": "in-flight"
+    },
+    {
+      "header": "## Notes",
+      "state": "none"
+    }
+  ],
+  "entries": [
+    {
+      "legacy_id": "fleet-1",
+      "first_line": 4,
+      "lines": [
+        "- fleet-1 PERSISTENT SECONDMATE keeps the night watch\r"
+      ],
+      "section": "## In flight (today)",
+      "disposition": "excluded",
+      "reason": "A persistent Fleet entry is never made an ordinary task."
+    },
+    {
+      "legacy_id": "beta-1",
+      "first_line": 5,
+      "lines": [
+        "- beta-1 Compare the quotes (since 2026-09-30)\r"
+      ],
+      "section": "## In flight (today)",
+      "disposition": "item",
+      "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+      "warnings": [
+        "the date tag was kept verbatim"
+      ]
+    },
+    {
+      "legacy_id": "beta-1",
+      "first_line": 6,
+      "lines": [
+        "- beta-1 Compare the quotes again\r"
+      ],
+      "section": "## In flight (today)",
+      "disposition": "duplicate",
+      "reason": "The identity beta-1 was already seen on line 5."
+    }
+  ],
+  "free_lines": [
+    {
+      "line": 8,
+      "text": "- loose bullet without an identifier\r"
+    }
+  ],
+  "imported_at": "2026-10-12T09:00:00.000Z",
+  "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7p",
+  "created_at": "2026-10-12T09:00:00.000Z",
+  "updated_at": "2026-10-12T09:00:00.000Z",
+  "writer": {
+    "package": "pool",
+    "command": "hive-pool",
+    "operation": "import-legacy",
+    "implementation_version": "0.1.0"
+  },
+  "unknown": {
+    "note": "kept verbatim"
+  }
+}

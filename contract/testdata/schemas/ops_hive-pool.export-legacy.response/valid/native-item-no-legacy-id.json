@@ -1,0 +1,12 @@
+{
+  "text": "- Native item (priority: 1)\n",
+  "digest": "sha256:98a5a10c5a89e809427844af12b5aacda240c7276268739bd6ba082a7f81ad54",
+  "bytes": 28,
+  "exact": false,
+  "items": [
+    {
+      "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+      "form": "rendered"
+    }
+  ]
+}

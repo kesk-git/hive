@@ -1,0 +1,90 @@
+{"name":"created-at-not-a-timestamp","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/created_at","value":"yesterday"}]}
+{"name":"entries-not-an-array","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries","value":{}}]}
+{"name":"entry-disposition-unknown","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/disposition","value":"merged"}]}
+{"name":"entry-duplicate-with-task-id","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/disposition","value":"duplicate"},{"op":"add","path":"/entries/0/reason","value":"Seen on line 2."}]}
+{"name":"entry-duplicate-without-reason","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/disposition","value":"duplicate"},{"op":"remove","path":"/entries/0/task_id"}]}
+{"name":"entry-excluded-with-hold-id","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/1/disposition","value":"excluded"},{"op":"remove","path":"/entries/1/task_id"},{"op":"add","path":"/entries/1/reason","value":"Persistent Fleet entry."}]}
+{"name":"entry-excluded-with-task-id","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/disposition","value":"excluded"},{"op":"add","path":"/entries/0/reason","value":"Persistent Fleet entry."}]}
+{"name":"entry-excluded-without-reason","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/disposition","value":"excluded"},{"op":"remove","path":"/entries/0/task_id"}]}
+{"name":"entry-first-line-a-string","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/first_line","value":"4"}]}
+{"name":"entry-first-line-zero","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/first_line","value":0}]}
+{"name":"entry-hold-id-wrong-prefix","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/1/hold_id","value":"task_01jc7d8e9f0g1h2j3k4m5n6p7m"}]}
+{"name":"entry-item-task-id-wrong-prefix","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/task_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7f"}]}
+{"name":"entry-item-with-reason","base":"three-items-with-hold.json","edits":[{"op":"add","path":"/entries/0/reason","value":"kept"}]}
+{"name":"entry-item-without-task-id","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/entries/0/task_id"}]}
+{"name":"entry-legacy-id-leading-dash","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/legacy_id","value":"-alpha-1"}]}
+{"name":"entry-legacy-id-too-long","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/legacy_id","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}
+{"name":"entry-legacy-id-with-space","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/legacy_id","value":"alpha 1"}]}
+{"name":"entry-lines-empty","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/lines","value":[]}]}
+{"name":"entry-lines-hold-a-non-string","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/lines","value":[3]}]}
+{"name":"entry-missing-disposition","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/entries/0/disposition"}]}
+{"name":"entry-missing-first-line","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/entries/0/first_line"}]}
+{"name":"entry-missing-legacy-id","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/entries/0/legacy_id"}]}
+{"name":"entry-missing-lines","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/entries/0/lines"}]}
+{"name":"entry-missing-section","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/entries/0/section"}]}
+{"name":"entry-reason-empty","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/disposition","value":"duplicate"},{"op":"remove","path":"/entries/0/task_id"},{"op":"add","path":"/entries/0/reason","value":""}]}
+{"name":"entry-reason-too-long","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/entries/0/disposition","value":"duplicate"},{"op":"remove","path":"/entries/0/task_id"},{"op":"add","path":"/entries/0/reason","value":"rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"}]}
+{"name":"entry-unknown-member","base":"three-items-with-hold.json","edits":[{"op":"add","path":"/entries/0/title","value":"Draft the vendor note"}]}
+{"name":"entry-warning-empty","base":"three-items-with-hold.json","edits":[{"op":"add","path":"/entries/0/warnings","value":[""]}]}
+{"name":"entry-warning-too-long","base":"three-items-with-hold.json","edits":[{"op":"add","path":"/entries/0/warnings","value":["wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww"]}]}
+{"name":"entry-warnings-not-an-array","base":"three-items-with-hold.json","edits":[{"op":"add","path":"/entries/0/warnings","value":"unreadable tag"}]}
+{"name":"free-line-missing-line","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/free_lines/0","value":{"text":"x"}}]}
+{"name":"free-line-missing-text","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/free_lines/0","value":{"line":8}}]}
+{"name":"free-line-number-zero","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/free_lines/0/line","value":0}]}
+{"name":"free-line-text-not-a-string","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/free_lines/0/text","value":8}]}
+{"name":"free-line-unknown-member","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/free_lines/0","value":{"line":8,"section":"## Queued","text":"x"}}]}
+{"name":"free-lines-not-an-array","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/free_lines","value":"none"}]}
+{"name":"hive-scope-with-workspace-id","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/scope_level","value":"hive"},{"op":"remove","path":"/project_id"}]}
+{"name":"home-id-wrong-prefix","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/home_id","value":"ws_01jc7d8e9f0g1h2j3k4m5n6p7a"}]}
+{"name":"imported-at-without-milliseconds","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/imported_at","value":"2026-10-12T09:00:00Z"}]}
+{"name":"migration-id-bad-alphabet","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/migration_id","value":"migr_01jc7d8e9f0g1h2j3k4m5n6p7u"}]}
+{"name":"migration-id-wrong-prefix","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/migration_id","value":"task_01jc7d8e9f0g1h2j3k4m5n6p7k"}]}
+{"name":"missing-created-at","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/created_at"}]}
+{"name":"missing-entries","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/entries"}]}
+{"name":"missing-free-lines","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/free_lines"}]}
+{"name":"missing-home-id","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/home_id"}]}
+{"name":"missing-imported-at","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/imported_at"}]}
+{"name":"missing-migration-id","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/migration_id"}]}
+{"name":"missing-preamble","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/preamble"}]}
+{"name":"missing-record-revision","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/record_revision"}]}
+{"name":"missing-request-id","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/request_id"}]}
+{"name":"missing-schema","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/schema"}]}
+{"name":"missing-schema-version","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/schema_version"}]}
+{"name":"missing-scope-level","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/scope_level"}]}
+{"name":"missing-sections","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/sections"}]}
+{"name":"missing-source","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/source"}]}
+{"name":"missing-updated-at","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/updated_at"}]}
+{"name":"missing-writer","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/writer"}]}
+{"name":"missing-zone","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/zone"}]}
+{"name":"preamble-line-not-a-string","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/preamble","value":["# Backlog",1]}]}
+{"name":"preamble-not-an-array","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/preamble","value":"# Backlog"}]}
+{"name":"project-scope-without-project-id","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/project_id"}]}
+{"name":"project-scope-without-workspace-id","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/workspace_id"}]}
+{"name":"record-revision-zero","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/record_revision","value":0}]}
+{"name":"request-id-wrong-prefix","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/request_id","value":"rcpt_01jc7d8e9f0g1h2j3k4m5n6p7p"}]}
+{"name":"schema-name-wrong","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/schema","value":"pool.item"}]}
+{"name":"schema-version-unknown","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/schema_version","value":"2.0"}]}
+{"name":"scope-level-unknown","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/scope_level","value":"clone"}]}
+{"name":"section-missing-header","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/sections/0","value":{"state":"queued"}}]}
+{"name":"section-missing-state","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/sections/0","value":{"header":"## Queued"}}]}
+{"name":"section-state-unknown","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/sections/0/state","value":"blocked"}]}
+{"name":"section-unknown-member","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/sections/0","value":{"header":"## Queued","line":3,"state":"queued"}}]}
+{"name":"source-bytes-negative","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/source/bytes","value":-1}]}
+{"name":"source-digest-uppercase","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/source/digest","value":"sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]}
+{"name":"source-digest-without-algorithm","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/source/digest","value":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}]}
+{"name":"source-missing-bytes","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/source/bytes"}]}
+{"name":"source-missing-digest","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/source/digest"}]}
+{"name":"source-missing-path","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/source/path"}]}
+{"name":"source-missing-read-at","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/source/read_at"}]}
+{"name":"source-missing-text","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/source/text"}]}
+{"name":"source-path-relative","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/source/path","value":"legacy/BACKLOG.md"}]}
+{"name":"source-path-windows-backslash","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/source/path","value":"C:\\legacy\\BACKLOG.md"}]}
+{"name":"source-text-not-a-string","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/source/text","value":["# Backlog"]}]}
+{"name":"source-unknown-member","base":"three-items-with-hold.json","edits":[{"op":"add","path":"/source/encoding","value":"utf-8"}]}
+{"name":"unknown-member-at-top","base":"three-items-with-hold.json","edits":[{"op":"add","path":"/state","value":"imported"}]}
+{"name":"unknown-not-an-object","base":"three-items-with-hold.json","edits":[{"op":"add","path":"/unknown","value":"kept"}]}
+{"name":"workspace-scope-with-project-id","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/scope_level","value":"workspace"}]}
+{"name":"writer-missing-operation","base":"three-items-with-hold.json","edits":[{"op":"remove","path":"/writer/operation"}]}
+{"name":"zone-empty","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/zone","value":""}]}
+{"name":"zone-offset-form","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/zone","value":"UTC+3"}]}
+{"name":"zone-with-space","base":"three-items-with-hold.json","edits":[{"op":"replace","path":"/zone","value":"Europe Helsinki"}]}

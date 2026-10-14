@@ -1,0 +1,12 @@
+{"name":"migration-id-bad-alphabet","base":"migration-with-selector.json","edits":[{"op":"replace","path":"/migration_id","value":"migr_01jc7d8e9f0g1h2j3k4m5n6p7u"}]}
+{"name":"migration-id-wrong-prefix","base":"migration-with-selector.json","edits":[{"op":"replace","path":"/migration_id","value":"mig_01jc7d8e9f0g1h2j3k4m5n6p7k"}]}
+{"name":"missing-zone","base":"migration-with-selector.json","edits":[{"op":"remove","path":"/zone"}]}
+{"name":"normalize-a-string","base":"migration-with-selector.json","edits":[{"op":"replace","path":"/normalize","value":"false"}]}
+{"name":"selector-limit-zero","base":"migration-with-selector.json","edits":[{"op":"replace","path":"/selector/limit","value":0}]}
+{"name":"selector-not-an-object","base":"migration-with-selector.json","edits":[{"op":"replace","path":"/selector","value":"ready"}]}
+{"name":"selector-state-unknown","base":"migration-with-selector.json","edits":[{"op":"replace","path":"/selector/states","value":["open"]}]}
+{"name":"selector-task-id-wrong-prefix","base":"migration-with-selector.json","edits":[{"op":"replace","path":"/selector","value":{"task_id":"hold_01jc7d8e9f0g1h2j3k4m5n6p7f"}}]}
+{"name":"selector-unknown-member","base":"migration-with-selector.json","edits":[{"op":"add","path":"/selector/legacy_id","value":"alpha-1"}]}
+{"name":"unknown-member","base":"migration-with-selector.json","edits":[{"op":"add","path":"/path","value":"/srv/legacy/BACKLOG.md"}]}
+{"name":"zone-offset-form","base":"migration-with-selector.json","edits":[{"op":"replace","path":"/zone","value":"UTC+3"}]}
+{"name":"zone-with-space","base":"migration-with-selector.json","edits":[{"op":"replace","path":"/zone","value":"Europe Helsinki"}]}
