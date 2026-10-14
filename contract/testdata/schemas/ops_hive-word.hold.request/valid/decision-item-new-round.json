@@ -1,0 +1,29 @@
+{
+  "new_item": {
+    "title": "Decide on the vendor budget",
+    "body": "The budget needs a ruling before any work is planned."
+  },
+  "origin": {
+    "kind": "spend"
+  },
+  "text": "May the integration spend more than planned?",
+  "consequence": "The planning of the integration cannot start.",
+  "options": [],
+  "amount": "40 EUR a month",
+  "round": {
+    "origin": {
+      "kind": "spend"
+    },
+    "complete": true,
+    "attachments": [
+      {
+        "file": {
+          "path": "word/rounds/notes.md",
+          "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "bytes": 2048
+        },
+        "fetched": "complete"
+      }
+    ]
+  }
+}

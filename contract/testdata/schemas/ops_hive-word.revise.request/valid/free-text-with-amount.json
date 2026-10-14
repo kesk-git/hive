@@ -1,0 +1,7 @@
+{
+  "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+  "text": "What monthly amount may the integration spend?",
+  "consequence": "The planning cannot start.",
+  "options": [],
+  "amount": "60 EUR a month"
+}

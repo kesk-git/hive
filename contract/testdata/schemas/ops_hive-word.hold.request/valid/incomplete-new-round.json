@@ -1,0 +1,44 @@
+{
+  "held_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+  "origin": {
+    "kind": "supervisor"
+  },
+  "text": "Which vendor should the integration use?",
+  "consequence": "Without an answer the integration work stays held.",
+  "recommendation": "keep-vendor",
+  "options": [
+    {
+      "option_id": "keep-vendor",
+      "label": "Keep the vendor",
+      "consequence": "The integration stays on the current vendor and the migration is dropped."
+    },
+    {
+      "option_id": "switch-vendor",
+      "label": "Switch vendor",
+      "consequence": "The integration moves to the second vendor and the work is re-planned."
+    }
+  ],
+  "round": {
+    "origin": {
+      "kind": "review",
+      "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7h",
+      "generation": 2,
+      "ref": {
+        "schema": "hive.review",
+        "id": "rev_01jc7d8e9f0g1h2j3k4m5n6p7b"
+      }
+    },
+    "complete": false,
+    "incomplete_reason": "The attachment was cut off at its size limit.",
+    "attachments": [
+      {
+        "file": {
+          "path": "word/rounds/notes.md",
+          "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "bytes": 2048
+        },
+        "fetched": "truncated"
+      }
+    ]
+  }
+}

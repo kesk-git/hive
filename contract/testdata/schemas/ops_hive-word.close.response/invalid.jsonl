@@ -1,0 +1,9 @@
+{"name":"hold-not-an-object","base":"moot-hold-released.json","edits":[{"op":"replace","path":"/hold","value":[]}]}
+{"name":"missing-hold","base":"moot-hold-released.json","edits":[{"op":"remove","path":"/hold"}]}
+{"name":"missing-question","base":"moot-hold-released.json","edits":[{"op":"remove","path":"/question"}]}
+{"name":"missing-round","base":"moot-hold-released.json","edits":[{"op":"remove","path":"/round"}]}
+{"name":"question-moot-without-closure","base":"moot-hold-released.json","edits":[{"op":"remove","path":"/question/closure"}]}
+{"name":"question-schema-wrong-const","base":"moot-hold-released.json","edits":[{"op":"replace","path":"/question/schema","value":"pool.hold"}]}
+{"name":"question-state-unknown","base":"moot-hold-released.json","edits":[{"op":"replace","path":"/question/state","value":"closed"}]}
+{"name":"round-closed-without-closed-at","base":"moot-hold-released.json","edits":[{"op":"remove","path":"/round/closed_at"}]}
+{"name":"unknown-member","base":"moot-hold-released.json","edits":[{"op":"add","path":"/receipts","value":[]}]}

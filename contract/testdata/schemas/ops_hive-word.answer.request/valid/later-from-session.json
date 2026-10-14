@@ -1,0 +1,24 @@
+{
+  "card": {
+    "card_id": "card_01jc7d8e9f0g1h2j3k4m5n6p7s",
+    "card_revision": 1,
+    "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+    "question_revision": 1,
+    "held_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+    "held_task_revision": 1,
+    "decision_round_id": "dr_01jc7d8e9f0g1h2j3k4m5n6p7r",
+    "decision_round_revision": 1,
+    "owner_home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "owner_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7h"
+  },
+  "text": "",
+  "later": {
+    "revisit_at": "2026-10-20T09:00:00.000Z"
+  },
+  "source": {
+    "kind": "session-input",
+    "input_id": "inp_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "receipt_id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7w"
+  },
+  "answered_at": "2026-10-12T09:30:00.000Z"
+}

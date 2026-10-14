@@ -1,0 +1,18 @@
+{
+  "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+  "text": "Which vendor, given the new price list?",
+  "consequence": "Without an answer the integration work stays held.",
+  "recommendation": "switch-vendor",
+  "options": [
+    {
+      "option_id": "switch-vendor",
+      "label": "Switch vendor",
+      "consequence": "The integration moves to the second vendor and the work is re-planned."
+    },
+    {
+      "option_id": "keep-vendor",
+      "label": "Keep the vendor",
+      "consequence": "The integration stays on the current vendor and the migration is dropped."
+    }
+  ]
+}

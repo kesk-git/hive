@@ -1,0 +1,17 @@
+{"name":"amount-empty","base":"free-text-with-amount.json","edits":[{"op":"replace","path":"/amount","value":""}]}
+{"name":"consequence-empty","base":"new-options.json","edits":[{"op":"replace","path":"/consequence","value":""}]}
+{"name":"missing-consequence","base":"new-options.json","edits":[{"op":"remove","path":"/consequence"}]}
+{"name":"missing-options","base":"new-options.json","edits":[{"op":"remove","path":"/options"}]}
+{"name":"missing-question-id","base":"new-options.json","edits":[{"op":"remove","path":"/question_id"}]}
+{"name":"missing-text","base":"new-options.json","edits":[{"op":"remove","path":"/text"}]}
+{"name":"option-id-uppercase","base":"new-options.json","edits":[{"op":"replace","path":"/options/0/option_id","value":"Switch"}]}
+{"name":"option-missing-label","base":"new-options.json","edits":[{"op":"remove","path":"/options/0/label"}]}
+{"name":"option-unknown-member","base":"new-options.json","edits":[{"op":"add","path":"/options/0/rank","value":1}]}
+{"name":"options-not-an-array","base":"new-options.json","edits":[{"op":"replace","path":"/options","value":{}}]}
+{"name":"options-without-recommendation","base":"new-options.json","edits":[{"op":"remove","path":"/recommendation"}]}
+{"name":"question-id-wrong-prefix","base":"new-options.json","edits":[{"op":"replace","path":"/question_id","value":"dr_01jc7d8e9f0g1h2j3k4m5n6p7q"}]}
+{"name":"recommendation-uppercase","base":"new-options.json","edits":[{"op":"replace","path":"/recommendation","value":"Switch"}]}
+{"name":"recommendation-without-options","base":"free-text-with-amount.json","edits":[{"op":"add","path":"/recommendation","value":"keep-vendor"}]}
+{"name":"text-empty","base":"new-options.json","edits":[{"op":"replace","path":"/text","value":""}]}
+{"name":"unknown-member-asked-at","base":"new-options.json","edits":[{"op":"add","path":"/asked_at","value":"2026-10-12T09:30:00.000Z"}]}
+{"name":"unknown-member-requested-by","base":"new-options.json","edits":[{"op":"add","path":"/requested_by","value":{"command":"hive-word","kind":"package","package":"word"}}]}
