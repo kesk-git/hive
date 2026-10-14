@@ -89,9 +89,9 @@ func stamp(t testing.TB, c clock.Clock) string {
 	return s
 }
 
-// envelope is the content of the n-th test event of pkg, without the two
+// eventEnvelope is the content of the n-th test event of pkg, without the two
 // members the journal sets, as a map a test may alter.
-func envelope(pkg string, n int) map[string]any {
+func eventEnvelope(pkg string, n int) map[string]any {
 	return map[string]any{
 		"schema":            "hive.event",
 		"schema_version":    "1.0",
@@ -113,7 +113,7 @@ func envelope(pkg string, n int) map[string]any {
 // event is the n-th test event of pkg as the store hands it to the journal.
 func event(t testing.TB, pkg string, n int) store.Event {
 	t.Helper()
-	return encoded(t, envelope(pkg, n))
+	return encoded(t, eventEnvelope(pkg, n))
 }
 
 // encoded is an envelope as a store.Event, in canonical form.

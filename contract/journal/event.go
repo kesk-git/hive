@@ -3,11 +3,11 @@ package journal
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/clock"
+	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/schema"
 	"github.com/kesk-git/hive/contract/store"
 )
@@ -31,8 +31,6 @@ const (
 	repairKindVersion = "1.0"
 	eventSchemaPrefix = "urn:hive:schema:events:"
 )
-
-var versionForm = regexp.MustCompile(`^([1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 
 // decodeLine reads one line of the journal, without its line feed, from the
 // segment named segment: it is canonical, it is an envelope of a version this
@@ -76,7 +74,7 @@ func (j *Journal) checkEvent(obj map[string]any, data []byte, segment string) er
 		return fmt.Errorf("schema is not %s", eventRecord)
 	}
 	version, _ := obj["schema_version"].(string)
-	if newer(version, eventVersion) {
+	if envelope.Newer(version, eventVersion) {
 		return fmt.Errorf("%w: %s is at version %s, this build reads up to %s", store.ErrUnsupportedVersion, eventRecord, version, eventVersion)
 	}
 	if err := j.reg.Validate(eventSchema, data); err != nil {
@@ -120,7 +118,7 @@ func (j *Journal) checkEvent(obj map[string]any, data []byte, segment string) er
 // record of the segment the line is in, which its body names too.
 func checkRepairEvent(obj map[string]any, segment string) error {
 	if kindVersion, _ := obj["kind_version"].(string); kindVersion != repairKindVersion {
-		if newer(kindVersion, repairKindVersion) {
+		if envelope.Newer(kindVersion, repairKindVersion) {
 			return fmt.Errorf("%w: %s is at version %s, this build reads %s", store.ErrUnsupportedVersion, RepairKind, kindVersion, repairKindVersion)
 		}
 		return fmt.Errorf("%s is at version %s, not %s", RepairKind, kindVersion, repairKindVersion)
@@ -172,26 +170,4 @@ func (j *Journal) checkBody(obj map[string]any) error {
 		return fmt.Errorf("body of %s: %w", kind, err)
 	}
 	return nil
-}
-
-// newer reports whether version, of the form MAJOR.MINOR, is newer than
-// known in its major or its minor part. Text of another form is not newer;
-// the schema refuses it.
-func newer(version, known string) bool {
-	got, want := versionForm.FindStringSubmatch(version), versionForm.FindStringSubmatch(known)
-	if got == nil || want == nil {
-		return false
-	}
-	if c := cmpNumbers(got[1], want[1]); c != 0 {
-		return c > 0
-	}
-	return cmpNumbers(got[2], want[2]) > 0
-}
-
-// cmpNumbers compares two decimal numbers written without leading zeros.
-func cmpNumbers(a, b string) int {
-	if len(a) != len(b) {
-		return len(a) - len(b)
-	}
-	return strings.Compare(a, b)
 }

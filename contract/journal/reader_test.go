@@ -171,7 +171,7 @@ func TestReaderWhileRetentionRemoves(t *testing.T) {
 // source_sequence seq (none when 0), that occurred at occurred.
 func sourced(t testing.TB, n int, sourceID string, seq int64, occurred string) store.Event {
 	t.Helper()
-	m := envelope("shadow", n)
+	m := eventEnvelope("shadow", n)
 	source := map[string]any{"package": "shadow", "source_id": sourceID}
 	if seq != 0 {
 		source["source_sequence"] = seq
@@ -359,7 +359,7 @@ func TestReaderLatenessAcrossResume(t *testing.T) {
 func paddedEvent(t testing.TB, n, size int) store.Event {
 	t.Helper()
 	pad := func(k int) store.Event {
-		m := envelope("pool", n)
+		m := eventEnvelope("pool", n)
 		m["kind"] = "pool." + strings.Repeat("x", k) + ".happened"
 		return encoded(t, m)
 	}
