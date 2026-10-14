@@ -40,8 +40,7 @@
             "$ref": "urn:hive:schema:records:pool.note:v1#/$defs/note_id"
           },
           "subject_id": {
-            "type": "string",
-            "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+            "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/subject_id"
           },
           "fact_id": {
             "type": "string",
