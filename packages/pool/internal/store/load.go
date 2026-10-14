@@ -98,7 +98,7 @@ func LoadAll(st *cstore.Store, kind string) ([]Loaded, []Omission, error) {
 	}
 	var names []string
 	for _, e := range entries {
-		if e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".json") {
+		if strings.HasSuffix(e.Name(), ".json") {
 			names = append(names, strings.TrimSuffix(e.Name(), ".json"))
 		}
 	}

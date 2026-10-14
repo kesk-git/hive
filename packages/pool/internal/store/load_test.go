@@ -79,6 +79,12 @@ func TestARecordThatCannotBeReadIsNamedAndNeverGuessed(t *testing.T) {
 		t.Fatal(err)
 	}
 	put(t, dir, "hold", "Bad Name", []byte("{}"))
+	if err := os.Mkdir(filepath.Join(dir, "pool", "records", "hold", "hold_dir.json"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(dir, "pool", "records", "hold", id+".json"), filepath.Join(dir, "pool", "records", "hold", "hold_link.json")); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, _, err := Load(st, "hold", "hold_absent"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("an absent record: %v", err)
@@ -93,6 +99,7 @@ func TestARecordThatCannotBeReadIsNamedAndNeverGuessed(t *testing.T) {
 	want := map[string]string{
 		"hold_broken": ReasonMalformed, "hold_norevision": ReasonMalformed, "hold_schema": ReasonMalformed,
 		"hold_newer": ReasonUnsupported, "hold_other": ReasonMalformed,
+		"hold_dir": ReasonMalformed, "hold_link": ReasonMalformed,
 	}
 	for id, reason := range want {
 		if l, om, err := Load(st, "hold", id); err != nil || l != nil || om == nil || *om != (Omission{id, reason}) {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
@@ -118,17 +117,8 @@ func (k Kind) Path(id string) (string, error) {
 	return cstore.RecordPath(Package, k.Name, id), nil
 }
 
-var (
-	registryOnce sync.Once
-	registry     *schema.Registry
-	registryErr  error
-)
-
 // Schemas is the registry of the embedded schemas.
-func Schemas() (*schema.Registry, error) {
-	registryOnce.Do(func() { registry, registryErr = schema.Embedded() })
-	return registry, registryErr
-}
+func Schemas() (*schema.Registry, error) { return schema.Embedded() }
 
 // Check holds a whole record of the kind to its schema and to the identity it
 // is stored under. A record of a newer version than the build reads is

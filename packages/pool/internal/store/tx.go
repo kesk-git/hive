@@ -101,6 +101,9 @@ func Stage(c *cli.Call, tx Transaction) (*Staged, error) {
 		if err := checkValues(data); err != nil {
 			return nil, checkFailure("the receipt "+r.ReceiptID, err)
 		}
+		if err := checkBody(receiptSchemaPrefix, r.Kind, r.KindVersion, r.Body); err != nil {
+			return nil, checkFailure("the receipt "+r.ReceiptID, err)
+		}
 		path := cstore.ReceiptPath(Package, r.ReceiptID)
 		if seen[path] {
 			return nil, envelope.Common(envelope.CodeInternal, "the transaction writes "+path+" twice")
@@ -148,12 +151,6 @@ func (s *Staged) Result(body map[string]any) *cli.Result {
 	return &cli.Result{Body: body, Records: s.Records, Receipts: s.Receipts, Events: s.Events}
 }
 
-// Intent is the staged transaction as an intent, for an operation that must
-// make its records durable before an effect outside Hive.
-func (s *Staged) Intent() cli.Intent {
-	return cli.Intent{Records: s.Records, Receipts: s.Receipts, Events: s.Events}
-}
-
 // compare checks that the record at the path of rw is at the revision rw
 // expects, or absent when it expects none. It is the harness's own comparison,
 // made once more here so that a stale expectation is answered before the
@@ -195,10 +192,13 @@ func checkValues(data []byte) error {
 	return schema.CheckShapes(v)
 }
 
-// The schemas an event is held to, as the journal holds it.
+// The schemas an event and a receipt are held to, as the journal and the
+// receipt's own schema hold them: the body schema of a kind is named by the
+// prefix, the kind and the major of its version.
 const (
-	eventSchema       = "urn:hive:schema:event:v1"
-	eventSchemaPrefix = "urn:hive:schema:events:"
+	eventSchema         = "urn:hive:schema:event:v1"
+	eventSchemaPrefix   = "urn:hive:schema:events:"
+	receiptSchemaPrefix = "urn:hive:schema:receipts:"
 )
 
 // checkEvent holds an event of the Pool to what the journal will hold it to
@@ -239,6 +239,17 @@ func checkEvent(c *cli.Call, e cstore.Event) error {
 	if err := reg.ValidateOwned(eventSchema, full); err != nil {
 		return err
 	}
+	if id, _ := obj["home_id"].(string); c.Home == nil || id != c.Home.HomeID {
+		return fmt.Errorf("home_id %q is not this home's", id)
+	}
+	for _, name := range []string{"occurred_at", "observed_at"} {
+		if s, _ := obj[name].(string); !clock.Valid(s) {
+			return fmt.Errorf("%s is not a timestamp", name)
+		}
+	}
+	if known, ok := obj["occurred_at_known"].(bool); ok && !known && obj["occurred_at"] != obj["observed_at"] {
+		return errors.New("occurred_at is unknown, so it must repeat observed_at")
+	}
 	kind, _ := obj["kind"].(string)
 	source, _ := obj["source"].(map[string]any)
 	if owner, _, _ := strings.Cut(kind, "."); owner != Package || source["package"] != Package {
@@ -248,13 +259,23 @@ func checkEvent(c *cli.Call, e cstore.Event) error {
 		return fmt.Errorf("source_id %s is not a source of the Pool", id)
 	}
 	kindVersion, _ := obj["kind_version"].(string)
-	major, _, _ := strings.Cut(kindVersion, ".")
 	body, _ := obj["body"].(map[string]any)
+	return checkBody(eventSchemaPrefix, kind, kindVersion, body)
+}
+
+// checkBody holds the body of an event or a receipt to the schema its kind
+// registers, or to being empty where it registers none.
+func checkBody(prefix, kind, kindVersion string, body map[string]any) error {
+	reg, err := Schemas()
+	if err != nil {
+		return err
+	}
+	major, _, _ := strings.Cut(kindVersion, ".")
 	data, err := canon.Encode(body)
 	if err != nil {
 		return err
 	}
-	switch err := reg.ValidateOwned(eventSchemaPrefix+kind+":v"+major, data); {
+	switch err := reg.ValidateOwned(prefix+kind+":v"+major, data); {
 	case errors.Is(err, schema.ErrUnknownSchema):
 		if len(body) > 0 {
 			return fmt.Errorf("kind %s registers no body schema, so its body is empty", kind)
