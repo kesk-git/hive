@@ -376,7 +376,7 @@ func joined(round string) map[string]any {
 func holdBody(t testing.TB, question, round map[string]any) map[string]any {
 	return map[string]any{
 		"question": question, "round": round, "card_id": mint(t, ids.Card),
-		"requested_by": map[string]any{"kind": "supervisor", "session_id": mint(t, ids.Session)},
+		"requested_by": map[string]any{"kind": "supervisor", "session_id": mint(t, ids.Session), "session_generation": int64(1)},
 	}
 }
 
@@ -423,7 +423,7 @@ func TestOnlyAHandoffFromWordIsAccepted(t *testing.T) {
 		"a causation of another request":                    {causationOf: mint(t, ids.Request)},
 		"a package other than word":                         {caller: map[string]any{"kind": "package", "package": "dispatch", "command": "hive-fleet"}},
 		"another command of the package word":               {caller: map[string]any{"kind": "package", "package": "word", "command": "hive-other"}},
-		"a supervisor that carries the handoff's causation": {caller: map[string]any{"kind": "supervisor", "session_id": mint(t, ids.Session)}},
+		"a supervisor that carries the handoff's causation": {caller: map[string]any{"kind": "supervisor", "session_id": mint(t, ids.Session), "session_generation": int64(1)}},
 	}
 	for name, o := range requests {
 		t.Run(name, func(t *testing.T) {
@@ -720,6 +720,9 @@ func TestEachRefusalOfHoldQuestion(t *testing.T) {
 // recorded of the first, replayed, and writes nothing more.
 func TestAHandoffSentAgainIsReplayed(t *testing.T) {
 	h := newHome(t)
+	// The executable keys a handoff on its causation once it lists word among
+	// the packages whose handoffs it accepts.
+	h.exe.Handoffs = []string{"word"}
 	item := h.item()
 	id := mint(t, ids.Request)
 	first := h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id})
