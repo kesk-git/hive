@@ -14,8 +14,8 @@ import (
 // TestAcceptanceDeclaredCallCrossesTheCommandLine sends the call that word
 // declares on pool (spec/packages.md, Calls between packages) to the built
 // hive-pool, as a package's code would: a request document in a file, a
-// response read from standard output. hive-pool's add is declared and not
-// built, so the call is proved up to its refusal: a complete response that
+// response read from standard output. hive-pool's open-generation is declared
+// and not built, so the call is proved up to its refusal: a complete response that
 // echoes the request, refused with unsupported_operation, exit code 4, no
 // body, and nothing written in the home.
 //
@@ -26,9 +26,9 @@ import (
 func TestAcceptanceDeclaredCallCrossesTheCommandLine(t *testing.T) {
 	home := newHome(t)
 	before := snapshot(t, home)
-	req := newRequest(asPackage{"word", "hive-word"}, "hive-pool", "add", 1, map[string]any{})
+	req := newRequest(asPackage{"word", "hive-word"}, "hive-pool", "open-generation", 1, map[string]any{})
 
-	r := call{program: "hive-pool", operation: "add", home: home, req: req}.run(t)
+	r := call{program: "hive-pool", operation: "open-generation", home: home, req: req}.run(t)
 	resp := r.must(t)
 
 	if got := r.result.Code; got != 4 {
@@ -43,8 +43,8 @@ func TestAcceptanceDeclaredCallCrossesTheCommandLine(t *testing.T) {
 	if resp.RequestID != req.id {
 		t.Errorf("request_id = %q, want the request's %q", resp.RequestID, req.id)
 	}
-	if resp.Command != "hive-pool" || resp.Operation != "add" {
-		t.Errorf("response is for %s %s, want hive-pool add", resp.Command, resp.Operation)
+	if resp.Command != "hive-pool" || resp.Operation != "open-generation" {
+		t.Errorf("response is for %s %s, want hive-pool open-generation", resp.Command, resp.Operation)
 	}
 	if resp.Responder.Package != "pool" || resp.Responder.Command != "hive-pool" {
 		t.Errorf("responder = %+v, want package pool, command hive-pool", resp.Responder)
