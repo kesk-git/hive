@@ -21,6 +21,7 @@
 {"name":"launch-parameters-unknown-member-model","base":"with-criteria.json","edits":[{"op":"add","path":"/launch_parameters/model","value":"claude-opus"}]}
 {"name":"launch-parameters-unknown-member-resolved-place","base":"with-criteria.json","edits":[{"op":"add","path":"/launch_parameters/resolved_place","value":"mac"}]}
 {"name":"launch-parameters-validation-unknown","base":"with-criteria.json","edits":[{"op":"replace","path":"/launch_parameters/validation","value":"none"}]}
+{"name":"memory-inventory-zero-revision","base":"memory-inventory.json","edits":[{"op":"replace","path":"/rules/0/record_revision","value":0}]}
 {"name":"missing-launch-parameters","base":"with-criteria.json","edits":[{"op":"remove","path":"/launch_parameters"}]}
 {"name":"missing-renderer-version","base":"with-criteria.json","edits":[{"op":"remove","path":"/renderer_version"}]}
 {"name":"missing-revision","base":"with-criteria.json","edits":[{"op":"remove","path":"/revision"}]}

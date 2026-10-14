@@ -27,7 +27,8 @@
     "schema_version": {
       "enum": [
         "1.0",
-        "1.1"
+        "1.1",
+        "1.2"
       ]
     },
     "record_revision": {
@@ -164,7 +165,7 @@
           }
         },
         "digest": {
-          "description": "Digest of canonical text, criteria, product_rules and plan_stage when present; absent optional members keep their historical digest input.",
+          "description": "Digest of canonical text and criteria, with touched_subjects, product_rules and plan_stage when present; absent optional members keep their historical digest input.",
           "$ref": "urn:hive:schema:common:v1#/$defs/digest"
         },
         "defined_at": {
@@ -178,6 +179,13 @@
         },
         "request_id": {
           "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        "touched_subjects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+          }
         },
         "product_rules": {
           "type": "array",
@@ -254,6 +262,59 @@
         },
         "invalidated_at": {
           "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
+        "need_test": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome",
+            "coverage",
+            "reason"
+          ],
+          "properties": {
+            "outcome": {
+              "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+            },
+            "coverage": {
+              "enum": [
+                "existing",
+                "new-definition"
+              ]
+            },
+            "reason": {
+              "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+            },
+            "covering_specification": {
+              "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "coverage": {
+                    "const": "existing"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "covering_specification"
+                ]
+              },
+              "else": {
+                "properties": {
+                  "covering_specification": false
+                }
+              }
+            }
+          ]
+        },
+        "open_product_questions": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
+          }
         }
       },
       "allOf": [
@@ -339,6 +400,53 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
         }
       }
+    },
+    "need_test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "coverage",
+        "reason"
+      ],
+      "properties": {
+        "outcome": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "coverage": {
+          "enum": [
+            "existing",
+            "new-definition"
+          ]
+        },
+        "reason": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "covering_specification": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "coverage": {
+                "const": "existing"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "covering_specification"
+            ]
+          },
+          "else": {
+            "properties": {
+              "covering_specification": false
+            }
+          }
+        }
+      ]
     }
   }
 }

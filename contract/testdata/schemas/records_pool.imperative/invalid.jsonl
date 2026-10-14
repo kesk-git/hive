@@ -29,6 +29,7 @@
 {"name":"hive-with-project-id","base":"hive-lictor-two-revisions-guess.json","edits":[{"op":"add","path":"/project_id","value":"proj_01jc7d8e9f0g1h2j3k4m5n6p7c"}]}
 {"name":"hive-with-workspace-id","base":"hive-lictor-two-revisions-guess.json","edits":[{"op":"add","path":"/workspace_id","value":"ws_01jc7d8e9f0g1h2j3k4m5n6p7b"}]}
 {"name":"home-id-wrong-prefix","base":"project-swarm-claude-mac.json","edits":[{"op":"replace","path":"/home_id","value":"ws_01jc7d8e9f0g1h2j3k4m5n6p7b"}]}
+{"name":"memory-inventory-zero-revision","base":"memory-inventory.json","edits":[{"op":"replace","path":"/deliveries/0/rules/0/record_revision","value":0}]}
 {"name":"project-id-wrong-prefix","base":"project-swarm-claude-mac.json","edits":[{"op":"replace","path":"/project_id","value":"ws_01jc7d8e9f0g1h2j3k4m5n6p7b"}]}
 {"name":"project-missing-project-id","base":"project-swarm-claude-mac.json","edits":[{"op":"remove","path":"/project_id"}]}
 {"name":"project-missing-workspace-id","base":"project-swarm-claude-mac.json","edits":[{"op":"remove","path":"/workspace_id"}]}
