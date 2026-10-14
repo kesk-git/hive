@@ -418,6 +418,28 @@ func TestRequestHoldingACredentialShapeIsRefusedWhole(t *testing.T) {
 	expect(t, h.invoke(t, home, "put", mention), envelope.Ok, "")
 }
 
+// Through the real journal an ok answer and a replayed one leave no diagnostic
+// event, and a request refused for a credential shape leaves none either: the
+// refusal names no lower layer.
+func TestRealJournalKeepsNothingWithoutDetail(t *testing.T) {
+	h := newHarness(t)
+	h.exe.Journal = journal.Opener("dispatch")
+	home := newHome(t)
+	expect(t, h.invoke(t, home, "echo", request(t, "echo", 1, nil)), envelope.Ok, "")
+	recorded := request(t, "refuse", 2, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "record it" })
+	expect(t, h.invoke(t, home, "refuse", recorded), envelope.Refused, "authority_missing")
+	if again := h.invoke(t, home, "refuse", recorded); !again.Replayed {
+		t.Fatal("not a replay")
+	}
+	shaped := request(t, "put", 3, func(m map[string]any) {
+		m["body"].(map[string]any)["home"].(map[string]any)["name"] = shapeFor("gho_", 36)
+	})
+	expect(t, h.invoke(t, home, "put", shaped), envelope.Invalid, "secret_shape_recognized")
+	if n := len(realEntries(t, home)); n != 0 {
+		t.Errorf("the journal holds %d events", n)
+	}
+}
+
 // A journal that applies the no-value check keeps the event; one that refuses
 // the body drops it whole, with the response standing.
 func TestRefusedDetailIsDroppedWhole(t *testing.T) {

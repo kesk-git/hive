@@ -162,10 +162,14 @@ func validateTree(tree any, id string) error {
 	return validateBytes(out, id)
 }
 
-// ValidateBody checks an operation's body, a decoded open member, against
-// the schema its capability declaration names. A body that breaks the schema
-// is a *Failure of status invalid with code schema_violation; a schema the
-// build does not hold is an internal failure.
+// ValidateBody is the owner's validation of an operation's body, a decoded
+// open member, against the schema its capability declaration names. The no-value
+// check comes first: a body holding a string of a shape on the fixed list of
+// the schema package, in a value or in a member name, is a *Failure of status
+// invalid with code secret_shape_recognized, whose message names the nearest
+// declared field and the shape and never the text. A body that breaks the
+// schema is a *Failure of status invalid with code schema_violation; a schema
+// the build does not hold is an internal failure.
 func ValidateBody(body map[string]any, ref string) error {
 	reg, err := registry()
 	if err != nil {
@@ -175,14 +179,25 @@ func ValidateBody(body map[string]any, ref string) error {
 	if err != nil {
 		return Common(CodeInternal, "the body cannot be written").Because(err)
 	}
-	if err := reg.Validate(ref, out); err != nil {
+	if err := reg.ValidateOwned(ref, out); err != nil {
 		var ve *schema.ValidationError
-		if errors.As(err, &ve) {
+		var se *schema.ShapeError
+		switch {
+		case errors.As(err, &se):
+			return secretShape("body", se)
+		case errors.As(err, &ve):
 			return violation("body", ref, ve)
 		}
 		return Common(CodeInternal, "the body cannot be checked against "+ref).Because(err)
 	}
 	return nil
+}
+
+// secretShape is the Failure of a document or body that holds a string of a
+// listed credential shape: one sentence naming the field and the shape, never
+// the text.
+func secretShape(what string, se *schema.ShapeError) *Failure {
+	return Common(CodeSecretShapeRecognized, fmt.Sprintf("the %s holds a string of the credential shape %s at %s", what, se.Shape, se.WhereIn(what)))
 }
 
 // Validate checks a document against the schema ref names, decoding it as a
