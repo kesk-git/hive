@@ -1,3 +1,8 @@
+{"name":"changed-authority-charter","base":"changed.json","edits":[{"op":"replace","path":"/changes/0/authority/kind","value":"charter"}]}
+{"name":"changed-authority-instruction","base":"changed.json","edits":[{"op":"replace","path":"/changes/0/authority/kind","value":"instruction"}]}
+{"name":"changed-authority-none","base":"changed.json","edits":[{"op":"replace","path":"/changes/0/authority/kind","value":"none"},{"op":"remove","path":"/changes/0/authority/ref"}]}
+{"name":"changed-authority-posture","base":"changed.json","edits":[{"op":"replace","path":"/changes/0/authority/kind","value":"posture"}]}
+{"name":"changed-authority-rule","base":"changed.json","edits":[{"op":"replace","path":"/changes/0/authority/kind","value":"rule"}]}
 {"name":"minimal-bad-schema-version","base":"minimal.json","edits":[{"op":"replace","path":"/schema_version","value":"not-allowed"}]}
 {"name":"minimal-missing-budget-id","base":"minimal.json","edits":[{"op":"remove","path":"/budget_id"}]}
 {"name":"minimal-missing-changes","base":"minimal.json","edits":[{"op":"remove","path":"/changes"}]}
