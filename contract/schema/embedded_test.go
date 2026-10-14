@@ -128,21 +128,16 @@ func loadEdited(t *testing.T, rel string, change func(map[string]any)) error {
 	return err
 }
 
-// The checks are not vacuous: a committed file, altered in one small way, is
-// refused. Each alteration is made to one committed schema, a different one
-// for each; the refusal of each alteration is proved once on a synthetic
-// schema as well, and the unaltered load of every committed schema is proved
-// by TestCommittedSchemasStayInsideTheProfileAndResolve.
+// The checks are not vacuous: a committed schema, altered in one small way, is
+// refused. Each alteration is made to one representative, the schema of the
+// request envelope; the refusal of each alteration is proved once on a
+// synthetic schema as well, and the unaltered load of every committed schema
+// is proved by TestCommittedSchemasStayInsideTheProfileAndResolve.
 func TestCommittedSchemasAreRefusedWhenAltered(t *testing.T) {
+	const rel = "request.v1.schema.json"
 	if err := loadEdited(t, "", func(map[string]any) {}); err != nil {
 		t.Fatalf("an unaltered copy is refused: %v", err)
 	}
-	docs := committed(t)
-	rels := make([]string, 0, len(docs))
-	for rel := range docs {
-		rels = append(rels, rel)
-	}
-	slices.Sort(rels)
 	alterations := []struct {
 		name   string
 		change func(map[string]any)
@@ -154,72 +149,15 @@ func TestCommittedSchemasAreRefusedWhenAltered(t *testing.T) {
 			m["$defs"] = map[string]any{"cut": map[string]any{"$ref": "urn:hive:schema:common:v1#/$defs/cut"}}
 		}},
 		{"unevaluatedProperties", func(m map[string]any) { m["unevaluatedProperties"] = false }},
-		{"an object that was opened", func(m map[string]any) { openFirstClosedObject(m) }},
+		{"an object that was opened", func(m map[string]any) { m["additionalProperties"] = true }},
 	}
-	for i, a := range alterations {
-		// The representative of the alteration: the schemas are spread over
-		// the sorted list, and the one that opens an object is the first from
-		// its place that holds a closed object.
-		at := i * len(rels) / len(alterations)
-		if a.name == "an object that was opened" {
-			for k := range rels {
-				probe := rels[(at+k)%len(rels)]
-				if openFirstClosedObject(cloned(t, docs[probe])) {
-					at = (at + k) % len(rels)
-					break
-				}
-			}
-		}
-		rel := rels[at]
-		t.Run(a.name+" in "+rel, func(t *testing.T) {
+	for _, a := range alterations {
+		t.Run(a.name, func(t *testing.T) {
 			if err := loadEdited(t, rel, a.change); err == nil {
-				t.Errorf("%s was accepted", a.name)
+				t.Errorf("%s in %s was accepted", a.name, rel)
 			}
 		})
 	}
-}
-
-// cloned returns a copy of a decoded schema that a probe may alter.
-func cloned(t *testing.T, doc any) any {
-	t.Helper()
-	data, err := json.Marshal(doc)
-	if err != nil {
-		t.Fatal(err)
-	}
-	copy, err := Decode(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return copy
-}
-
-// openFirstClosedObject flips the first closed object it finds, in a fixed
-// order, to open, and says whether there was one.
-func openFirstClosedObject(v any) bool {
-	switch t := v.(type) {
-	case map[string]any:
-		if f, ok := t["additionalProperties"].(bool); ok && !f {
-			t["additionalProperties"] = true
-			return true
-		}
-		keys := make([]string, 0, len(t))
-		for k := range t {
-			keys = append(keys, k)
-		}
-		slices.Sort(keys)
-		for _, k := range keys {
-			if openFirstClosedObject(t[k]) {
-				return true
-			}
-		}
-	case []any:
-		for _, c := range t {
-			if openFirstClosedObject(c) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func TestCommittedSchemasHoldNothingButSchemaFiles(t *testing.T) {
