@@ -56,7 +56,7 @@
               "fresh",
               "stale"
             ],
-            "description": "Computed at the check from the rules in force at checked_at: fresh when they resolve to the rendering's rules_digest, the resolved-rule digest, and have no conflict, stale otherwise. The comparison names the rules digest and never the digest of the rendered text, so an unchanged rendering of changed rules is stale."
+            "description": "Computed at the check from the rules in force at checked_at: fresh when they resolve to the rendering's rules_digest, the resolved-rule digest, with no conflict, and every non-rule source revision and the budget revision agrees; stale otherwise. The comparison names the rules digest and never the digest of the rendered text, so an unchanged rendering of changed rules is stale, and a changed fact, corrected provenance or budget revision makes it stale with the rules digest unchanged."
           },
           "bytes": {
             "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
@@ -65,14 +65,14 @@
             "type": "boolean"
           },
           "stale_sources": {
-            "description": "Rules whose revision differs from the one rendered, rules now in force that the rendering did not read, and rules it read that are no longer in force at checked_at (expired by the clock, lifted, ended, superseded or not yet effective).",
+            "description": "Sources whose revision differs from the one rendered, rules now in force that the rendering did not read, and rules it read that are no longer in force at checked_at (expired by the clock, lifted, ended, superseded or not yet effective).",
             "type": "array",
             "items": {
               "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
             }
           },
           "duplicates": {
-            "description": "Rule lines that appear in this projection and in another of the same scope, which would be two copies of one fact.",
+            "description": "Rule lines that appear in this projection and in another of the same scope and audience, which would be two copies of one fact. An always line in both the Hive and Fleet audience projections at Hive scope is intended, not a duplicate.",
             "type": "array",
             "items": {
               "type": "object",

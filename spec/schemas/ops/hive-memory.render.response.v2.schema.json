@@ -13,7 +13,7 @@
       "$ref": "urn:hive:schema:records:pool.projection:v2"
     },
     "unchanged": {
-      "description": "True when the rendering equals the current one by digest: nothing was written.",
+      "description": "True when the rendering equals the current one in text, exact source revisions, rule inventory and budget revision: nothing was written.",
       "type": "boolean"
     }
   }

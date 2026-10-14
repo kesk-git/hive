@@ -7,6 +7,30 @@
   "required": [
     "recorded"
   ],
+  "oneOf": [
+    {
+      "properties": {
+        "recorded": {
+          "const": true
+        }
+      },
+      "required": [
+        "miss"
+      ]
+    },
+    {
+      "properties": {
+        "recorded": {
+          "const": false
+        }
+      },
+      "not": {
+        "required": [
+          "miss"
+        ]
+      }
+    }
+  ],
   "properties": {
     "recorded": {
       "type": "boolean"

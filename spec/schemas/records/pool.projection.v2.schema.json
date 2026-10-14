@@ -106,24 +106,7 @@
     "receipt_history": {
       "type": "array",
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "consumer",
-          "received"
-        ],
-        "properties": {
-          "consumer": {
-            "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/consumer_ref"
-          },
-          "received": {
-            "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/propagation_step"
-          },
-          "acknowledged": {
-            "description": "Absent until the consumer acknowledged a digest. A consumer acknowledged at an older digest than current is drift.",
-            "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/propagation_step"
-          }
-        }
+        "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/consumer"
       }
     },
     "history": {
@@ -207,7 +190,7 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
         },
         "rules_digest": {
-          "description": "The resolved-rule digest the rendering was made from. A rendering is fresh while the rules now in force for its scope resolve to this digest.",
+          "description": "The resolved-rule digest the rendering was made from. A rendering is fresh while the rules now in force for its scope resolve to this digest and every non-rule source revision and the budget revision agrees.",
           "$ref": "urn:hive:schema:common:v1#/$defs/digest"
         },
         "sources": {
