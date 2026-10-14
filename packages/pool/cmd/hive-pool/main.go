@@ -7,6 +7,7 @@ import (
 
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/packages/pool/internal/entry"
+	_ "github.com/kesk-git/hive/packages/pool/internal/item"
 )
 
 func main() {

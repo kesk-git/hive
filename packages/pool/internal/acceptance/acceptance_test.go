@@ -153,10 +153,17 @@ func request(t testing.TB, command, operation string) []byte {
 	return append(out, "\n"...)
 }
 
+// built are the operations built so far, by command: the items and the holds
+// that are not the decision intake's, with the read of their kinds. Every other
+// operation of the declaration is declared and refused.
+var built = map[string][]string{
+	"hive-pool": {"add", "read", "update", "transition", "hold", "release"},
+}
+
 // Every command name of the package answers capabilities: exit 0, one
 // complete response with a null request_id, whose body declares the
 // package's command, its executable and exactly the operations the
-// declaration lists, none of them callable yet.
+// declaration lists, supported where it is built and otherwise not callable.
 func TestEveryCommandNameAnswersCapabilities(t *testing.T) {
 	p := declaration(t)
 	dir := delivered(t, p)
@@ -183,8 +190,8 @@ func TestEveryCommandNameAnswersCapabilities(t *testing.T) {
 			var got []string
 			for _, op := range caps.Operations {
 				got = append(got, op.Name)
-				if op.State != envelope.Unsupported {
-					t.Errorf("%s is %s; only capabilities is built", op.Name, op.State)
+				if want := builtOperation(c.Name, op.Name); (op.State == envelope.Supported) != want {
+					t.Errorf("%s is %s; built is %v", op.Name, op.State, want)
 				}
 			}
 			slices.Sort(got)
@@ -196,8 +203,9 @@ func TestEveryCommandNameAnswersCapabilities(t *testing.T) {
 }
 
 // Every command name refuses an operation it does not declare as usage, exit
-// 2, and every operation it does declare as refused, exit 4, with
-// unsupported_operation: nothing but capabilities is built.
+// 2, and every operation it declares and has not built as refused, exit 4, with
+// unsupported_operation; one that is built answers its own schema, and an empty
+// body is invalid, exit 3.
 func TestEveryCommandNameRefusesEverythingElse(t *testing.T) {
 	p := declaration(t)
 	dir := delivered(t, p)
@@ -222,6 +230,12 @@ func TestEveryCommandNameRefusesEverythingElse(t *testing.T) {
 				resp, err := envelope.AcceptResponse([]byte(stdout), exit, requestID(t, req))
 				if err != nil {
 					t.Fatal(err)
+				}
+				if builtOperation(c.Name, operation) {
+					if exit != 3 || resp.Status != envelope.Invalid || resp.Error == nil || resp.Error.Code != envelope.CodeSchemaViolation {
+						t.Fatalf("exit %d, status %s, error %+v", exit, resp.Status, resp.Error)
+					}
+					return
 				}
 				if exit != 4 || resp.Status != envelope.Refused || resp.Error == nil || resp.Error.Code != envelope.CodeUnsupportedOperation {
 					t.Fatalf("exit %d, status %s, error %+v", exit, resp.Status, resp.Error)
@@ -264,6 +278,11 @@ func TestEveryCommandNameAnswersVersion(t *testing.T) {
 			t.Errorf("%s: exit %d, stdout %q, stderr %q", c.Name, exit, stdout, stderr)
 		}
 	}
+}
+
+// builtOperation reports whether the operation of the command is built.
+func builtOperation(command, operation string) bool {
+	return slices.Contains(built[command], operation)
 }
 
 // requestID reads the request_id of an encoded request.
