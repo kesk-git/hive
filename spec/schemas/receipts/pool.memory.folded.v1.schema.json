@@ -22,8 +22,7 @@
     "notes": {
       "type": "array",
       "items": {
-        "type": "string",
-        "pattern": "^note_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+        "$ref": "urn:hive:schema:records:pool.note:v1#/$defs/note_id"
       }
     },
     "facts": {
@@ -38,8 +37,7 @@
         ],
         "properties": {
           "note_id": {
-            "type": "string",
-            "pattern": "^note_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+            "$ref": "urn:hive:schema:records:pool.note:v1#/$defs/note_id"
           },
           "subject_id": {
             "type": "string",
@@ -64,8 +62,7 @@
         ],
         "properties": {
           "note_id": {
-            "type": "string",
-            "pattern": "^note_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+            "$ref": "urn:hive:schema:records:pool.note:v1#/$defs/note_id"
           },
           "task_id": {
             "$ref": "urn:hive:schema:common:v1#/$defs/task_id"

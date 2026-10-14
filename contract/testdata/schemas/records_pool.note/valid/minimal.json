@@ -2,7 +2,7 @@
   "schema": "pool.note",
   "schema_version": "1.0",
   "record_revision": 9007199254740991,
-  "note_id": "note_01000000000000000000000000",
+  "note_id": "mnote_01000000000000000000000000",
   "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
   "scope_level": "hive",
   "text": "Example fact.",

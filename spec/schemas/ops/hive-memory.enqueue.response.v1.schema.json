@@ -12,7 +12,18 @@
     "notes": {
       "type": "array",
       "items": {
-        "$ref": "urn:hive:schema:records:pool.note:v1"
+        "allOf": [
+          {
+            "$ref": "urn:hive:schema:records:pool.note:v1"
+          },
+          {
+            "properties": {
+              "state": {
+                "const": "pending"
+              }
+            }
+          }
+        ]
       },
       "minItems": 1
     },

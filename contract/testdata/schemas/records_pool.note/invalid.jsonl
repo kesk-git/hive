@@ -1,6 +1,7 @@
 {"name":"folded-bad-origin","base":"folded.json","edits":[{"op":"replace","path":"/origin","value":"not-allowed"}]}
 {"name":"folded-bad-schema-version","base":"folded.json","edits":[{"op":"replace","path":"/schema_version","value":"not-allowed"}]}
 {"name":"folded-bad-state","base":"folded.json","edits":[{"op":"replace","path":"/state","value":"not-allowed"}]}
+{"name":"folded-disposition-fact-alias","base":"folded.json","edits":[{"op":"add","path":"/disposition/fact_id","value":"mechanics"}]}
 {"name":"folded-missing-created-at","base":"folded.json","edits":[{"op":"remove","path":"/created_at"}]}
 {"name":"folded-missing-home-id","base":"folded.json","edits":[{"op":"remove","path":"/home_id"}]}
 {"name":"folded-missing-note-id","base":"folded.json","edits":[{"op":"remove","path":"/note_id"}]}
@@ -31,6 +32,7 @@
 {"name":"minimal-missing-text","base":"minimal.json","edits":[{"op":"remove","path":"/text"}]}
 {"name":"minimal-missing-updated-at","base":"minimal.json","edits":[{"op":"remove","path":"/updated_at"}]}
 {"name":"minimal-missing-writer","base":"minimal.json","edits":[{"op":"remove","path":"/writer"}]}
+{"name":"minimal-review-note-prefix","base":"minimal.json","edits":[{"op":"replace","path":"/note_id","value":"note_01000000000000000000000000"}]}
 {"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}
 {"name":"routed-bad-origin","base":"routed.json","edits":[{"op":"replace","path":"/origin","value":"not-allowed"}]}
 {"name":"routed-bad-schema-version","base":"routed.json","edits":[{"op":"replace","path":"/schema_version","value":"not-allowed"}]}

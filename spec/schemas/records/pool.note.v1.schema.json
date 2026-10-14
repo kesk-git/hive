@@ -19,6 +19,12 @@
     "updated_at",
     "writer"
   ],
+  "$defs": {
+    "note_id": {
+      "type": "string",
+      "pattern": "^mnote_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    }
+  },
   "properties": {
     "schema": {
       "const": "pool.note"
@@ -32,8 +38,7 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
     },
     "note_id": {
-      "type": "string",
-      "pattern": "^note_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+      "$ref": "urn:hive:schema:records:pool.note:v1#/$defs/note_id"
     },
     "home_id": {
       "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
@@ -84,10 +89,6 @@
       "properties": {
         "fold": {
           "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
-        },
-        "fact_id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
         },
         "task_id": {
           "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
@@ -145,9 +146,6 @@
         ],
         "properties": {
           "disposition": {
-            "required": [
-              "fact_id"
-            ],
             "properties": {
               "task_id": false
             }
@@ -168,10 +166,7 @@
           "disposition": {
             "required": [
               "task_id"
-            ],
-            "properties": {
-              "fact_id": false
-            }
+            ]
           }
         }
       }

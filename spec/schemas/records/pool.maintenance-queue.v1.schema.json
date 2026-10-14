@@ -36,8 +36,7 @@
     "pending": {
       "type": "array",
       "items": {
-        "type": "string",
-        "pattern": "^note_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+        "$ref": "urn:hive:schema:records:pool.note:v1#/$defs/note_id"
       }
     },
     "created_at": {

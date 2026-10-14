@@ -51,7 +51,7 @@ Stage 2 uses the following prefixes, each minted by `pool`:
 | `mem_` | a knowledge projection |
 | `migr_` | a legacy migration |
 | `subj_` | a memory subject |
-| `note_` | a maintenance note |
+| `mnote_` | a maintenance note |
 | `miss_` | one reported miss incident |
 
 The first six patterns are the `$defs` of [`records/pool.item.v1`](schemas/records/pool.item.v1.schema.json); the additional patterns are in their respective new record schemas.
