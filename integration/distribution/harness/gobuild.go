@@ -93,8 +93,9 @@ func GoProgram(t testing.TB, dir string, args ...string) (output string, code in
 
 // Build builds the main package pkg, a path relative to the repository root,
 // into out for the platform, without the C toolchain, and with paths trimmed
-// unless trimpath is false.
-func Build(t testing.TB, pkg, out, goos, goarch string, trimpath bool) {
+// unless trimpath is false. Any further flags are given to go build as they
+// are.
+func Build(t testing.TB, pkg, out, goos, goarch string, trimpath bool, flags ...string) {
 	t.Helper()
 	t.Setenv("GOOS", goos)
 	t.Setenv("GOARCH", goarch)
@@ -103,6 +104,7 @@ func Build(t testing.TB, pkg, out, goos, goarch string, trimpath bool) {
 	if trimpath {
 		args = append(args, "-trimpath")
 	}
+	args = append(args, flags...)
 	args = append(args, "-o", filepath.ToSlash(out), "./"+filepath.ToSlash(pkg))
 	if _, err := Go(t, args...); err != nil {
 		t.Fatal(err)

@@ -9,11 +9,14 @@
 // program is started with exactly the path it is given, and with a home of the
 // caller's.
 //
-// A program is given nothing of this process's environment but what is named:
-// each -env name=value, which may be repeated, sets one variable the program
-// is started with, besides the search path and the home.
+// A program is given nothing of this process's environment but the search
+// path, the home and, where the run names them, the two directories the
+// integration tests take from the run: -executables sets
+// HIVE_TEST_EXECUTABLES_DIR, the directory of the seven executables, and
+// -callees sets HIVE_TEST_CALLEES_DIR, the directory of the test-only callees.
+// No other variable can be named.
 //
-// Usage: runwith -path <search path> -home <directory> [-dir <directory>] [-env name=value ...] <program> [argument ...]
+// Usage: runwith -path <search path> -home <directory> [-dir <directory>] [-executables <directory>] [-callees <directory>] <program> [argument ...]
 package main
 
 import (
@@ -23,34 +26,26 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 
 	"github.com/kesk-git/hive/contract/exec"
 )
 
-// envFlag collects the repeated -env name=value flags.
-type envFlag []string
-
-func (e *envFlag) String() string { return strings.Join(*e, " ") }
-
-func (e *envFlag) Set(v string) error {
-	if name, _, ok := strings.Cut(v, "="); !ok || name == "" {
-		return fmt.Errorf("%q is not name=value", v)
-	}
-	*e = append(*e, v)
-	return nil
-}
+// The two variables the integration tests take their directories from.
+const (
+	executablesVar = "HIVE_TEST_EXECUTABLES_DIR"
+	calleesVar     = "HIVE_TEST_CALLEES_DIR"
+)
 
 func main() {
-	var extra envFlag
-	flag.Var(&extra, "env", "a variable the program is started with, as name=value; may be repeated")
 	path := flag.String("path", "", "the search path of the program")
 	home := flag.String("home", "", "the home of the program")
 	dir := flag.String("dir", "", "the working directory of the program; this process's own when empty")
+	executables := flag.String("executables", "", "the directory of the seven executables, which the program is told in "+executablesVar)
+	callees := flag.String("callees", "", "the directory of the test-only callees, which the program is told in "+calleesVar)
 	flag.Parse()
 	if flag.NArg() == 0 || *path == "" || *home == "" {
-		fmt.Fprintln(os.Stderr, "usage: runwith -path <search path> -home <directory> [-dir <directory>] [-env name=value ...] <program> [argument ...]")
+		fmt.Fprintln(os.Stderr, "usage: runwith -path <search path> -home <directory> [-dir <directory>] [-executables <directory>] [-callees <directory>] <program> [argument ...]")
 		os.Exit(2)
 	}
 	if *dir == "" {
@@ -73,13 +68,15 @@ func main() {
 	for k, v := range vars {
 		os.Setenv(k, v)
 	}
-	// The named variables are set here and passed on by name, as the program's
-	// own configuration; contract/exec passes nothing else.
+	// A directory the run names is set here and passed on by the name of its
+	// variable, as the program's own configuration; contract/exec passes
+	// nothing else.
 	var config []string
-	for _, kv := range extra {
-		name, value, _ := strings.Cut(kv, "=")
-		os.Setenv(name, value)
-		config = append(config, name)
+	for _, v := range []struct{ name, dir string }{{executablesVar, *executables}, {calleesVar, *callees}} {
+		if v.dir != "" {
+			os.Setenv(v.name, v.dir)
+			config = append(config, v.name)
+		}
 	}
 	run, err := exec.Start(exec.Spec{
 		Program: exec.Program{Kind: exec.Project, Name: flag.Arg(0)},

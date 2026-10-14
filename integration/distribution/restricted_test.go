@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -15,7 +16,8 @@ import (
 )
 
 // restricted makes the world of an integration run for the artefact of this
-// platform: its bin/, the recorded fakes and the real Git's directory.
+// platform: its bin/, the recorded fakes and, alone in a directory, the git
+// that starts the real Git.
 func restricted(t *testing.T) (harness.Restricted, string) {
 	t.Helper()
 	root := repo(t)
@@ -47,8 +49,8 @@ func listed(t *testing.T, dirs []string, name string) string {
 // What the restricted search path reaches is its three directories and
 // nothing else: the probe, started under that path by the same launcher the
 // integration run uses, finds each of the programs in the first of the
-// artefact's bin/, the fakes and the directory of Git alone that holds it, and the path
-// it reports is exactly those three. It catches a path that keeps the
+// artefact's bin/, the fakes and the directory of git alone that holds it, and
+// the path it reports is exactly those three. It catches a path that keeps the
 // toolchain's directory or any of the test's own, a program that is found
 // where the listing does not hold it, and one the listing holds that is not
 // found. The probe starts no program.
@@ -214,7 +216,7 @@ func TestIntegrationVariablesReachTheChild(t *testing.T) {
 	harness.Build(t, "integration/distribution/testdata/probe", filepath.Join(r.Fakes, "integration-probe"+harness.Suffix()), runtime.GOOS, runtime.GOARCH, true)
 	t.Setenv("HIVE_TEST_LEAK", "must-not-reach-the-child")
 
-	out, code, err := harness.LaunchWith(t, r.Path(), r.Home, r.Environment(), root, "integration-probe")
+	out, code, err := r.RunWithDirectories(t, root, "integration-probe")
 	if err != nil || code != 0 {
 		t.Fatalf("the probe: code %d, %v\n%s", code, err, out)
 	}
@@ -264,27 +266,82 @@ func TestIntegrationTestsPassUnderTheRestrictedSearchPath(t *testing.T) {
 	}
 }
 
-// The real Git runs from the directory that holds only it: it starts, by its
-// bare name under the restricted search path, and keeps a repository, which
-// needs none of the other programs of the directory it came from.
-func TestRealGitRunsFromItsOwnDirectory(t *testing.T) {
-	r, root := restricted(t)
-	if got := listed(t, []string{r.Git}, "git"); got != r.Git {
-		t.Fatalf("git is not in %q", r.Git)
+// The git of the restricted search path is one executable the test built,
+// alone in its directory, and what it runs is the real Git where that is
+// installed: neither a link to the real Git nor a copy of it, which an
+// installation that finds its own parts beside it does not survive. Started
+// by its bare name under the restricted search path it makes a repository and
+// a commit and names the commit, which no fake does; what the real Git prints
+// on both of its output streams and the code it exits with pass through
+// unchanged, and so does a standard input that holds nothing. It catches a
+// directory that holds anything else, and a relay that loses a stream, the
+// working directory, the home or the exit code.
+func TestGitOfTheRestrictedPathStartsTheRealGit(t *testing.T) {
+	realDir, err := harness.GitDir()
+	if err != nil {
+		t.Fatal(err)
 	}
+	real := filepath.Join(realDir, "git"+harness.Suffix())
+	r, _ := restricted(t)
 	entries, err := os.ReadDir(r.Git)
-	if err != nil || len(entries) != 1 {
-		t.Fatalf("the directory of Git alone holds %d entries, want 1: %v", len(entries), err)
+	if err != nil || len(entries) != 1 || entries[0].Name() != "git"+harness.Suffix() {
+		t.Fatalf("the directory of git alone holds %d entries, want git and nothing else: %v", len(entries), err)
 	}
+	file := filepath.Join(r.Git, entries[0].Name())
+	fi, err := os.Lstat(file)
+	if err != nil || !fi.Mode().IsRegular() {
+		t.Fatalf("git is not a regular file of its directory: %v", err)
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !executableMagic(runtime.GOOS, data) {
+		t.Errorf("git does not begin with the header of a %s executable: %q", runtime.GOOS, data[:min(len(data), 4)])
+	}
+	rfi, err := os.Stat(real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	realData, err := os.ReadFile(real)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.SameFile(fi, rfi) || bytes.Equal(data, realData) {
+		t.Errorf("git is a link to %s or a copy of it, not the program that starts it", real)
+	}
+
 	repo := t.TempDir()
-	for _, args := range [][]string{
-		{"init", "-q", repo},
-		{"-C", repo, "-c", "user.name=hive", "-c", "user.email=hive@example.org", "commit", "-q", "--allow-empty", "-m", "x"},
-		{"-C", repo, "rev-parse", "--verify", "HEAD"},
-	} {
-		out, code, err := r.Run(t, root, "git", args...)
-		if err != nil || code != 0 {
-			t.Fatalf("git %v: code %d, %v\n%s", args, code, err, out)
+	git := func(args ...string) (string, int) {
+		t.Helper()
+		out, code, err := r.Run(t, repo, "git", args...)
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
+		return out, code
+	}
+	if out, code := git("--version"); code != 0 || !strings.HasPrefix(out, "git version ") {
+		t.Fatalf("git --version: code %d\n%s", code, out)
+	}
+	for _, args := range [][]string{
+		{"init", "-q", "--object-format=sha1"},
+		{"-c", "user.name=hive", "-c", "user.email=hive@example.org", "commit", "-q", "--allow-empty", "-m", "x"},
+	} {
+		if out, code := git(args...); code != 0 {
+			t.Fatalf("git %v: code %d\n%s", args, code, out)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(repo, ".git", "HEAD")); err != nil {
+		t.Errorf("git init made no repository in the directory it was started from: %v", err)
+	}
+	if out, code := git("rev-parse", "--verify", "HEAD"); code != 0 || !regexp.MustCompile(`^[0-9a-f]{40}\r?\n$`).MatchString(out) {
+		t.Errorf("git rev-parse --verify HEAD: code %d, and what it printed is not the name of the commit: %q", code, out)
+	}
+	if out, code := git("rev-parse", "--verify", "refs/heads/no-such-branch"); code != 128 || !strings.Contains(out, "fatal:") {
+		t.Errorf("a failure of the real Git: code %d, want its own 128 with its message: %q", code, out)
+	}
+	// The name of the blob that holds nothing.
+	if out, code := git("hash-object", "--stdin"); code != 0 || strings.TrimSpace(out) != "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391" {
+		t.Errorf("git hash-object --stdin with nothing on standard input: code %d, %q", code, out)
 	}
 }
