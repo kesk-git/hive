@@ -11,6 +11,8 @@ import (
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/internal/testsupport"
+	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 	"github.com/kesk-git/hive/contract/store"
 )
 
@@ -748,7 +750,7 @@ func TestReaderErrorsAreDistinct(t *testing.T) {
 // journal/ for the owner only.
 func TestOpenChecksTheHome(t *testing.T) {
 	home := newHome(t, false)
-	grantOthers(t, home)
+	testsupport.GrantOthers(t, home, 0o755)
 	if _, err := Open(home, Options{Package: "pool"}); !errors.Is(err, store.ErrLayout) {
 		t.Errorf("an open home: %v", err)
 	}
@@ -758,7 +760,7 @@ func TestOpenChecksTheHome(t *testing.T) {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(filepath.Join(home, journalDir))
-	if err != nil || !info.IsDir() || !hasMode(info, filepath.Join(home, journalDir), dirMode) {
+	if err != nil || !info.IsDir() || !access.HasMode(info, filepath.Join(home, journalDir), dirMode) {
 		t.Errorf("journal/: %v %v", info, err)
 	}
 	if j.Package() != "pool" || j.HomeID != testHomeID {

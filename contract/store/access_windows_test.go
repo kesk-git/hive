@@ -4,12 +4,15 @@ package store
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/kesk-git/hive/contract/exec"
+	"github.com/kesk-git/hive/contract/internal/testsupport"
 )
 
 // secureHome makes the home at dir what spec/records.md says a home is on
@@ -29,26 +32,11 @@ func hasMode(info fs.FileInfo, path string, want os.FileMode) bool {
 	return CheckOwnerOnly(path) == nil
 }
 
-// grantTo adds an entry that gives the security identifier sid read access to
-// path, which is what a check of the home refuses.
-func grantTo(t testing.TB, path, sid string) {
-	t.Helper()
-	if out, err := exec.Command("icacls", path, "/grant", "*"+sid+":(R)").CombinedOutput(); err != nil {
-		t.Fatalf("icacls: %v: %s", err, out)
-	}
-}
-
-// grantOthers gives Everyone read access to path; mode is for macOS and Linux.
-func grantOthers(t testing.TB, path string, mode os.FileMode) {
-	t.Helper()
-	grantTo(t, path, "S-1-1-0")
-}
-
 // grantGroup gives the group Users read access to path; mode is for macOS and
 // Linux.
 func grantGroup(t testing.TB, path string, mode os.FileMode) {
 	t.Helper()
-	grantTo(t, path, "S-1-5-32-545")
+	testsupport.GrantReadTo(t, path, "S-1-5-32-545")
 }
 
 // symlink makes link a symbolic link to target, which Windows allows only
@@ -61,11 +49,23 @@ func symlink(t testing.TB, target, link string) {
 }
 
 // junction makes link a junction to the directory target, which needs no
-// privilege.
+// privilege. The platform's own utility makes it, run through the one
+// process-execution path.
 func junction(t testing.TB, target, link string) {
 	t.Helper()
-	if out, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil {
-		t.Skipf("mklink /J: %v: %s", err, out)
+	run, err := exec.Start(exec.Spec{
+		Program: exec.Program{Kind: exec.Platform, Name: "cmd"},
+		Args:    []string{"/c", "mklink", "/J", link, target},
+		Dir:     os.TempDir(),
+		Stdout:  exec.Pipe(),
+	})
+	if err != nil {
+		t.Skipf("mklink /J: %v", err)
+	}
+	defer run.Close()
+	out, _ := io.ReadAll(run.Stdout())
+	if res := run.Wait(); !res.Passed() {
+		t.Skipf("mklink /J: %v: %s", res, out)
 	}
 }
 

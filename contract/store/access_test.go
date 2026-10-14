@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/kesk-git/hive/contract/internal/testsupport"
 )
 
 // SecureDir makes a directory what a check of the home accepts, and a check
@@ -21,7 +23,7 @@ func TestSecureDirAndCheckOwnerOnly(t *testing.T) {
 	if err := CheckOwnerOnly(dir); err != nil {
 		t.Fatalf("a secured directory: %v", err)
 	}
-	grantOthers(t, dir, 0o755)
+	testsupport.GrantOthers(t, dir, 0o755)
 	if err := CheckOwnerOnly(dir); !errors.Is(err, ErrLayout) {
 		t.Fatalf("a directory open to others: %v", err)
 	}
@@ -56,7 +58,7 @@ func TestOpenPrivate(t *testing.T) {
 	if err := CheckOwnerOnly(path); err != nil {
 		t.Fatalf("a file made private: %v", err)
 	}
-	grantOthers(t, path, 0o644)
+	testsupport.GrantOthers(t, path, 0o644)
 	if err := CheckOwnerOnly(path); !errors.Is(err, ErrLayout) {
 		t.Fatalf("a file open to others: %v", err)
 	}

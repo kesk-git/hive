@@ -45,18 +45,6 @@ func kill(id ProcessID) {
 	}
 }
 
-// waitGone waits for the process to be gone.
-func waitGone(t testing.TB, id ProcessID) {
-	t.Helper()
-	for i := 0; i < 500; i++ {
-		if !alive(id) {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("process %d is still running", id.PID)
-}
-
 // The command line is built as syscall.EscapeArg quotes it.
 func TestCommandLineIsQuotedAsEscapeArgQuotesIt(t *testing.T) {
 	for _, a := range awkwardArguments {

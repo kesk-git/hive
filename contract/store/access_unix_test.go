@@ -20,12 +20,6 @@ func hasMode(info fs.FileInfo, path string, want os.FileMode) bool {
 	return info.Mode().Perm() == want
 }
 
-// grantOthers opens the entry at path to everyone, as mode says.
-func grantOthers(t testing.TB, path string, mode os.FileMode) {
-	t.Helper()
-	os.Chmod(path, mode)
-}
-
 // grantGroup opens the entry at path to its group, as mode says.
 func grantGroup(t testing.TB, path string, mode os.FileMode) {
 	t.Helper()

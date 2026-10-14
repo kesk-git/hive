@@ -2,8 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -17,21 +15,18 @@ import (
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/internal/testsupport"
+	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 	"github.com/kesk-git/hive/contract/store"
 )
 
 var epoch = time.Date(2026, 10, 11, 8, 0, 0, 0, time.UTC)
 
-const alphabet = "0123456789abcdefghjkmnpqrstvwxyz"
-
-// id invents the n-th identifier of kind p.
-func id(p ids.Prefix, n int) string {
-	s := string(p) + "_0" + strings.Repeat("0", 23) + string(alphabet[n/32%32]) + string(alphabet[n%32])
-	if err := ids.Check(s, p); err != nil {
-		panic(err)
-	}
-	return s
-}
+// The helpers the tests of the contract share.
+var (
+	id   = testsupport.ID
+	tree = testsupport.Tree
+)
 
 // The identities of the test home and its registry.
 var (
@@ -83,22 +78,11 @@ func homeRecord(home string) map[string]any {
 	}
 }
 
-// emptyHome makes a home directory with nothing in it.
-func emptyHome(t testing.TB) string {
-	t.Helper()
-	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	secureHome(t, dir)
-	return dir
-}
-
 // newHome makes a home with its identity record and a registry holding one
 // active workspace, project and clone that belong to each other.
 func newHome(t testing.TB) string {
 	t.Helper()
-	dir := emptyHome(t)
+	dir := access.EmptyHome(t)
 	record(t, dir, "home.json", homeRecord(homeID))
 	record(t, dir, "dispatch/registry/workspaces/"+workspaceID+".json", workspaceRecord(workspaceID, homeID, "active"))
 	record(t, dir, "dispatch/registry/projects/"+projectID+".json", projectRecord(projectID, workspaceID, homeID, "active"))
@@ -605,30 +589,6 @@ func expect(t testing.TB, resp *envelope.Response, status envelope.Status, code 
 	if resp.Error == nil || resp.Error.Code != code {
 		t.Fatalf("error %+v, want code %s", resp.Error, code)
 	}
-}
-
-// tree is the state of a directory: every file by slash path below it, with
-// the digest of its bytes.
-func tree(t testing.TB, dir string) map[string]string {
-	t.Helper()
-	out := map[string]string{}
-	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		data, err := os.ReadFile(p)
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(dir, p)
-		sum := sha256.Sum256(data)
-		out[filepath.ToSlash(rel)] = hex.EncodeToString(sum[:])
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return out
 }
 
 // same asserts two directory states are the same.
