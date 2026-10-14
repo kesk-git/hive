@@ -31,11 +31,8 @@ var poolOperation = map[string]string{
 	Complete: "complete-question", Close: "close-question",
 }
 
-// Names are the operations built here, in the order of the declaration.
-var Names = []string{Hold, Revise, Release, Complete, Close}
-
-// Operation is the operation of hive-word of the name, which is one of Names,
-// or nil. It is supported, mutating, keeps no store and writes no receipt of
+// Operation is the operation of hive-word of the name, when it is one built
+// here, or nil. It is supported, mutating, keeps no store and writes no receipt of
 // its own: its receipts are the Pool's.
 func Operation(name string) *cli.Operation {
 	if _, ok := poolOperation[name]; !ok {

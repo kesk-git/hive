@@ -117,6 +117,7 @@ func TestAnOutcomeThatCannotBeLearnedIsUnknown(t *testing.T) {
 		t.Run(operation, func(t *testing.T) {
 			r := newRig(t)
 			req := r.request(operation, mint(t, ids.Request), r.supervisor(), r.body(operation, mint(t, ids.Question)))
+			before := r.listing()
 
 			r.pool.ReadErr = errors.New("the pipe closed")
 			resp, exit := r.send(operation, req)
@@ -131,6 +132,9 @@ func TestAnOutcomeThatCannotBeLearnedIsUnknown(t *testing.T) {
 			r.pool.SendErr = nil
 			if resp, _ = r.send(operation, req); resp.Status != envelope.Ok || r.pool.Count() != 2 || len(r.pool.Reads) != 3 {
 				t.Fatalf("retry: %s %+v, %d sent, %d reads", resp.Status, resp.Error, r.pool.Count(), len(r.pool.Reads))
+			}
+			if after := r.listing(); !slices.Equal(before, after) {
+				t.Errorf("the home held %v and holds %v", before, after)
 			}
 		})
 	}

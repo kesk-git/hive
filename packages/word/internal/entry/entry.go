@@ -7,7 +7,6 @@ package entry
 import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
-	"github.com/kesk-git/hive/contract/journal"
 	"github.com/kesk-git/hive/packages/word/internal/intake"
 )
 
@@ -29,9 +28,9 @@ var commands = []struct {
 // Executable is the hive-word executable. Started under any of its command names
 // it acts as that command; the contract library's harness answers
 // capabilities and --version and refuses a name the executable does not own.
-// It has no way to the Pool yet: the call to hive-pool is built apart, and
-// until it is every read of the Pool is unavailable and nothing is sent.
-func Executable() *cli.Executable { return ExecutableWith(intake.Unwired()) }
+// It reaches the Pool by running hive-pool, and it has no journal: word
+// appends no event and has no part of the home.
+func Executable() *cli.Executable { return ExecutableWith(intake.Pool{}) }
 
 // ExecutableWith is the hive-word executable reaching the Pool through the
 // callee given, behind the check of who brings each request.
@@ -41,7 +40,6 @@ func ExecutableWith(callee cli.Callee) *cli.Executable {
 		Name:      "hive-word",
 		Version:   Version,
 		Storeless: true,
-		Journal:   journal.Opener("word"),
 		Callee:    intake.Guard(callee),
 	}
 	for _, c := range commands {

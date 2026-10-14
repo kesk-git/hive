@@ -57,19 +57,3 @@ func (g guarded) ReadOutcome(c *cli.Call, requestID string) ([]byte, bool, error
 	}
 	return record, found, err
 }
-
-// unwired is the callee of a build with no call to the Pool yet.
-type unwired struct{}
-
-// Unwired is the callee of an executable that has no way to the Pool: every
-// read of the Pool is unavailable, so that nothing is ever answered from
-// a record that was not read and nothing is sent.
-func Unwired() cli.Callee { return unwired{} }
-
-func (unwired) ReadOutcome(*cli.Call, string) ([]byte, bool, error) {
-	return nil, false, envelope.Common(envelope.CodeDependencyMissing, "hive-pool is not reachable from this build")
-}
-
-func (unwired) Send(*cli.Call, []byte) ([]byte, int, error) {
-	return nil, 0, envelope.Common(envelope.CodeDependencyMissing, "hive-pool is not reachable from this build")
-}

@@ -2,6 +2,7 @@ package intake_test
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -85,6 +86,27 @@ func (r *rig) write(rel string, tree map[string]any) {
 	if err := os.WriteFile(path, append(out, '\n'), 0o600); err != nil {
 		r.t.Fatal(err)
 	}
+}
+
+// listing is every path under the home with its size.
+func (r *rig) listing() []string {
+	r.t.Helper()
+	var out []string
+	err := filepath.WalkDir(r.home, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		out = append(out, fmt.Sprintf("%s %d", path, info.Size()))
+		return nil
+	})
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	return out
 }
 
 // Callers, as a request names them.

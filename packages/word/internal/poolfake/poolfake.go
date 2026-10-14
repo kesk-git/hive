@@ -40,6 +40,11 @@ const (
 	completedAt = "2026-10-11T08:00:00.000Z"
 )
 
+// Fixtures is the directory of the contract's valid examples of the declared
+// schemas when the fake runs where no repository is above its working
+// directory, as a process started in a home does.
+var Fixtures string
+
 // Pool is the fake. The zero value answers every operation ok.
 type Pool struct {
 	mu sync.Mutex
@@ -100,19 +105,8 @@ func (p *Pool) Send(c *cli.Call, request []byte) ([]byte, int, error) {
 	if p.SendErr != nil {
 		return nil, 0, p.SendErr
 	}
-	answer := func(r *envelope.Response) ([]byte, int, error) {
-		r.RequestID, r.Command, r.Operation = req.RequestID, req.Command, req.Operation
-		r.Responder = envelope.Responder{Package: "pool", Command: "hive-pool", ImplementationVersion: "0.1.0-fake", ContractVersion: envelope.ContractVersion}
-		r.CompletedAt = completedAt
-		if r.Receipts == nil {
-			r.Receipts = []envelope.Receipt{}
-		}
-		data, err := r.Encode()
-		return data, r.Status.ExitCode(), err
-	}
-	failed := func(f *envelope.Failure) ([]byte, int, error) {
-		return answer(&envelope.Response{Status: f.Status, Error: &f.Err, Receipts: f.Receipts})
-	}
+	answer := func(r *envelope.Response) ([]byte, int, error) { return answer(req, r) }
+	failed := func(f *envelope.Failure) ([]byte, int, error) { return failure(req, f) }
 	op, ok := Operations[req.Operation]
 	if req.Command != "hive-pool" || !ok {
 		return failed(envelope.Common(envelope.CodeUnknownOperation, "the fake Pool has no such operation"))
@@ -161,6 +155,40 @@ func (p *Pool) Send(c *cli.Call, request []byte) ([]byte, int, error) {
 	}
 	p.outcomes[req.RequestID] = recorded{cause.Digest, resp}
 	return out, exit, nil
+}
+
+// answer is the response to the request, completed as the Pool completes one,
+// encoded, with the exit code its status fixes.
+func answer(req *envelope.Request, r *envelope.Response) ([]byte, int, error) {
+	r.RequestID, r.Command, r.Operation = req.RequestID, req.Command, req.Operation
+	r.Responder = envelope.Responder{Package: "pool", Command: "hive-pool", ImplementationVersion: "0.1.0-fake", ContractVersion: envelope.ContractVersion}
+	r.CompletedAt = completedAt
+	if r.Receipts == nil {
+		r.Receipts = []envelope.Receipt{}
+	}
+	data, err := r.Encode()
+	return data, r.Status.ExitCode(), err
+}
+
+// failure is the response of the failure to the request.
+func failure(req *envelope.Request, f *envelope.Failure) ([]byte, int, error) {
+	return answer(req, &envelope.Response{Status: f.Status, Error: &f.Err, Receipts: f.Receipts})
+}
+
+// Serve is the fake as a process: the operation of hive-pool given the
+// request on its standard input, answered as the document and exit code the
+// process writes. It keeps nothing between runs, so a read finds no recorded
+// outcome, and an operation is a handoff answered with the example of its
+// schema.
+func (p *Pool) Serve(operation string, request []byte) ([]byte, int, error) {
+	req, err := envelope.DecodeRequest(request)
+	if err != nil {
+		return nil, 0, err
+	}
+	if operation == "read" {
+		return failure(req, envelope.Common(envelope.CodeNotFound, "the Pool records no outcome of the request"))
+	}
+	return p.Send(nil, request)
 }
 
 // Count is the number of mutating requests received.
@@ -229,6 +257,9 @@ func example(req *envelope.Request) (map[string]any, error) {
 // fixtures is the directory of the contract's valid examples of the declared
 // schemas, found above the working directory of the test.
 func fixtures() string {
+	if Fixtures != "" {
+		return Fixtures
+	}
 	dir, err := os.Getwd()
 	if err != nil {
 		return ""
