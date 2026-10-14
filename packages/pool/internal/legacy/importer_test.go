@@ -148,6 +148,13 @@ func snapshot(t testing.TB, dir string) map[string]string {
 		if rel == "locks" || strings.HasPrefix(rel, "locks"+string(filepath.Separator)) {
 			return nil
 		}
+		// import-legacy mutates, so the harness records the outcome of every
+		// request of it that is answered ok, a dry run included; that record
+		// is the replay record and is neither a record, a receipt nor an
+		// intent of the Pool.
+		if strings.HasPrefix(rel, filepath.Join("pool", "requests")+string(filepath.Separator)) {
+			return nil
+		}
 		// A directory is made by opening the Pool, as hive-pool read opens it;
 		// what an operation writes is a file.
 		if d.IsDir() {
@@ -480,20 +487,32 @@ func TestImportRefusesWhatItCannotRead(t *testing.T) {
 	refused(t, resp, envelope.Invalid, "schema_violation")
 }
 
-// The live import is a later lane's: with dry_run false the request is refused
-// as an operation the build has not reached, and nothing is written, in the
-// home or at the source.
-func TestImportThatWritesIsUnsupported(t *testing.T) {
+// A dry run of the operation that mutates writes nothing of the Pool's: it
+// returns no record and no receipt, and leaves only the outcome the harness
+// records, which a replay of the request reads.
+func TestDryRunLeavesOnlyTheRecordedOutcome(t *testing.T) {
 	h := newHome(t)
 	path, data, when := source(t, "backlog.md")
-	before := snapshot(t, h.dir)
-	resp := h.do("import-legacy", map[string]any{"path": path, "zone": "UTC", "dry_run": false})
-	refused(t, resp, envelope.Refused, envelope.CodeUnsupportedOperation)
+	resp := h.do("import-legacy", map[string]any{"path": path, "zone": "UTC", "dry_run": true})
+	ok(t, resp)
 	if len(resp.Receipts) != 0 {
 		t.Errorf("receipts %v", resp.Receipts)
 	}
-	if after := snapshot(t, h.dir); !equal(before, after) {
-		t.Errorf("the home changed: before %v, after %v", before, after)
+	var files []string
+	err := filepath.WalkDir(h.dir, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			rel, _ := filepath.Rel(h.dir, p)
+			if !strings.HasPrefix(rel, "locks") {
+				files = append(files, filepath.ToSlash(rel))
+			}
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 || files[0] != "home.json" || !strings.HasPrefix(files[1], "pool/requests/") {
+		t.Errorf("the home holds %v", files)
 	}
 	unchanged(t, path, data, when)
 }

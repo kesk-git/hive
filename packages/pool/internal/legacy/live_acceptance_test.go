@@ -272,7 +272,7 @@ func TestLiveImportOfTheTwoUpstreamFixtures(t *testing.T) {
 			t.Errorf("%s: %v; want state %s", legacyID, rec, state)
 			continue
 		}
-		if state == "done" && (rec["completed"] != true || rec["closed_at"] == nil) {
+		if state == "done" && (rec["completed"] != true || (rec["closed_at"] == nil && rec["closed_at_unknown"] != true)) {
 			t.Errorf("%s: a done entry is imported completed with its closing time: %v", legacyID, rec)
 		}
 	}
@@ -293,9 +293,13 @@ func TestLiveImportOfTheTwoUpstreamFixtures(t *testing.T) {
 	// An edge to an entry of the same file is resolved to the identity the
 	// import minted for it.
 	im.dep("cache-adopt", "blocked-by", "cache-core-t4")
-	// The body of an entry is its continuation lines.
-	if body := im.items["notes-multi-w8"]["body"]; body != "Follow-up note added later: the harness environment was the cause, not the feature.\nSecond continuation line for good measure." {
+	// The body of an entry is its continuation lines, kept as they are: a tag
+	// on one of them is prose, and the entry has no closing date.
+	if body := im.items["notes-multi-w8"]["body"]; body != "Follow-up note added later: the harness environment was the cause, not the feature.\nSecond continuation line for good measure. (reported 2026-10-02)" {
 		t.Errorf("notes-multi-w8: body %q", body)
+	}
+	if im.items["notes-multi-w8"]["closed_at_unknown"] != true || im.items["cache-core-t4"]["closed_at"] != "2026-10-02T00:00:00.000Z" {
+		t.Errorf("the closing dates are %v and %v", im.items["notes-multi-w8"], im.items["cache-core-t4"]["closed_at"])
 	}
 
 	// The second fixture is a second migration into the same home.
@@ -439,7 +443,7 @@ func TestLiveImportOfCarriageReturnsASuffixAndAnUnrecognizedSection(t *testing.T
 		l := v.(map[string]any)
 		free[l["line"].(int64)] = l["text"].(string)
 	}
-	if free[9] != "- Loose note between entries.\r" {
+	if free[7] != "- Loose note between entries.\r" {
 		t.Errorf("the free lines are %v", free)
 	}
 }

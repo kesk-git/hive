@@ -13,18 +13,24 @@ import (
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
+	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
+	cids "github.com/kesk-git/hive/contract/ids"
 	"github.com/kesk-git/hive/contract/schema"
+	cstore "github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/pool/internal/entry"
+	"github.com/kesk-git/hive/packages/pool/internal/item"
+	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
 )
 
 // This file is translated from the load half of tasks-axi's
 // src/backends/markdown.ts: reading a backlog file whole, and the mapping of
-// its parsed entries to what the Pool would make of them. The two default
-// backlog names of src/config.ts are not carried: the request names the path.
-// What is built here is the dry run, which parses the file with the grammar of
-// this package and reports it; the live import, which writes the migration,
-// the items and the holds, is a later lane's, and the file is only ever read.
+// its parsed entries to what the Pool makes of them. The two default backlog
+// names of src/config.ts are not carried: the request names the path. With
+// dry_run true the file is parsed with the grammar of this package and
+// reported; with dry_run false it is imported in one transaction, which
+// writes the migration, the items, the holds and their receipts. The source
+// file is only ever read.
 
 func init() { entry.RegisterLegacy(entry.Default, importLegacy, exportLegacy) }
 
@@ -54,17 +60,18 @@ func stateWord(s State) string {
 	return "none"
 }
 
-// importLegacy is the operation import-legacy. With dry_run true it reads the
-// file at the path, parses it and returns the report; it writes nothing, and
-// never the file. With dry_run false it is refused as an operation the build
-// has not reached, before anything is read.
+// importLegacy is the operation import-legacy. It reads the file at the path,
+// parses it and checks that the Pool can make what the file says. With dry_run
+// true it returns the report and writes nothing; with dry_run false it
+// requires that the parsed file renders back byte for byte, and writes the
+// migration, the items, the holds and the receipts in one transaction. It
+// never writes the file.
 func importLegacy(c *cli.Call) (*cli.Result, error) {
 	body := c.Request.Body
-	if dry, _ := body["dry_run"].(bool); !dry {
-		return nil, envelope.Common(envelope.CodeUnsupportedOperation, "the import that writes is not built yet; only dry_run true is")
-	}
+	dry, _ := body["dry_run"].(bool)
 	zone, _ := body["zone"].(string)
-	if _, err := location(zone); err != nil {
+	loc, err := location(zone)
+	if err != nil {
 		return nil, envelope.Common(envelope.CodeSchemaViolation, "zone is not a zone of the IANA database").Because(err)
 	}
 	path, _ := body["path"].(string)
@@ -76,6 +83,16 @@ func importLegacy(c *cli.Call) (*cli.Result, error) {
 	if want, ok := body["expected_digest"].(string); ok && want != digest {
 		return nil, envelope.Common(envelope.CodeRevisionConflict, "the file is not the one the caller inspected: its digest differs from expected_digest")
 	}
+	if !dry {
+		// A request whose text holds a credential is refused whole before
+		// anything is made of it, and so is a second import of the same text.
+		if err := refuseCredential(src); err != nil {
+			return nil, err
+		}
+		if err := refuseSecondImport(c, digest); err != nil {
+			return nil, err
+		}
+	}
 	b, err := Parse(src)
 	if err != nil {
 		return nil, envelope.Fail(envelope.Invalid, codeLegacyMalformed, "the file is not a legacy backlog the grammar accepts").Because(err)
@@ -84,7 +101,16 @@ func importLegacy(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &cli.Result{Body: map[string]any{"report": r}}, nil
+	if err := importable(walk(b)); err != nil {
+		return nil, err
+	}
+	if dry {
+		return &cli.Result{Body: map[string]any{"report": r}}, nil
+	}
+	if exact, _ := r["round_trip_exact"].(bool); !exact {
+		return nil, envelope.Fail(envelope.Refused, codeNotRoundTrip, "the parsed file does not render back byte for byte, so it is not imported")
+	}
+	return writeImport(c, src, digest, path, zone, loc, b, r)
 }
 
 // location is the zone of the IANA database named, never the machine's own.
@@ -213,18 +239,15 @@ func report(src []byte, digest string, b *Backlog) (map[string]any, error) {
 				return nil, unrepresentable(header, "section", "the header is not UTF-8")
 			}
 			row := map[string]any{
-				"legacy_id": t.ID, "section": section, "state": stateWord(s.State), "disposition": "item",
+				"legacy_id": t.ID, "section": section, "state": stateWord(s.State),
 			}
-			switch {
-			case IsPersistentSupervisor(t):
-				row["disposition"] = "excluded"
-				row["reason"] = exclusionReason
-			case seen[t.ID]:
-				row["disposition"] = "duplicate"
-				row["reason"] = "a later entry with an identity already seen; it creates no item"
+			row["disposition"], row["reason"] = disposition(t, seen)
+			switch row["disposition"] {
+			case DispositionItem:
+				delete(row, "reason")
+			case DispositionDuplicate:
 				warn(at, "entry %q repeats an identity already seen; the later entry is kept in the migration and creates no item", t.ID)
 			}
-			seen[t.ID] = true
 			entries = append(entries, row)
 			places = append(places, place{line: at, header: header})
 			for _, d := range t.Deps {
@@ -244,12 +267,33 @@ func report(src []byte, digest string, b *Backlog) (map[string]any, error) {
 	}
 	rep := map[string]any{
 		"digest": digest, "bytes": int64(len(src)), "entries": entries, "free_lines": free,
-		"warnings": warnings, "round_trip_exact": bytes.Equal(b.Render(), src),
+		"warnings": warnings, "round_trip_exact": roundTrips(src, b),
 	}
 	if err := representable(rep, places, warned); err != nil {
 		return nil, err
 	}
 	return rep, nil
+}
+
+// disposition is what an entry of a backlog becomes, given the identities seen
+// before it, and the reason for one that becomes no item.
+func disposition(t *Task, seen map[string]bool) (string, string) {
+	d, reason := DispositionItem, ""
+	switch {
+	case IsPersistentSupervisor(t):
+		d, reason = DispositionExcluded, exclusionReason
+	case seen[t.ID]:
+		d, reason = DispositionDuplicate, "a later entry with an identity already seen; it creates no item"
+	}
+	seen[t.ID] = true
+	return d, reason
+}
+
+// roundTrips reports whether the parsed backlog renders back to src byte for
+// byte and src can be kept as it is: the migration holds the text in a JSON
+// string, which holds no byte sequence that is not UTF-8.
+func roundTrips(src []byte, b *Backlog) bool {
+	return utf8.Valid(src) && bytes.Equal(b.Render(), src)
 }
 
 // clip is s cut to at most n bytes at the start of a character, which holds the
@@ -269,4 +313,468 @@ func holdUntil(t *Task) string {
 		return ""
 	}
 	return t.Hold.Until
+}
+
+// ---------------------------------------------------------------------------
+// The import that writes
+// ---------------------------------------------------------------------------
+
+// The codes the import that writes refuses with, besides those the report
+// does.
+const codeNotRoundTrip = "pool.legacy_not_round_trip"
+
+// refuseCredential refuses a file that holds a string of a credential shape,
+// naming the line where one is found and the shape, never the text.
+func refuseCredential(src []byte) error {
+	var shape *schema.ShapeError
+	if err := schema.CheckShapes(map[string]any{"text": string(src)}); !errors.As(err, &shape) {
+		return nil
+	}
+	f := envelope.Common(envelope.CodeSecretShapeRecognized, "the file holds a string of the credential shape "+shape.Shape+"; nothing is imported")
+	for i, line := range strings.Split(string(src), "\n") {
+		if schema.HoldsShape(line) {
+			f = f.With("line", int64(i+1))
+			break
+		}
+	}
+	return f.With("shape", shape.Shape)
+}
+
+// refuseSecondImport refuses a file whose digest a migration of this home
+// already holds.
+func refuseSecondImport(c *cli.Call, digest string) error {
+	all, omitted, err := poolstore.LoadAll(c.Store, "migration")
+	if err != nil {
+		return poolstore.Failure("the migrations of the Pool", err)
+	}
+	if len(omitted) > 0 {
+		return envelope.Common(envelope.CodeRecordMalformed, "a migration of the Pool cannot be read, so a second import cannot be ruled out").With("record", omitted[0].ID)
+	}
+	for _, l := range all {
+		if src, _ := l.Data["source"].(map[string]any); src["digest"] == digest {
+			return envelope.Common(envelope.CodeAlreadyExists, "a migration of this home already holds a file with this digest").With("migration_id", l.ID)
+		}
+	}
+	return nil
+}
+
+// holdKinds are the Pool's kinds for the kind words of a legacy hold. A hold
+// that names none is a parked hold.
+var holdKinds = map[string]string{
+	"captain": "word", "external": "external", "load": "resource", "parked": "parked", "future": "future", "": "parked",
+}
+
+const maxTitle = 200
+
+// importable refuses an entry the Pool cannot make an item of, naming its
+// line and field: a title the item cannot keep and a future hold with no date.
+func importable(w walked) error {
+	seen := map[string]bool{}
+	for _, e := range w.Entries {
+		if d, _ := disposition(e.Task, seen); d != DispositionItem {
+			continue
+		}
+		t := e.Task
+		if n := utf8.RuneCountInString(t.Title); n == 0 || n > maxTitle {
+			return unrepresentable(e.FirstLine, "title", "an item's title is 1 to "+strconv.Itoa(maxTitle)+" characters, and this one is "+strconv.Itoa(n))
+		}
+		if h := t.Hold; h != nil && strings.TrimSpace(h.Reason) != "" && holdKinds[h.Kind] == "future" && h.Until == "" {
+			return unrepresentable(e.FirstLine, "hold-until", "a future hold needs the date it is held until, and this one has none")
+		}
+	}
+	return nil
+}
+
+// txn gathers the transaction of the import.
+type txn struct {
+	c  *cli.Call
+	tx poolstore.Transaction
+}
+
+func writerTree(c *cli.Call) map[string]any {
+	w := c.Writer()
+	return map[string]any{
+		"package": w.Package, "command": w.Command, "operation": w.Operation,
+		"implementation_version": w.ImplementationVersion,
+	}
+}
+
+// putScope writes the scope's flat members into a record or an event.
+func putScope(m map[string]any, s envelope.Scope, clone bool) {
+	m["scope_level"], m["home_id"] = s.Level, s.HomeID
+	if s.WorkspaceID != "" {
+		m["workspace_id"] = s.WorkspaceID
+	}
+	if s.ProjectID != "" {
+		m["project_id"] = s.ProjectID
+	}
+	if clone && s.CloneID != "" {
+		m["clone_id"] = s.CloneID
+	}
+}
+
+// put adds the record, new, to the transaction, finalized, and returns it with
+// the reference a receipt names it by.
+func (t *txn) put(kind, id string, body map[string]any) (map[string]any, *envelope.RecordRef, error) {
+	k, ok := poolstore.Lookup(kind)
+	if !ok {
+		return nil, nil, envelope.Common(envelope.CodeInternal, kind+" is not a kind of the Pool")
+	}
+	path, err := k.Path(id)
+	if err != nil {
+		return nil, nil, envelope.Common(envelope.CodeInternal, "a record has no identity it can be stored under").Because(err)
+	}
+	body["writer"] = writerTree(t.c)
+	content, err := canon.Encode(body)
+	if err != nil {
+		return nil, nil, envelope.Common(envelope.CodeInternal, "a record cannot be encoded").Because(err)
+	}
+	rw, digest, err := t.c.Finalize(cstore.RecordWrite{Path: path, Content: content})
+	if err != nil {
+		return nil, nil, envelope.Common(envelope.CodeInternal, "a record cannot be finalized").Because(err)
+	}
+	v, err := canon.Parse(rw.Content)
+	if err != nil {
+		return nil, nil, envelope.Common(envelope.CodeInternal, "a record cannot be read back").Because(err)
+	}
+	final := v.(map[string]any)
+	t.tx.Records = append(t.tx.Records, poolstore.Write{Kind: kind, ID: id, Body: final})
+	ref := &envelope.RecordRef{Schema: "pool." + kind, ID: id, HomeID: t.c.Home.HomeID, RecordRevision: 1, Digest: digest}
+	return final, ref, nil
+}
+
+// receipt adds the receipt of the kind about the subject to the transaction,
+// with the event the Pool registers beside it. Both take the scope given and,
+// where there is one, the task_id.
+func (t *txn) receipt(kind string, subject *envelope.RecordRef, scope envelope.Scope, taskID string) error {
+	internal := func(what string, err error) error { return envelope.Common(envelope.CodeInternal, what).Because(err) }
+	r, err := t.c.NewReceipt(kind, "1.0", subject, nil, nil)
+	if err != nil {
+		return internal("a receipt cannot be made", err)
+	}
+	r.Scope = scope
+	r.Scope.TaskID = taskID
+	t.tx.Receipts = append(t.tx.Receipts, r)
+	eventID, err := cids.Mint(t.c.Clock, cids.Event)
+	if err != nil {
+		return internal("an event cannot be made", err)
+	}
+	now, err := t.c.Stamp()
+	if err != nil {
+		return internal("an event cannot be made", err)
+	}
+	event := map[string]any{
+		"schema": "hive.event", "schema_version": "1.0", "event_id": eventID,
+		"kind": kind, "kind_version": "1.0",
+		"source":         map[string]any{"package": poolstore.Package, "source_id": poolstore.Package},
+		"correlation_id": t.c.Request.CorrelationID,
+		"causation":      map[string]any{"schema": "hive.request", "id": t.c.Request.RequestID},
+		"occurred_at":    now, "observed_at": now,
+		"basis": map[string]any{"kind": "receipt", "ref": map[string]any{"schema": "hive.receipt", "id": r.ReceiptID}},
+		"body":  map[string]any{},
+	}
+	putScope(event, scope, true)
+	if taskID != "" {
+		event["task_id"] = taskID
+	}
+	content, err := canon.Encode(event)
+	if err != nil {
+		return internal("an event cannot be written", err)
+	}
+	t.tx.Events = append(t.tx.Events, cstore.Event{ID: eventID, Content: content})
+	return nil
+}
+
+// importer maps the entries of one file to the records of one migration.
+type importer struct {
+	c     *cli.Call
+	loc   *time.Location
+	zone  string
+	now   string
+	scope envelope.Scope
+	migID string
+	// taskOf is the item made of each legacy identifier: the first entry that
+	// is an item.
+	taskOf map[string]string
+}
+
+// at is the instant of the start of the calendar date in the zone of the
+// import, or false for a date that is not one.
+func (im *importer) at(date string) (string, bool) {
+	t, err := time.ParseInLocation("2006-01-02", date, im.loc)
+	if err != nil {
+		return "", false
+	}
+	s, err := clock.Format(t)
+	return s, err == nil
+}
+
+// itemRecord is the item an entry becomes (spec/pool.md, the table of Legacy
+// import and export): the words of the entry as they are, the dates at the
+// start of their day in the zone, no level and no parent, and the legacy
+// identity beside them. The warnings are what it kept but could not read.
+func (im *importer) itemRecord(e walkedEntry, taskID string) (map[string]any, []string) {
+	t := e.Task
+	var warns []string
+	state := map[State]string{StateQueued: "queued", StateInFlight: "in-flight", StateDone: "done"}[t.State]
+	rec := map[string]any{
+		"schema": "pool.item", "schema_version": "1.0", "record_revision": int64(1),
+		"task_id": taskID, "title": t.Title, "state": state, "definition": "not-required",
+		"placement_requested": "policy", "links": []any{}, "generations": []any{},
+		"created_at": im.now, "updated_at": im.now,
+	}
+	putScope(rec, im.scope, true)
+	if t.Body != "" {
+		rec["body"] = t.Body
+	}
+	if t.Priority != nil {
+		rec["priority"] = int64(*t.Priority)
+	}
+	if t.Created != "" {
+		if at, ok := im.at(t.Created); ok {
+			rec["created_at"] = at
+		} else {
+			warns = append(warns, "the date "+t.Created+" is not a calendar date; it stays in the entry's lines and the item is created now")
+		}
+	}
+	if t.State == StateDone {
+		rec["completed"] = true
+		at, ok := im.at(t.Closed)
+		switch {
+		case ok:
+			rec["closed_at"] = at
+		case t.Closed == "":
+			rec["closed_at_unknown"] = true
+			warns = append(warns, "the entry has no closing date; it is completed with its time unknown")
+		default:
+			rec["closed_at_unknown"] = true
+			warns = append(warns, "the date "+t.Closed+" is not a calendar date; the entry is completed with its time unknown")
+		}
+	}
+	legacy := map[string]any{"legacy_id": t.ID, "migration_id": im.migID}
+	if t.Kind != "" {
+		legacy["kind"] = t.Kind
+	}
+	if t.Repo != "" {
+		legacy["repo"] = t.Repo
+	}
+	var meta []any
+	deps := []any{}
+	for _, d := range t.Deps {
+		to, held := im.taskOf[d.ID]
+		if !held || d.ID == t.ID {
+			value := d.ID
+			if d.Reason != "" {
+				value += " - " + d.Reason
+			}
+			meta = append(meta, map[string]any{"key": d.Type, "value": value})
+			warns = append(warns, "the "+d.Type+" edge names "+d.ID+", which the file holds no item for; it is kept in the item's legacy members and treated as resolved")
+			continue
+		}
+		edge := map[string]any{"type": d.Type, "task_id": to}
+		if d.Reason != "" {
+			edge["reason"] = d.Reason
+		}
+		deps = append(deps, edge)
+	}
+	rec["deps"] = deps
+	if meta != nil {
+		legacy["meta"] = meta
+	}
+	rec["legacy"] = legacy
+	links := []any{}
+	for _, l := range t.Links {
+		switch l.Kind {
+		case item.LinkPR:
+			links = append(links, map[string]any{"kind": "harvest", "url": l.URL})
+		case item.LinkReport:
+			links = append(links, map[string]any{"kind": "report", "path": l.URL})
+		default:
+			links = append(links, map[string]any{"kind": "doc", "url": l.URL})
+		}
+	}
+	rec["links"] = links
+	return rec, warns
+}
+
+// holdRecord is the hold an entry's hold tags become, or nil for an entry
+// whose tags give no reason. The date is kept as the instant it starts at in
+// the zone, the zone and the date as written.
+func (im *importer) holdRecord(taskID, holdID string, h *Hold) (map[string]any, []string) {
+	if h == nil || strings.TrimSpace(h.Reason) == "" {
+		if h != nil {
+			return nil, []string{"the hold tag has no reason; no hold is made of it"}
+		}
+		return nil, nil
+	}
+	var warns []string
+	rec := map[string]any{
+		"schema": "pool.hold", "schema_version": "1.0", "record_revision": int64(1),
+		"hold_id": holdID, "task_id": taskID, "kind": holdKinds[h.Kind], "reason": h.Reason, "state": "active",
+		"placed_at":  im.now,
+		"placed_by":  map[string]any{"request_id": im.c.Request.RequestID, "caller": im.c.Request.Tree()["caller"]},
+		"created_at": im.now, "updated_at": im.now,
+	}
+	putScope(rec, im.scope, false)
+	if h.Until != "" {
+		if at, ok := im.at(h.Until); ok {
+			rec["until"] = map[string]any{"at": at, "zone": im.zone, "date": h.Until}
+		} else {
+			warns = append(warns, "the date "+h.Until+" is not a calendar date; the hold is made with no date")
+		}
+	}
+	return rec, warns
+}
+
+// writeImport is the import that writes: in one transaction the migration with
+// the source text and every entry's exact lines, an item for each entry that is
+// one with its legacy identifier kept, a hold for each entry with hold tags,
+// and the receipts of each record. It reads the migration back through its own
+// codec first and refuses the file if what is stored would not render back to
+// the file, so that nothing is written that an export could not return.
+func writeImport(c *cli.Call, src []byte, digest, path, zone string, loc *time.Location, b *Backlog, rep map[string]any) (*cli.Result, error) {
+	now, err := c.Stamp()
+	if err != nil {
+		return nil, envelope.Common(envelope.CodeInternal, "the import cannot be given a time").Because(err)
+	}
+	scope := c.Request.Scope
+	scope.TaskID, scope.Generation = "", 0
+	migID, err := cids.Mint(c.Clock, cids.Migration)
+	if err != nil {
+		return nil, envelope.Common(envelope.CodeInternal, "a migration cannot be given an identity").Because(err)
+	}
+	im := &importer{c: c, loc: loc, zone: zone, now: now, scope: scope, migID: migID, taskOf: map[string]string{}}
+
+	w := walk(b)
+	made := make([]MigrationEntry, len(w.Entries))
+	holdIDs := make([]string, len(w.Entries))
+	seen := map[string]bool{}
+	for i, e := range w.Entries {
+		d, reason := disposition(e.Task, seen)
+		made[i] = MigrationEntry{LegacyID: e.Task.ID, FirstLine: e.FirstLine, Lines: e.Lines, Section: e.Section, Disposition: d, Reason: reason}
+		if d != DispositionItem {
+			continue
+		}
+		if made[i].TaskID, err = cids.Mint(c.Clock, cids.Task); err != nil {
+			return nil, envelope.Common(envelope.CodeInternal, "an item cannot be given an identity").Because(err)
+		}
+		if _, held := im.taskOf[e.Task.ID]; !held {
+			im.taskOf[e.Task.ID] = made[i].TaskID
+		}
+	}
+
+	t := &txn{c: c}
+	var itemRecs, holdRecs []any
+	type staged struct {
+		kind, id string
+		rec      map[string]any
+		task     string
+		scope    envelope.Scope
+	}
+	var rest []staged
+	for i, e := range w.Entries {
+		if made[i].Disposition != DispositionItem {
+			continue
+		}
+		rec, warns := im.itemRecord(e, made[i].TaskID)
+		made[i].Warnings = append(made[i].Warnings, warns...)
+		rest = append(rest, staged{"item", made[i].TaskID, rec, made[i].TaskID, scope})
+		if e.Task.Hold == nil {
+			continue
+		}
+		if holdIDs[i], err = cids.Mint(c.Clock, cids.Hold); err != nil {
+			return nil, envelope.Common(envelope.CodeInternal, "a hold cannot be given an identity").Because(err)
+		}
+		hold, warns := im.holdRecord(made[i].TaskID, holdIDs[i], e.Task.Hold)
+		made[i].Warnings = append(made[i].Warnings, warns...)
+		if hold == nil {
+			holdIDs[i] = ""
+			continue
+		}
+		made[i].HoldID = holdIDs[i]
+		holdScope := scope
+		holdScope.CloneID = ""
+		rest = append(rest, staged{"hold", holdIDs[i], hold, made[i].TaskID, holdScope})
+	}
+
+	// The migration is the first record of the transaction, and its receipt the
+	// first receipt.
+	mrec := encodeMigrationBody(path, digest, src, now, zone, b, made)
+	for k, v := range map[string]any{
+		"schema": "pool.migration", "schema_version": "1.0", "record_revision": int64(1),
+		"migration_id": migID, "imported_at": now, "request_id": c.Request.RequestID,
+		"created_at": now, "updated_at": now,
+	} {
+		mrec[k] = v
+	}
+	putScope(mrec, scope, false)
+	migScope := scope
+	migScope.CloneID = ""
+	final, ref, err := t.put("migration", migID, mrec)
+	if err != nil {
+		return nil, err
+	}
+	// What is stored must lay the file out again and render it back exactly.
+	m, err := DecodeMigration(migID, 1, final)
+	if err == nil {
+		var l *Layout
+		if l, err = m.Layout(); err == nil && l.Text() != string(src) {
+			err = errors.New("the layout renders another text")
+		}
+	}
+	if err != nil {
+		return nil, envelope.Fail(envelope.Refused, codeNotRoundTrip, "the parsed file does not render back byte for byte from the migration that would be stored, so it is not imported").Because(err)
+	}
+	if err := t.receipt("pool.legacy.imported", ref, migScope, ""); err != nil {
+		return nil, err
+	}
+	for _, s := range rest {
+		recFinal, recRef, err := t.put(s.kind, s.id, s.rec)
+		if err != nil {
+			return nil, err
+		}
+		receipt := "pool.item.added"
+		if s.kind == "hold" {
+			receipt = "pool.hold.placed"
+			holdRecs = append(holdRecs, recFinal)
+		} else {
+			itemRecs = append(itemRecs, recFinal)
+		}
+		if err := t.receipt(receipt, recRef, s.scope, s.task); err != nil {
+			return nil, err
+		}
+	}
+	for _, rec := range t.tx.Records {
+		if err := checkScope(c, rec.Body); err != nil {
+			return nil, err
+		}
+	}
+	st, err := poolstore.Stage(c, t.tx)
+	if err != nil {
+		return nil, err
+	}
+
+	// The report names the item each entry became.
+	if rows, _ := rep["entries"].([]any); len(rows) == len(made) {
+		for i, row := range rows {
+			if made[i].TaskID != "" {
+				row.(map[string]any)["task_id"] = made[i].TaskID
+			}
+		}
+	}
+	if itemRecs == nil {
+		itemRecs = []any{}
+	}
+	if holdRecs == nil {
+		holdRecs = []any{}
+	}
+	return st.Result(map[string]any{"report": rep, "migration": final, "items": itemRecs, "holds": holdRecs}), nil
+}
+
+// checkScope refuses a record staged outside the scope of the request.
+func checkScope(c *cli.Call, rec map[string]any) error {
+	if !inScope(c.Request.Scope, rec) {
+		return envelope.Common(envelope.CodeScopeMismatch, "the record is outside the scope of the request")
+	}
+	return nil
 }
