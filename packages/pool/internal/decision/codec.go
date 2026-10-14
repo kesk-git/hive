@@ -188,7 +188,25 @@ func list[T any](o *object, key string, required bool, f func(*object) T) []T {
 
 // trees returns an array member of documents the codec keeps whole.
 func (o *object) trees(key string, required bool) []map[string]any {
-	return list(o, key, required, func(c *object) map[string]any { return copyTree(c.m).(map[string]any) })
+	v, ok := o.raw(key, required)
+	if !ok {
+		return nil
+	}
+	a, isArray := v.([]any)
+	if !isArray {
+		o.fail("%s is not an array", key)
+		return nil
+	}
+	out := make([]map[string]any, 0, len(a))
+	for i, e := range a {
+		m, isObject := e.(map[string]any)
+		if !isObject {
+			o.fail("%s[%d] is not an object", key, i)
+			return nil
+		}
+		out = append(out, copyTree(m).(map[string]any))
+	}
+	return out
 }
 
 // done reports the first fault, or a member the schema does not name.

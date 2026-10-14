@@ -380,3 +380,22 @@ func TestAMalformedOutcomeIsUnavailable(t *testing.T) {
 		}
 	})
 }
+
+// A deferred question whose revisit date is no real instant is omitted as
+// malformed from a read by date, and the read does not claim to be complete.
+func TestAQueryByDateNamesTheQuestionWhoseRevisitDateIsNoInstant(t *testing.T) {
+	p := decisionPool(t)
+	id, body := question(t, "deferred-by-later.json", mint(t, ids.Project), mint(t, ids.Task), "2026-02-30T09:00:00.000Z")
+	if written := p.write(poolstore.Transaction{Records: []poolstore.Write{{Kind: "question", ID: id, Body: body}}}); written.Status != envelope.Ok {
+		t.Fatalf("write: %s %+v", written.Status, written.Error)
+	}
+	resp := p.read("question", map[string]any{"due_before": "2027-01-01T00:00:00.000Z"})
+	if resp.Status != envelope.Ok {
+		t.Fatalf("read: %s %+v", resp.Status, resp.Error)
+	}
+	header := resp.Body["projection"].(map[string]any)
+	omitted, _ := header["omitted"].([]any)
+	if n := len(resp.Body["records"].([]any)); n != 0 || header["complete"] != false || len(omitted) != 1 {
+		t.Errorf("%d records, header %v", n, header)
+	}
+}

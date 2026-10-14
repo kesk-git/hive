@@ -225,3 +225,31 @@ func TestWhatIsNotARecordDoesNotDecode(t *testing.T) {
 		t.Error("a document that is not an object decoded")
 	}
 }
+
+// A released question's disposition keeps the evidence it carries whole, and
+// the record still round trips.
+func TestADispositionKeepsItsEvidence(t *testing.T) {
+	kind, _ := poolstore.Lookup("question")
+	v, _ := canon.Parse(fixtures(t, "question")["released.json"])
+	tree := v.(map[string]any)
+	tree["disposition"].(map[string]any)["evidence"] = []any{
+		map[string]any{"schema": "pool.question", "id": "q_01jc7d8e9f0g1h2j3k4m5n6p7z"},
+	}
+	q, err := ParseQuestion(tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(q.Disposition.Evidence) != 1 || q.Disposition.Evidence[0]["id"] != "q_01jc7d8e9f0g1h2j3k4m5n6p7z" {
+		t.Errorf("the evidence: %+v", q.Disposition)
+	}
+	if canonical(t, q.Tree()) != canonical(t, tree) {
+		t.Errorf("the tree changed:\n got %s\nwant %s", canonical(t, q.Tree()), canonical(t, tree))
+	}
+	encoded, err := q.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := kind.Check(encoded, q.QuestionID, false); err != nil {
+		t.Errorf("what was encoded is not a question: %v", err)
+	}
+}

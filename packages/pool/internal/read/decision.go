@@ -128,9 +128,9 @@ func readKind(c *Context, keep keeper) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	res.Omitted = omitted
 	for _, l := range all {
 		add(l)
 	}
-	res.Omitted = omitted
 	return res, nil
 }
