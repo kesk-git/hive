@@ -318,18 +318,39 @@ func TestExportHoldsInForce(t *testing.T) {
 	refused(t, resp, envelope.Invalid, "pool.legacy_malformed")
 }
 
-// A link is not taken for one the prose holds because its URL is the start of
-// another.
-func TestExportKeepsALinkWhoseURLPrefixesAnotherInTheBody(t *testing.T) {
+// A stored link the body already holds is still written into the title, where
+// a re-parse finds it, and a link whose URL is the start of another in the body
+// is not taken for it.
+func TestExportWritesAStoredLinkTheBodyHolds(t *testing.T) {
 	h := newHome(t)
 	h.leaf("link-a1", "ship the gauge", "done", completed("2026-10-04T00:00:00.000Z"), func(rec map[string]any) {
-		rec["body"] = "Follows https://github.com/acme/app/pull/1234 first."
-		rec["links"] = []any{map[string]any{"kind": "harvest", "url": "https://github.com/acme/app/pull/123"}}
+		rec["body"] = "Merged in https://github.com/acme/app/pull/77 after https://github.com/acme/app/pull/1234."
+		rec["links"] = []any{
+			map[string]any{"kind": "harvest", "url": "https://github.com/acme/app/pull/77"},
+			map[string]any{"kind": "harvest", "url": "https://github.com/acme/app/pull/123"},
+		}
 	})
 	e := h.export(map[string]any{"zone": "UTC"})
 	task, _ := e.task(t, "link-a1")
-	if len(task.Links) != 1 || task.Links[0].URL != "https://github.com/acme/app/pull/123" {
-		t.Errorf("%+v", task.Links)
+	got := []string{}
+	for _, l := range task.Links {
+		got = append(got, l.URL)
+	}
+	if !slices.Equal(got, []string{"https://github.com/acme/app/pull/77", "https://github.com/acme/app/pull/123"}) || task.Closed != "2026-10-04" || !strings.Contains(e.text, "(merged 2026-10-04)") {
+		t.Errorf("links %v, closed %q:\n%s", got, task.Closed, e.text)
+	}
+}
+
+// An item blocked by itself cannot be written in the legacy form, and the
+// export is refused rather than written without the edge.
+func TestExportRefusesAnItemBlockedByItself(t *testing.T) {
+	h := newHome(t)
+	h.leaf("fine-a1", "a plain item", "queued")
+	id := h.leaf("self-b2", "waits on itself", "queued", func(rec map[string]any) { blockedBy(rec["task_id"].(string), "")(rec) })
+	resp := h.do("export-legacy", map[string]any{"zone": "UTC"})
+	refused(t, resp, envelope.Invalid, "pool.legacy_malformed")
+	if resp.Error.Detail["task_id"] != id {
+		t.Errorf("the refusal names %v", resp.Error.Detail)
 	}
 }
 

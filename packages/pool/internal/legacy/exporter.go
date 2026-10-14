@@ -321,13 +321,10 @@ func (r *renderer) task(id string) (*Task, error) {
 			return nil, malformed(err)
 		}
 	}
-	if t.Title, t.Links, err = r.links(t.Title, t.Body, data); err != nil {
+	if t.Title, t.Links, err = r.links(t.Title, data); err != nil {
 		return nil, malformed(err)
 	}
 	for _, e := range read.Edges(data) {
-		if e.TaskID == id {
-			continue
-		}
 		d, err := NormalizeDep(t.ID, Dep{Type: e.Type, ID: r.identity(e.TaskID), Reason: e.Reason})
 		if err != nil {
 			return nil, malformed(err)
@@ -353,12 +350,12 @@ func (r *renderer) date(v any) (string, error) {
 	return at.In(r.loc).Format("2006-01-02"), nil
 }
 
-// links returns the title with the links the item carries that its prose does
-// not yet hold, which is where the legacy form keeps them, and the links that
+// links returns the title with the links the item carries that it does not yet
+// hold, which is where the legacy form keeps them, and the links that
 // title holds as the legacy words name their kinds, which a re-parse derives.
 // A link the legacy form cannot hold, a record reference or a path that is no
 // report, is left out.
-func (r *renderer) links(title, body string, data map[string]any) (string, []item.Link, error) {
+func (r *renderer) links(title string, data map[string]any) (string, []item.Link, error) {
 	for _, v := range asList(data["links"]) {
 		m, _ := v.(map[string]any)
 		url, _ := m["url"].(string)
@@ -376,9 +373,6 @@ func (r *renderer) links(title, body string, data map[string]any) (string, []ite
 		}
 		link := derived[i]
 		if _, err := NormalizeTypedLink(link); err != nil {
-			continue
-		}
-		if slices.ContainsFunc(item.DeriveLinks(body), func(l item.Link) bool { return l.URL == link.URL }) {
 			continue
 		}
 		var err error
