@@ -92,7 +92,9 @@ func Close(c *cli.Call) (*cli.Result, error) {
 	for _, v := range listOf(body["resolved_findings"]) {
 		evidence = append(evidence, evidenceRef("finding", mapOf(v)))
 	}
-	if err := b.receiptAs(receiptID, "pool.specification.closed", ref, scopeOf(n.Data), taskID, evidence); err != nil {
+	scope := scopeOf(n.Data)
+	scope.Generation = generation
+	if err := b.receiptAs(receiptID, "pool.specification.closed", ref, scope, taskID, evidence); err != nil {
 		return nil, err
 	}
 	return b.stage(map[string]any{"specification": final, "closure": closure})

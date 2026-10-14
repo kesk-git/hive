@@ -22,8 +22,12 @@ import (
 // Define writes a revision of a specification.
 func Define(c *cli.Call) (*cli.Result, error) {
 	body := c.Request.Body
+	touched, ok := body["touched_subjects"].([]any)
+	if !ok {
+		return nil, invalid("a define request carries touched_subjects, empty where no subject is touched")
+	}
 	subjects := map[string]bool{}
-	for _, v := range listOf(body["touched_subjects"]) {
+	for _, v := range touched {
 		s, _ := v.(string)
 		if subjects[s] {
 			return nil, invalid("touched_subjects names a subject twice")
@@ -80,10 +84,7 @@ func Define(c *cli.Call) (*cli.Result, error) {
 	rev := map[string]any{
 		"revision": number, "text": body["text"], "criteria": copyValue(body["criteria"]),
 		"defined_at": now, "defined_by": callerTree(c), "authority": authorityTree(c), "request_id": c.Request.RequestID,
-		"touched_subjects": []any{},
-	}
-	if v, ok := body["touched_subjects"]; ok {
-		rev["touched_subjects"] = copyValue(v)
+		"touched_subjects": copyValue(touched),
 	}
 	for _, name := range []string{"product_rules", "plan_stage"} {
 		if v, ok := body[name]; ok {

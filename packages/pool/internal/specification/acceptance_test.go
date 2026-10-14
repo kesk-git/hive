@@ -652,6 +652,22 @@ func TestCloseIsRecordedOnceAndAnInterruptedCloseReplays(t *testing.T) {
 	if closed != 1 {
 		t.Errorf("%d closed receipts", closed)
 	}
+	if again.Receipts[0].Scope.Generation != 1 || again.Receipts[0].Scope.TaskID != H {
+		t.Errorf("the closed receipt names task %q generation %d", again.Receipts[0].Scope.TaskID, again.Receipts[0].Scope.Generation)
+	}
+	events := 0
+	for name, text := range h.files("journal") {
+		if !strings.Contains(text, `"pool.specification.closed"`) {
+			continue
+		}
+		events++
+		if !strings.Contains(text, `"generation":1`) || !strings.Contains(text, `"task_id":"`+H+`"`) {
+			t.Errorf("the closed event %s names no generation: %s", name, text)
+		}
+	}
+	if events != 1 {
+		t.Errorf("%d closed events", events)
+	}
 
 	// The same request again is the recorded answer, and another request for
 	// the same closure is refused.
@@ -697,6 +713,9 @@ func TestDefineRefusesADuplicateSubjectAndAnUntitledSpecification(t *testing.T) 
 	h.quiet(func() {
 		refused(t, h.spec("define", define("Titled", "Prose.", criteria(), map[string]any{"touched_subjects": []any{s, s}})), envelope.Invalid, envelope.CodeSchemaViolation)
 		refused(t, h.spec("define", define("", "Prose.", criteria(), nil)), envelope.Invalid, envelope.CodeSchemaViolation)
+		omitted := define("Titled", "Prose.", criteria(), nil)
+		delete(omitted, "touched_subjects")
+		refused(t, h.spec("define", omitted), envelope.Invalid, envelope.CodeSchemaViolation)
 	})
 	id := h.defined(criteria(), nil)
 	h.quiet(func() {
@@ -707,4 +726,35 @@ func TestDefineRefusesADuplicateSubjectAndAnUntitledSpecification(t *testing.T) 
 	if got := h.stored("specification", id)["current_revision"]; got != int64(1) {
 		t.Errorf("current_revision %v", got)
 	}
+}
+
+// An existing coverage holds only while an item stands bound to the covering
+// revision: an acceptance entry left in the history by a binding that was
+// since lost does not cover.
+func TestAnExistingCoverageNeedsAStandingBinding(t *testing.T) {
+	h := newHome(t)
+	a, u := h.addID(leaf("A", false)), h.addID(leaf("U", false))
+	id := h.defined(criteria(), nil)
+	covering := h.defined(criteria(), nil)
+	h.accepted(covering, 1, a)
+
+	prose := h.ok(h.revise(covering, "Only the prose changes.", criteria(), map[string]any{"touched_subjects": []any{}}))
+	if len(prose["invalidated"].([]any)) != 0 {
+		t.Fatalf("a prose-only revision invalidated %v", prose["invalidated"])
+	}
+	h.accepted(covering, 2, a)
+	changed := h.ok(h.revise(covering, "Criteria change.", []any{criterion("other", "Another outcome holds.", "A test shows it.")}, map[string]any{"touched_subjects": []any{}}))
+	if len(changed["invalidated"].([]any)) != 1 {
+		t.Fatalf("invalidated %v", changed["invalidated"])
+	}
+
+	digest := revisionOf(t, h.stored("specification", covering), 1)["digest"]
+	b := acceptBody(id, 1, u)
+	b["need_test"] = map[string]any{
+		"outcome": "The counter resets.", "coverage": "existing", "reason": "The covering specification covers it.",
+		"covering_specification": map[string]any{"specification_id": covering, "revision": int64(1), "digest": digest},
+	}
+	h.quiet(func() {
+		refused(t, h.spec("accept", b), envelope.Refused, "pool.specification_unaccepted")
+	})
 }

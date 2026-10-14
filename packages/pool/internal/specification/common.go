@@ -219,6 +219,9 @@ func (b *builder) receiptAs(receiptID, kind string, subject *envelope.RecordRef,
 	if taskID != "" {
 		event["task_id"] = taskID
 	}
+	if scope.Generation != 0 {
+		event["generation"] = scope.Generation
+	}
 	content, err := canon.Encode(event)
 	if err != nil {
 		return internal("an event cannot be written", err)

@@ -67,7 +67,7 @@ func Accept(c *cli.Call) (*cli.Result, error) {
 		}
 	}
 	if needTest["coverage"] == "existing" {
-		if err := checkCovering(c, cur, mapOf(needTest["covering_specification"])); err != nil {
+		if err := checkCovering(c, g, cur, mapOf(needTest["covering_specification"])); err != nil {
 			return nil, err
 		}
 	}
@@ -139,9 +139,9 @@ func (b *builder) accept(n *read.Node) error {
 }
 
 // checkCovering holds an existing coverage to the covering specification it
-// names: that specification, at that revision and digest, must carry an
-// acceptance that stands.
-func checkCovering(c *cli.Call, cur *poolstore.Loaded, ref map[string]any) error {
+// names: that specification, at that revision and digest, must stand bound to
+// an item. An acceptance entry alone is history and does not stand.
+func checkCovering(c *cli.Call, g *read.Graph, cur *poolstore.Loaded, ref map[string]any) error {
 	unaccepted := refuse(codeSpecificationUnaccepted, "the covering specification is not an accepted specification")
 	id, _ := ref["specification_id"].(string)
 	revision, _ := ref["revision"].(int64)
@@ -161,8 +161,8 @@ func checkCovering(c *cli.Call, cur *poolstore.Loaded, ref map[string]any) error
 	if rev == nil || rev["digest"] != digest {
 		return unaccepted
 	}
-	for _, v := range listOf(covering.Data["acceptances"]) {
-		if a := mapOf(v); a["revision"] == revision && a["digest"] == digest && a["state"] == "accepted" {
+	for _, id := range g.Order {
+		if bound, r, d, ok := bindingOf(g.Items[id].Data); ok && bound == covering.ID && r == revision && d == digest {
 			return nil
 		}
 	}

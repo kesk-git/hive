@@ -323,7 +323,7 @@ func criteria() []any {
 func subject(t testing.TB) string { return "subj_" + strings.TrimPrefix(mint(t, ids.Task), "task_") }
 
 func define(title string, text string, crit []any, extra map[string]any) map[string]any {
-	b := map[string]any{"text": text, "criteria": crit}
+	b := map[string]any{"text": text, "criteria": crit, "touched_subjects": []any{}}
 	if title != "" {
 		b["title"] = title
 	}
