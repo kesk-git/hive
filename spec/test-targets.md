@@ -31,20 +31,6 @@ Every committed schema requires at least one accepted example and one refused ex
 
 | Schema path under `spec/schemas/` | Fixtures owed |
 | --- | --- |
-| `ops/hive-admit.approve.request.v1.schema.json` | stage 2 |
-| `ops/hive-admit.approve.response.v1.schema.json` | stage 2 |
-| `ops/hive-admit.check.request.v1.schema.json` | stage 2 |
-| `ops/hive-admit.check.response.v1.schema.json` | stage 2 |
-| `ops/hive-admit.create.request.v1.schema.json` | stage 2 |
-| `ops/hive-admit.create.response.v1.schema.json` | stage 2 |
-| `ops/hive-imperative.create.request.v1.schema.json` | stage 2 |
-| `ops/hive-imperative.create.response.v1.schema.json` | stage 2 |
-| `ops/hive-imperative.deliver.request.v1.schema.json` | stage 2 |
-| `ops/hive-imperative.deliver.response.v1.schema.json` | stage 2 |
-| `ops/hive-imperative.render.request.v1.schema.json` | stage 2 |
-| `ops/hive-imperative.render.response.v1.schema.json` | stage 2 |
-| `ops/hive-imperative.revise.request.v1.schema.json` | stage 2 |
-| `ops/hive-imperative.revise.response.v1.schema.json` | stage 2 |
 | `ops/hive-memory.check.request.v1.schema.json` | stage 2 |
 | `ops/hive-memory.check.response.v1.schema.json` | stage 2 |
 | `ops/hive-memory.propagate.request.v1.schema.json` | stage 2 |
@@ -69,8 +55,6 @@ Every committed schema requires at least one accepted example and one refused ex
 | `ops/hive-spec.close.response.v1.schema.json` | stage 2 |
 | `ops/hive-spec.define.request.v1.schema.json` | stage 2 |
 | `ops/hive-spec.define.response.v1.schema.json` | stage 2 |
-| `records/pool.admission.v1.schema.json` | stage 2 |
-| `records/pool.imperative.v1.schema.json` | stage 2 |
 | `records/pool.migration.v1.schema.json` | stage 2 |
 | `records/pool.projection.v1.schema.json` | stage 2 |
 | `records/pool.rule.v1.schema.json` | stage 2 |
