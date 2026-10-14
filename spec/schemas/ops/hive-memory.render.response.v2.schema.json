@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:hive:schema:ops:hive-memory.render.response:v1",
+  "$id": "urn:hive:schema:ops:hive-memory.render.response:v2",
   "title": "hive-memory render: response body",
   "type": "object",
   "additionalProperties": false,
@@ -10,7 +10,7 @@
   ],
   "properties": {
     "projection": {
-      "$ref": "urn:hive:schema:records:pool.projection:v1"
+      "$ref": "urn:hive:schema:records:pool.projection:v2"
     },
     "unchanged": {
       "description": "True when the rendering equals the current one by digest: nothing was written.",

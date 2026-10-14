@@ -1,0 +1,3 @@
+{"name":"minimal-missing-recorded","base":"minimal.json","edits":[{"op":"remove","path":"/recorded"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}
+{"name":"recorded-incident-bad-evidence","base":"recorded-incident.json","edits":[{"op":"replace","path":"/miss/provenance/evidence","value":[]}]}

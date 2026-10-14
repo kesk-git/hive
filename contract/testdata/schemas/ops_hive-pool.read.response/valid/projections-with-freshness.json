@@ -9,14 +9,14 @@
   "records": [
     {
       "schema": "pool.projection",
-      "schema_version": "1.0",
+      "schema_version": "2.0",
       "record_revision": 2,
       "projection_id": "mem_01jc7d8e9f0g1h2j3k4m5n6p7e",
       "scope_level": "project",
       "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
       "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
       "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
-      "audience": "project",
+      "audience": "class-3",
       "current": {
         "rendering": 2,
         "rendered_at": "2026-10-12T09:30:00.000Z",
@@ -34,13 +34,15 @@
         ],
         "text": "Answer in the language of the question.\n",
         "digest": "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
-        "bytes": 40
+        "bytes": 40,
+        "rules": []
       },
       "consumers": [
         {
           "consumer": {
-            "kind": "file",
-            "path": "project/AGENTS.md"
+            "kind": "session",
+            "session_id": "sess_01jc7d8e9f0g1h2j3k4m5n6p7e",
+            "session_generation": 1
           },
           "received": {
             "rendering": 2,
@@ -57,7 +59,26 @@
         "command": "hive-memory",
         "operation": "render",
         "implementation_version": "0.1.0"
-      }
+      },
+      "tier": "subject",
+      "subject_id": "subj_01jc7d8e9f0g1h2j3k4m5n6p7s",
+      "budget_revision": 1,
+      "receipt_history": [
+        {
+          "consumer": {
+            "kind": "session",
+            "session_id": "sess_01jc7d8e9f0g1h2j3k4m5n6p7e",
+            "session_generation": 1
+          },
+          "received": {
+            "rendering": 2,
+            "digest": "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "at": "2026-10-12T10:00:00.000Z",
+            "receipt_id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7y"
+          }
+        }
+      ],
+      "history": []
     }
   ],
   "derived": [

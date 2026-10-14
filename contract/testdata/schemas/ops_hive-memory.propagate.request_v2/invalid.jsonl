@@ -1,0 +1,8 @@
+{"name":"minimal-bad-step","base":"minimal.json","edits":[{"op":"replace","path":"/step","value":"not-allowed"}]}
+{"name":"minimal-missing-at","base":"minimal.json","edits":[{"op":"remove","path":"/at"}]}
+{"name":"minimal-missing-consumer","base":"minimal.json","edits":[{"op":"remove","path":"/consumer"}]}
+{"name":"minimal-missing-digest","base":"minimal.json","edits":[{"op":"remove","path":"/digest"}]}
+{"name":"minimal-missing-projection-id","base":"minimal.json","edits":[{"op":"remove","path":"/projection_id"}]}
+{"name":"minimal-missing-rendering","base":"minimal.json","edits":[{"op":"remove","path":"/rendering"}]}
+{"name":"minimal-missing-step","base":"minimal.json","edits":[{"op":"remove","path":"/step"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

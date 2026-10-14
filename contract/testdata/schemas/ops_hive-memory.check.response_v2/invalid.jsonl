@@ -1,0 +1,7 @@
+{"name":"minimal-missing-budget-revision","base":"minimal.json","edits":[{"op":"remove","path":"/budget_revision"}]}
+{"name":"minimal-missing-checked-at","base":"minimal.json","edits":[{"op":"remove","path":"/checked_at"}]}
+{"name":"minimal-missing-projections","base":"minimal.json","edits":[{"op":"remove","path":"/projections"}]}
+{"name":"minimal-missing-subjects","base":"minimal.json","edits":[{"op":"remove","path":"/subjects"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}
+{"name":"second-independent-miss-negative-count","base":"second-independent-miss.json","edits":[{"op":"replace","path":"/subjects/0/independent_misses","value":-1}]}
+{"name":"second-independent-miss-untyped-due","base":"second-independent-miss.json","edits":[{"op":"replace","path":"/subjects/0/decision_due","value":"yes"}]}

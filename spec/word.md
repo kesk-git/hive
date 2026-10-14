@@ -56,6 +56,8 @@ A round is `open` while any of its cards is `open`, and `closed` from the moment
 
 A review's [final record](review.md#finaljson) reads each card's decision in these states: `pending` for a question open or deferred, `accepted` for one answered, `released`, `completed`, and `superseded` for one closed as moot, each with the receipt that establishes it.
 
+Second-miss questions use the subject-origin deduplication rule of [Generated knowledge](pool.md#generated-knowledge); the Pool enforces it under its write lock.
+
 ## Operations
 
 Each mutating operation is one handoff to one `hive-pool` operation, which does all of what follows in one transaction and writes the receipts named, with the Pool's events that [pool.md](pool.md#receipts-and-events) lists for them. Who may send each, by the envelope's `caller`, which is attribution and never authentication:

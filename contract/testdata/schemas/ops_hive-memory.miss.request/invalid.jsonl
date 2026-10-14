@@ -1,0 +1,7 @@
+{"name":"minimal-bad-step","base":"minimal.json","edits":[{"op":"replace","path":"/step","value":"not-allowed"}]}
+{"name":"minimal-missing-actor","base":"minimal.json","edits":[{"op":"remove","path":"/actor"}]}
+{"name":"minimal-missing-observed-at","base":"minimal.json","edits":[{"op":"remove","path":"/observed_at"}]}
+{"name":"minimal-missing-provenance","base":"minimal.json","edits":[{"op":"remove","path":"/provenance"}]}
+{"name":"minimal-missing-rule","base":"minimal.json","edits":[{"op":"remove","path":"/rule"}]}
+{"name":"minimal-missing-step","base":"minimal.json","edits":[{"op":"remove","path":"/step"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

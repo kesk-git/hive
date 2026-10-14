@@ -1,0 +1,11 @@
+{"name":"minimal-bad-audience","base":"minimal.json","edits":[{"op":"replace","path":"/audience","value":"not-allowed"}]}
+{"name":"minimal-bad-tier","base":"minimal.json","edits":[{"op":"replace","path":"/tier","value":"not-allowed"}]}
+{"name":"minimal-missing-audience","base":"minimal.json","edits":[{"op":"remove","path":"/audience"}]}
+{"name":"minimal-missing-tier","base":"minimal.json","edits":[{"op":"remove","path":"/tier"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}
+{"name":"subject-bad-audience","base":"subject.json","edits":[{"op":"replace","path":"/audience","value":"not-allowed"}]}
+{"name":"subject-bad-tier","base":"subject.json","edits":[{"op":"replace","path":"/tier","value":"not-allowed"}]}
+{"name":"subject-identity-required","base":"subject.json","edits":[{"op":"remove","path":"/subject_id"}]}
+{"name":"subject-missing-audience","base":"subject.json","edits":[{"op":"remove","path":"/audience"}]}
+{"name":"subject-missing-tier","base":"subject.json","edits":[{"op":"remove","path":"/tier"}]}
+{"name":"subject-unknown","base":"subject.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

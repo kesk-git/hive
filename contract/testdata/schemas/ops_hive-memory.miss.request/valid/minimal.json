@@ -1,0 +1,36 @@
+{
+  "rule": {
+    "rule_id": "rule_01000000000000000000000000",
+    "record_revision": 9007199254740991
+  },
+  "actor": {
+    "kind": "session",
+    "session_id": "sess_01j9xk3m2nq4r5s6t7v8w9xyza",
+    "session_generation": 9007199254740991
+  },
+  "step": "dispatch",
+  "provenance": {
+    "incident": {
+      "schema": "pool.item",
+      "id": "item_01j9xk3m2nq4r5s6t7v8w9xyzp",
+      "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+      "record_revision": 3,
+      "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab"
+    },
+    "observer": {
+      "kind": "test"
+    },
+    "independence": "independent",
+    "derived_from": [],
+    "evidence": [
+      {
+        "schema": "pool.item",
+        "id": "item_01j9xk3m2nq4r5s6t7v8w9xyzp",
+        "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+        "record_revision": 3,
+        "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab"
+      }
+    ]
+  },
+  "observed_at": "2026-10-11T08:00:00.000Z"
+}

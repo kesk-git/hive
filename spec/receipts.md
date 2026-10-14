@@ -42,7 +42,7 @@ The kinds registered at stage 1:
 | `dispatch.clone.registered` | A physical clone was bound to one project. | Empty |
 | `dispatch.session-input.accepted` | One input was placed durably in a session's canonical input sequence. | [`receipts/dispatch.session-input.accepted.v1`](schemas/receipts/dispatch.session-input.accepted.v1.schema.json) |
 
-Stage 2 registers the thirty-four kinds of the Pool in [`packages/pool/hive-package.json`](../packages/pool/hive-package.json), each with an empty body, as [pool.md](pool.md#receipts-and-events) describes; nine of them are those of the questions the Mind's word persists, which [word.md](word.md#operations) gives. `word` registers none: the receipts of a `hive-word` request are the Pool's.
+Stage 2 registers the thirty-seven kinds of the Pool in [`packages/pool/hive-package.json`](../packages/pool/hive-package.json), each with an empty body, as [pool.md](pool.md#receipts-and-events) describes; nine of them are those of the questions the Mind's word persists, which [word.md](word.md#operations) gives. `word` registers none: the receipts of a `hive-word` request are the Pool's.
 
 ## Rules
 

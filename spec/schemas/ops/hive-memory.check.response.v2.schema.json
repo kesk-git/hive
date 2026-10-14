@@ -1,12 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:hive:schema:ops:hive-memory.check.response:v1",
+  "$id": "urn:hive:schema:ops:hive-memory.check.response:v2",
   "title": "hive-memory check: response body",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "checked_at",
-    "projections"
+    "projections",
+    "budget_revision",
+    "subjects"
   ],
   "properties": {
     "checked_at": {
@@ -25,7 +27,8 @@
           "over_budget",
           "stale_sources",
           "duplicates",
-          "drift"
+          "drift",
+          "max_bytes"
         ],
         "properties": {
           "projection_id": {
@@ -33,9 +36,19 @@
           },
           "audience": {
             "enum": [
-              "shared",
+              "hive",
               "fleet",
-              "project"
+              "class-0",
+              "class-1",
+              "class-2",
+              "class-3",
+              "class-4",
+              "class-5",
+              "class-6",
+              "class-7",
+              "reviewer",
+              "fixer",
+              "validation"
             ]
           },
           "state": {
@@ -82,8 +95,51 @@
             "description": "Consumers that received or acknowledged a digest other than the current one.",
             "type": "array",
             "items": {
-              "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/consumer"
+              "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/consumer"
             }
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "budget_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "subjects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subject_id",
+          "independent_misses",
+          "misses",
+          "decision_due"
+        ],
+        "properties": {
+          "subject_id": {
+            "type": "string",
+            "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+          },
+          "independent_misses": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "misses": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^miss_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+            }
+          },
+          "decision_due": {
+            "type": "boolean"
+          },
+          "question_id": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/question_id"
           }
         }
       }
