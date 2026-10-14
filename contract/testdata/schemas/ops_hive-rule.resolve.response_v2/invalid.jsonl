@@ -1,0 +1,6 @@
+{"name":"minimal-missing-at","base":"minimal.json","edits":[{"op":"remove","path":"/at"}]}
+{"name":"minimal-missing-conflicts","base":"minimal.json","edits":[{"op":"remove","path":"/conflicts"}]}
+{"name":"minimal-missing-excluded","base":"minimal.json","edits":[{"op":"remove","path":"/excluded"}]}
+{"name":"minimal-missing-role","base":"minimal.json","edits":[{"op":"remove","path":"/role"}]}
+{"name":"minimal-missing-rules","base":"minimal.json","edits":[{"op":"remove","path":"/rules"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

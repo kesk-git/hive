@@ -1,0 +1,3 @@
+{"name":"minimal-missing-intake","base":"minimal.json","edits":[{"op":"remove","path":"/intake"}]}
+{"name":"minimal-missing-projections","base":"minimal.json","edits":[{"op":"remove","path":"/projections"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

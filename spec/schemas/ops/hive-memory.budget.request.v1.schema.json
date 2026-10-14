@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.budget.request:v1",
+  "title": "hive-memory budget: request body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "projections",
+    "intake"
+  ],
+  "properties": {
+    "projections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "projection_id",
+          "max_bytes"
+        ],
+        "properties": {
+          "projection_id": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "intake": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    }
+  }
+}

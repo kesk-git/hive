@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.budget:v1",
+  "title": "Projection budget configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "budget_id",
+    "home_id",
+    "defaults",
+    "projections",
+    "changes",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.budget"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "budget_id": {
+      "const": "memory"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hive_always",
+        "fleet_always",
+        "subject"
+      ],
+      "properties": {
+        "hive_always": {
+          "const": 18432
+        },
+        "fleet_always": {
+          "const": 4608
+        },
+        "subject": {
+          "const": 9216
+        }
+      }
+    },
+    "projections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "projection_id",
+          "max_bytes"
+        ],
+        "properties": {
+          "projection_id": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "authority",
+          "intake",
+          "before",
+          "after",
+          "recorded_at",
+          "request_id",
+          "receipt_id"
+        ],
+        "properties": {
+          "sequence": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/sequence"
+          },
+          "authority": {
+            "description": "Only the Hive Mind's word changes a budget.",
+            "allOf": [
+              {
+                "$ref": "urn:hive:schema:common:v1#/$defs/authority"
+              },
+              {
+                "properties": {
+                  "kind": {
+                    "const": "word"
+                  }
+                }
+              }
+            ]
+          },
+          "intake": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          },
+          "before": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "projection_id",
+                "max_bytes"
+              ],
+              "properties": {
+                "projection_id": {
+                  "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "projection_id",
+                "max_bytes"
+              ],
+              "properties": {
+                "projection_id": {
+                  "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "recorded_at": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+          },
+          "request_id": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+          },
+          "receipt_id": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
+          }
+        }
+      }
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  }
+}

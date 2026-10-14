@@ -4,7 +4,7 @@
   "name": "pool",
   "kind": "package",
   "title": "Pool",
-  "owns": "Pool storage and migrations; admission records; Imperatives; accepted specifications; original rules and their projections, including temporary rules with an expiry or lift condition; generated knowledge projections; and the questions and decision rounds of the Mind's word. It is the one store that word persists decisions in.",
+  "owns": "Pool storage and migrations; admission records; Imperatives; accepted specifications; original rules and their projections, including temporary rules with an expiry or lift condition; generated knowledge projections; and the questions and decision rounds of the Mind's word. It is the one store that word persists decisions in. Subjects and canonical mechanics facts, and word-authorized projection budgets.",
   "plan_stage": 2,
   "executable": "hive-pool",
   "commands": [
@@ -74,7 +74,8 @@
       "operations": [
         "render",
         "check",
-        "propagate"
+        "propagate",
+        "budget"
       ]
     }
   ],
@@ -155,7 +156,7 @@
     },
     {
       "kind": "pool.rule.recorded",
-      "asserts": "A ruling was recorded verbatim with its subject, scope, authority, rule line and effective time."
+      "asserts": "A ruling was recorded verbatim with its kind, subject, scope, authority and effective time, and an operating rule with its tier and rule line, a product rule with none."
     },
     {
       "kind": "pool.rule.amended",
@@ -220,10 +221,14 @@
     {
       "kind": "pool.question.mooted",
       "asserts": "A question with no applied answer was closed as moot on the evidence named, with no answer recorded or implied."
+    },
+    {
+      "kind": "pool.budget.changed",
+      "asserts": "Named projection budgets were changed on the standing word named."
     }
   ],
   "test_target": "test-pool",
-  "test_scope": "Record round trips, transitions, concurrent writes, migration and recovery, and rule expiry by the clock and lift by receipt. From stage 2: byte-exact legacy round trip and identity migration; admission with each requested place, Codex Cloud refused, a Void place refused for a local-only project and held for an unpushed branch; criteria carried from Pool to Imperative by revision; deterministic rendering; a home inside a repository refused; a persistent Fleet never an ordinary task; no worktree assumed; dependencies satisfied only by the completion marker kept through archival, a date-less imported completion included, and checked before every generation opens; export placing each item in the section of its state; identity reads that recover first; an imported dated word hold still blocking after its date; secrets by reference only; and the records and operations of the Mind's word: an answer idempotent by source within its question, a late answer and a late Later recorded unreconciled, a disposition only on an applied answer and a moot close only on evidence that holds, and the six refused to any caller but a handoff from hive-word.",
+  "test_scope": "Record round trips, transitions, concurrent writes, migration and recovery, and rule expiry by the clock and lift by receipt. From stage 2: byte-exact legacy round trip and identity migration; admission with each requested place, Codex Cloud refused, a Void place refused for a local-only project and held for an unpushed branch; criteria carried from Pool to Imperative by revision; deterministic rendering; a home inside a repository refused; a persistent Fleet never an ordinary task; no worktree assumed; dependencies satisfied only by the completion marker kept through archival, a date-less imported completion included, and checked before every generation opens; export placing each item in the section of its state; identity reads that recover first; an imported dated word hold still blocking after its date; secrets by reference only; and the records and operations of the Mind's word: an answer idempotent by source within its question, a late answer and a late Later recorded unreconciled, a disposition only on an applied answer and a moot close only on evidence that holds, and the six refused to any caller but a handoff from hive-word. The contracts introduced by the Pool memory definition at 2.0, with their shapes and semantic acceptance cases.",
   "calls": [],
   "executes": {
     "core": [],

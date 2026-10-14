@@ -7,10 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 // fixtureRoot is where spec/layout.md keeps the fixtures of the schemas:
-// contract/testdata/schemas/<name>/.
+// contract/testdata/schemas/<name>/ or <name>_v<major>/ after major 1.
 const fixtureRoot = "../testdata/schemas"
 
 // TestFixturesProveTheCommittedSchemas runs every example under fixtureRoot
@@ -25,7 +26,8 @@ const fixtureRoot = "../testdata/schemas"
 // brings its fixtures.
 //
 // Each directory <name> directly under fixtureRoot names the schema whose
-// $id is urn:hive:schema:<name>:v1, where a schema under a subdirectory of
+// $id is urn:hive:schema:<name>:v1 unless a terminal _v<major> selects a
+// later major, where a schema under a subdirectory of
 // spec/schemas/ has the colons of its $id written as underscores: the
 // fixtures of receipts/x.v1.schema.json sit under receipts_x/. A directory
 // naming no schema fails.
@@ -216,7 +218,75 @@ func fixtureDirs(root string) (names, problems []string) {
 
 // schemaIDFor turns a fixture directory name into the $id it names.
 func schemaIDFor(dir string) string {
-	return idPrefix + strings.ReplaceAll(dir, "_", ":") + ":v1"
+	name, major := dir, "1"
+	if i := strings.LastIndex(dir, "_v"); i >= 0 && dir[i+2:] != "" && strings.Trim(dir[i+2:], "0123456789") == "" {
+		name, major = dir[:i], dir[i+2:]
+		if major == "1" || !fixtureMajor.MatchString(major) {
+			return ""
+		}
+	}
+	id := idPrefix + strings.ReplaceAll(name, "_", ":") + ":v" + major
+	if canonical, ok := fixtureDirFor(id); !ok || canonical != dir {
+		return ""
+	}
+	return id
+}
+
+// Two majors of one schema consume different fixtures; neither may borrow
+// the other's acceptance or refusal proof.
+func TestFixtureWalkerSeparatesSchemaMajors(t *testing.T) {
+	const v1 = "urn:hive:schema:example:v1"
+	const v2 = "urn:hive:schema:example:v2"
+	r, err := Load(fstest.MapFS{
+		"example.v1.schema.json": file(v1, `"const":1`),
+		"example.v2.schema.json": file(v2, `"const":2`),
+	}, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := fixtureTree(t, map[string]string{
+		"example/valid/one.json":      "1\n",
+		"example/invalid/two.json":    "2\n",
+		"example_v2/valid/two.json":   "2\n",
+		"example_v2/invalid/one.json": "1\n",
+	})
+	if got := checkFixtureTree(r, root, r.IDs(), nil); len(got) != 0 {
+		t.Fatalf("correct major-specific proofs failed: %v", got)
+	}
+	if err := os.RemoveAll(filepath.Join(root, "example_v2")); err != nil {
+		t.Fatal(err)
+	}
+	got := checkFixtureTree(r, root, r.IDs(), nil)
+	if !mentions(got, "example_v2", "no accepted example") || !mentions(got, "example_v2", "no refused example") {
+		t.Errorf("v1 proof satisfied a missing v2 directory: %v", got)
+	}
+	deferred := []fixtureDeferral{{ID: v2, Stage: 2}}
+	if got := checkFixtureTree(r, root, r.IDs(), deferred); len(got) != 0 {
+		t.Errorf("a v2 deferral affected the complete v1 proof: %v", got)
+	}
+	if err := os.Mkdir(filepath.Join(root, "example_v2"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if got := checkFixtureTree(r, root, r.IDs(), deferred); !mentions(got, "example_v2", "deferred", "has fixtures") {
+		t.Errorf("a v2 directory beside its deferral was accepted: %v", got)
+	}
+}
+
+func TestFixtureWalkerSelectsDefinitionsForLaterCommonMajors(t *testing.T) {
+	const id = "urn:hive:schema:common:v2"
+	r, err := Load(fstest.MapFS{
+		"common.v2.schema.json": file(id, `"$defs":{"sample":{"const":2}}`),
+	}, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := fixtureTree(t, map[string]string{
+		"common_v2/valid/sample.two.json":   "2\n",
+		"common_v2/invalid/sample.one.json": "1\n",
+	})
+	if got := checkFixtureTree(r, root, r.IDs(), nil); len(got) != 0 {
+		t.Errorf("later common major did not select its definition: %v", got)
+	}
 }
 
 // checkFixtureDir checks the fixtures of the schema directory name under
@@ -399,7 +469,7 @@ func examplesIn(dir string, problems *[]string) []string {
 // refFor names the schema the example at p is checked against: the
 // directory's schema, or for common, the definition the file name selects.
 func refFor(name, id, p string, problems *[]string) (string, bool) {
-	if name != "common" {
+	if !strings.HasPrefix(id, idPrefix+"common:v") {
 		return id, true
 	}
 	def, label, found := strings.Cut(strings.TrimSuffix(filepath.Base(p), ".json"), ".")

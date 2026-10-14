@@ -1,0 +1,12 @@
+{
+  "subject": "example.subject",
+  "words": "Example fact.",
+  "origin": {
+    "kind": "ruling"
+  },
+  "applies": [],
+  "kind": "product",
+  "governs": {
+    "target_id": "task_01000000000000000000000000"
+  }
+}

@@ -1,0 +1,2 @@
+{"name":"minimal-missing-rule","base":"minimal.json","edits":[{"op":"remove","path":"/rule"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

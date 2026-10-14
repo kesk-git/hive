@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:hive:schema:records:pool.rule:v1",
+  "$id": "urn:hive:schema:records:pool.rule:v2",
   "title": "Rule",
-  "description": "One ruling, kept verbatim with its origin, scope, status, effective and expiry times, one rendered rule line and its attributed amendments, at pool/records/rule/<rule_id>.json. A temporary rule is this same record with an expiry time, a lift condition or both. See spec/pool.md, Rules.",
+  "description": "A kind-tagged ruling. Operating rulings render a capped line in their tier and filing subject; product rulings name governed work and specification bindings and render no line. See spec/pool.md, Rules and Contract versions.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,7 +15,6 @@
     "subject",
     "words",
     "origin",
-    "rule_line",
     "applies",
     "status",
     "effective_at",
@@ -23,7 +22,8 @@
     "amendments",
     "created_at",
     "updated_at",
-    "writer"
+    "writer",
+    "kind"
   ],
   "properties": {
     "schema": {
@@ -31,7 +31,7 @@
     },
     "schema_version": {
       "enum": [
-        "1.0"
+        "2.0"
       ]
     },
     "record_revision": {
@@ -60,9 +60,8 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/generation"
     },
     "subject": {
-      "description": "What the rule governs, as a fixed key such as hunt-limit, model-default or assimilation.posture. Two rules in force on one subject at one scope are a conflict unless one of them names the other in changes.",
       "type": "string",
-      "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z][a-z0-9-]{0,62}){0,3}$"
+      "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
     },
     "words": {
       "description": "The Hive Mind's exact words, or the request text as submitted. Never rewritten.",
@@ -94,13 +93,13 @@
       "description": "The one rendered rule line: the operational interpretation of the words, supplied by the recorder, without its source suffix. The resolver appends the source and revision.",
       "type": "string",
       "minLength": 1,
-      "maxLength": 500
+      "maxLength": 300
     },
     "applies": {
       "description": "Which roles the rule applies to. Empty means every role.",
       "type": "array",
       "items": {
-        "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/role"
+        "$ref": "urn:hive:schema:records:pool.rule:v2#/$defs/role"
       }
     },
     "status": {
@@ -179,7 +178,7 @@
       "description": "Attributed revisions of the rule's operation, never of its words or dates: an extension, an early end, a lift, a supersession or a note. Each is appended.",
       "type": "array",
       "items": {
-        "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/amendment"
+        "$ref": "urn:hive:schema:records:pool.rule:v2#/$defs/amendment"
       }
     },
     "expiry": {
@@ -215,6 +214,61 @@
     },
     "unknown": {
       "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    },
+    "kind": {
+      "enum": [
+        "operating",
+        "product"
+      ]
+    },
+    "tier": {
+      "enum": [
+        "always",
+        "subject"
+      ]
+    },
+    "filed_under": {
+      "type": "string",
+      "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "governs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "target_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        },
+        "stage": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "target_id"
+          ],
+          "properties": {
+            "stage": false
+          }
+        },
+        {
+          "required": [
+            "stage"
+          ],
+          "properties": {
+            "target_id": false
+          }
+        }
+      ]
+    },
+    "specifications": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
+      }
     }
   },
   "allOf": [
@@ -238,6 +292,37 @@
       "else": {
         "properties": {
           "expiry": false
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "operating"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "tier",
+          "filed_under",
+          "rule_line"
+        ],
+        "properties": {
+          "governs": false,
+          "specifications": false
+        }
+      },
+      "else": {
+        "required": [
+          "governs",
+          "specifications"
+        ],
+        "properties": {
+          "tier": false,
+          "filed_under": false,
+          "rule_line": false
         }
       }
     }
@@ -373,7 +458,9 @@
         "scope_level",
         "subject",
         "line",
-        "effective_at"
+        "effective_at",
+        "tier",
+        "filed_under"
       ],
       "properties": {
         "rule_id": {
@@ -387,7 +474,7 @@
         },
         "subject": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z][a-z0-9-]{0,62}){0,3}$"
+          "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
         },
         "line": {
           "description": "The rule line followed by its source: the rule identity and record revision in brackets.",
@@ -404,6 +491,16 @@
         "temporary": {
           "description": "True when the rule carries an expiry time or a lift condition.",
           "type": "boolean"
+        },
+        "tier": {
+          "enum": [
+            "always",
+            "subject"
+          ]
+        },
+        "filed_under": {
+          "type": "string",
+          "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
         }
       }
     },
@@ -419,7 +516,7 @@
       "properties": {
         "subject": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z][a-z0-9-]{0,62}){0,3}$"
+          "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
         },
         "scope_level": {
           "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
