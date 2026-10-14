@@ -332,10 +332,39 @@ func (r *renderer) task(id string) (*Task, error) {
 		}
 		t.Deps = append(t.Deps, d)
 	}
+	// An edge to an identifier the file did not hold was kept in the legacy
+	// members, and is written back where it was read.
+	for _, m := range asList(legacyMeta(data)) {
+		row, _ := m.(map[string]any)
+		key, _ := row["key"].(string)
+		value, _ := row["value"].(string)
+		if key != "blocked-by" && key != "parent" && key != "discovered-from" {
+			continue
+		}
+		dep := Dep{Type: key, ID: value}
+		if id, reason, found := strings.Cut(value, " - "); found {
+			dep.ID, dep.Reason = id, reason
+		}
+		if dep.ID == t.ID {
+			// An edge to itself cannot be written, and blocks nothing.
+			continue
+		}
+		d, err := NormalizeDep(t.ID, dep)
+		if err != nil {
+			return nil, malformed(err)
+		}
+		t.Deps = append(t.Deps, d)
+	}
 	if t.Hold, err = r.hold(id); err != nil {
 		return nil, malformed(err)
 	}
 	return t, nil
+}
+
+// legacyMeta is the free-form fields of the item's legacy member.
+func legacyMeta(data map[string]any) any {
+	m, _ := data["legacy"].(map[string]any)
+	return m["meta"]
 }
 
 // date is the calendar date of a timestamp in the zone, or "" for none.

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	cstore "github.com/kesk-git/hive/contract/store"
+	"github.com/kesk-git/hive/packages/pool/internal/read"
 	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
 )
 
@@ -474,4 +475,41 @@ func (l *Layout) Text() string {
 		out += "\n"
 	}
 	return out
+}
+
+func init() {
+	read.Register(read.Kind{
+		Name:       "migration",
+		Members:    []string{read.MemberID, read.MemberLimit},
+		Standalone: func(s read.Selector) bool { return s.ID != "" },
+		Read:       readMigrations,
+	})
+}
+
+// readMigrations is the reader of the kind migration of hive-pool read: the
+// records whole, as they are stored.
+func readMigrations(c *read.Context) (*read.Result, error) {
+	res := &read.Result{}
+	if id := c.Selector.ID; id != "" {
+		l, om, err := poolstore.Load(c.Store, "migration", id)
+		switch {
+		case errors.Is(err, poolstore.ErrNotFound):
+		case err != nil:
+			return nil, err
+		case om != nil:
+			res.Omitted = append(res.Omitted, *om)
+		default:
+			res.Records = append(res.Records, read.Record{ID: l.ID, Data: l.Data})
+		}
+		return res, nil
+	}
+	all, omitted, err := poolstore.LoadAll(c.Store, "migration")
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range all {
+		res.Records = append(res.Records, read.Record{ID: l.ID, Data: l.Data})
+	}
+	res.Omitted = omitted
+	return res, nil
 }
