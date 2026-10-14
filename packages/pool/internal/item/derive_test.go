@@ -112,3 +112,15 @@ func TestRetainedDerivedFacts(t *testing.T) {
 		})
 	}
 }
+
+// Retained upstream case inventory (test declarations, with table rows in
+// their subtests); upstream: test/derive.test.ts.
+// - "marks a task blocked when a blocker is not done".
+// - "does not mark a task blocked when its blocker is done".
+// - "treats a missing blocker as resolved (not blocking)".
+// - "ready = queued tasks with no unresolved blocker".
+// - "excludes active held tasks from ready unless requested".
+// - "date-gates holds by local YYYY-MM-DD".
+// - "activeBlockers lists only the unresolved blockers".
+// - "a blocked-by edge with a free-text reason still blocks (graph keys off the id)".
+// - "multiple reason-bearing blocked-by edges each participate in readiness".
