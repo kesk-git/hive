@@ -158,7 +158,7 @@ func request(t testing.TB, command, operation string) []byte {
 // operations hold-question, revise-question and answer-question. Every other
 // operation of the declaration is declared and refused.
 var built = map[string][]string{
-	"hive-pool": {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question"},
+	"hive-pool": {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question", "import-legacy", "export-legacy"},
 }
 
 // Every command name of the package answers capabilities: exit 0, one
