@@ -1,14 +1,17 @@
 package legacy_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/packages/pool/internal/item"
 	"github.com/kesk-git/hive/packages/pool/internal/legacy"
 )
 
@@ -344,5 +347,41 @@ func TestExportClosesByTheLinksOfTheTitle(t *testing.T) {
 		if !strings.Contains(e.text, lines[0]+"\n") || !strings.Contains(lines[0], "("+word+" 2026-10-04)") {
 			t.Errorf("%s is written %q; a re-parse renders %q", id, e.text, lines[0])
 		}
+	}
+}
+
+// An item whose body holds a private key is refused whole before anything is
+// rendered, naming the record and the field and never the key, and no text is
+// returned.
+func TestExportRefusesAnItemHoldingAPrivateKey(t *testing.T) {
+	h := newHome(t)
+	h.leaf("fine-a1", "a plain item", "queued")
+	key := "-----BEGIN " + "RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END " + "RSA PRIVATE KEY-----"
+	id := h.leaf("keyed-b2", "an item with a key in it", "queued", func(rec map[string]any) { rec["body"] = "Notes.\n" + key })
+	before := snapshot(t, h.dir)
+	resp := h.do("export-legacy", map[string]any{"zone": "UTC"})
+	refused(t, resp, envelope.Invalid, envelope.CodeSecretShapeRecognized)
+	if resp.Error.Detail["record"] != id || resp.Error.Detail["field"] != "/body" {
+		t.Errorf("the refusal names %v", resp.Error.Detail)
+	}
+	if strings.Contains(resp.Error.Message, "MIIB") || strings.Contains(fmt.Sprint(resp.Error.Detail), "MIIB") {
+		t.Errorf("the refusal repeats the key: %+v", resp.Error)
+	}
+	if after := snapshot(t, h.dir); !equal(before, after) {
+		t.Errorf("a refused export wrote in the home: before %v, after %v", before, after)
+	}
+}
+
+// A stored link from whose URL several links derive is kept whole.
+func TestExportKeepsAStoredLinkFromWhichSeveralDerive(t *testing.T) {
+	h := newHome(t)
+	url := "https://docs.example/data/job-a1/report.md"
+	h.leaf("doc-a1", "write the guide", "queued", func(rec map[string]any) {
+		rec["links"] = []any{map[string]any{"kind": "doc", "url": url}}
+	})
+	e := h.export(map[string]any{"zone": "UTC"})
+	task, _ := e.task(t, "doc-a1")
+	if !slices.ContainsFunc(task.Links, func(l item.Link) bool { return l.URL == url }) {
+		t.Errorf("the link %s is dropped: %+v", url, task.Links)
 	}
 }

@@ -1,6 +1,8 @@
 package legacy
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -8,6 +10,7 @@ import (
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/schema"
 	cstore "github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/pool/internal/item"
 	"github.com/kesk-git/hive/packages/pool/internal/read"
@@ -64,6 +67,9 @@ func exportLegacy(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := noCredential(g, selected); err != nil {
+		return nil, err
+	}
 
 	r := &renderer{g: g, loc: loc}
 	out := &Backlog{FinalNewline: true, Preamble: []string{"# Backlog", ""}}
@@ -115,6 +121,58 @@ func openStore(c *cli.Call) (*cstore.Store, error) {
 		st.Fault(e.Fault)
 	}
 	return st, nil
+}
+
+// noCredential refuses an export when a record it writes from holds a string
+// of a credential shape, as the owner's no-value check finds it in the record
+// as stored, before any of it is rendered: an item selected, an item one of
+// their edges names, or a hold on an item selected. The refusal names the
+// record and the field, never the value.
+func noCredential(g *read.Graph, selected []string) error {
+	reg, err := poolstore.Schemas()
+	if err != nil {
+		return envelope.Common(envelope.CodeInternal, "the embedded schemas do not load").Because(err)
+	}
+	itemKind, _ := poolstore.Lookup("item")
+	holdKind, _ := poolstore.Lookup("hold")
+	check := func(k poolstore.Kind, id string, data map[string]any) error {
+		var se *schema.ShapeError
+		switch err := reg.CheckShapes(k.Ref(), data); {
+		case err == nil:
+			return nil
+		case errors.As(err, &se):
+			where := se.WhereIn("record")
+			return envelope.Common(envelope.CodeSecretShapeRecognized, fmt.Sprintf("the %s record %s holds a string of the credential shape %s at %s", k.Name, id, se.Shape, where)).
+				With("record", id).With("field", where)
+		default:
+			return envelope.Common(envelope.CodeInternal, "a record cannot be checked for a credential").Because(err)
+		}
+	}
+	checked := map[string]bool{}
+	checkItem := func(id string) error {
+		n := g.Items[id]
+		if n == nil || checked[id] {
+			return nil
+		}
+		checked[id] = true
+		return check(itemKind, id, n.Data)
+	}
+	for _, id := range selected {
+		if err := checkItem(id); err != nil {
+			return err
+		}
+		for _, e := range read.Edges(g.Items[id].Data) {
+			if err := checkItem(e.TaskID); err != nil {
+				return err
+			}
+		}
+		for _, h := range g.Holds[id] {
+			if err := check(holdKind, h.ID, h.Data); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // selection is the identities of the items the request's selector matches, in
@@ -312,10 +370,11 @@ func (r *renderer) links(title, body string, data map[string]any) (string, []ite
 		}
 		// The legacy words are those the prose derives for the URL itself.
 		derived := item.DeriveLinks(url)
-		if len(derived) != 1 || derived[0].URL != url {
+		i := slices.IndexFunc(derived, func(l item.Link) bool { return l.URL == url })
+		if i < 0 {
 			continue
 		}
-		link := derived[0]
+		link := derived[i]
 		if _, err := NormalizeTypedLink(link); err != nil {
 			continue
 		}
