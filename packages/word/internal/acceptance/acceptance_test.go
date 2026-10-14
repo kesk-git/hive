@@ -153,10 +153,14 @@ func request(t testing.TB, command, operation string) []byte {
 	return append(out, "\n"...)
 }
 
+// notBuilt are the operations declared and not built yet; the others are
+// proved by the tests of the intake.
+var notBuilt = []string{"answer", "verify"}
+
 // Every command name of the package answers capabilities: exit 0, one
 // complete response with a null request_id, whose body declares the
 // package's command, its executable and exactly the operations the
-// declaration lists, none of them callable yet.
+// declaration lists, those not built yet unsupported.
 func TestEveryCommandNameAnswersCapabilities(t *testing.T) {
 	p := declaration(t)
 	dir := delivered(t, p)
@@ -183,8 +187,8 @@ func TestEveryCommandNameAnswersCapabilities(t *testing.T) {
 			var got []string
 			for _, op := range caps.Operations {
 				got = append(got, op.Name)
-				if op.State != envelope.Unsupported {
-					t.Errorf("%s is %s; only capabilities is built", op.Name, op.State)
+				if slices.Contains(notBuilt, op.Name) != (op.State == envelope.Unsupported) {
+					t.Errorf("%s is %s; only %v are not built", op.Name, op.State, notBuilt)
 				}
 			}
 			slices.Sort(got)
@@ -215,7 +219,7 @@ func TestEveryCommandNameRefusesEverythingElse(t *testing.T) {
 				t.Fatalf("exit %d, status %s, error %+v", exit, resp.Status, resp.Error)
 			}
 		})
-		for _, operation := range c.Operations {
+		for _, operation := range notBuilt {
 			t.Run(c.Name+" "+operation, func(t *testing.T) {
 				req := request(t, c.Name, operation)
 				stdout, _, exit := run(t, program, req, operation, "--home", home)
