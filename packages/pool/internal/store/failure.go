@@ -10,13 +10,16 @@ import (
 )
 
 // Failure turns an error of the checks or of the contract's store into the
-// failure that ends the request: a body that holds a credential shape is
+// failure that ends the request: a record that is absent is not_found, a body that holds a credential shape is
 // secret_shape_recognized, one that breaks its schema is schema_violation, and
 // the store's own refusals keep the common codes they carry. what says which
 // record or file the error is about.
 func Failure(what string, err error) *envelope.Failure {
 	if f := envelope.AsFailure(err); f != nil {
 		return f
+	}
+	if errors.Is(err, ErrNotFound) {
+		return envelope.Common(envelope.CodeNotFound, what+" does not exist")
 	}
 	var shape *schema.ShapeError
 	if errors.As(err, &shape) {
