@@ -2,6 +2,8 @@ package cli
 
 import (
 	"errors"
+	"fmt"
+	"io/fs"
 	"maps"
 	"path/filepath"
 	"strings"
@@ -273,10 +275,14 @@ func TestNoEventWithoutDetail(t *testing.T) {
 	}
 }
 
-// The journal landed in stage 1 does not apply the no-value check, so through
-// it no detail is kept: nothing is appended, and the response and its one line
-// of standard error stand.
-func TestLandedJournalKeepsNoDetail(t *testing.T) {
+// shapeFor is a string of a listed credential shape, built at run time from
+// its prefix and a repeated character so that no file holds one.
+func shapeFor(prefix string, n int) string { return prefix + strings.Repeat("a", n) }
+
+// The journal as built applies the no-value check, so through it the detail of
+// a failure is kept: one diagnostic event of the answering package for each
+// failure, with the response and its one line of standard error as they were.
+func TestLandedJournalKeepsDetail(t *testing.T) {
 	h := newHarness(t)
 	h.exe.Journal = journal.Opener("dispatch")
 	home := newHome(t)
@@ -294,13 +300,122 @@ func TestLandedJournalKeepsNoDetail(t *testing.T) {
 			t.Errorf("standard error = %q, want %q", stderr, want)
 		}
 	}
+	entries := realEntries(t, home)
+	if len(entries) != 2 {
+		t.Fatalf("the journal holds %d events, want 2", len(entries))
+	}
+	for n, e := range entries {
+		body, _ := e.Event["body"].(map[string]any)
+		if e.Kind != "dispatch.diagnostic.recorded" || body["request_id"] != id(ids.Request, n+1) || e.Event["correlation_id"] != id(ids.Correlation, 1) {
+			t.Errorf("event %d: %v", n+1, e.Event)
+		}
+	}
+}
+
+// realEntries reads what the home's own journal holds.
+func realEntries(t testing.TB, home string) []*journal.Entry {
+	t.Helper()
 	j, err := journal.Open(home, journal.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if head, err := j.Head(); err != nil || head != 0 {
-		t.Errorf("the journal holds %d events (%v)", head, err)
+	r, err := j.Reader(0)
+	if err != nil {
+		t.Fatal(err)
 	}
+	var out []*journal.Entry
+	for {
+		e, err := r.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e == nil {
+			return out
+		}
+		out = append(out, e)
+	}
+}
+
+// shaping adds to hive-fleet an operation of the name given that fails with an
+// error chain holding the text given.
+func (h *harness) shaping(name, text string) {
+	fleet := h.exe.command("hive-fleet")
+	decl := fleet.Operations[0].OperationDecl
+	decl.Name, decl.Mutates = name, false
+	fleet.Operations = append(fleet.Operations, &Operation{OperationDecl: decl, Handle: func(c *Call) (*Result, error) {
+		return nil, fmt.Errorf("the vendor refused %s: %w", text, fs.ErrNotExist)
+	}})
+}
+
+// A failure whose detail holds a string of a listed shape keeps no diagnostic
+// at all: the whole event is dropped, with the response, its status and its
+// line of standard error as they would have been, and a failure beside it
+// that only mentions a prefix is kept.
+func TestDetailHoldingACredentialShapeIsDroppedWhole(t *testing.T) {
+	text := shapeFor("ghp_", 36)
+	h := newHarness(t)
+	h.exe.Journal = journal.Opener("dispatch")
+	h.shaping("shaped", text)
+	h.shaping("mention", "a token that begins ghp_ and goes on")
+	home := newHome(t)
+
+	code, out, stderr := h.run("hive-fleet", request(t, "shaped", 1, nil), "shaped", HomeOption, home)
+	resp, err := envelope.AcceptResponse(out, code, id(ids.Request, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, resp, envelope.Failed, "internal")
+	if want := "hive-fleet shaped: failed internal " + id(ids.Request, 1) + "\n"; stderr != want {
+		t.Errorf("standard error = %q, want %q", stderr, want)
+	}
+	if n := len(realEntries(t, home)); n != 0 {
+		t.Fatalf("the journal holds %d events", n)
+	}
+
+	expect(t, h.invoke(t, home, "mention", request(t, "mention", 2, nil)), envelope.Failed, "internal")
+	entries := realEntries(t, home)
+	if len(entries) != 1 || strings.Contains(string(entries[0].Line), text) {
+		t.Fatalf("the journal holds %d events", len(entries))
+	}
+}
+
+// A request whose body holds a string of a listed shape is refused whole as
+// invalid, before anything is read or written: the refusal names the field and
+// the shape and never the text, which reaches neither the response, standard
+// error nor the journal. A sentence that mentions the prefix passes.
+func TestRequestHoldingACredentialShapeIsRefusedWhole(t *testing.T) {
+	text := shapeFor("ghp_", 36)
+	h := newHarness(t)
+	home := newHome(t)
+	before := tree(t, home)
+
+	req := request(t, "put", 1, func(m map[string]any) {
+		m["body"].(map[string]any)["home"].(map[string]any)["name"] = text
+	})
+	code, out, stderr := h.run("hive-fleet", req, "put", HomeOption, home)
+	resp, err := envelope.AcceptResponse(out, code, id(ids.Request, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, resp, envelope.Invalid, "secret_shape_recognized")
+	if !strings.Contains(resp.Error.Message, "/home/name") || !strings.Contains(resp.Error.Message, "github.pat-classic") {
+		t.Errorf("the message %q names neither the field nor the shape", resp.Error.Message)
+	}
+	saw := string(out) + stderr
+	for _, e := range h.events(t) {
+		saw += string(h.journal.lines[e["event_id"].(string)])
+	}
+	if strings.Contains(saw, text) {
+		t.Error("the text of the credential is in the response, standard error or the journal")
+	}
+	if h.calls["put"] != 0 || !maps.Equal(before, tree(t, home)) {
+		t.Errorf("the operation ran %d times or the home changed", h.calls["put"])
+	}
+
+	mention := request(t, "put", 2, func(m map[string]any) {
+		m["body"].(map[string]any)["home"].(map[string]any)["name"] = "ghp_"
+	})
+	expect(t, h.invoke(t, home, "put", mention), envelope.Ok, "")
 }
 
 // A journal that applies the no-value check keeps the event; one that refuses
