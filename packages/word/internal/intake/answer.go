@@ -116,21 +116,24 @@ func answer(c *cli.Call) (*cli.Result, error) {
 	return &cli.Result{Body: out}, nil
 }
 
+// poolAnswerResponse is the schema of the body of the Pool's answer-question
+// response.
+const poolAnswerResponse = "urn:hive:schema:ops:hive-pool.answer-question.response:v1"
+
 // adaptAnswer is the Pool's body, except for an outcome whose disposition is
 // unreconciled, which is returned as held: no body, the hold in error.hold,
-// and the code word.question_changed.
+// and the code word.question_changed. That outcome is read only once the body
+// is held to the Pool's response schema; a body that breaks it is an error,
+// never a recorded answer and hold.
 func adaptAnswer(_ *cli.Call, callee *envelope.Response) (map[string]any, error) {
 	if callee.Body["disposition"] != "unreconciled" {
 		return callee.Body, nil
 	}
-	hold, ok := callee.Body["hold"].(map[string]any)
-	if !ok {
-		return nil, errors.New("intake: the Pool's body holds no hold")
+	if err := envelope.ValidateBody(callee.Body, poolAnswerResponse); err != nil {
+		return nil, fmt.Errorf("intake: the Pool's body is not its answer-question response: %v", err)
 	}
-	id, ok := hold["hold_id"].(string)
-	if !ok {
-		return nil, errors.New("intake: the Pool's hold holds no hold_id")
-	}
+	hold := callee.Body["hold"].(map[string]any)
+	id := hold["hold_id"].(string)
 	record, err := canon.Encode(hold)
 	if err != nil {
 		return nil, err
