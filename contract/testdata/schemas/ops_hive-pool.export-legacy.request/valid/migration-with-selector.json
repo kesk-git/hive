@@ -1,0 +1,14 @@
+{
+  "migration_id": "migr_01jc7d8e9f0g1h2j3k4m5n6p7k",
+  "selector": {
+    "states": [
+      "queued",
+      "in-flight",
+      "done"
+    ],
+    "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+    "limit": 50
+  },
+  "zone": "Etc/GMT+3",
+  "normalize": false
+}

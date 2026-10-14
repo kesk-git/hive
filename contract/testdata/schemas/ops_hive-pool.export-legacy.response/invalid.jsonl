@@ -1,0 +1,19 @@
+{"name":"bytes-a-string","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/bytes","value":"12"}]}
+{"name":"bytes-negative","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/bytes","value":-1}]}
+{"name":"digest-uppercase","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/digest","value":"sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]}
+{"name":"digest-without-algorithm","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/digest","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}
+{"name":"exact-a-string","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/exact","value":"true"}]}
+{"name":"item-form-unknown","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/items/0/form","value":"normalized"}]}
+{"name":"item-legacy-id-with-space","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/items/0/legacy_id","value":"alpha 1"}]}
+{"name":"item-missing-form","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/items/0","value":{"legacy_id":"alpha-1","task_id":"task_01jc7d8e9f0g1h2j3k4m5n6p7f"}}]}
+{"name":"item-missing-task-id","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/items/0","value":{"form":"verbatim","legacy_id":"alpha-1"}}]}
+{"name":"item-task-id-wrong-prefix","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/items/0/task_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7f"}]}
+{"name":"item-unknown-member","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/items/0","value":{"form":"verbatim","section":"## Queued","task_id":"task_01jc7d8e9f0g1h2j3k4m5n6p7f"}}]}
+{"name":"items-not-an-array","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/items","value":{}}]}
+{"name":"missing-bytes","base":"exact-verbatim.json","edits":[{"op":"remove","path":"/bytes"}]}
+{"name":"missing-digest","base":"exact-verbatim.json","edits":[{"op":"remove","path":"/digest"}]}
+{"name":"missing-exact","base":"exact-verbatim.json","edits":[{"op":"remove","path":"/exact"}]}
+{"name":"missing-items","base":"exact-verbatim.json","edits":[{"op":"remove","path":"/items"}]}
+{"name":"missing-text","base":"exact-verbatim.json","edits":[{"op":"remove","path":"/text"}]}
+{"name":"text-not-a-string","base":"exact-verbatim.json","edits":[{"op":"replace","path":"/text","value":["# Backlog"]}]}
+{"name":"unknown-member","base":"exact-verbatim.json","edits":[{"op":"add","path":"/migration_id","value":"migr_01jc7d8e9f0g1h2j3k4m5n6p7k"}]}

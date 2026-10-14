@@ -1,0 +1,32 @@
+{
+  "report": {
+    "digest": "sha256:cff16b26e4908ca5035412752e9cf6e71f3a636fbcc4b2d98d9fea80b1cb3969",
+    "bytes": 263,
+    "entries": [
+      {
+        "legacy_id": "alpha-1",
+        "section": "## Queued",
+        "state": "queued",
+        "disposition": "item",
+        "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f"
+      },
+      {
+        "legacy_id": "alpha-2",
+        "section": "## Queued",
+        "state": "queued",
+        "disposition": "item",
+        "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7g"
+      },
+      {
+        "legacy_id": "alpha-3",
+        "section": "## Done",
+        "state": "done",
+        "disposition": "item",
+        "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7h"
+      }
+    ],
+    "free_lines": 1,
+    "warnings": [],
+    "round_trip_exact": true
+  }
+}

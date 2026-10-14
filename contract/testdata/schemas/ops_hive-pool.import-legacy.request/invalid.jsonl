@@ -1,0 +1,16 @@
+{"name":"dry-run-a-string","base":"dry-run.json","edits":[{"op":"replace","path":"/dry_run","value":"true"}]}
+{"name":"dry-run-null","base":"dry-run.json","edits":[{"op":"replace","path":"/dry_run","value":null}]}
+{"name":"expected-digest-short","base":"dry-run.json","edits":[{"op":"add","path":"/expected_digest","value":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}
+{"name":"expected-digest-uppercase","base":"dry-run.json","edits":[{"op":"add","path":"/expected_digest","value":"sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}]}
+{"name":"expected-digest-without-algorithm","base":"dry-run.json","edits":[{"op":"add","path":"/expected_digest","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}
+{"name":"missing-dry-run","base":"dry-run.json","edits":[{"op":"remove","path":"/dry_run"}]}
+{"name":"missing-path","base":"dry-run.json","edits":[{"op":"remove","path":"/path"}]}
+{"name":"missing-zone","base":"dry-run.json","edits":[{"op":"remove","path":"/zone"}]}
+{"name":"path-empty","base":"dry-run.json","edits":[{"op":"replace","path":"/path","value":""}]}
+{"name":"path-not-a-string","base":"dry-run.json","edits":[{"op":"replace","path":"/path","value":["/srv/legacy/BACKLOG.md"]}]}
+{"name":"path-relative","base":"dry-run.json","edits":[{"op":"replace","path":"/path","value":"legacy/BACKLOG.md"}]}
+{"name":"path-windows-backslash","base":"dry-run.json","edits":[{"op":"replace","path":"/path","value":"C:\\legacy\\BACKLOG.md"}]}
+{"name":"unknown-member","base":"dry-run.json","edits":[{"op":"add","path":"/migration_id","value":"migr_01jc7d8e9f0g1h2j3k4m5n6p7k"}]}
+{"name":"zone-not-a-string","base":"dry-run.json","edits":[{"op":"replace","path":"/zone","value":3}]}
+{"name":"zone-offset-form","base":"dry-run.json","edits":[{"op":"replace","path":"/zone","value":"UTC+3"}]}
+{"name":"zone-with-space","base":"dry-run.json","edits":[{"op":"replace","path":"/zone","value":"Europe Helsinki"}]}

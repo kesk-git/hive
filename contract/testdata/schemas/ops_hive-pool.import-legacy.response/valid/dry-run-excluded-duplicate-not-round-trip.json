@@ -1,0 +1,34 @@
+{
+  "report": {
+    "digest": "sha256:25a345a3f87f7f2ac4ce01e882c34d6bb69032f4cc3572e51ba244b83073df5f",
+    "bytes": 219,
+    "entries": [
+      {
+        "legacy_id": "fleet-1",
+        "section": "## In flight (today)",
+        "state": "in-flight",
+        "disposition": "excluded",
+        "reason": "A persistent Fleet entry is never made an ordinary task."
+      },
+      {
+        "legacy_id": "beta-1",
+        "section": "## In flight (today)",
+        "state": "in-flight",
+        "disposition": "item",
+        "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f"
+      },
+      {
+        "legacy_id": "beta-1",
+        "section": "## In flight (today)",
+        "state": "in-flight",
+        "disposition": "duplicate",
+        "reason": "The identity beta-1 was already seen on line 5."
+      }
+    ],
+    "free_lines": 1,
+    "warnings": [
+      "line 5: the date tag was kept verbatim"
+    ],
+    "round_trip_exact": false
+  }
+}
