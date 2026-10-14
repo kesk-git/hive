@@ -24,6 +24,14 @@ var commands = []struct {
 	{"hive-word", []string{"hold", "revise", "answer", "release", "complete", "close", "verify"}},
 }
 
+// ExecutableWith is the hive-word executable reaching the Pool through the
+// callee given.
+func ExecutableWith(callee cli.Callee) *cli.Executable {
+	e := Executable()
+	e.Callee = callee
+	return e
+}
+
 // Executable is the hive-word executable. Started under any of its command names
 // it acts as that command; the contract library's harness answers
 // capabilities and --version and refuses a name the executable does not own.
