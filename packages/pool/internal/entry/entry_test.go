@@ -50,6 +50,21 @@ func request(t testing.TB, command, operation string) []byte {
 	return append(out, "\n"...)
 }
 
+// wordDeclaration is the declaration of the package word, whose handoffs the
+// executable keys on the original request's digest. It is read, not changed.
+func wordDeclaration(t testing.TB) *declare.Package {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "word", "hive-package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := declare.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return w
+}
+
 // The executable is well formed and agrees with the package's declaration:
 // the executable, the commands, the operations of each, what they may run,
 // call and write, and whether the package keeps a store.
@@ -66,7 +81,7 @@ func TestTheExecutableAgreesWithTheDeclaration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := &declare.Set{Packages: []*declare.Package{p}}
+	set := &declare.Set{Packages: []*declare.Package{p, wordDeclaration(t)}}
 	if ps := set.Agree(e); len(ps) != 0 {
 		t.Fatal(ps)
 	}
