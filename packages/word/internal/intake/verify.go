@@ -319,6 +319,9 @@ func (v *verifier) questionOf(hold map[string]any) (q map[string]any, several bo
 			list = p.records
 		}
 		v.byTask[task] = list
+		for _, cand := range list {
+			v.keepQuestion(cand)
+		}
 	}
 	for _, cand := range list {
 		if cand["hold_id"] != hold["hold_id"] {
@@ -328,9 +331,6 @@ func (v *verifier) questionOf(hold map[string]any) (q map[string]any, several bo
 			return nil, true, nil
 		}
 		q = cand
-	}
-	if q != nil {
-		v.keepQuestion(q)
 	}
 	return q, false, nil
 }
@@ -479,10 +479,14 @@ func (v *verifier) task(subject map[string]any) (verdict, error) {
 			return nil, err
 		}
 		switch {
-		case h == nil || h["state"] != "active":
-			// The Pool derived a hold from records it does not hold as active.
+		case h == nil:
+			// The Pool derived a hold it does not hold.
 			got.add(malformed)
-		case h["kind"] == "word":
+		case h["kind"] != "word":
+		case h["state"] != "active":
+			// The Pool derived a word hold from records it does not hold as active.
+			got.add(malformed)
+		default:
 			if err := v.judge(h, got); err != nil {
 				return nil, err
 			}

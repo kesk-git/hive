@@ -584,6 +584,14 @@ func TestVerifyAHold(t *testing.T) {
 		resp, exit := w.verify(holdSubject(h["hold_id"].(string)), w.r.supervisor())
 		w.expect(resp, exit, false, []string{"not-word"}, nil)
 	})
+	t.Run("a hold whose question replaced a moot one on its task", func(t *testing.T) {
+		w := newWorld(t)
+		old, p := w.pair("moot"), w.pair("open")
+		old.q["held_task_id"], old.h["task_id"] = p.task(), p.task()
+		w.put(old, p)
+		resp, exit := w.verify(holdSubject(p.hid()), w.r.supervisor())
+		w.expect(resp, exit, false, []string{"unanswered"}, &records{holds: []map[string]any{p.h}, questions: []map[string]any{old.q, p.q}})
+	})
 	t.Run("a hold the Pool does not hold", func(t *testing.T) {
 		w := newWorld(t)
 		resp, exit := w.verify(holdSubject(mint(t, ids.Hold)), w.r.supervisor())
@@ -657,6 +665,23 @@ func TestVerifyATask(t *testing.T) {
 		w.item(h["task_id"].(string), h["hold_id"].(string))
 		resp, exit := w.verify(taskSubject(h["task_id"].(string)), w.r.supervisor())
 		w.expect(resp, exit, false, []string{"no-question"}, &records{holds: []map[string]any{h}})
+	})
+	t.Run("an active word hold whose question replaced a moot one on its task", func(t *testing.T) {
+		w := newWorld(t)
+		old, p := w.pair("moot"), w.pair("open")
+		old.q["held_task_id"], old.h["task_id"] = p.task(), p.task()
+		w.put(old, p)
+		w.item(p.task(), p.hid())
+		resp, exit := w.verify(taskSubject(p.task()), w.r.supervisor())
+		w.expect(resp, exit, false, []string{"unanswered"}, &records{holds: []map[string]any{p.h}, questions: []map[string]any{old.q, p.q}})
+	})
+	t.Run("a hold that is not a word hold and is released after the item was read", func(t *testing.T) {
+		w := newWorld(t)
+		h := w.otherHold()
+		w.item(h["task_id"].(string), h["hold_id"].(string))
+		release(h, w)
+		resp, exit := w.verify(taskSubject(h["task_id"].(string)), w.r.supervisor())
+		w.expect(resp, exit, true, nil, nil)
 	})
 	t.Run("a word hold of a question already released", func(t *testing.T) {
 		w := newWorld(t)
