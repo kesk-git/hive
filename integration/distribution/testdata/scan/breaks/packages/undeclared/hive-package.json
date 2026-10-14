@@ -1,0 +1,1 @@
+{"name":"undeclared","executes":{"core":["git"],"transitional":[],"optional":[],"project":false},"platform":[],"calls":[],"commands":[{"name":"hive-undeclared"}]}

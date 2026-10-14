@@ -1,0 +1,22 @@
+NOTICE
+
+Hive is distributed under the licence in the file LICENSE. This file carries
+the copyright notices of the material Hive took from other projects: one
+block for each import record under imports/, in order of import_id, each with
+the notices of its record verbatim.
+
+--------------------------------------------------------------------------------
+a-dep: Dependency
+Licence: MIT
+Licence texts kept in the repository: packages/dispatch/dep-licence.txt
+
+Copyright (c) 2019 Dependency Author
+Copyright (c) 2021 Another Author
+Second line of the notice
+
+--------------------------------------------------------------------------------
+example-lib: Example Upstream
+Licence: MIT
+Licence texts kept in the repository: packages/spawning-pool/upstream/example-lib/LICENSE
+
+Copyright (c) 2020 Example Author

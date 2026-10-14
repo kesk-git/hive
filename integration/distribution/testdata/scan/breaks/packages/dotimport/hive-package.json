@@ -1,0 +1,1 @@
+{"name":"dotimport","executes":{"core":["git"],"transitional":[],"optional":[],"project":false},"platform":[],"calls":[],"commands":[{"name":"hive-dotimport"}]}

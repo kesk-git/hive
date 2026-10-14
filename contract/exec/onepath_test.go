@@ -1,113 +1,14 @@
 package exec
 
 import (
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
-	"strconv"
 	"strings"
 	"testing"
-)
 
-// The ways Go code starts a process, by any means: the standard library's
-// os/exec; os.StartProcess; a process-creation function of syscall, or the
-// system call numbers that create one; and a process-creation call of a
-// platform's system library, reached by its name through syscall's lazy
-// libraries, a dynamic loader or any other call that takes the name.
-var (
-	startingImports = []string{"os/exec", "golang.org/x/sys/execabs"}
-	startingCalls   = map[string][]string{
-		"os":      {"StartProcess"},
-		"syscall": {"StartProcess", "ForkExec", "Exec", "CreateProcess", "CreateProcessAsUser", "SYS_FORK", "SYS_VFORK", "SYS_EXECVE", "SYS_CLONE", "SYS_CLONE3", "SYS_POSIX_SPAWN"},
-		"windows": {"CreateProcess", "CreateProcessAsUser", "CreateProcessWithLogonW", "CreateProcessWithTokenW", "ShellExecute", "ShellExecuteEx"},
-		"unix":    {"ForkExec", "Exec", "Execve", "PosixSpawn", "Fork", "Vfork"},
-	}
-	startingNames = []string{
-		"CreateProcessA", "CreateProcessW", "CreateProcessAsUserA", "CreateProcessAsUserW", "CreateProcessWithLogonW",
-		"CreateProcessWithTokenW", "ShellExecuteA", "ShellExecuteW", "ShellExecuteExA", "ShellExecuteExW", "WinExec",
-		"posix_spawn", "posix_spawnp", "execve", "execv", "execvp", "execl", "execlp", "execle", "fexecve",
-	}
-	// Names that are also words, and so count only where a call takes them to
-	// look up a symbol of a library.
-	lookedUpNames = []string{"fork", "vfork", "system", "popen"}
-	lookups       = []string{"Dlsym", "NewProc", "NewLazyProc", "FindProc", "MustFindProc", "GetProcAddress", "RegisterLibFunc", "Symbol", "Lookup"}
+	"github.com/kesk-git/hive/contract/exec/starts"
 )
-
-// startsAProcess reads one Go source file and says how it starts a process, in
-// lines of the form "name:line: how".
-func startsAProcess(name string, src []byte) ([]string, error) {
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, name, src, parser.SkipObjectResolution)
-	if err != nil {
-		return nil, err
-	}
-	var found []string
-	note := func(pos token.Pos, how string) {
-		found = append(found, name+":"+strconv.Itoa(fset.Position(pos).Line)+": "+how)
-	}
-	local := map[string]string{} // the name an import is known by, to its path
-	for _, imp := range file.Imports {
-		path, _ := strconv.Unquote(imp.Path.Value)
-		if slices.Contains(startingImports, path) {
-			note(imp.Pos(), "imports "+path)
-		}
-		base := filepath.Base(path)
-		if imp.Name != nil {
-			base = imp.Name.Name
-		}
-		local[base] = path
-	}
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch n := n.(type) {
-		case *ast.SelectorExpr:
-			id, ok := n.X.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			path := local[id.Name]
-			if path == "" {
-				return true
-			}
-			pkg := filepath.Base(path)
-			for _, call := range startingCalls[pkg] {
-				if n.Sel.Name == call || pkg == "windows" && strings.HasPrefix(n.Sel.Name, call) {
-					note(n.Pos(), "uses "+path+"."+n.Sel.Name)
-				}
-			}
-		case *ast.CallExpr:
-			var callee string
-			switch f := n.Fun.(type) {
-			case *ast.SelectorExpr:
-				callee = f.Sel.Name
-			case *ast.Ident:
-				callee = f.Name
-			}
-			if !slices.Contains(lookups, callee) {
-				return true
-			}
-			for _, arg := range n.Args {
-				if lit, ok := arg.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-					if s, err := strconv.Unquote(lit.Value); err == nil && slices.Contains(lookedUpNames, s) {
-						note(lit.Pos(), "looks up the call "+s)
-					}
-				}
-			}
-		case *ast.BasicLit:
-			if n.Kind != token.STRING {
-				return true
-			}
-			if s, err := strconv.Unquote(n.Value); err == nil && slices.Contains(startingNames, s) {
-				note(n.Pos(), "names the call "+s)
-			}
-		}
-		return true
-	})
-	return found, nil
-}
 
 // Architecture check, not behavioral evidence: the scan below finds every way
 // of starting a process in the source it is given, and passes code that
@@ -129,9 +30,14 @@ func TestArchitectureScanFindsEveryWayOfStartingAProcess(t *testing.T) {
 		"x/sys/unix":         `package p; import "golang.org/x/sys/unix"; func f() { unix.Exec("x", nil, nil) }`,
 		"os/exec execabs":    `package p; import "golang.org/x/sys/execabs"; var _ = execabs.Command`,
 		"an aliased syscall": `package p; import sc "syscall"; func f() { sc.StartProcess("x", nil, nil) }`,
+		"cgo":                `package p; import "C"`,
+		"a dot import":       `package p; import . "os"; func f() { StartProcess("x", nil, nil) }`,
+		"a spliced name":     `package p; import "syscall"; var _ = syscall.NewLazyDLL("k").NewProc("Create" + "ProcessW")`,
+		"a registered func":  `package p; func f(reg func(string) uintptr) { reg("posix_" + "spawn") }`,
+		"a system call":      `package p; import "golang.org/x/sys/unix"; var _ = unix.SYS_EXECVE`,
 	}
 	for name, src := range bad {
-		found, err := startsAProcess(name+".go", []byte(src))
+		found, err := starts.Find(name+".go", []byte(src))
 		if err != nil || len(found) == 0 {
 			t.Errorf("%s: not found (%v)", name, err)
 		}
@@ -147,7 +53,7 @@ func TestArchitectureScanFindsEveryWayOfStartingAProcess(t *testing.T) {
 		"a different Start": `package p; import "syscall"; var _ = syscall.SYS_GETSID`,
 	}
 	for name, src := range good {
-		found, err := startsAProcess(name+".go", []byte(src))
+		found, err := starts.Find(name+".go", []byte(src))
 		if err != nil || len(found) != 0 {
 			t.Errorf("%s: %v %v", name, found, err)
 		}
@@ -185,7 +91,7 @@ func TestArchitectureNoOtherPackageStartsAProcess(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		found, err := startsAProcess(rel, src)
+		found, err := starts.Find(rel, src)
 		if err != nil {
 			return err
 		}

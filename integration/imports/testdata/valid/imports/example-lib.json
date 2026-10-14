@@ -1,0 +1,43 @@
+{
+  "schema": "hive.import",
+  "schema_version": "1.0",
+  "import_id": "example-lib",
+  "kind": "adaptation",
+  "owner": "spawning-pool",
+  "recorded_on": "2026-01-02",
+  "upstream": {
+    "name": "Example Upstream",
+    "repository": "https://example.invalid/example-lib",
+    "revision": "0123456789abcdef0123456789abcdef01234567"
+  },
+  "licence": {
+    "spdx": "MIT",
+    "copyright": [
+      "Copyright (c) 2020 Example Author"
+    ],
+    "files": [
+      {
+        "path": "packages/spawning-pool/upstream/example-lib/LICENSE",
+        "digest": "sha256:709ea05bdd05d3458f3120928bbe2383c2529a00a6ce3276ac6419725f443299",
+        "bytes": 126
+      }
+    ]
+  },
+  "portions": [
+    {
+      "hive_path": "packages/spawning-pool/internal/example/copy.go",
+      "upstream_paths": [
+        "src/copy.go"
+      ],
+      "disposition": "adapted"
+    }
+  ],
+  "retained_tests": [],
+  "transitive": [],
+  "excluded": [],
+  "local_changes": "Renamed the package.",
+  "audit": {
+    "audited_on": "2026-01-01",
+    "statement": "The copied file was examined and its terms are those of the licence kept."
+  }
+}

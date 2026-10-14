@@ -3,9 +3,16 @@
 
 GO ?= go
 
+# PATHSEP separates the entries of a search path on the platform that runs make.
+ifeq ($(OS),Windows_NT)
+PATHSEP := ;
+else
+PATHSEP := :
+endif
+
 .PHONY: test test-contract test-pool test-spawning-pool test-dispatch \
 	test-shadow test-synapse test-word test-ui test-integration \
-	test-distribution check-imports check build
+	test-distribution check-imports check build assemble
 
 # test-dir runs the tests under the directories in $(1) with the module's
 # standard tooling. A target whose directories hold no test fails, so an empty
@@ -40,6 +47,7 @@ test:
 	$(MAKE) test-ui
 	$(MAKE) build
 	$(MAKE) test-integration
+	$(MAKE) assemble
 	$(MAKE) test-distribution
 	$(MAKE) check-imports
 
@@ -76,6 +84,10 @@ test-ui:
 test-integration:
 	$(GO) run ./integration/testcmd/testintegration
 
+# test-distribution checks the artefact that `make assemble` left in dist/; it
+# builds none. Its result depends on programs it builds and runs, which the
+# test cache cannot see, so it is never taken from the cache.
+test-distribution: export GOFLAGS := $(GOFLAGS) -count=1
 test-distribution:
 	$(call test-dir,integration/distribution)
 
@@ -103,3 +115,12 @@ build:
 	$(call build-exe,synapse,hive-synapse)
 	$(call build-exe,word,hive-word)
 	$(call build-exe,ui,hive-ui)
+
+# assemble writes the artefact of this platform, dist/hive-<version>-<os>-<arch>/,
+# from the seven executables `make build` left in dist/. It builds nothing. It
+# runs the executables through the one process-execution path, which finds a
+# program on the search path the process was started with, so dist/ comes first
+# on it for this recipe.
+assemble: export PATH := $(CURDIR)/dist$(PATHSEP)$(PATH)
+assemble:
+	$(GO) run ./integration/distribution/cmd/assemble
