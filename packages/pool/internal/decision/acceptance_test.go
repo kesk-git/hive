@@ -720,9 +720,6 @@ func TestEachRefusalOfHoldQuestion(t *testing.T) {
 // recorded of the first, replayed, and writes nothing more.
 func TestAHandoffSentAgainIsReplayed(t *testing.T) {
 	h := newHome(t)
-	// The executable keys a handoff on its causation once it lists word among
-	// the packages whose handoffs it accepts.
-	h.exe.Handoffs = []string{"word"}
 	item := h.item()
 	id := mint(t, ids.Request)
 	first := h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id})
