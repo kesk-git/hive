@@ -148,6 +148,13 @@ func snapshot(t testing.TB, dir string) map[string]string {
 		if rel == "locks" || strings.HasPrefix(rel, "locks"+string(filepath.Separator)) {
 			return nil
 		}
+		// import-legacy mutates, so the harness records the outcome of every
+		// request of it that is answered ok, a dry run included; that record
+		// is the replay record and is neither a record, a receipt nor an
+		// intent of the Pool.
+		if strings.HasPrefix(rel, filepath.Join("pool", "requests")+string(filepath.Separator)) {
+			return nil
+		}
 		// A directory is made by opening the Pool, as hive-pool read opens it;
 		// what an operation writes is a file.
 		if d.IsDir() {
@@ -421,6 +428,14 @@ func TestDryRunRefusesAnIdentifierTooLongToReport(t *testing.T) {
 	newHome(t).unrepresentable("# Backlog\n\n## Queued\n- [ ] short-a1 - fine\n- [ ] "+strings.Repeat("a", 201)+" - too long\n\n## Done\n", 5, "legacy_id")
 }
 
+// An entry whose hold tags give no reason is refused whole, naming its line and
+// the hold, as an entry that depends on itself is: neither is imported with
+// the hold or the edge dropped.
+func TestDryRunRefusesAHoldWithNoReasonAndAnEntryThatDependsOnItself(t *testing.T) {
+	newHome(t).unrepresentable("# Backlog\n\n## Queued\n- [ ] hold-a1 - fine\n- [ ] hold-b2 - work (hold: ) (hold-kind: parked)\n\n## Done\n", 5, "hold")
+	newHome(t).unrepresentable("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] self-b2 - waits blocked-by: self-b2\n\n## Done\n", 5, "dependency")
+}
+
 // A section header that is not UTF-8 is refused, naming its line.
 func TestDryRunRefusesASectionHeaderThatIsNotUTF8(t *testing.T) {
 	newHome(t).unrepresentable("# Backlog\n\n## Queued\n\n## Done\xff\n- [x] enc-a1 - closed (done 2026-10-01)\n", 5, "section")
@@ -429,31 +444,42 @@ func TestDryRunRefusesASectionHeaderThatIsNotUTF8(t *testing.T) {
 // credential is a string of a credential shape the response never carries.
 var credential = "ghp_" + strings.Repeat("a", 36)
 
-// secretShape checks that a dry run of the text is refused, naming the line
-// and the field and never the credential.
-func (h *home) secretShape(text string, line int64, field string) {
+// secretShape checks that a dry run of the text is refused as the import is,
+// with secret_shape_recognized, naming the line and the shape and never the
+// credential, and writes nothing.
+func (h *home) secretShape(text string, line int64) {
 	h.t.Helper()
-	resp := h.unrepresentable(text, line, field)
+	path, data, when := sourceBytes(h.t, []byte(text))
+	before := snapshot(h.t, h.dir)
+	resp := h.do("import-legacy", map[string]any{"path": path, "zone": "UTC", "dry_run": true})
+	refused(h.t, resp, envelope.Invalid, envelope.CodeSecretShapeRecognized)
+	if resp.Error.Detail["line"] != line || resp.Error.Detail["shape"] != "github.pat-classic" {
+		h.t.Errorf("the refusal names %v; want line %d and the shape github.pat-classic", resp.Error.Detail, line)
+	}
 	if strings.Contains(resp.Error.Message, credential) || strings.Contains(fmt.Sprint(resp.Error.Detail), credential) {
 		h.t.Errorf("the refusal repeats the credential: %+v", resp.Error)
 	}
+	if after := snapshot(h.t, h.dir); !equal(before, after) {
+		h.t.Errorf("a refused dry run wrote in the home: before %v, after %v", before, after)
+	}
+	unchanged(h.t, path, data, when)
 }
 
 // An identifier of a credential shape is refused, naming its line.
 func TestDryRunRefusesAnIdentifierOfACredentialShape(t *testing.T) {
-	newHome(t).secretShape("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] "+credential+" - a secret\n\n## Done\n", 5, "legacy_id")
+	newHome(t).secretShape("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] "+credential+" - a secret\n\n## Done\n", 5)
 }
 
 // A section header whose suffix is of a credential shape is refused, naming
 // the header's line.
 func TestDryRunRefusesAHeaderSuffixOfACredentialShape(t *testing.T) {
-	newHome(t).secretShape("# Backlog\n\n## Queued\n\n## Done "+credential+"\n- [x] done-a1 - closed (done 2026-10-01)\n", 5, "section")
+	newHome(t).secretShape("# Backlog\n\n## Queued\n\n## Done "+credential+"\n- [x] done-a1 - closed (done 2026-10-01)\n", 5)
 }
 
 // A dangling dependency on an identifier of a credential shape is refused,
-// naming the line of the entry that names it.
+// naming the line that holds it.
 func TestDryRunRefusesADanglingDependencyOfACredentialShape(t *testing.T) {
-	newHome(t).secretShape("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] dep-b2 - waits blocked-by: "+credential+"\n\n## Done\n", 5, "warnings")
+	newHome(t).secretShape("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] dep-b2 - waits blocked-by: "+credential+"\n\n## Done\n", 5)
 }
 
 // expected_digest makes the caller import what it inspected.
@@ -480,20 +506,32 @@ func TestImportRefusesWhatItCannotRead(t *testing.T) {
 	refused(t, resp, envelope.Invalid, "schema_violation")
 }
 
-// The live import is a later lane's: with dry_run false the request is refused
-// as an operation the build has not reached, and nothing is written, in the
-// home or at the source.
-func TestImportThatWritesIsUnsupported(t *testing.T) {
+// A dry run of the operation that mutates writes nothing of the Pool's: it
+// returns no record and no receipt, and leaves only the outcome the harness
+// records, which a replay of the request reads.
+func TestDryRunLeavesOnlyTheRecordedOutcome(t *testing.T) {
 	h := newHome(t)
 	path, data, when := source(t, "backlog.md")
-	before := snapshot(t, h.dir)
-	resp := h.do("import-legacy", map[string]any{"path": path, "zone": "UTC", "dry_run": false})
-	refused(t, resp, envelope.Refused, envelope.CodeUnsupportedOperation)
+	resp := h.do("import-legacy", map[string]any{"path": path, "zone": "UTC", "dry_run": true})
+	ok(t, resp)
 	if len(resp.Receipts) != 0 {
 		t.Errorf("receipts %v", resp.Receipts)
 	}
-	if after := snapshot(t, h.dir); !equal(before, after) {
-		t.Errorf("the home changed: before %v, after %v", before, after)
+	var files []string
+	err := filepath.WalkDir(h.dir, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			rel, _ := filepath.Rel(h.dir, p)
+			if !strings.HasPrefix(rel, "locks") {
+				files = append(files, filepath.ToSlash(rel))
+			}
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 || files[0] != "home.json" || !strings.HasPrefix(files[1], "pool/requests/") {
+		t.Errorf("the home holds %v", files)
 	}
 	unchanged(t, path, data, when)
 }
