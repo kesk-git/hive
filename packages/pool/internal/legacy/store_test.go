@@ -486,6 +486,129 @@ func TestRetainedStoreArchiveLookup(t *testing.T) {
 	}
 }
 
+// test/backends/markdown.test.ts: "filters list by state, repo, and kind
+// with a true total" used the Markdown repo/kind filters. Hive item read uses
+// state and ready selectors; repo/kind/blocked selector forms are not carried.
+// spec/pool.md, Reading the Pool, says read returns every record whole with a
+// projection header and "an incomplete read says so and is never an
+// authoritative empty result". Derived facts says blocked is computed at read.
+func TestRetainedStoreSelectors(t *testing.T) {
+	t.Run("filters list by state, repo, and kind with a true total", func(t *testing.T) {
+		h := newHome(t)
+		im := retainedStoreImport(t, h, "## In flight\n- [ ] blocker-a - Unfinished\n## Queued\n- [ ] blocked-b - Wait blocked-by: blocker-a - Needs the blocker\n- [ ] ready-c - Ready\n## Done\n- [x] done-d - Completed (merged 2026-10-01)\n")
+		read := func(selector map[string]any) map[string]any {
+			return ok(t, h.do("read", map[string]any{"kind": "item", "selector": selector}))
+		}
+		limited := read(map[string]any{"states": []any{"queued"}, "limit": int64(1)})
+		rows := limited["records"].([]any)
+		projection := limited["projection"].(map[string]any)
+		omissions := projection["omitted"].([]any)
+		if len(rows) != 1 || len(omissions) != 1 || projection["complete"] != false {
+			t.Fatalf("limited view = %v", limited)
+		}
+		seen := map[string]bool{rows[0].(map[string]any)["task_id"].(string): true}
+		for _, v := range omissions {
+			row := v.(map[string]any)
+			id := row["id"].(string)
+			if row["reason"] != "limit" || seen[id] {
+				t.Fatalf("omission = %v", row)
+			}
+			seen[id] = true
+		}
+		if !seen[im.taskID("blocked-b")] || !seen[im.taskID("ready-c")] || len(seen) != 2 {
+			t.Fatalf("records/omissions = %v", seen)
+		}
+		ready := read(map[string]any{"ready": true})
+		readyRows := ready["records"].([]any)
+		if len(readyRows) != 1 || readyRows[0].(map[string]any)["task_id"] != im.taskID("ready-c") || ready["projection"].(map[string]any)["complete"] != true {
+			t.Fatalf("ready view = %v", ready)
+		}
+		all := read(map[string]any{})
+		var blocked []string
+		for i, row := range all["records"].([]any) {
+			if all["derived"].([]any)[i].(map[string]any)["blocked"].(bool) {
+				blocked = append(blocked, row.(map[string]any)["task_id"].(string))
+			}
+		}
+		if !reflect.DeepEqual(blocked, []string{im.taskID("blocked-b")}) {
+			t.Fatalf("derived blocked view = %v", blocked)
+		}
+	})
+}
+
+// test/backends/markdown.test.ts: "archives the superseded body before
+// replacing it" and "restores the note archive when the active backlog write
+// fails" are re-expressed as lookup of preserved archive bytes. The native
+// archive_body writer and its rollback are not carried: the import plan's
+// Portions keeps "Archive lookup for the export", and Local changes says
+// "prune is not carried for Hive's records and survives only as archive
+// lookup for import". No Pool record or archive is pruned or appended here.
+func TestRetainedStoreNoteArchiveLookup(t *testing.T) {
+	for _, name := range []string{"archives the superseded body before replacing it", "restores the note archive when the active backlog write fails"} {
+		t.Run(name, func(t *testing.T) {
+			text := "\n## Archived 2026-10-14\n- [ ] note-a - Work (repo: app)\n  Old line one.\n  Old line two.\n"
+			path := filepath.Join(t.TempDir(), legacy.NoteArchiveName)
+			if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			archive, err := legacy.ParseArchive(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			found, exists := legacy.Lookup("note-a", nil, archive)
+			if !exists || !found.Archived || found.Task.Body != "Old line one.\nOld line two." || found.Stamp != "2026-10-14" {
+				t.Fatalf("prior body lookup = %+v / %v", found, exists)
+			}
+			live, err := legacy.Parse([]byte("## Queued\n- [ ] note-a - Work (repo: app)\n  Current note.\n"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			current, exists := legacy.Lookup("note-a", live, archive)
+			if !exists || current.Archived || current.Task.Body != "Current note." {
+				t.Fatalf("live lookup = %+v / %v", current, exists)
+			}
+			after, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(archive.Render()) != text || string(after) != text {
+				t.Fatal("lookup changed archive bytes")
+			}
+		})
+	}
+}
+
+// test/backends/markdown.test.ts: "sets repo and kind as canonical tags"
+// changed them through update upstream. Native mutation is not carried;
+// spec/pool.md calls legacy identity, kind, repo and free-form fields
+// "verbatim", and its export renders "Legacy words ... from the legacy
+// member". Import preserves that metadata and canonical export emits it.
+func TestRetainedStoreLegacyTags(t *testing.T) {
+	t.Run("sets repo and kind as canonical tags", func(t *testing.T) {
+		h := newHome(t)
+		im := retainedStoreImport(t, h, "## Queued\n- [ ] tagged-a - Original prose (repo: app) (kind: docs)\n")
+		id := im.taskID("tagged-a")
+		ok(t, h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"title": "Changed prose"}}))
+		record := h.records("item")[id]
+		if legacyMember(record, "repo") != "app" || legacyMember(record, "kind") != "docs" {
+			t.Fatalf("legacy metadata = %v", record["legacy"])
+		}
+		exported := h.exportMigration(im.migration["migration_id"].(string), nil)["text"].(string)
+		parsed, err := legacy.Parse([]byte(exported))
+		if err != nil {
+			t.Fatal(err)
+		}
+		task := parsed.Find("tagged-a")
+		if task == nil || task.Title != "Changed prose" || task.Repo != "app" || task.Kind != "docs" || !strings.Contains(exported, "(repo: app) (kind: docs)") {
+			t.Fatalf("canonical tags = %q / %+v", exported, task)
+		}
+	})
+}
+
 // Retained upstream case inventory (test declarations, with table rows in
 // their subtests); upstream: test/backends/markdown.test.ts.
 // - "creates a queued task and reads it back".
@@ -500,6 +623,7 @@ func TestRetainedStoreArchiveLookup(t *testing.T) {
 // - "creates and reads structured holds".
 // - "rejects unsafe hold fields before rendering".
 // - "rejects invalid date tags before rendering".
+// - "filters list by state, repo, and kind with a true total".
 // - "a single mutation only alters the targeted line".
 // - "adding a body leaves all original lines intact".
 // - "a no-holds backlog still renders byte-exactly after parsing".
@@ -507,8 +631,11 @@ func TestRetainedStoreArchiveLookup(t *testing.T) {
 // - "replaces the body as continuation lines".
 // - "adds body lines without duplicating existing lines".
 // - "does not rewrite when added body lines already exist".
+// - "archives the superseded body before replacing it".
 // - "does not archive an unchanged body replacement".
 // - "does not archive the same body twice after replacement".
+// - "restores the note archive when the active backlog write fails".
+// - "sets repo and kind as canonical tags".
 // - "folds an added link into the prose and re-derives links".
 // - "dedupes added links by exact parsed url, not substring".
 // - "rejects empty added links before updating".
@@ -580,9 +707,3 @@ func TestRetainedStoreArchiveLookup(t *testing.T) {
 // Reason: spec/import-plan-tasks-axi.md, Excluded: "The backend seam and the
 // TypeScript data model: Hive's records are the schemas under
 // spec/schemas/records/, and there is no second backend."
-//
-// Not claimed by this file pending the behavioral decision:
-// - "filters list by state, repo, and kind with a true total".
-// - "archives the superseded body before replacing it".
-// - "restores the note archive when the active backlog write fails".
-// - "sets repo and kind as canonical tags".
