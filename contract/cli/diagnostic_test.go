@@ -768,3 +768,42 @@ func TestValidationRefusalOfABodyWritesNoEvent(t *testing.T) {
 		t.Errorf("%d events for a request document that breaks its schema, want 1", n)
 	}
 }
+
+// The detail of a failure is clipped to 1,024 bytes a string, and a credential
+// cut by the clip is no longer a listed shape; each string is checked whole
+// before it is clipped, and a diagnostic whose chain held a shape is dropped
+// whole, so that no fragment of a credential reaches the journal. The same
+// failure without a shape is kept, clipped.
+func TestClippedDetailHoldingACredentialShapeIsDroppedWhole(t *testing.T) {
+	text := shapeFor("ghp_", 36)
+	// The message begins with 19 bytes, so the clip at 1,024 bytes falls 20
+	// bytes into the 40 of the shape.
+	pad := strings.Repeat("x", 984) + " "
+	for _, c := range []struct {
+		name string
+		with string
+		kept bool
+	}{
+		{"a shape cut by the clip", pad + text, false},
+		{"the same length without a shape", pad + "ghp_ and then a few letters", true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.exe.Journal = journal.Opener("dispatch")
+			h.adding("clipped", false, func(*Call) (*Result, error) {
+				return nil, fmt.Errorf("the vendor refused %s: %w", c.with, fs.ErrNotExist)
+			})
+			home := newHome(t)
+			expect(t, h.invoke(t, home, "clipped", request(t, "clipped", 1, nil)), envelope.Failed, "internal")
+			entries := realEntries(t, home)
+			if c.kept != (len(entries) == 1) {
+				t.Fatalf("the journal holds %d events", len(entries))
+			}
+			for _, e := range entries {
+				if strings.Contains(string(e.Line), text[:12]) {
+					t.Errorf("a fragment of the credential is in the journal: %s", e.Line)
+				}
+			}
+		})
+	}
+}
