@@ -85,7 +85,7 @@ type verifier struct {
 	questions []any
 	seenHold  map[string]bool
 	seenQ     map[string]bool
-	byTask    map[string][]map[string]any
+	byTask    map[string]*page
 }
 
 // verdict is the answer: the reasons the word does not stand, each once.
@@ -100,7 +100,7 @@ func (v verdict) add(reasons ...string) {
 func verify(c *cli.Call, r Reader) (*cli.Result, error) {
 	v := &verifier{
 		c: c, r: r,
-		seenHold: map[string]bool{}, seenQ: map[string]bool{}, byTask: map[string][]map[string]any{},
+		seenHold: map[string]bool{}, seenQ: map[string]bool{}, byTask: map[string]*page{},
 	}
 	subject, _ := c.Request.Body["subject"].(map[string]any)
 	var got verdict
@@ -147,11 +147,12 @@ func orEmpty(list []any) []any {
 // asked for.
 var errNotFound = fmt.Errorf("intake: the Pool holds no such record")
 
-// page is what a read of the Pool gave: the records, and for an item the
-// facts derived beside each.
+// page is what a read of the Pool gave: the records, for an item the facts
+// derived beside each, and the journal cursor the read was taken at.
 type page struct {
 	records []map[string]any
 	derived []map[string]any
+	cursor  int64
 }
 
 // read is hive-pool read of the kind by the selector, sent as the handoffs are
@@ -226,7 +227,8 @@ func pageOf(body map[string]any, kind string) (*page, error) {
 	if body["kind"] != kind || header["complete"] != true {
 		return nil, unusable(fmt.Errorf("the read is incomplete or of another kind"))
 	}
-	p := &page{}
+	cursor, _ := header["journal_cursor"].(int64)
+	p := &page{cursor: cursor}
 	list, _ := body["records"].([]any)
 	for _, rec := range list {
 		m, ok := rec.(map[string]any)
@@ -289,50 +291,60 @@ func (v *verifier) getQuestion(id string) (map[string]any, error) {
 	return p.records[0], nil
 }
 
-// getHold reads the hold of the identity and returns it, or nil when the Pool
-// holds none. A hold read is kept among the records returned.
-func (v *verifier) getHold(id string) (map[string]any, error) {
+// getHold reads the hold of the identity and returns it with the journal
+// cursor it was read at, or nil when the Pool holds none. A hold read is kept
+// among the records returned.
+func (v *verifier) getHold(id string) (map[string]any, int64, error) {
 	p, err := v.one("hold", "hold_id", id)
 	if err == errNotFound {
-		return nil, nil
+		return nil, 0, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	v.keepHold(p.records[0])
-	return p.records[0], nil
+	return p.records[0], p.cursor, nil
 }
 
-// questionOf reads the question that answers for the hold: the question of
-// the hold's task whose hold_id is the hold's, the Pool having no selector by
-// hold. Several, which no operation produces, are none. A question found is
-// kept among the records returned.
-func (v *verifier) questionOf(hold map[string]any) (q map[string]any, several bool, err error) {
+// disagree is the verdict on a word hold and a record that disagree with it:
+// malformed when both were read at one journal cursor, and no verdict when the
+// Pool changed between the reads.
+func disagree(got verdict, at, other int64) error {
+	if at != other {
+		return unusable(fmt.Errorf("the Pool changed between the reads the verdict rests on"))
+	}
+	got.add(malformed)
+	return nil
+}
+
+// questionOf reads the question that answers for the hold, with the journal
+// cursor of the read: the question of the hold's task whose hold_id is the
+// hold's, the Pool having no selector by hold. Several, which no operation
+// produces, are none. Every question the read gave is kept among the records
+// returned, whichever decides.
+func (v *verifier) questionOf(hold map[string]any) (q map[string]any, at int64, several bool, err error) {
 	task, _ := hold["task_id"].(string)
-	list, ok := v.byTask[task]
+	p, ok := v.byTask[task]
 	if !ok {
-		p, err := v.read("question", map[string]any{"task_id": task})
-		if err != nil && err != errNotFound {
-			return nil, false, err
+		p, err = v.read("question", map[string]any{"task_id": task})
+		if err != nil {
+			return nil, 0, false, err
 		}
-		if p != nil {
-			list = p.records
-		}
-		v.byTask[task] = list
-		for _, cand := range list {
+		v.byTask[task] = p
+		for _, cand := range p.records {
 			v.keepQuestion(cand)
 		}
 	}
-	for _, cand := range list {
+	for _, cand := range p.records {
 		if cand["hold_id"] != hold["hold_id"] {
 			continue
 		}
 		if q != nil {
-			return nil, true, nil
+			return nil, p.cursor, true, nil
 		}
 		q = cand
 	}
-	return q, false, nil
+	return q, p.cursor, false, nil
 }
 
 // awaiting reports whether an answer of the question awaits reconciliation:
@@ -398,7 +410,7 @@ func (v *verifier) question(subject map[string]any) (verdict, error) {
 func (v *verifier) hold(subject map[string]any) (verdict, error) {
 	got := verdict{}
 	id, _ := subject["hold_id"].(string)
-	h, err := v.getHold(id)
+	h, at, err := v.getHold(id)
 	if err != nil {
 		return nil, err
 	}
@@ -406,18 +418,21 @@ func (v *verifier) hold(subject map[string]any) (verdict, error) {
 		got.add(notFound)
 		return got, nil
 	}
-	return got, v.judge(h, got)
+	if err := v.judge(h, at, got); err != nil {
+		return nil, err
+	}
+	return got, nil
 }
 
-// judge adds the reasons the word hold gives: those of the question it answers
-// for, read against the state of the hold. A hold that is not a word hold is
-// not the word.
-func (v *verifier) judge(h map[string]any, got verdict) error {
+// judge adds the reasons the word hold, read at the journal cursor, gives:
+// those of the question it answers for, read against the state of the hold. A
+// hold that is not a word hold is not the word.
+func (v *verifier) judge(h map[string]any, at int64, got verdict) error {
 	if h["kind"] != "word" {
 		got.add(notWord)
 		return nil
 	}
-	q, several, err := v.questionOf(h)
+	q, asked, several, err := v.questionOf(h)
 	if err != nil {
 		return err
 	}
@@ -437,7 +452,7 @@ func (v *verifier) judge(h map[string]any, got verdict) error {
 		case "moot":
 			stateReasons(q, got)
 		default:
-			got.add(malformed)
+			return disagree(got, at, asked)
 		}
 	case "active":
 		switch state {
@@ -449,7 +464,7 @@ func (v *verifier) judge(h map[string]any, got verdict) error {
 		case "open", "deferred":
 			stateReasons(q, got)
 		default:
-			got.add(malformed)
+			return disagree(got, at, asked)
 		}
 	default:
 		got.add(malformed)
@@ -474,7 +489,7 @@ func (v *verifier) task(subject map[string]any) (verdict, error) {
 	active, _ := p.derived[0]["active_holds"].([]any)
 	for _, a := range active {
 		holdID, _ := a.(string)
-		h, err := v.getHold(holdID)
+		h, at, err := v.getHold(holdID)
 		if err != nil {
 			return nil, err
 		}
@@ -485,11 +500,12 @@ func (v *verifier) task(subject map[string]any) (verdict, error) {
 		case h["kind"] != "word":
 		case h["state"] != "active":
 			// The Pool derived a word hold from records it does not hold as active.
-			got.add(malformed)
+			err = disagree(got, p.cursor, at)
 		default:
-			if err := v.judge(h, got); err != nil {
-				return nil, err
-			}
+			err = v.judge(h, at, got)
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 	return got, nil

@@ -2,6 +2,7 @@ package intake_test
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -61,6 +62,11 @@ type readingPool struct {
 	problems []string
 	// fail, when set, is the Pool's answer to every read.
 	fail *envelope.Failure
+	// cursor is the journal cursor every read is answered at; after, when
+	// set, is run once each read is answered, as the Pool changing between
+	// reads.
+	cursor int64
+	after  func(kind string)
 }
 
 func (p *readingPool) problem(format string, args ...any) {
@@ -172,7 +178,7 @@ func (p *readingPool) Read(c *cli.Call, request []byte) ([]byte, int, error) {
 		records = []any{}
 	}
 	body := map[string]any{
-		"projection": map[string]any{"home_id": p.homeID, "read_at": "2026-10-12T11:00:00.000Z", "journal_cursor": int64(1), "complete": true},
+		"projection": map[string]any{"home_id": p.homeID, "read_at": "2026-10-12T11:00:00.000Z", "journal_cursor": p.cursor, "complete": true},
 		"kind":       kind, "records": records,
 	}
 	if derived != nil {
@@ -181,7 +187,11 @@ func (p *readingPool) Read(c *cli.Call, request []byte) ([]byte, int, error) {
 	if err := envelope.ValidateBody(body, readResponseSchema); err != nil {
 		p.t.Fatalf("the fake's own answer is not valid: %v", err)
 	}
-	return answer(&envelope.Response{Status: envelope.Ok, Body: body})
+	data, exit, err := answer(&envelope.Response{Status: envelope.Ok, Body: body})
+	if p.after != nil {
+		p.after(kind)
+	}
+	return data, exit, err
 }
 
 // world is the executable over the fake Pool, with the records the Pool holds.
@@ -194,7 +204,7 @@ func newWorld(t testing.TB) *world {
 	t.Helper()
 	r := newRig(t)
 	p := &readingPool{
-		t: t, homeID: r.homeID,
+		t: t, homeID: r.homeID, cursor: 1,
 		questions: map[string]map[string]any{}, holds: map[string]map[string]any{},
 		items: map[string]map[string]any{}, derived: map[string]map[string]any{},
 	}
@@ -596,6 +606,27 @@ func TestVerifyAHold(t *testing.T) {
 		w := newWorld(t)
 		resp, exit := w.verify(holdSubject(mint(t, ids.Hold)), w.r.supervisor())
 		w.expect(resp, exit, false, []string{"not-found"}, &records{})
+	})
+	t.Run("a question released between the read of its hold and its own", func(t *testing.T) {
+		w := newWorld(t)
+		p := w.pair("released")
+		activate(p.h)
+		w.put(p)
+		answered := maps.Clone(p.q)
+		answered["state"] = "answered"
+		delete(answered, "disposition")
+		w.check(answered, questionSchema)
+		w.p.questions[p.qid()] = answered
+		w.p.after = func(kind string) {
+			if kind == "hold" {
+				w.p.questions[p.qid()], w.p.cursor = p.q, w.p.cursor+1
+				release(p.h, w)
+			}
+		}
+		resp, exit := w.verify(holdSubject(p.hid()), w.r.supervisor())
+		if exit != envelope.Unavailable.ExitCode() || resp.Status != envelope.Unavailable || resp.Error == nil || resp.Error.Code != envelope.CodeDependencyUnusable || resp.Body != nil {
+			t.Errorf("exit %d, %s, %+v, body %v", exit, resp.Status, resp.Error, resp.Body)
+		}
 	})
 	t.Run("a released hold of a question still open", func(t *testing.T) {
 		w := newWorld(t)
