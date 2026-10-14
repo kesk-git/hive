@@ -2,6 +2,7 @@ package proof_test
 
 import (
 	"debug/macho"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -134,7 +135,11 @@ func TestImportedLibrariesOfADynamicSystemExecutable(t *testing.T) {
 	case "darwin":
 		path, want = "/bin/ls", []string{"/usr/lib/libSystem.B.dylib"}
 	case "windows":
-		path, want = filepath.Join(`C:\Windows`, "System32", "cmd.exe"), []string{"kernel32.dll"}
+		root := os.Getenv("SystemRoot")
+		if root == "" {
+			t.Fatal("SystemRoot is not set: the system's own directory cannot be found")
+		}
+		path, want = filepath.Join(root, "System32", "cmd.exe"), []string{"kernel32.dll"}
 	default:
 		t.Fatalf("no expectation for %s", runtime.GOOS)
 	}

@@ -19,6 +19,12 @@ import (
 // Linux executables only. macOS keeps its keychain route through security.
 const keyring = "github.com/zalando/go-keyring"
 
+// macArchitectures are the architectures a macOS artefact is delivered for
+// (spec/distribution.md, Platforms): x86-64 and ARM64. A source file may be
+// built for one of them alone, so what a macOS executable holds is read for
+// each.
+var macArchitectures = []string{"amd64", "arm64"}
+
 // record is the part of an import record these checks read.
 type record struct {
 	ImportID string `json:"import_id"`
@@ -92,8 +98,8 @@ func thirdParty(importPath, module string) bool {
 // audit must speak of the process, which is as much as a program can read of a
 // statement that a reviewer weighs. A module another package declares, or one
 // only a record covers, is not declared where it is linked. And a macOS
-// executable that holds go-keyring fails: no package that builds for macOS
-// imports it.
+// executable that holds go-keyring fails: no package imports it in the source
+// that builds for macOS, on either architecture an artefact is delivered for.
 func Libraries(root string) ([]string, error) {
 	module, err := modulePath(root)
 	if err != nil {
@@ -155,18 +161,20 @@ func Libraries(root string) ([]string, error) {
 	}
 	sort.Strings(list)
 	for _, d := range list {
-		ctx := build.Default
-		ctx.GOOS, ctx.GOARCH, ctx.CgoEnabled = "darwin", "amd64", false
-		pkg, err := ctx.ImportDir(filepath.Join(root, filepath.FromSlash(d)), 0)
-		if err != nil {
-			if _, none := err.(*build.NoGoError); none {
-				continue
+		for _, goarch := range macArchitectures {
+			ctx := build.Default
+			ctx.GOOS, ctx.GOARCH, ctx.CgoEnabled = "darwin", goarch, false
+			pkg, err := ctx.ImportDir(filepath.Join(root, filepath.FromSlash(d)), 0)
+			if err != nil {
+				if _, none := err.(*build.NoGoError); none {
+					continue
+				}
+				return nil, fmt.Errorf("%s: %w", d, err)
 			}
-			return nil, fmt.Errorf("%s: %w", d, err)
-		}
-		for _, p := range pkg.Imports {
-			if p == keyring || strings.HasPrefix(p, keyring+"/") {
-				found = append(found, fmt.Sprintf("%s builds for macOS and imports %s, which no macOS executable holds", d, p))
+			for _, p := range pkg.Imports {
+				if p == keyring || strings.HasPrefix(p, keyring+"/") {
+					found = append(found, fmt.Sprintf("%s builds for macOS on %s and imports %s, which no macOS executable holds", d, goarch, p))
+				}
 			}
 		}
 	}

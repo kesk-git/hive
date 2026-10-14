@@ -124,15 +124,31 @@ func TestPlatformUtilitiesFindsAListThatIsNotAllowed(t *testing.T) {
 // process. A package that imports a module it does not list, one that lists it
 // with the record of another module, one that lists a module with no record,
 // and a file that imports one outside every package are each found, as is a
-// package that builds for macOS and imports go-keyring. It catches a check
-// that takes a record alone, or another package's declaration, for a
-// declaration of the package that links the module.
+// package that imports go-keyring in source that builds for macOS: for both
+// architectures a macOS artefact is delivered for, and for either of them
+// alone, in a file built for that architecture only. It catches a check that
+// takes a record alone, or another package's declaration, for a declaration of
+// the package that links the module, and one that reads the macOS source of
+// one architecture and passes an import the other's executable holds.
 func TestLibrariesFindsAnExceptionUsedWrongly(t *testing.T) {
 	findings, err := proof.Libraries(scanRoot("breaks"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	mustFind(t, findings, "keyringmac", "no macOS executable holds")
+	const holds = " and imports github.com/zalando/go-keyring, which no macOS executable holds"
+	mustFind(t, findings, "keyringmac", "builds for macOS on amd64"+holds)
+	mustFind(t, findings, "keyringmac", "builds for macOS on arm64"+holds)
+	for _, c := range []struct{ pkg, arch, other string }{
+		{"keyringarm64", "arm64", "amd64"},
+		{"keyringamd64", "amd64", "arm64"},
+	} {
+		mustFind(t, findings, c.pkg, "builds for macOS on "+c.arch+holds)
+		for _, f := range hits(findings, c.pkg) {
+			if strings.Contains(f, "builds for macOS on "+c.other) {
+				t.Errorf("%s imports go-keyring for %s alone and is reported for %s: %s", c.pkg, c.arch, c.other, f)
+			}
+		}
+	}
 	mustFind(t, findings, "keyringmac", "does not name the starts of a process")
 	mustFind(t, findings, "thirdparty", "example.org/anything, which has no dependency record")
 	mustFind(t, findings, "unlisted", "which the declaration of unlisted does not list under libraries")
@@ -141,8 +157,8 @@ func TestLibrariesFindsAnExceptionUsedWrongly(t *testing.T) {
 	if !slices.Contains(findings, outside) {
 		t.Errorf("no finding says %q; findings: %q", outside, findings)
 	}
-	if len(findings) != 6 {
-		t.Errorf("%d findings, want two for keyringmac and one for each of the other four breaks: %q", len(findings), findings)
+	if len(findings) != 11 {
+		t.Errorf("%d findings, want three for keyringmac, two for each of keyringarm64 and keyringamd64, whose record does not name the starts either, and one for each of the other four breaks: %q", len(findings), findings)
 	}
 }
 
