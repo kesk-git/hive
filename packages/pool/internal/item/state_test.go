@@ -292,6 +292,48 @@ func TestRetainedStateEmptyEvidence(t *testing.T) {
 	})
 }
 
+// test/commands/state.test.ts, done: "rejects a whitespace note before
+// closing the task" refused a whitespace-only note upstream. Hive appends the
+// note without trimming it: spec/pool.md, What an item carries, says title and
+// body are "Kept exactly as written". Markdown restrictions apply at export.
+func TestRetainedStateNoteExactText(t *testing.T) {
+	t.Run("rejects a whitespace note before closing the task", func(t *testing.T) {
+		h := newHome(t)
+		body := leaf("Whitespace note")
+		body["body"] = "Existing note"
+		id := h.addID(body)
+		completed := h.move(id, "done", map[string]any{"note": "   "})
+		stored, _ := h.item(id)
+		if completed["body"] != "Existing note\n   " || stored["body"] != completed["body"] || stored["state"] != "done" {
+			t.Fatalf("completion did not preserve the note exactly: %v / %v", completed, stored)
+		}
+	})
+}
+
+// test/commands/state.test.ts, hold: "rejects missing or unsafe hold fields
+// before mutating". Upstream required a reason, limited it to safe Markdown
+// tag text, and required an ISO date. Hive's separate hold record requires a
+// reason and a zoned instant: spec/pool.md, Holds, says "with a reason; future
+// with its until" and "A hold's until is a wall-clock time with its zone".
+// The parenthesis row ("wait (blocked)") is left out pending the Pool hold
+// validation correction; it is not claimed by these two passing rows.
+func TestRetainedStateHoldRequiredFields(t *testing.T) {
+	t.Run("rejects missing or unsafe hold fields before mutating", func(t *testing.T) {
+		for _, name := range []string{"missing reason", "invalid until"} {
+			t.Run(name, func(t *testing.T) {
+				h := newHome(t)
+				id := h.addID(leaf("Required hold fields"))
+				body := map[string]any{"task_id": id, "kind": "parked"}
+				if name == "invalid until" {
+					body["kind"], body["reason"] = "future", "Wait until the day"
+					body["until"] = map[string]any{"at": "07/10/2026", "zone": "UTC"}
+				}
+				h.unchanged(func() { refused(t, h.do("hold", body), envelope.Invalid, envelope.CodeSchemaViolation) })
+			})
+		}
+	})
+}
+
 // Retained upstream case inventory (test declarations, with table rows in
 // their subtests); upstream: test/commands/state.test.ts.
 // - "rejects malformed primary ids before store lookup".
@@ -302,6 +344,7 @@ func TestRetainedStateEmptyEvidence(t *testing.T) {
 // - "closes with a Forgejo pulls URL and preserves it byte-for-byte".
 // - "emits a machine-readable task and pruned count with --json".
 // - "rejects an empty link flag before closing the task".
+// - "rejects a whitespace note before closing the task".
 // - "is idempotent when already done".
 // - "backfills metadata on an already done task without pruning".
 // - "preserves body edits made before an already-done note update".
@@ -321,6 +364,7 @@ func TestRetainedStateEmptyEvidence(t *testing.T) {
 // - "gives a definitive empty state".
 // - "records and clears a structured hold idempotently".
 // - "fails closed on unknown ids".
+// - "rejects missing or unsafe hold fields before mutating".
 //
 // Not carried:
 // - "rejects extra positional arguments before mutating".
@@ -364,9 +408,14 @@ func TestRetainedStateEmptyEvidence(t *testing.T) {
 // Reason: spec/import-plan-tasks-axi.md, Excluded: "The multi-item move is
 // left for a later stage" and "Nothing of it is translated at stage 2."
 //
-// Not claimed by this file pending the behavioral decision:
+// Left out here pending the Pool correction; no failing assertion is
+// claimed or committed for these cases:
 // - "rejects non-canonical pull URLs without mutating".
 // - "rejects a malformed pr link before closing the task".
-// - "rejects a whitespace note before closing the task".
 // - "rejects a self-block before changing dependencies".
-// - "rejects missing or unsafe hold fields before mutating".
+// - "rejects missing or unsafe hold fields before mutating", only the parenthesis reason row
+//   ("wait (blocked)"); required-reason/date rows are retained above.
+// The pending evidence cases validate full harvest URLs; the dependency
+// case validates the refusal of a self blocked-by edge, and the hold row
+// validates a reason safe for the legacy form. These corrections and their
+// executable cases are kept together in the separate Pool correction lane.
