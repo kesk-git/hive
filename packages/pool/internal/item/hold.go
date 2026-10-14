@@ -23,6 +23,9 @@ func hold(c *cli.Call) (*cli.Result, error) {
 	case om != nil:
 		return nil, envelope.Common(envelope.CodeRecordMalformed, "the item cannot be read")
 	}
+	if err := checkScope(c, l.Data); err != nil {
+		return nil, err
+	}
 	if _, err := expectedRevision(c, "pool.item", taskID, l.Revision); err != nil {
 		return nil, err
 	}
@@ -61,6 +64,9 @@ func release(c *cli.Call) (*cli.Result, error) {
 		return nil, poolstore.Failure("the hold", err)
 	case om != nil:
 		return nil, envelope.Common(envelope.CodeRecordMalformed, "the hold cannot be read")
+	}
+	if err := checkScope(c, l.Data); err != nil {
+		return nil, err
 	}
 	if _, err := expectedRevision(c, "pool.hold", holdID, l.Revision); err != nil {
 		return nil, err

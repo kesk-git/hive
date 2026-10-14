@@ -240,6 +240,17 @@ func loadGraph(c *cli.Call) (*read.Graph, error) {
 	return g, nil
 }
 
+// checkScope refuses a request whose scope level, workspace or project differs
+// from the scope of the record it acts on, before anything is written. The
+// clone is not compared.
+func checkScope(c *cli.Call, rec map[string]any) error {
+	have, want := scopeOf(rec), c.Request.Scope
+	if have.Level != want.Level || have.WorkspaceID != want.WorkspaceID || have.ProjectID != want.ProjectID {
+		return envelope.Common(envelope.CodeScopeMismatch, "the record is outside the scope of the request")
+	}
+	return nil
+}
+
 // expectedRevision is the revision the request expects of the record: the one
 // it names, which must be the current one, or the current one where the
 // request names none. The comparison is made under the lock before anything is

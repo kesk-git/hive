@@ -1123,3 +1123,37 @@ func TestEachReaderRefusesTheMembersThatDoNotApply(t *testing.T) {
 		}
 	})
 }
+
+// A request acts only on a record of its own scope: update, transition, hold
+// and release compare the scope level, the workspace and the project with the
+// record's and refuse a difference with scope_mismatch before anything is
+// written.
+func TestARequestOutsideTheRecordsScopeIsRefused(t *testing.T) {
+	h := newHome(t)
+	id := h.addID(leaf("A project item"))
+	holdID := h.hold(id, "parked")
+	scoped := func(kind, id string) {
+		rec := h.stored(kind, id)
+		rec["scope_level"], rec["workspace_id"], rec["project_id"] = "project", mint(t, ids.Workspace), mint(t, ids.Project)
+		h.plant(kind, id, rec)
+	}
+	scoped("item", id)
+	scoped("hold", holdID)
+	for _, tc := range []struct {
+		name string
+		do   func() *envelope.Response
+	}{
+		{"update", func() *envelope.Response {
+			return h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"title": "Elsewhere"}})
+		}},
+		{"transition", func() *envelope.Response { return h.do("transition", map[string]any{"task_id": id, "to": "done"}) }},
+		{"hold", func() *envelope.Response {
+			return h.do("hold", map[string]any{"task_id": id, "kind": "parked", "reason": "Elsewhere."})
+		}},
+		{"release", func() *envelope.Response { return h.do("release", map[string]any{"hold_id": holdID}) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h.unchanged(func() { refused(t, tc.do(), envelope.Refused, envelope.CodeScopeMismatch) })
+		})
+	}
+}

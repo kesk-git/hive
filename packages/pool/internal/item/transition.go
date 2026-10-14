@@ -21,6 +21,9 @@ func transition(c *cli.Call) (*cli.Result, error) {
 	if n == nil {
 		return nil, notFound("item")
 	}
+	if err := checkScope(c, n.Data); err != nil {
+		return nil, err
+	}
 	expected, err := expectedRevision(c, "pool.item", taskID, n.Revision)
 	if err != nil {
 		return nil, err
