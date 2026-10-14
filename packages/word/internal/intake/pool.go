@@ -9,7 +9,6 @@ import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/exec"
-	"github.com/kesk-git/hive/contract/ids"
 )
 
 // readResponseSchema is the schema of the body of the Pool's read.
@@ -23,12 +22,10 @@ const readResponseSchema = "urn:hive:schema:ops:hive-pool.read.response:v1"
 // response, or the Pool answering unknown, is unknown.
 type Pool struct{}
 
-// ReadOutcome is hive-pool read of kind request-outcome for the request_id.
+// ReadOutcome is hive-pool read of kind request-outcome for the request_id,
+// sent under that same request_id, as the handoff is: nothing is minted before
+// the read.
 func (Pool) ReadOutcome(c *cli.Call, requestID string) ([]byte, bool, error) {
-	id, err := ids.Mint(c.Clock, ids.Request)
-	if err != nil {
-		return nil, false, err
-	}
 	issued, err := c.Stamp()
 	if err != nil {
 		return nil, false, err
@@ -41,7 +38,7 @@ func (Pool) ReadOutcome(c *cli.Call, requestID string) ([]byte, bool, error) {
 		Command:          poolCommand,
 		Operation:        "read",
 		OperationVersion: bodyVersion,
-		RequestID:        id,
+		RequestID:        requestID,
 		CorrelationID:    c.Request.CorrelationID,
 		Causation:        &envelope.RecordRef{Schema: envelope.RequestSchema, ID: c.Request.RequestID, Digest: digest},
 		IssuedAt:         issued,
@@ -61,7 +58,7 @@ func (Pool) ReadOutcome(c *cli.Call, requestID string) ([]byte, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	resp, err := envelope.AcceptResponse(output, exit, id)
+	resp, err := envelope.AcceptResponse(output, exit, requestID)
 	if err != nil {
 		return nil, false, err
 	}

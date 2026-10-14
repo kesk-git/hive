@@ -177,15 +177,20 @@ func failure(req *envelope.Request, f *envelope.Failure) ([]byte, int, error) {
 
 // Serve is the fake as a process: the operation of hive-pool given the
 // request on its standard input, answered as the document and exit code the
-// process writes. It keeps nothing between runs, so a read finds no recorded
-// outcome, and an operation is a handoff answered with the example of its
-// schema.
+// process writes. It keeps nothing between runs, so a read of the recorded
+// outcome of a request, sent under that request's own request_id, finds none;
+// any other read is invalid. An operation is a handoff answered with the
+// example of its schema.
 func (p *Pool) Serve(operation string, request []byte) ([]byte, int, error) {
 	req, err := envelope.DecodeRequest(request)
 	if err != nil {
 		return nil, 0, err
 	}
 	if operation == "read" {
+		selector, _ := req.Body["selector"].(map[string]any)
+		if req.Body["kind"] != "request-outcome" || selector["id"] != req.RequestID {
+			return failure(req, envelope.Common(envelope.CodeSchemaViolation, "the fake Pool reads only the outcome of the request it is sent under"))
+		}
 		return failure(req, envelope.Common(envelope.CodeNotFound, "the Pool records no outcome of the request"))
 	}
 	return p.Send(nil, request)
