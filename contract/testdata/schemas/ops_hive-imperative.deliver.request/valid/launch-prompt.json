@@ -1,0 +1,16 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+  "generation": 1,
+  "revision": 1,
+  "renderer_version": "0.2.0",
+  "text_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "text_bytes": 18432,
+  "transport": "launch-prompt",
+  "evidence": {
+    "schema": "dispatch.launch",
+    "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7t",
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "record_revision": 1,
+    "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  }
+}

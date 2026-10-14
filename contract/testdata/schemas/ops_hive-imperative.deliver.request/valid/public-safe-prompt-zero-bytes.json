@@ -1,0 +1,13 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7g",
+  "generation": 2,
+  "revision": 2,
+  "renderer_version": "0.2.0",
+  "text_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "text_bytes": 0,
+  "transport": "public-safe-prompt",
+  "evidence": {
+    "schema": "github.run",
+    "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7t"
+  }
+}

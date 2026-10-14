@@ -1,0 +1,21 @@
+{
+  "revision": 1,
+  "revision_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "renderer_version": "0.2.0",
+  "text": "You are a worker. Stay inside the boundary below and stop where the Definition of done says.\n\n# Task\nMake the nightly export stop retrying forever.\n\n# Setup\nPlacement: mac\n\n# Rules\nBoundary: the export worker.\n\n# Definition of done\nA branch with the change.\n",
+  "text_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "text_bytes": 258,
+  "criteria": {
+    "specification_id": "spec_01jc7d8e9f0g1h2j3k4m5n6p7r",
+    "revision": 1,
+    "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "launch_parameters": {
+    "role": "swarm",
+    "harness": "claude",
+    "placement_requested": "mac",
+    "class": 3,
+    "validation": "synapse",
+    "publication": "harvest"
+  }
+}

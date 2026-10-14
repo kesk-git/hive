@@ -1,0 +1,47 @@
+{
+  "schema": "pool.admission",
+  "schema_version": "1.0",
+  "record_revision": 1,
+  "admission_id": "adm_01jc7d8e9f0g1h2j3k4m5n6p7h",
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+  "scope_level": "project",
+  "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+  "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+  "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+  "clone_id": "clone_01jc7d8e9f0g1h2j3k4m5n6p7d",
+  "imperative_revision": 1,
+  "imperative_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "request": {
+    "words": "Run the export retry fix now, and keep the vendor client as it is.",
+    "caller": {
+      "kind": "supervisor",
+      "session_id": "sess_01jc7d8e9f0g1h2j3k4m5n6p7e",
+      "session_generation": 1
+    },
+    "authority": {
+      "kind": "posture",
+      "ref": {
+        "schema": "pool.rule",
+        "id": "rule_01jc7d8e9f0g1h2j3k4m5n6p7e"
+      }
+    },
+    "received_at": "2026-10-12T09:00:00.000Z",
+    "source": {
+      "schema": "word.intake",
+      "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7v",
+      "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+      "record_revision": 1,
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  "checks": [],
+  "state": "created",
+  "created_at": "2026-10-12T09:00:00.000Z",
+  "updated_at": "2026-10-12T09:00:00.000Z",
+  "writer": {
+    "package": "pool",
+    "command": "hive-admit",
+    "operation": "create",
+    "implementation_version": "0.2.0"
+  }
+}

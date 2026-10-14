@@ -1,0 +1,18 @@
+{"name":"imperative-current-revision-zero","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative/current_revision","value":0}]}
+{"name":"imperative-hive-with-project-id","base":"second-revision-written.json","edits":[{"op":"add","path":"/imperative/project_id","value":"proj_01jc7d8e9f0g1h2j3k4m5n6p7c"}]}
+{"name":"imperative-missing-deliveries","base":"second-revision-written.json","edits":[{"op":"remove","path":"/imperative/deliveries"}]}
+{"name":"imperative-missing-writer","base":"second-revision-written.json","edits":[{"op":"remove","path":"/imperative/writer"}]}
+{"name":"imperative-not-object","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative","value":[]}]}
+{"name":"imperative-null","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative","value":null}]}
+{"name":"imperative-object-guess-without-question","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative/revisions/0/task/object/confidence","value":{"consequence":"The wrong file would be changed.","level":"guess"}}]}
+{"name":"imperative-record-revision-zero","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative/record_revision","value":0}]}
+{"name":"imperative-repository-local-only-with-host","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative/revisions/0/setup/repository","value":{"host":"github.com","kind":"local-only"}}]}
+{"name":"imperative-revision-class-eight","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative/revisions/0/class","value":8}]}
+{"name":"imperative-revision-missing-digest","base":"second-revision-written.json","edits":[{"op":"remove","path":"/imperative/revisions/0/digest"}]}
+{"name":"imperative-revision-two-supersedes-reason-empty","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative/revisions/1/supersedes_reason","value":""}]}
+{"name":"imperative-revisions-empty","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative/revisions","value":[]}]}
+{"name":"imperative-schema-wrong","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative/schema","value":"pool.admission"}]}
+{"name":"imperative-task-id-wrong-prefix","base":"second-revision-written.json","edits":[{"op":"replace","path":"/imperative/task_id","value":"adm_01jc7d8e9f0g1h2j3k4m5n6p7h"}]}
+{"name":"imperative-unknown-member","base":"second-revision-written.json","edits":[{"op":"add","path":"/imperative/rendered_text","value":"x"}]}
+{"name":"missing-imperative","base":"second-revision-written.json","edits":[{"op":"remove","path":"/imperative"}]}
+{"name":"unknown-member","base":"second-revision-written.json","edits":[{"op":"add","path":"/status","value":"ok"}]}

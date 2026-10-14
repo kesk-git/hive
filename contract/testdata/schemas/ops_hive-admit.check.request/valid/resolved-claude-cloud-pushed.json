@@ -1,0 +1,22 @@
+{
+  "admission_id": "adm_01jc7d8e9f0g1h2j3k4m5n6p7h",
+  "placement": {
+    "kind": "resolved",
+    "value": "claude-cloud-session",
+    "resolved_by": {
+      "schema": "dispatch.policy",
+      "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7w"
+    }
+  },
+  "source_branch": {
+    "branch": "hive/export-retry",
+    "pushed": "true",
+    "observed_at": "2026-10-12T09:00:00.000Z",
+    "revision": "3f5a9c1e7b2d4860a1c3e5f708192a3b4c5d6e7f",
+    "evidence": {
+      "schema": "dispatch.observation",
+      "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7x"
+    }
+  },
+  "rules_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+}
