@@ -1,0 +1,9 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+  "generation": 1,
+  "outcome": "unknown",
+  "closed_by": {
+    "schema": "dispatch.session.ended",
+    "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7q"
+  }
+}

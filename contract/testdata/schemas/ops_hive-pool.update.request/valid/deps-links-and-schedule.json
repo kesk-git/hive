@@ -1,0 +1,33 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+  "patch": {
+    "add_deps": [
+      {
+        "type": "parent",
+        "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7e"
+      }
+    ],
+    "remove_deps": [
+      {
+        "type": "parent",
+        "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7d"
+      }
+    ],
+    "add_links": [
+      {
+        "kind": "report",
+        "url": "https://example.invalid/r"
+      }
+    ],
+    "schedule": {
+      "kind": "recurrence",
+      "recurrence": {
+        "interval": "PT6H",
+        "anchor": {
+          "at": "2026-10-12T09:30:00.000Z",
+          "zone": "Europe/Berlin"
+        }
+      }
+    }
+  }
+}

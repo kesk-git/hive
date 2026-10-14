@@ -1,0 +1,10 @@
+{"name":"item-missing","base":"hunt-item.json","edits":[{"op":"remove","path":"/item"}]}
+{"name":"item-missing-task-id","base":"hunt-item.json","edits":[{"op":"remove","path":"/item/task_id"}]}
+{"name":"item-not-an-object","base":"hunt-item.json","edits":[{"op":"replace","path":"/item","value":"task"}]}
+{"name":"item-schema-wrong-const","base":"hunt-item.json","edits":[{"op":"replace","path":"/item/schema","value":"pool.hold"}]}
+{"name":"item-state-unknown","base":"hunt-item.json","edits":[{"op":"replace","path":"/item/state","value":"running"}]}
+{"name":"item-task-id-wrong-prefix","base":"hunt-item.json","edits":[{"op":"replace","path":"/item/task_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7m"}]}
+{"name":"item-unknown-member","base":"hunt-item.json","edits":[{"op":"add","path":"/item/extra","value":1}]}
+{"name":"response-unknown-member","base":"hunt-item.json","edits":[{"op":"add","path":"/created","value":true}]}
+{"name":"root-not-an-object","base":"hunt-item.json","edits":[{"op":"replace","path":"","value":[]}]}
+{"name":"target-item-with-deliverable","base":"target-item.json","edits":[{"op":"add","path":"/item/deliverable","value":"swarm"}]}

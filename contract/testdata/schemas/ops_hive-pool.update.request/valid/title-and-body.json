@@ -1,0 +1,11 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+  "patch": {
+    "title": "Renamed",
+    "body": "New notes.",
+    "add_body_lines": [
+      "one",
+      "two"
+    ]
+  }
+}

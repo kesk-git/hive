@@ -1,0 +1,11 @@
+{"name":"changed-item-not-a-string","base":"changed-title.json","edits":[{"op":"replace","path":"/changed","value":[1]}]}
+{"name":"changed-missing","base":"changed-title.json","edits":[{"op":"remove","path":"/changed"}]}
+{"name":"changed-not-an-array","base":"changed-title.json","edits":[{"op":"replace","path":"/changed","value":"title"}]}
+{"name":"changed-unknown-field","base":"changed-title.json","edits":[{"op":"replace","path":"/changed","value":["state"]}]}
+{"name":"changed-unknown-field-after-valid","base":"changed-title.json","edits":[{"op":"replace","path":"/changed","value":["title","unknown"]}]}
+{"name":"item-missing","base":"changed-title.json","edits":[{"op":"remove","path":"/item"}]}
+{"name":"item-missing-record-revision","base":"changed-title.json","edits":[{"op":"remove","path":"/item/record_revision"}]}
+{"name":"item-state-unknown","base":"changed-title.json","edits":[{"op":"replace","path":"/item/state","value":"running"}]}
+{"name":"response-unknown-member","base":"changed-title.json","edits":[{"op":"add","path":"/revision","value":2}]}
+{"name":"root-not-an-object","base":"changed-title.json","edits":[{"op":"replace","path":"","value":[]}]}
+{"name":"target-item-with-generation","base":"nothing-changed.json","edits":[{"op":"replace","path":"/item/generations","value":[{"admission_id":"adm_01jc7d8e9f0g1h2j3k4m5n6p7j","generation":1,"imperative_revision":2,"opened_at":"2026-10-12T09:30:00.000Z","placement_requested":"mac","state":"open"}]}]}

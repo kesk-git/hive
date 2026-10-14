@@ -1,0 +1,9 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+  "kind": "resource",
+  "reason": "Machine busy.",
+  "until": {
+    "at": "2026-10-12T10:00:00.000Z",
+    "zone": "UTC"
+  }
+}

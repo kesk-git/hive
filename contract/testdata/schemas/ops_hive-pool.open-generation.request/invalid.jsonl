@@ -1,0 +1,11 @@
+{"name":"admission-id-not-a-string","base":"task-and-admission.json","edits":[{"op":"replace","path":"/admission_id","value":3}]}
+{"name":"admission-id-upper-case","base":"task-and-admission.json","edits":[{"op":"replace","path":"/admission_id","value":"ADM_01JC7D8E9F0G1H2J3K4M5N6P7J"}]}
+{"name":"admission-id-wrong-prefix","base":"task-and-admission.json","edits":[{"op":"replace","path":"/admission_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7m"}]}
+{"name":"generation-not-accepted","base":"task-and-admission.json","edits":[{"op":"add","path":"/generation","value":1}]}
+{"name":"missing-admission-id","base":"task-and-admission.json","edits":[{"op":"remove","path":"/admission_id"}]}
+{"name":"missing-task-id","base":"task-and-admission.json","edits":[{"op":"remove","path":"/task_id"}]}
+{"name":"opened-by-missing-id","base":"with-opened-by.json","edits":[{"op":"remove","path":"/opened_by/id"}]}
+{"name":"opened-by-missing-schema","base":"with-opened-by.json","edits":[{"op":"remove","path":"/opened_by/schema"}]}
+{"name":"opened-by-not-an-object","base":"with-opened-by.json","edits":[{"op":"replace","path":"/opened_by","value":"launch"}]}
+{"name":"root-not-an-object","base":"task-and-admission.json","edits":[{"op":"replace","path":"","value":[]}]}
+{"name":"task-id-wrong-prefix","base":"task-and-admission.json","edits":[{"op":"replace","path":"/task_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7m"}]}
