@@ -132,7 +132,8 @@ func refused(t testing.TB, resp *envelope.Response, status envelope.Status, code
 	}
 }
 
-// snapshot is every file under dir with the digest of its bytes.
+// snapshot is every file under dir, the Pool's lock excepted, with the digest
+// of its bytes.
 func snapshot(t testing.TB, dir string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
@@ -141,8 +142,14 @@ func snapshot(t testing.TB, dir string) map[string]string {
 			return err
 		}
 		rel, _ := filepath.Rel(dir, path)
+		// The Pool's lock file is made by any operation that reads the Pool,
+		// hive-pool read as much as an export.
+		if rel == "locks" || strings.HasPrefix(rel, "locks"+string(filepath.Separator)) {
+			return nil
+		}
+		// A directory is made by opening the Pool, as hive-pool read opens it;
+		// what an operation writes is a file.
 		if d.IsDir() {
-			out[rel+"/"] = ""
 			return nil
 		}
 		data, err := os.ReadFile(path)

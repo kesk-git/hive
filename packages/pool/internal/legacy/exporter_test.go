@@ -100,7 +100,7 @@ func (h *home) export(body map[string]any) exported {
 	before := snapshot(h.t, h.dir)
 	got := ok(h.t, h.do("export-legacy", body))
 	if after := snapshot(h.t, h.dir); !equal(before, after) {
-		h.t.Errorf("an export wrote in the home")
+		h.t.Errorf("an export wrote in the home: before %v, after %v", before, after)
 	}
 	text, _ := got["text"].(string)
 	if got["digest"] != canon.FileDigest([]byte(text)) || got["bytes"] != int64(len(text)) {
@@ -144,7 +144,9 @@ func TestExportPlacesEachItemInTheSectionOfItsState(t *testing.T) {
 		rec["body"] = "Body line one.\n\nBody line after a blank."
 	})
 	h.leaf("flying-b2", "fly the gauge", "in-flight", blockedBy(queued, "needs the wire"))
-	h.leaf("done-c3", "ship the gauge https://github.com/acme/app/pull/77", "done", completed("2026-10-04T00:00:00.000Z"))
+	h.leaf("done-c3", "ship the gauge https://github.com/acme/app/pull/77", "done", completed("2026-10-04T00:00:00.000Z"), func(rec map[string]any) {
+		rec["links"] = []any{map[string]any{"kind": "harvest", "url": "https://github.com/acme/app/pull/77"}}
+	})
 	// A Target stores no completion of its own: it has landed when the Prey
 	// beneath it has, and is read as done.
 	target := h.leaf("outcome-d4", "the gauge outcome", "queued", func(rec map[string]any) {
@@ -164,7 +166,7 @@ func TestExportPlacesEachItemInTheSectionOfItsState(t *testing.T) {
 	word := h.leaf("word-i9", "wait for the word", "queued")
 	h.plantHold(word, "word", "awaiting the word", "active", map[string]any{"at": "2026-11-01T00:00:00.000Z", "zone": "UTC", "date": "2026-11-01"})
 	released := h.leaf("released-j1", "was held, is not", "queued")
-	h.plantHold(released, "future", "a held past", "released", nil)
+	h.plantHold(released, "resource", "a held past", "released", nil)
 
 	e := h.export(map[string]any{"zone": "UTC"})
 	if e.body["exact"] != false {
@@ -190,7 +192,7 @@ func TestExportPlacesEachItemInTheSectionOfItsState(t *testing.T) {
 			t.Errorf("%+v", b.Deps)
 		}
 		c, _ := e.task(t, "done-c3")
-		if c.Closed != "2026-10-04" {
+		if c.Closed != "2026-10-04" || !strings.Contains(e.text, "(merged 2026-10-04)") {
 			t.Errorf("%+v", c)
 		}
 	})
@@ -219,7 +221,7 @@ func TestExportPlacesEachItemInTheSectionOfItsState(t *testing.T) {
 	})
 	t.Run("the items are listed with the form they were rendered in", func(t *testing.T) {
 		list, _ := e.body["items"].([]any)
-		if len(list) != 11 {
+		if len(list) != 10 {
 			t.Fatalf("%d items listed", len(list))
 		}
 		for _, v := range list {
@@ -265,7 +267,7 @@ func TestExportSelector(t *testing.T) {
 // An item with no legacy identity is written under its own identity.
 func TestExportOfAnItemThatWasNeverImported(t *testing.T) {
 	h := newHome(t)
-	id := h.leaf("x", "a native item", "queued", func(rec map[string]any) { delete(rec, "legacy") })
+	id := h.leaf("x", "a native item", "queued", func(rec map[string]any) { delete(rec, "legacy"); rec["level"] = "prey" })
 	e := h.export(map[string]any{"zone": "UTC"})
 	if task, state := e.task(t, id); state != legacy.StateQueued || task.Title != "a native item" {
 		t.Errorf("%+v", task)
