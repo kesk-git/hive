@@ -329,3 +329,20 @@ func TestExportKeepsALinkWhoseURLPrefixesAnotherInTheBody(t *testing.T) {
 		t.Errorf("%+v", task.Links)
 	}
 }
+
+// A completed item whose title holds a pull request URL or a report path, with
+// no link stored, is written with the closing word a re-parse keeps.
+func TestExportClosesByTheLinksOfTheTitle(t *testing.T) {
+	h := newHome(t)
+	native := func(rec map[string]any) { delete(rec, "legacy"); rec["level"] = "prey" }
+	pr := h.leaf("x", "ship the gauge https://github.com/acme/app/pull/77", "done", completed("2026-10-04T00:00:00.000Z"), native)
+	rep := h.leaf("x", "scout the gauge data/scout-a1/report.md", "done", completed("2026-10-04T00:00:00.000Z"), native)
+	e := h.export(map[string]any{"zone": "UTC"})
+	for id, word := range map[string]string{pr: "merged", rep: "reported"} {
+		task, _ := e.task(t, id)
+		lines := legacy.RenderTaskLines(task)
+		if !strings.Contains(e.text, lines[0]+"\n") || !strings.Contains(lines[0], "("+word+" 2026-10-04)") {
+			t.Errorf("%s is written %q; a re-parse renders %q", id, e.text, lines[0])
+		}
+	}
+}

@@ -397,6 +397,33 @@ func TestDryRunExcludesAPersistentSupervisorWhateverItsKindTag(t *testing.T) {
 	}
 }
 
+// unrepresentable checks that a dry run of the text is refused as malformed,
+// naming the line and the field, and writes nothing.
+func (h *home) unrepresentable(text string, line int64, field string) {
+	h.t.Helper()
+	path, data, when := sourceBytes(h.t, []byte(text))
+	before := snapshot(h.t, h.dir)
+	resp := h.do("import-legacy", map[string]any{"path": path, "zone": "UTC", "dry_run": true})
+	refused(h.t, resp, envelope.Invalid, "pool.legacy_malformed")
+	if resp.Error.Detail["line"] != line || resp.Error.Detail["field"] != field {
+		h.t.Errorf("the refusal names %v; want line %d and field %s", resp.Error.Detail, line, field)
+	}
+	if after := snapshot(h.t, h.dir); !equal(before, after) {
+		h.t.Errorf("a refused dry run wrote in the home: before %v, after %v", before, after)
+	}
+	unchanged(h.t, path, data, when)
+}
+
+// An identifier longer than the report can carry is refused, naming its line.
+func TestDryRunRefusesAnIdentifierTooLongToReport(t *testing.T) {
+	newHome(t).unrepresentable("# Backlog\n\n## Queued\n- [ ] short-a1 - fine\n- [ ] "+strings.Repeat("a", 201)+" - too long\n\n## Done\n", 5, "legacy_id")
+}
+
+// A section header that is not UTF-8 is refused, naming its line.
+func TestDryRunRefusesASectionHeaderThatIsNotUTF8(t *testing.T) {
+	newHome(t).unrepresentable("# Backlog\n\n## Queued\n\n## Done\xff\n- [x] enc-a1 - closed (done 2026-10-01)\n", 5, "section")
+}
+
 // expected_digest makes the caller import what it inspected.
 func TestExpectedDigest(t *testing.T) {
 	h := newHome(t)

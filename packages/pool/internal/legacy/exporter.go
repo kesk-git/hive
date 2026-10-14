@@ -296,11 +296,11 @@ func (r *renderer) date(v any) (string, error) {
 }
 
 // links returns the title with the links the item carries that its prose does
-// not yet hold, which is where the legacy form keeps them, and the links as the
-// legacy words name their kinds. A link the legacy form cannot hold, a record
-// reference or a path that is no report, is left out.
+// not yet hold, which is where the legacy form keeps them, and the links that
+// title holds as the legacy words name their kinds, which a re-parse derives.
+// A link the legacy form cannot hold, a record reference or a path that is no
+// report, is left out.
 func (r *renderer) links(title, body string, data map[string]any) (string, []item.Link, error) {
-	var out []item.Link
 	for _, v := range asList(data["links"]) {
 		m, _ := v.(map[string]any)
 		url, _ := m["url"].(string)
@@ -319,7 +319,6 @@ func (r *renderer) links(title, body string, data map[string]any) (string, []ite
 		if _, err := NormalizeTypedLink(link); err != nil {
 			continue
 		}
-		out = append(out, link)
 		if slices.ContainsFunc(item.DeriveLinks(body), func(l item.Link) bool { return l.URL == link.URL }) {
 			continue
 		}
@@ -328,7 +327,7 @@ func (r *renderer) links(title, body string, data map[string]any) (string, []ite
 			return "", nil, err
 		}
 	}
-	return title, out, nil
+	return title, item.DeriveLinks(title), nil
 }
 
 // hold is the hold tags of the item's first hold in force that has a legacy

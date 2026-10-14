@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 	"unicode/utf8"
 
@@ -73,9 +74,13 @@ func importLegacy(c *cli.Call) (*cli.Result, error) {
 	}
 	b, err := Parse(src)
 	if err != nil {
-		return nil, envelope.Fail(envelope.Invalid, "pool.legacy_malformed", "the file is not a legacy backlog the grammar accepts").Because(err)
+		return nil, envelope.Fail(envelope.Invalid, codeLegacyMalformed, "the file is not a legacy backlog the grammar accepts").Because(err)
 	}
-	return &cli.Result{Body: map[string]any{"report": report(src, digest, b)}}, nil
+	r, err := report(src, digest, b)
+	if err != nil {
+		return nil, err
+	}
+	return &cli.Result{Body: map[string]any{"report": r}}, nil
 }
 
 // location is the zone of the IANA database named, never the machine's own.
@@ -86,10 +91,22 @@ func location(zone string) (*time.Location, error) {
 	return time.LoadLocation(zone)
 }
 
+// maxLegacyID is the most characters the report carries of a legacy identifier.
+const maxLegacyID = 200
+
+// unrepresentable refuses a file whose entry or section the report cannot
+// carry, naming the line and the field.
+func unrepresentable(line int, field, why string) error {
+	return envelope.Fail(envelope.Invalid, codeLegacyMalformed, "the report cannot carry the "+field+" at line "+strconv.Itoa(line)+": "+why).
+		With("line", int64(line)).With("field", field)
+}
+
 // report is the parse report of a backlog read from src: one entry for every
 // bullet with an identifier, the lines without one, what the parser kept but
-// could not read canonically, and whether the backlog renders back to src.
-func report(src []byte, digest string, b *Backlog) map[string]any {
+// could not read canonically, and whether the backlog renders back to src. A
+// file with an identifier or a section header the report cannot carry is
+// refused.
+func report(src []byte, digest string, b *Backlog) (map[string]any, error) {
 	held := map[string]bool{}
 	for _, t := range b.Tasks() {
 		held[t.ID] = true
@@ -101,15 +118,27 @@ func report(src []byte, digest string, b *Backlog) map[string]any {
 		warnings = append(warnings, clip(fmt.Sprintf(format, args...), 500))
 	}
 	seen := map[string]bool{}
+	line := len(b.Preamble)
 	for _, s := range b.Sections {
+		line++
+		header := line
+		section := semanticLine(s.HeaderLine)
 		for _, e := range s.Entries {
+			at := line + 1
+			line += len(e.Lines)
 			t := e.Task
 			if t == nil {
 				free += int64(len(e.Lines))
 				continue
 			}
+			switch {
+			case len(t.ID) > maxLegacyID:
+				return nil, unrepresentable(at, "legacy_id", "the identifier is longer than "+strconv.Itoa(maxLegacyID)+" characters")
+			case !utf8.ValidString(section):
+				return nil, unrepresentable(header, "section", "the header is not UTF-8")
+			}
 			row := map[string]any{
-				"legacy_id": t.ID, "section": semanticLine(s.HeaderLine), "state": stateWord(s.State), "disposition": "item",
+				"legacy_id": t.ID, "section": section, "state": stateWord(s.State), "disposition": "item",
 			}
 			switch {
 			case IsPersistentSupervisor(t):
@@ -140,7 +169,7 @@ func report(src []byte, digest string, b *Backlog) map[string]any {
 	return map[string]any{
 		"digest": digest, "bytes": int64(len(src)), "entries": entries, "free_lines": free,
 		"warnings": warnings, "round_trip_exact": bytes.Equal(b.Render(), src),
-	}
+	}, nil
 }
 
 // clip is s cut to at most n bytes at the start of a character, which holds the
