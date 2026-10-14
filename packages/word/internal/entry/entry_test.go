@@ -66,7 +66,16 @@ func TestTheExecutableAgreesWithTheDeclaration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := &declare.Set{Packages: []*declare.Package{p}}
+	// The callee's declaration is needed to agree on the calls.
+	data, err = os.ReadFile(filepath.Join("..", "..", "..", "pool", "hive-package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, err := declare.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	set := &declare.Set{Packages: []*declare.Package{p, pool}}
 	if ps := set.Agree(e); len(ps) != 0 {
 		t.Fatal(ps)
 	}
@@ -75,9 +84,14 @@ func TestTheExecutableAgreesWithTheDeclaration(t *testing.T) {
 	}
 }
 
+// built are the operations that persist through one handoff to the Pool; the
+// others are declared and not built yet.
+var built = []string{"hold", "revise", "release", "complete", "close"}
+
 // Every command name, as the executable is started under it, answers
-// capabilities for that command and no other, with every operation
-// unsupported.
+// capabilities for that command and no other. The five handoffs are supported
+// mutating operations that call hive-pool and write no receipt of their own;
+// the rest are unsupported.
 func TestEachNameAnswersCapabilities(t *testing.T) {
 	for _, c := range Executable().Commands {
 		out, exit := invoke(t, "/some/bin/"+c.Name, nil, "capabilities")
@@ -96,6 +110,12 @@ func TestEachNameAnswersCapabilities(t *testing.T) {
 			t.Errorf("%s: %d operations declared, %d owned", c.Name, len(caps.Operations), len(c.Operations))
 		}
 		for _, op := range caps.Operations {
+			if slices.Contains(built, op.Name) {
+				if op.State != envelope.Supported || !op.Mutates || !slices.Equal(op.Calls, []string{"hive-pool"}) || len(op.ReceiptKinds) != 0 || len(op.Executes) != 0 {
+					t.Errorf("%s %s: state %s, mutates %v, calls %v, receipts %v", c.Name, op.Name, op.State, op.Mutates, op.Calls, op.ReceiptKinds)
+				}
+				continue
+			}
 			if op.State != envelope.Unsupported || op.Reason == "" || op.Mutates {
 				t.Errorf("%s %s: state %s, reason %q, mutates %v", c.Name, op.Name, op.State, op.Reason, op.Mutates)
 			}
@@ -144,12 +164,15 @@ func TestAnUnknownOperationExitsTwo(t *testing.T) {
 	}
 }
 
-// A declared operation is refused as unsupported, writes nothing in the home
-// it is pointed at, and a request addressed to another command or operation
-// is invalid before the state of the operation is read.
+// A declared operation not built is refused as unsupported, writes nothing in
+// the home it is pointed at, and a request addressed to another command or
+// operation is invalid before the state of the operation is read.
 func TestADeclaredOperationIsRefusedAndWritesNothing(t *testing.T) {
 	for _, c := range Executable().Commands {
 		for _, op := range c.Operations {
+			if slices.Contains(built, op.Name) {
+				continue
+			}
 			home := t.TempDir()
 			req := request(t, c.Name, op.Name)
 			out, exit := invoke(t, c.Name, req, op.Name, "--home", home)

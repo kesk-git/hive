@@ -170,6 +170,14 @@ func sameButOneDiagnostic(t testing.TB, what string, before, after map[string]st
 			lines = append(lines, l)
 		}
 	}
+	if callee.Name == "word" {
+		// spec/word.md: word appends no event and has no part of the home, so
+		// even the invalid request leaves no diagnostic.
+		if len(lines) != 0 {
+			t.Fatalf("%s left %d events in the journal, want none: word appends no event", what, len(lines))
+		}
+		return
+	}
 	if len(lines) != 1 {
 		t.Fatalf("%s left %d events in the journal, want exactly the one diagnostic of the invalid request", what, len(lines))
 	}
