@@ -1,0 +1,332 @@
+{
+  "schema": "pool.imperative",
+  "schema_version": "1.1",
+  "record_revision": 2,
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7g",
+  "scope_level": "hive",
+  "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+  "current_revision": 2,
+  "revisions": [
+    {
+      "revision": 1,
+      "class": 0,
+      "task": {
+        "intent": "Make the nightly export stop retrying forever when the vendor is down.",
+        "object": {
+          "text": "The nightly export job of the widget service.",
+          "artifact": "The retry loop in the export worker.",
+          "confidence": {
+            "level": "guess",
+            "question": "Which export file is meant?",
+            "consequence": "The wrong file would be changed."
+          }
+        },
+        "standard": {
+          "conditions": "The retry path gives up after three attempts and leaves the queue unchanged.",
+          "evidence": [
+            "The test log of the retry package.",
+            "The diff of the queue worker."
+          ],
+          "rules_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "confidence": {
+            "level": "high"
+          }
+        }
+      },
+      "setup": {
+        "base_branch": "main",
+        "base_revision": "3f5a9c1e7b2d4860a1c3e5f708192a3b4c5d6e7f",
+        "source_branch": "main",
+        "output_branch_rule": "A branch named hive/<task> cut from the source branch.",
+        "role": "lictor",
+        "harness": "policy",
+        "dependencies": [
+          "The vendor sandbox is reachable."
+        ],
+        "tools": [
+          "git",
+          "go-test"
+        ],
+        "access": {
+          "credentials": []
+        },
+        "isolation": [
+          "The working directory is the clone root.",
+          "The repository top level matches the binding."
+        ],
+        "repository": {
+          "kind": "local-only"
+        },
+        "placement": {
+          "requested": "policy",
+          "item_revision": 1
+        }
+      },
+      "rules": {
+        "boundary": {
+          "scope": "The export worker and its tests.",
+          "exclusions": [
+            "The vendor client library.",
+            "Deployment files."
+          ],
+          "allowed_effects": [
+            "Edit files in the clone.",
+            "Run the package tests."
+          ],
+          "resources": "One CPU hour of local test time.",
+          "permissions": "Read and write inside the clone only.",
+          "stop_conditions": [
+            "A test outside the worker fails for an unrelated reason."
+          ],
+          "repair_scope": "The worker and its own tests.",
+          "retry_limit": 3,
+          "sensitive": [],
+          "confidence": {
+            "level": "high"
+          }
+        },
+        "validation_commands": [
+          {
+            "name": "export-tests",
+            "argv": [
+              "go",
+              "test",
+              "./export/..."
+            ],
+            "working_directory": "services/export"
+          },
+          {
+            "name": "lint",
+            "argv": [
+              "make",
+              "lint"
+            ]
+          }
+        ],
+        "channels": {
+          "delivery": "Commit to the output branch.",
+          "decisions": "Ask the supervisor through a question.",
+          "blocker_owner": "The supervising session."
+        }
+      },
+      "definition_of_done": {
+        "output": {
+          "deliverable": "A branch holding the retry change and its tests.",
+          "recipient": "The supervising session.",
+          "validation": "direct",
+          "publication": "local-only",
+          "completion_evidence": [
+            "The passing test output.",
+            "The branch name and head revision."
+          ],
+          "confidence": {
+            "level": "guess",
+            "question": "Is a Harvest wanted?",
+            "consequence": "A Harvest would be published."
+          }
+        },
+        "stopping_point": "The branch is pushed and the evidence is written; the worker stops there."
+      },
+      "digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "authored_at": "2026-10-12T09:00:00.000Z",
+      "authored_by": {
+        "kind": "package",
+        "package": "word",
+        "command": "hive-word"
+      },
+      "authority": {
+        "kind": "word",
+        "ref": {
+          "schema": "pool.question",
+          "id": "q_01jc7d8e9f0g1h2j3k4m5n6p7s",
+          "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+          "record_revision": 2,
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7s"
+    },
+    {
+      "revision": 2,
+      "class": 0,
+      "task": {
+        "intent": "Make the nightly export stop retrying forever when the vendor is down.",
+        "object": {
+          "text": "The nightly export job of the widget service.",
+          "artifact": "The retry loop in the export worker.",
+          "confidence": {
+            "level": "high"
+          }
+        },
+        "standard": {
+          "conditions": "The retry path gives up after three attempts and leaves the queue unchanged.",
+          "evidence": [
+            "The test log of the retry package.",
+            "The diff of the queue worker."
+          ],
+          "rules_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "confidence": {
+            "level": "high"
+          }
+        }
+      },
+      "setup": {
+        "base_branch": "main",
+        "base_revision": "3f5a9c1e7b2d4860a1c3e5f708192a3b4c5d6e7f",
+        "source_branch": "main",
+        "output_branch_rule": "A branch named hive/<task> cut from the source branch.",
+        "role": "lictor",
+        "harness": "policy",
+        "dependencies": [
+          "The vendor sandbox is reachable."
+        ],
+        "tools": [
+          "git",
+          "go-test"
+        ],
+        "access": {
+          "credentials": []
+        },
+        "isolation": [
+          "The working directory is the clone root.",
+          "The repository top level matches the binding."
+        ],
+        "repository": {
+          "kind": "local-only"
+        },
+        "placement": {
+          "requested": "policy",
+          "item_revision": 2
+        }
+      },
+      "rules": {
+        "boundary": {
+          "scope": "The export worker and its tests.",
+          "exclusions": [
+            "The vendor client library.",
+            "Deployment files."
+          ],
+          "allowed_effects": [
+            "Edit files in the clone.",
+            "Run the package tests."
+          ],
+          "resources": "One CPU hour of local test time.",
+          "permissions": "Read and write inside the clone only.",
+          "stop_conditions": [
+            "A test outside the worker fails for an unrelated reason."
+          ],
+          "repair_scope": "The worker and its own tests.",
+          "retry_limit": 3,
+          "sensitive": [],
+          "confidence": {
+            "level": "high"
+          }
+        },
+        "validation_commands": [
+          {
+            "name": "export-tests",
+            "argv": [
+              "go",
+              "test",
+              "./export/..."
+            ],
+            "working_directory": "services/export"
+          },
+          {
+            "name": "lint",
+            "argv": [
+              "make",
+              "lint"
+            ]
+          }
+        ],
+        "channels": {
+          "delivery": "Commit to the output branch.",
+          "decisions": "Ask the supervisor through a question.",
+          "blocker_owner": "The supervising session."
+        }
+      },
+      "definition_of_done": {
+        "output": {
+          "deliverable": "A branch holding the retry change and its tests.",
+          "recipient": "The supervising session.",
+          "validation": "direct",
+          "publication": "local-only",
+          "completion_evidence": [
+            "The passing test output.",
+            "The branch name and head revision."
+          ],
+          "confidence": {
+            "level": "high"
+          }
+        },
+        "stopping_point": "The branch is pushed and the evidence is written; the worker stops there."
+      },
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authored_at": "2026-10-13T08:15:00.000Z",
+      "authored_by": {
+        "kind": "package",
+        "package": "word",
+        "command": "hive-word"
+      },
+      "authority": {
+        "kind": "word",
+        "ref": {
+          "schema": "pool.question",
+          "id": "q_01jc7d8e9f0g1h2j3k4m5n6p7s",
+          "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+          "record_revision": 2,
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7t",
+      "supersedes_reason": "The steer narrowed the scope to the export worker."
+    }
+  ],
+  "deliveries": [
+    {
+      "generation": 1,
+      "revision": 1,
+      "renderer_version": "0.2.0",
+      "text_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "text_bytes": 18432,
+      "transport": "launch-prompt",
+      "evidence": {
+        "schema": "dispatch.launch",
+        "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7t",
+        "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+        "record_revision": 1,
+        "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "rules": [
+        {
+          "rule_id": "rule_01000000000000000000000000",
+          "record_revision": 1
+        }
+      ],
+      "subject_projections": [
+        {
+          "projection_id": "mem_01000000000000000000000000",
+          "rendering": 1,
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "rules": [
+            {
+              "rule_id": "rule_01000000000000000000000000",
+              "record_revision": 1
+            }
+          ]
+        }
+      ],
+      "rendered_at": "2026-10-11T08:00:00.000Z",
+      "delivered_at": "2026-10-11T08:00:00.000Z"
+    }
+  ],
+  "created_at": "2026-10-12T09:00:00.000Z",
+  "updated_at": "2026-10-13T08:15:00.000Z",
+  "writer": {
+    "package": "pool",
+    "command": "hive-imperative",
+    "operation": "revise",
+    "implementation_version": "0.2.0"
+  }
+}

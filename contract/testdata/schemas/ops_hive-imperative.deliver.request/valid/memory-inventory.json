@@ -1,0 +1,37 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+  "generation": 1,
+  "revision": 1,
+  "renderer_version": "0.2.0",
+  "text_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "text_bytes": 18432,
+  "transport": "launch-prompt",
+  "evidence": {
+    "schema": "dispatch.launch",
+    "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7t",
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "record_revision": 1,
+    "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "rules": [
+    {
+      "rule_id": "rule_01000000000000000000000000",
+      "record_revision": 1
+    }
+  ],
+  "subject_projections": [
+    {
+      "projection_id": "mem_01000000000000000000000000",
+      "rendering": 1,
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "rules": [
+        {
+          "rule_id": "rule_01000000000000000000000000",
+          "record_revision": 1
+        }
+      ]
+    }
+  ],
+  "rendered_at": "2026-10-11T08:00:00.000Z",
+  "rendered_text": "Example rendered instructions."
+}

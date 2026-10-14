@@ -11,6 +11,7 @@
 {"name":"evidence-unknown-member","base":"launch-prompt.json","edits":[{"op":"add","path":"/evidence/url","value":"https://example.org"}]}
 {"name":"generation-string","base":"launch-prompt.json","edits":[{"op":"replace","path":"/generation","value":"1"}]}
 {"name":"generation-zero","base":"launch-prompt.json","edits":[{"op":"replace","path":"/generation","value":0}]}
+{"name":"memory-inventory-zero-revision","base":"memory-inventory.json","edits":[{"op":"replace","path":"/rules/0/record_revision","value":0}]}
 {"name":"missing-evidence","base":"launch-prompt.json","edits":[{"op":"remove","path":"/evidence"}]}
 {"name":"missing-generation","base":"launch-prompt.json","edits":[{"op":"remove","path":"/generation"}]}
 {"name":"missing-renderer-version","base":"launch-prompt.json","edits":[{"op":"remove","path":"/renderer_version"}]}

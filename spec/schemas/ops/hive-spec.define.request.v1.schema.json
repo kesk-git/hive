@@ -35,6 +35,13 @@
         "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
       }
     },
+    "touched_subjects": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+      }
+    },
     "product_rules": {
       "type": "array",
       "items": {
