@@ -40,12 +40,15 @@ func ExecutableWith(callee cli.Callee) *cli.Executable {
 		Name:      "hive-word",
 		Version:   Version,
 		Storeless: true,
-		Callee:    intake.Guard(callee),
+		Callee:    intake.Guard(intake.GuardAnswer(callee)),
 	}
 	for _, c := range commands {
 		cmd := &cli.Command{Name: c.name}
 		for _, name := range c.operations {
 			op := intake.Operation(name)
+			if name == intake.Answer {
+				op = intake.AnswerOperation()
+			}
 			if op == nil {
 				op = unsupported(name)
 			}
