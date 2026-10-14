@@ -4,21 +4,19 @@ package store
 
 import (
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 )
 
-// The access a test home, and what is made in it, has on macOS and Linux is
-// the mode its maker gives it, so there is nothing to set.
-func secureHome(t testing.TB, dir string) {}
-
-// hasMode reports whether the entry at path, which info describes, has the
-// access of an owner-only entry of the mode given.
-func hasMode(info fs.FileInfo, path string, want os.FileMode) bool {
-	return info.Mode().Perm() == want
-}
+// The helpers the tests of the contract share for the access of a home.
+var (
+	secureHome = access.SecureHome
+	hasMode    = access.HasMode
+	newHome    = access.EmptyHome
+)
 
 // grantGroup opens the entry at path to its group, as mode says.
 func grantGroup(t testing.TB, path string, mode os.FileMode) {

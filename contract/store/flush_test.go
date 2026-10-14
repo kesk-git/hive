@@ -4,30 +4,19 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/kesk-git/hive/contract/internal/flushseam"
 )
 
 // The tests skip the real flush to the medium, which costs milliseconds a call
 // on macOS; every step the recovery tests observe is kept.
 func TestMain(m *testing.M) {
-	flushseam.Skip = true
+	SkipFlush(m)
 	os.Exit(m.Run())
-}
-
-// withRealFlush runs the rest of a test with the real flush, which the other
-// tests skip.
-func withRealFlush(t testing.TB) {
-	t.Helper()
-	was := flushseam.Skip
-	flushseam.Skip = false
-	t.Cleanup(func() { flushseam.Skip = was })
 }
 
 // A record written with the real flush is whole, and the file and directory
 // flushes themselves succeed on the file system the tests run on.
 func TestWriteWithTheRealFlush(t *testing.T) {
-	withRealFlush(t)
+	RealFlush(t)
 	home := newHome(t)
 	s, _, _ := open(t, home, "pool")
 	if err := s.writeFile("pool/a.json", "req1", []byte("{}\n")); err != nil {

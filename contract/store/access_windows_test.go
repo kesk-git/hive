@@ -15,6 +15,22 @@ import (
 	"github.com/kesk-git/hive/contract/internal/testsupport"
 )
 
+// On Windows the helpers of the package access import the store, so the tests
+// of the store, which an import of that package would put in a cycle, keep
+// these three.
+//
+// newHome makes an empty home under a temporary directory, which the test
+// removes.
+func newHome(t testing.TB) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "home")
+	if err := os.Mkdir(dir, dirMode); err != nil {
+		t.Fatal(err)
+	}
+	secureHome(t, dir)
+	return dir
+}
+
 // secureHome makes the home at dir what spec/records.md says a home is on
 // Windows: a protected access-control list of its owner alone, which what is
 // made in it inherits.

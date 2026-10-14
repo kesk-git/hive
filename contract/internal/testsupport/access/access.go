@@ -1,8 +1,11 @@
 // Package access holds the helpers of the contract's tests that make a home
 // private, and read whether an entry is, in the way of the platform: the mode
 // bits on macOS and Linux, and on Windows the access-control list the store
-// sets and checks. It imports the store on Windows, so the tests of the store
-// do not import it and keep their own.
+// sets and checks. It is a package of its own, beneath testsupport, only
+// because on Windows it imports the store: were it part of testsupport, which
+// the tests of the store import, they would form an import cycle that Go
+// refuses. For the same reason the tests of the store on Windows keep their
+// own copies of these helpers; everywhere else they use these.
 package access
 
 import (

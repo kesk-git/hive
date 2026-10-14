@@ -1,6 +1,6 @@
 // Package testsupport holds the helpers the tests of the contract share. Only
 // the tests of the contract import it: it is under contract/internal/, no
-// delivered file imports it (a test checks that), and it starts no process of
+// delivered file imports it, and it starts no process of
 // its own: where a test needs a platform utility it runs it through
 // contract/exec.
 //

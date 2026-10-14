@@ -23,18 +23,6 @@ var (
 	parsed = testsupport.Parsed
 )
 
-// newHome makes an empty home under a temporary directory, which the test
-// removes.
-func newHome(t testing.TB) string {
-	t.Helper()
-	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, dirMode); err != nil {
-		t.Fatal(err)
-	}
-	secureHome(t, dir)
-	return dir
-}
-
 // fakeJournal stands in for the home journal: it keeps each event once, by
 // event_id, in the order appended. appends counts the calls of either
 // method, recovers those of Recover alone.
