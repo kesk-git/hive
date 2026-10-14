@@ -408,6 +408,36 @@ func TestLiveImportOfAFileWithEveryTag(t *testing.T) {
 	}
 }
 
+// A date whose midnight a change to summer time skips starts at the change, the
+// first instant of that date in the zone, and renders back as the same date:
+// in America/Santiago 2026-09-06 begins at 01:00, at 04:00 UTC.
+func TestLiveImportOfADateWhoseMidnightIsSkipped(t *testing.T) {
+	h := newHome(t)
+	const zone, first = "America/Santiago", "2026-09-06T04:00:00.000Z"
+	text := "# Backlog\n\n## Queued\n- [ ] gap-a1 - wait (since 2026-09-06) (hold: until the change) (hold-kind: future) (hold-until: 2026-09-06)\n\n## Done\n- [x] gap-b2 - closed (since 2026-09-06) (done 2026-09-06)\n"
+	path, data, when := sourceBytes(t, []byte(text))
+	im := h.importPath(path, data, when, zone)
+	if a1 := im.items["gap-a1"]; a1["created_at"] != first {
+		t.Errorf("gap-a1: created_at %v; want %s", a1["created_at"], first)
+	}
+	if until, _ := im.holds["gap-a1"]["until"].(map[string]any); until["at"] != first || until["date"] != "2026-09-06" {
+		t.Errorf("gap-a1: hold until %v; want %s", until, first)
+	}
+	if b2 := im.items["gap-b2"]; b2["created_at"] != first || b2["closed_at"] != first {
+		t.Errorf("gap-b2: created_at %v, closed_at %v; want %s", b2["created_at"], b2["closed_at"], first)
+	}
+	out := ok(t, h.do("export-legacy", map[string]any{"zone": zone}))
+	rendered := out["text"].(string)
+	for _, want := range []string{"(since 2026-09-06)", "(done 2026-09-06)"} {
+		if !strings.Contains(rendered, want) {
+			t.Errorf("the export in %s does not write %s:\n%s", zone, want, rendered)
+		}
+	}
+	if strings.Contains(rendered, "2026-09-05") {
+		t.Errorf("the export in %s writes the day before:\n%s", zone, rendered)
+	}
+}
+
 // A file with carriage returns, a header suffix, an unrecognized section and no
 // final newline is imported with its source kept exactly.
 func TestLiveImportOfCarriageReturnsASuffixAndAnUnrecognizedSection(t *testing.T) {

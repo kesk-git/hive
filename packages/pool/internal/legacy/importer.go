@@ -511,10 +511,17 @@ type importer struct {
 }
 
 // at is the instant of the start of the calendar date in the zone of the
-// import, or false for a date that is not one.
+// import, or false for a date that is not one there. A date whose midnight a
+// change of offset skips starts at the change.
 func (im *importer) at(date string) (string, bool) {
 	t, err := time.ParseInLocation("2006-01-02", date, im.loc)
 	if err != nil {
+		return "", false
+	}
+	if t.Format("2006-01-02") < date {
+		_, t = t.ZoneBounds()
+	}
+	if t.Format("2006-01-02") != date {
 		return "", false
 	}
 	s, err := clock.Format(t)
