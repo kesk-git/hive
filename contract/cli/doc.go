@@ -33,6 +33,22 @@
 // gives a Failure a short sentence and the error beneath it, and never puts
 // the error's text in the sentence.
 //
+// A command with no store (Executable.Storeless) keeps no store, takes no
+// lock and writes no requests directory, and persists through its Callee. For
+// a mutating operation the harness, once the request, the home and the scope
+// are checked and before the handler runs, reads the callee's recorded outcome
+// of the request: an outcome of the same digest is returned as a replay,
+// adapted to the operation's own response by Operation.Adapt, with the
+// callee's receipts and status, and a different digest is replay_mismatch with
+// nothing sent. With none the handler runs and sends the callee exactly one
+// handoff, Call.SendHandoff: the same request_id, correlation_id and scope,
+// the package and its command as the caller, and as the causation the
+// original request by identity and digest. The callee's harness, told by
+// Executable.Handoffs which packages keep no store, keys such a request on
+// that digest, so that retries that race past the read are answered by
+// whichever reached the callee first. A callee that gives no response the
+// contract accepts leaves the request unknown, with nothing recorded.
+//
 // An operation with an effect outside Hive commits its intent first, with
 // Call.CommitIntent: the records, receipts and events of the intent are
 // durable, as one transaction, before the effect, and the request has no

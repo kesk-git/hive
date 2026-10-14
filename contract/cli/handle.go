@@ -311,6 +311,15 @@ func (e *Executable) handle(inv Invocation, read **envelope.Request) (resp *enve
 	if err := e.floor(c, op); err != nil {
 		return nil, nil, fmt.Errorf("%w: the operation is refused before anything is written", err)
 	}
+	// A command with no store takes no lock and opens no store: it replays
+	// through its callee, as handleStoreless does.
+	if e.Storeless {
+		digest, err := envelope.Digest(inv.Request)
+		if err != nil {
+			return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the request cannot be digested").Because(err)), nil, nil
+		}
+		return e.handleStoreless(call, digest, func(f *envelope.Failure) *envelope.Response { return fail(req.RequestID, f) }), nil, nil
+	}
 	// Then the store's lock, for this request, and the replay check.
 	at := &recordClock{}
 	st, w, err := e.open(home, req.RequestID, at)
@@ -322,6 +331,8 @@ func (e *Executable) handle(inv Invocation, read **envelope.Request) (resp *enve
 	if err != nil {
 		return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the request cannot be digested").Because(err)), nil, nil
 	}
+	// A handoff is keyed on the original request's digest, which it carries.
+	digest = e.handoffKey(req, digest)
 	recorded, err := readOutcome(st, req.RequestID)
 	if err != nil {
 		return fail(req.RequestID, envelope.AsFailure(err)), nil, nil
@@ -452,7 +463,9 @@ func (e *Executable) run(c *Call) (res *Result, err error) {
 			// Only a refusal or a hold of a mutating operation leaves receipts.
 			// An unknown outcome returns the receipts of the intents the call
 			// committed, which the harness attaches, and none of its own.
-			if len(f.Receipts) > 0 && (!c.Operation.Mutates || (f.Status != envelope.Refused && f.Status != envelope.Held)) {
+			// The answer of a callee to a handoff is the one exception: its
+			// status and its receipts are the callee's.
+			if len(f.Receipts) > 0 && f != c.handedFailure && (!c.Operation.Mutates || (f.Status != envelope.Refused && f.Status != envelope.Held)) {
 				return nil, envelope.Common(envelope.CodeInternal, "the operation returned receipts with a status that leaves none").Carry(f)
 			}
 			return nil, f

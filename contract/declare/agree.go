@@ -15,7 +15,10 @@ import (
 // receipt and runs as a platform utility is among what the package
 // declares; and the executable keeps no store exactly when the declaration
 // lists no home path of the package's own. A storeless executable that
-// declares a home path, or a stored one that declares none, is refused.
+// declares a home path, or a stored one that declares none, is refused. The
+// packages whose handoffs an executable keys on the original request's digest
+// are packages the declaration says keep no store: an executable that lists
+// one that is not, or one that is not a package, is refused.
 func (s *Set) Agree(e *cli.Executable) Problems {
 	p := s.Lookup(e.Package)
 	if p == nil || p.Kind != KindPackage {
@@ -33,6 +36,15 @@ func (s *Set) Agree(e *cli.Executable) Problems {
 			add(e.Name, "%s declares no home path, so its executable keeps no store, and this one is not storeless", p.Name)
 		} else {
 			add(e.Name, "%s declares the home paths %v, so its executable keeps a store, and this one is storeless", p.Name, p.HomePaths)
+		}
+	}
+	for _, name := range e.Handoffs {
+		q := s.Lookup(name)
+		switch {
+		case q == nil || q.Kind != KindPackage:
+			add(e.Name, "%q is listed as a package whose handoffs it accepts, and it is not a declared package", name)
+		case len(q.HomePaths) != 0:
+			add(e.Name, "%s declares the home paths %v, so its requests are never handoffs", q.Name, q.HomePaths)
 		}
 	}
 	declared := map[string]Command{}

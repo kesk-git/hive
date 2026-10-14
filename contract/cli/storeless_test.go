@@ -306,6 +306,7 @@ func TestACalleeKeysOnTheOriginalOnlyForAHandoff(t *testing.T) {
 		req := request(t, "put", n, func(m map[string]any) {
 			m["caller"] = map[string]any{"kind": "package", "package": "word", "command": "hive-word"}
 			m["causation"] = map[string]any{"schema": "hive.request", "id": id(ids.Request, n), "digest": original}
+			m["body"] = map[string]any{"home": map[string]any{"role": "hive", "name": fmt.Sprintf("case-%d", n)}}
 			tc.edit(m)
 		})
 		expect(t, h.invoke(t, home, "put", req), envelope.Ok, "")

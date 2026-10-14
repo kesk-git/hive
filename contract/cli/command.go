@@ -57,9 +57,22 @@ type Executable struct {
 	// Waiting says how a mutating operation waits for its store's lock.
 	Waiting store.Waiting
 	// Storeless declares that the package owns no part of the home and keeps
-	// no store, as word persists through the Pool. Check refuses a storeless
-	// executable with a supported mutating operation.
+	// no store, as word persists through the Pool. A storeless executable
+	// takes no lock and writes no store and no requests directory: a supported
+	// mutating operation of it replays its callee's recorded outcome of the
+	// request or sends the callee one handoff (spec/commands.md, A command
+	// with no store), and Check admits one only with a Callee.
 	Storeless bool
+	// Callee is how a storeless executable reaches the one package it
+	// persists through. Only a storeless executable has one.
+	Callee Callee
+	// Handoffs are the packages that declare no home path, whose requests
+	// this executable treats as handoffs when they carry their original as
+	// the causation: it keys the replay of such a request on the digest the
+	// causation names. A package the executable does not list is a caller
+	// whose request is keyed on its own digest. The declaration of the
+	// packages states who they are, and Agree holds this list to it.
+	Handoffs []string
 	// Journal opens the home journal of the home at dir for a transaction
 	// that appends events, and for the diagnostic event of a failure. Nil
 	// means the executable appends none; a transaction that names events
@@ -97,6 +110,11 @@ type Operation struct {
 	// and the replay are checked, with the store's lock held for a mutating
 	// operation. It returns a *envelope.Failure to end with another status.
 	Handle func(*Call) (*Result, error)
+	// Adapt gives the operation's own response body from the response of its
+	// callee: the ok response recorded for the request, when a command with
+	// no store replays it, and the one a handoff returns. A supported mutating
+	// operation of a storeless executable has it; no other does.
+	Adapt func(c *Call, callee *envelope.Response) (map[string]any, error)
 }
 
 // Call is one validated invocation of an operation, as the handler sees it.
@@ -128,6 +146,15 @@ type Call struct {
 	// was made durable, whether or not it had receipts.
 	intent   []envelope.Receipt
 	intended bool
+
+	// digest is the digest of the canonical form of the request, which a
+	// handoff names as its causation. handoffs counts the handoffs sent,
+	// handed is the callee's accepted response to the one sent, and
+	// handedFailure the failure that response gave a handler that returned it.
+	digest        string
+	handoffs      int
+	handed        *envelope.Response
+	handedFailure *envelope.Failure
 }
 
 // Intent is what an operation makes durable before an effect outside Hive:
@@ -416,8 +443,8 @@ func (e *Executable) Check() error {
 			if op.State == envelope.Supported && op.Handle == nil {
 				return fmt.Errorf("cli: %s %s is supported and has no handler", c.Name, op.Name)
 			}
-			if e.Storeless && op.State == envelope.Supported && op.Mutates {
-				return fmt.Errorf("cli: %s %s mutates, and the executable %s is storeless: the delegating handoff is defined with the package that needs it", c.Name, op.Name, e.Name)
+			if err := e.checkHandoff(c, op); err != nil {
+				return err
 			}
 		}
 		if err := e.Capabilities(c).Check(); err != nil {
@@ -430,6 +457,32 @@ func (e *Executable) Check() error {
 				}
 			}
 		}
+	}
+	return nil
+}
+
+// checkHandoff checks a supported mutating operation of a storeless
+// executable: it has the callee it hands off to, says how to adapt the
+// callee's outcome and declares the command it calls. An executable that keeps
+// a store has no callee, since the handoff is the way of a command that has
+// none.
+func (e *Executable) checkHandoff(c *Command, op *Operation) error {
+	if !e.Storeless {
+		if e.Callee != nil {
+			return fmt.Errorf("cli: the executable %s keeps a store and names a callee: a handoff is made only by a command with no store", e.Name)
+		}
+		return nil
+	}
+	if op.State != envelope.Supported || !op.Mutates {
+		return nil
+	}
+	switch {
+	case e.Callee == nil:
+		return fmt.Errorf("cli: %s %s mutates, and the executable %s keeps no store and names no callee to hand it off to", c.Name, op.Name, e.Name)
+	case op.Adapt == nil:
+		return fmt.Errorf("cli: %s %s mutates without a store and says no way to adapt its callee's outcome", c.Name, op.Name)
+	case len(op.Calls) == 0:
+		return fmt.Errorf("cli: %s %s mutates without a store and declares no command it calls", c.Name, op.Name)
 	}
 	return nil
 }

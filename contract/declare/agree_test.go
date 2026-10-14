@@ -67,6 +67,28 @@ func TestStorelessFollowsTheHomePaths(t *testing.T) {
 	}
 }
 
+// The packages an executable accepts handoffs from are the packages that
+// declare no home path: a package that keeps a store, or none at all, is not
+// one.
+func TestHandoffCallersAreThePackagesWithNoStore(t *testing.T) {
+	set := read(t, repo(t))
+	e := described(t, set, "pool")
+	e.Handoffs = []string{"word"}
+	if ps := set.Agree(e); len(ps) != 0 {
+		t.Errorf("%v", ps)
+	}
+	for name, want := range map[string]string{
+		"dispatch": "so its requests are never handoffs",
+		"nothing":  "not a declared package",
+		"contract": "not a declared package",
+	} {
+		e.Handoffs = []string{"word", name}
+		if ps := set.Agree(e); len(ps) != 1 || !mention(ps, want) {
+			t.Errorf("%s: %v", name, ps)
+		}
+	}
+}
+
 // What a command or an operation declares must be among what its package
 // declares.
 func TestAnExecutableThatStraysFromItsDeclaration(t *testing.T) {
