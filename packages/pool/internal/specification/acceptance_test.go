@@ -532,16 +532,16 @@ func TestAcceptBindsTheRevisionAndReleasesTheHolds(t *testing.T) {
 		t.Errorf("receipts %v, receipt_id %v", kinds(resp), a["receipt_id"])
 	}
 
+	t.Run("an item accepted at a revision once", func(t *testing.T) {
+		h.quiet(func() {
+			refused(t, h.spec("accept", acceptBody(id, 1, T)), envelope.Conflict, envelope.CodeAlreadyExists)
+		})
+	})
 	t.Run("a revision that is not the current one", func(t *testing.T) {
 		other := h.addID(leaf("Other", false))
 		h.ok(h.revise(id, "Revision 2.", criteria(), nil))
 		h.quiet(func() {
 			refused(t, h.spec("accept", acceptBody(id, 1, other)), envelope.Conflict, envelope.CodeRevisionConflict)
-		})
-	})
-	t.Run("an item accepted at a revision once", func(t *testing.T) {
-		h.quiet(func() {
-			refused(t, h.spec("accept", acceptBody(id, 2, T)), envelope.Conflict, envelope.CodeAlreadyExists)
 		})
 	})
 	t.Run("a request that omits the test or the questions", func(t *testing.T) {

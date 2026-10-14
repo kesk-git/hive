@@ -28,6 +28,9 @@ type home struct {
 	homeID string
 	clk    *clock.Fake
 	exe    *cli.Executable
+	// correlation is the one correlation of every request, so that a request
+	// sent again is the same request.
+	correlation string
 }
 
 func mint(t testing.TB, p ids.Prefix) string {
@@ -45,7 +48,7 @@ func writer(operation string) map[string]any {
 
 func newHome(t testing.TB) *home {
 	t.Helper()
-	h := &home{t: t, dir: filepath.Join(t.TempDir(), "home"), homeID: mint(t, ids.Home), clk: clock.NewFake(start)}
+	h := &home{t: t, dir: filepath.Join(t.TempDir(), "home"), homeID: mint(t, ids.Home), clk: clock.NewFake(start), correlation: mint(t, ids.Correlation)}
 	if err := os.Mkdir(h.dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +84,7 @@ func (h *home) send(requestID, command, operation string, body map[string]any, e
 	req := map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
 		"command": command, "operation": operation, "operation_version": "1.0",
-		"request_id": requestID, "correlation_id": mint(h.t, ids.Correlation),
+		"request_id": requestID, "correlation_id": h.correlation,
 		"issued_at": "2026-10-14T09:00:00.000Z", "caller": map[string]any{"kind": "test"},
 		"scope_level": "hive", "home_id": h.homeID,
 		"authority": map[string]any{"kind": "none"}, "body": body,
