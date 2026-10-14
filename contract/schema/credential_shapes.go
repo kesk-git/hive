@@ -195,6 +195,11 @@ func lineShapeOf(s string) string {
 	return ""
 }
 
+// HoldsShape reports whether the string s is, or holds as a whole token run or a
+// whole line, a string of a listed shape. A caller that is about to cut a string,
+// a diagnostic clipping an error chain, asks it of the whole string first.
+func HoldsShape(s string) bool { return shapeOf(s) != "" }
+
 // CheckShapes looks through a decoded document, as Decode yields it, for a
 // string of a listed shape in a value or in a member name, and returns a
 // *ShapeError for the first found, in the order of the sorted member names. No

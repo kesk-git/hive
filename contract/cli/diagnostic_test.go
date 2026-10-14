@@ -479,8 +479,7 @@ func TestReplacedFailureKeepsItsReason(t *testing.T) {
 }
 
 // A request that breaks its schema is answered with one sentence naming where,
-// never with a member's name or a value of the request, and its detail goes to
-// the journal.
+// never with a member's name or a value of the request.
 func TestSchemaViolationQuotesNothingOfTheRequest(t *testing.T) {
 	const typed = "sk-live-0123456789abcdefSECRET"
 	for name, edit := range map[string]func(m map[string]any){
@@ -633,5 +632,139 @@ func TestUndeliveredResponseGivesOneLine(t *testing.T) {
 				t.Errorf("exit %d, stdout %q, standard error %q, want %q", code, out, stderr, c.want)
 			}
 		})
+	}
+}
+
+// adding adds to hive-fleet an operation of the name given.
+func (h *harness) adding(name string, mutates bool, handle func(*Call) (*Result, error)) {
+	fleet := h.exe.command("hive-fleet")
+	decl := fleet.Operations[0].OperationDecl
+	decl.Name, decl.Mutates = name, mutates
+	fleet.Operations = append(fleet.Operations, &Operation{OperationDecl: decl, Handle: handle})
+}
+
+// detailOf is the detail of the one diagnostic event the harness's journal
+// holds, joined, or fails the test when it holds another number.
+func (h *harness) detailOf(t testing.TB) string {
+	t.Helper()
+	var events []map[string]any
+	for _, e := range h.events(t) {
+		if kind, _ := e["kind"].(string); strings.HasSuffix(kind, ".diagnostic.recorded") {
+			events = append(events, e)
+		}
+	}
+	if len(events) != 1 {
+		t.Fatalf("%d diagnostic events, want 1", len(events))
+	}
+	var detail []string
+	for _, d := range events[0]["body"].(map[string]any)["detail"].([]any) {
+		detail = append(detail, d.(string))
+	}
+	return strings.Join(detail, "\n")
+}
+
+// A body a command would answer with that holds a string of a listed shape is
+// refused whole, and the answer follows the rule for a response that cannot be
+// written: failed with internal while nothing of the request is durable, unknown
+// with outcome_unknown once the operation's changes are, never a status whose
+// row promises that nothing changed. The shape and the field are in the
+// diagnostic, and the text is nowhere.
+func TestResponseBodyHoldingACredentialShape(t *testing.T) {
+	text := shapeFor("ghs_", 255)
+	leak := func(c *Call) map[string]any { return map[string]any{"note": "kept " + text, "n": int64(1)} }
+	for _, c := range []struct {
+		name    string
+		mutates bool
+		handle  func(*Call) (*Result, error)
+		status  envelope.Status
+		code    string
+		durable bool
+	}{
+		{"leakread", false, func(c *Call) (*Result, error) { return &Result{Body: leak(c)}, nil }, envelope.Failed, "internal", false},
+		{"leakwrite", true, func(c *Call) (*Result, error) { return &Result{Body: leak(c)}, nil }, envelope.Failed, "internal", false},
+		{"leakintent", true, func(c *Call) (*Result, error) {
+			path := store.RecordPath("dispatch", "thing", "intended")
+			if _, err := c.CommitIntent(Intent{Records: []store.RecordWrite{{Path: path, Content: []byte(`{"schema":"dispatch.thing","schema_version":"1.0","name":"intended"}`)}}}); err != nil {
+				return nil, err
+			}
+			return &Result{Body: leak(c)}, nil
+		}, envelope.Unknown, "outcome_unknown", true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.adding(c.name, c.mutates, c.handle)
+			home := newHome(t)
+			before := tree(t, home)
+			code, out, stderr := h.run("hive-fleet", request(t, c.name, 1, nil), c.name, HomeOption, home)
+			resp, err := envelope.AcceptResponse(out, code, id(ids.Request, 1))
+			if err != nil {
+				t.Fatal(err)
+			}
+			expect(t, resp, c.status, c.code)
+			if strings.Contains(string(out), text) || strings.Contains(stderr, text) {
+				t.Error("the text of the credential is in the response or standard error")
+			}
+			detail := h.detailOf(t)
+			if !strings.Contains(detail, "github.app-installation-opaque") || !strings.Contains(detail, "the root of the body") || strings.Contains(detail, text) {
+				t.Errorf("detail %q", detail)
+			}
+			for _, line := range h.journal.lines {
+				if strings.Contains(string(line), text) {
+					t.Error("the text of the credential is in the journal")
+				}
+			}
+			after := tree(t, home)
+			for path := range after {
+				if _, there := before[path]; !there && !strings.HasPrefix(path, "locks/") && !c.durable {
+					t.Errorf("a failed request left %s", path)
+				}
+			}
+			if _, kept := after[store.RecordPath("dispatch", "thing", "intended")]; kept != c.durable {
+				t.Errorf("the intended record is kept: %v, want %v", kept, c.durable)
+			}
+		})
+	}
+}
+
+// A command with no store whose callee may hold the request answers unknown when
+// the body it adapts from the callee's answer holds a listed shape, since
+// failed would promise that nothing changed; the callee was sent once.
+func TestStorelessAdaptedBodyHoldingACredentialShape(t *testing.T) {
+	text := shapeFor("gho_", 36)
+	h := newHarness(t)
+	adapter := &scripted{}
+	w := newWordy(t, h, adapter)
+	w.exe.Journal = func(string) (store.Journal, error) { return h.journal, nil }
+	w.exe.Commands[0].Operations[0].Adapt = func(c *Call, callee *envelope.Response) (map[string]any, error) {
+		return map[string]any{"adapted": []any{"x", text}}, nil
+	}
+	home := newHome(t)
+	resp := w.send(t, home, "say", sayRequest(t, "say", 1, "first"))
+	expect(t, resp, envelope.Unknown, "outcome_unknown")
+	if len(adapter.sent) != 1 {
+		t.Errorf("%d handoffs", len(adapter.sent))
+	}
+	if detail := h.detailOf(t); !strings.Contains(detail, "github.oauth-access") || !strings.Contains(detail, "the root of the body") || strings.Contains(detail, text) {
+		t.Errorf("detail %q", detail)
+	}
+}
+
+// A body of a request that was read and breaks its operation's schema is a
+// validation refusal naming the field: its message says everything, and it
+// writes no event. A request document that cannot be read whole keeps its
+// detail.
+func TestValidationRefusalOfABodyWritesNoEvent(t *testing.T) {
+	h := newHarness(t)
+	h.exe.Journal = journal.Opener("dispatch")
+	home := newHome(t)
+	body := request(t, "fail", 1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["role"] = "nest" })
+	expect(t, h.invoke(t, home, "fail", body), envelope.Invalid, "schema_violation")
+	if n := len(realEntries(t, home)); n != 0 {
+		t.Fatalf("%d events for a body that breaks its schema", n)
+	}
+	document := request(t, "fail", 2, func(m map[string]any) { m["extra"] = "x" })
+	expect(t, h.invoke(t, home, "fail", document), envelope.Invalid, "schema_violation")
+	if n := len(realEntries(t, home)); n != 1 {
+		t.Errorf("%d events for a request document that breaks its schema, want 1", n)
 	}
 }

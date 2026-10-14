@@ -363,3 +363,15 @@ func TestRegistryCheckShapes(t *testing.T) {
 		t.Errorf("got %v", err)
 	}
 }
+
+func TestHoldsShape(t *testing.T) {
+	tok := tokenOf("ghp_", 36)
+	for s, want := range map[string]bool{
+		tok: true, "cut at the end " + tok + " and after": true, tok[:30]: false, "": false,
+		marker("EC PRIVATE KEY") + "\n": true, "ghp_ alone": false,
+	} {
+		if got := HoldsShape(s); got != want {
+			t.Errorf("HoldsShape(%.12q) = %v, want %v", s, got, want)
+		}
+	}
+}
