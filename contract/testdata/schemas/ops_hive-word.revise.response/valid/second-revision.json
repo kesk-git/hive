@@ -1,0 +1,120 @@
+{
+  "question": {
+    "schema": "pool.question",
+    "schema_version": "1.0",
+    "record_revision": 2,
+    "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+    "scope_level": "project",
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+    "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+    "held_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+    "held_item": "work",
+    "hold_id": "hold_01jc7d8e9f0g1h2j3k4m5n6p7m",
+    "decision_round_id": "dr_01jc7d8e9f0g1h2j3k4m5n6p7r",
+    "card_id": "card_01jc7d8e9f0g1h2j3k4m5n6p7s",
+    "origin": {
+      "kind": "supervisor"
+    },
+    "current_revision": 2,
+    "revisions": [
+      {
+        "revision": 1,
+        "text": "Which vendor should the integration use?",
+        "consequence": "Without an answer the integration work stays held.",
+        "recommendation": "keep-vendor",
+        "options": [
+          {
+            "option_id": "keep-vendor",
+            "label": "Keep the vendor",
+            "consequence": "The integration stays on the current vendor and the migration is dropped."
+          },
+          {
+            "option_id": "switch-vendor",
+            "label": "Switch vendor",
+            "consequence": "The integration moves to the second vendor and the work is re-planned."
+          }
+        ],
+        "asked_at": "2026-10-12T09:00:00.000Z",
+        "asked_by": {
+          "kind": "package",
+          "package": "word",
+          "command": "hive-word"
+        },
+        "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7p"
+      },
+      {
+        "revision": 2,
+        "text": "Which vendor, given the new price list?",
+        "consequence": "Without an answer the integration work stays held.",
+        "recommendation": "switch-vendor",
+        "options": [
+          {
+            "option_id": "switch-vendor",
+            "label": "Switch vendor",
+            "consequence": "The integration moves to the second vendor and the work is re-planned."
+          },
+          {
+            "option_id": "keep-vendor",
+            "label": "Keep the vendor",
+            "consequence": "The integration stays on the current vendor and the migration is dropped."
+          }
+        ],
+        "asked_at": "2026-10-12T09:30:00.000Z",
+        "asked_by": {
+          "kind": "package",
+          "package": "word",
+          "command": "hive-word"
+        },
+        "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7t"
+      }
+    ],
+    "state": "open",
+    "answers": [],
+    "created_at": "2026-10-12T09:00:00.000Z",
+    "updated_at": "2026-10-12T09:30:00.000Z",
+    "writer": {
+      "package": "pool",
+      "command": "hive-pool",
+      "operation": "revise-question",
+      "implementation_version": "0.1.0"
+    }
+  },
+  "round": {
+    "schema": "pool.decision-round",
+    "schema_version": "1.0",
+    "record_revision": 2,
+    "decision_round_id": "dr_01jc7d8e9f0g1h2j3k4m5n6p7r",
+    "scope_level": "project",
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+    "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+    "origin": {
+      "kind": "supervisor"
+    },
+    "cards": [
+      {
+        "card_id": "card_01jc7d8e9f0g1h2j3k4m5n6p7s",
+        "card_revision": 2,
+        "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+        "question_revision": 2,
+        "held_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+        "held_task_revision": 1,
+        "presented_at": "2026-10-12T09:00:00.000Z",
+        "state": "open"
+      }
+    ],
+    "attachments": [],
+    "complete": true,
+    "state": "open",
+    "opened_at": "2026-10-12T09:00:00.000Z",
+    "created_at": "2026-10-12T09:00:00.000Z",
+    "updated_at": "2026-10-12T09:30:00.000Z",
+    "writer": {
+      "package": "pool",
+      "command": "hive-pool",
+      "operation": "revise-question",
+      "implementation_version": "0.1.0"
+    }
+  }
+}

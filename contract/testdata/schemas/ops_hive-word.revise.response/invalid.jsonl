@@ -1,0 +1,8 @@
+{"name":"missing-question","base":"second-revision.json","edits":[{"op":"remove","path":"/question"}]}
+{"name":"missing-round","base":"second-revision.json","edits":[{"op":"remove","path":"/round"}]}
+{"name":"question-current-revision-zero","base":"second-revision.json","edits":[{"op":"replace","path":"/question/current_revision","value":0}]}
+{"name":"question-missing-revisions","base":"second-revision.json","edits":[{"op":"remove","path":"/question/revisions"}]}
+{"name":"question-schema-wrong-const","base":"second-revision.json","edits":[{"op":"replace","path":"/question/schema","value":"pool.decision-round"}]}
+{"name":"round-not-an-object","base":"second-revision.json","edits":[{"op":"replace","path":"/round","value":"dr_01jc7d8e9f0g1h2j3k4m5n6p7r"}]}
+{"name":"round-state-unknown","base":"second-revision.json","edits":[{"op":"replace","path":"/round/state","value":"answered"}]}
+{"name":"unknown-member-hold","base":"second-revision.json","edits":[{"op":"add","path":"/hold","value":{}}]}
