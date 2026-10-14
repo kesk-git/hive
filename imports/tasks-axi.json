@@ -1,0 +1,253 @@
+{
+  "schema": "hive.import",
+  "schema_version": "1.0",
+  "import_id": "tasks-axi",
+  "kind": "translation",
+  "owner": "pool",
+  "recorded_on": "2026-10-14",
+  "upstream": {
+    "name": "tasks-axi",
+    "repository": "https://github.com/kunchenguid/tasks-axi",
+    "revision": "9401ff899c0d1d8ae6b4fd8727b9025abda2032c",
+    "tag": "tasks-axi-v0.2.6"
+  },
+  "licence": {
+    "spdx": "MIT",
+    "copyright": [
+      "Copyright (c) 2026 Kun Chen"
+    ],
+    "files": [
+      {
+        "path": "packages/pool/upstream/tasks-axi/LICENSE",
+        "digest": "sha256:945016bd37e1ba7211622ef60ee1d23ab727896ba7710edd21e8fbe983863969",
+        "bytes": 1065
+      }
+    ]
+  },
+  "portions": [
+    {
+      "hive_path": "packages/pool/internal/legacy/grammar.go",
+      "upstream_paths": [
+        "src/backends/markdown-grammar.ts",
+        "src/id.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/legacy/normalize.go",
+      "upstream_paths": [
+        "src/backends/markdown.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/legacy/archive.go",
+      "upstream_paths": [
+        "src/backends/markdown.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/item/links.go",
+      "upstream_paths": [
+        "src/pr-url.ts",
+        "src/backends/markdown-grammar.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/testdata/legacy/backlog.md",
+      "upstream_paths": [
+        "test/fixtures/backlog.md"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/testdata/legacy/checkbox-in-flight.md",
+      "upstream_paths": [
+        "test/fixtures/firstmate-backlog.md"
+      ],
+      "disposition": "translated"
+    }
+  ],
+  "retained_tests": [
+    {
+      "hive_path": "packages/pool/internal/legacy/grammar_test.go",
+      "upstream_paths": [
+        "test/backends/markdown-grammar.test.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/legacy/maintain_test.go",
+      "upstream_paths": [
+        "test/commands/maintain.test.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/legacy/id_test.go",
+      "upstream_paths": [
+        "test/id.test.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/item/links_test.go",
+      "upstream_paths": [
+        "test/pr-url.test.ts",
+        "test/backends/markdown-grammar.test.ts"
+      ],
+      "disposition": "translated"
+    }
+  ],
+  "transitive": [
+    {
+      "name": "@toon-format/toon",
+      "version": "^2.1.0",
+      "spdx": "MIT by registry metadata, licence file not read",
+      "disposition": "replaced"
+    },
+    {
+      "name": "axi-sdk-js",
+      "version": "^0.1.10",
+      "spdx": "MIT by registry metadata, licence file not read",
+      "disposition": "replaced"
+    },
+    {
+      "name": "@eslint/js",
+      "version": "^10.0.1",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    },
+    {
+      "name": "@types/node",
+      "version": "^22.0.0",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    },
+    {
+      "name": "eslint",
+      "version": "^10.1.0",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    },
+    {
+      "name": "globals",
+      "version": "^17.4.0",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    },
+    {
+      "name": "prettier",
+      "version": "^3.8.1",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    },
+    {
+      "name": "tsx",
+      "version": "^4.0.0",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    },
+    {
+      "name": "typescript",
+      "version": "^5.7.0",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    },
+    {
+      "name": "typescript-eslint",
+      "version": "^8.58.0",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    },
+    {
+      "name": "vitest",
+      "version": "^3.0.0",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    },
+    {
+      "name": "yaml",
+      "version": "^2.9.0",
+      "spdx": "not established; compiled into nothing",
+      "disposition": "dropped"
+    }
+  ],
+  "excluded": [
+    {
+      "upstream_path": "src/public-followup.ts",
+      "reason": "The upstream's own operating workflow for a promised public reply. The Pool keeps the marker and its body as text and translates none of the state machine; the grammar here reads the marker as body lines and refuses nothing for it."
+    },
+    {
+      "upstream_path": "src/commands/public-followup.ts",
+      "reason": "The command of the public-followup workflow; left behind with it."
+    },
+    {
+      "upstream_path": "test/public-followup.test.ts",
+      "reason": "Tests of the public-followup state machine, which is not translated."
+    },
+    {
+      "upstream_path": "test/commands/public-followup.test.ts",
+      "reason": "Tests of the public-followup command, which is not translated."
+    },
+    {
+      "upstream_path": "src/cli.ts, src/args.ts, src/toon.ts, src/format.ts, src/view.ts, src/confirm.ts, src/suggestions.ts, src/context.ts, src/commands/home.ts, src/commands/setup.ts, src/skill.ts, src/version.ts, bin/tasks-axi.ts",
+      "reason": "Presentation and packaging: argument parsing, output encoding, suggestions, the home and setup commands, the skill asset and the version fast path. Hive's command contract is the interface."
+    },
+    {
+      "upstream_path": "test/cli.test.ts, test/commands/home.test.ts, test/commands/setup.test.ts, test/suggestions.test.ts, test/skill.test.ts, test/format.test.ts, test/bin/version-fast-path.test.ts",
+      "reason": "Tests of the presentation and packaging files above."
+    },
+    {
+      "upstream_path": "src/config.ts, test/config.test.ts",
+      "reason": "Configuration from flags, environment variables and configuration files; Hive reads none as an input to the contract."
+    },
+    {
+      "upstream_path": "src/errors.ts",
+      "reason": "Error codes bound to the SDK's error type; Hive's exit states and codes replace them. The grammar here returns plain Go errors."
+    },
+    {
+      "upstream_path": "src/backends/lock.ts, test/backends/lock.test.ts",
+      "reason": "The advisory lock; Hive's transaction lock is the contract library's."
+    },
+    {
+      "upstream_path": "src/store.ts, src/model.ts",
+      "reason": "The backend seam and the TypeScript data model; Hive's records are its schemas. The structured reading of an entry in the grammar is a Go type of its own, written for the parser."
+    },
+    {
+      "upstream_path": "src/id.ts (minting), test/commands/mint-collision.test.ts, the mintId cases of test/id.test.ts",
+      "reason": "Minting of slug-xx identifiers; Hive mints ULIDs. Only the identifier pattern the parser accepts is carried."
+    },
+    {
+      "upstream_path": "src/backends/markdown.ts (the store: load, create, update, remove, moveTo, moveManyTo, transition, addDep, removeDep, prune, render's writing, locking and atomic writes)",
+      "reason": "Not taken by this portion. The pure normalization and the archive lookup are translated; the store verbs belong to the later lanes of the import or are left behind, and prune is not carried for Hive's records."
+    },
+    {
+      "upstream_path": "test/backends/markdown.test.ts, test/commands/state.test.ts, test/commands/crud.test.ts, test/derive.test.ts",
+      "reason": "Tests of the store verbs and derived facts, which this portion does not translate."
+    },
+    {
+      "upstream_path": "test/backends/markdown-grammar.test.ts (the case that reads the upstream author's own backlog)",
+      "reason": "It reads a file of a private machine and skips without it; nothing to carry."
+    },
+    {
+      "upstream_path": "test/helpers.ts, test/fixtures/module-trace-hook.mjs, test/fixtures/module-trace-register.mjs",
+      "reason": "Test helpers and tooling of the TypeScript test runner and the version fast path."
+    },
+    {
+      "upstream_path": "skills/tasks-axi/SKILL.md, scripts/build-skill.ts, scripts/guard-generated-files.sh, .github/workflows/*, test/release-ci-exclusions.test.ts, test/workflows/guard-generated-files.test.ts",
+      "reason": "A generated asset and the upstream's build, release and workflow files."
+    },
+    {
+      "upstream_path": "README.md and every other documentation file",
+      "reason": "Documentation; none is quoted."
+    }
+  ],
+  "local_changes": "The grammar, its byte-exact round trip, the normalization of titles, tags, links, holds, dates and dependency reasons, the archive lookup, the recognition of pull request URLs and the legacy identifier are the upstream's behaviour, re-expressed in Go. Hive changes: the parse reads bytes and keeps them (a file that is not UTF-8 round-trips); the JavaScript white space and line terminators the upstream's patterns relied on are written out, since Go's differ; the trailing dependency edge, which the upstream matches with a look-ahead, is matched by hand with the same result; the public-followup marker is kept as body text and never decoded, so the grammar refuses nothing; an archive file is read with the same grammar and its entries resolve by identifier, the state of an archived entry coming from its bullet; nothing is pruned, written or locked; the two groups of tests are carried as Go tests with Hive hosts, dates and identifiers, and the two sample backlogs are re-expressed as Go-side fixtures with Hive's identifiers and wording, recorded as translated portions. Verified against the upstream's compiled parser on generated documents outside the repository.",
+  "audit": {
+    "audited_on": "2026-10-14",
+    "statement": "The upstream was read at revision 9401ff899c0d1d8ae6b4fd8727b9025abda2032c (tag tasks-axi-v0.2.6), read-only. Its root LICENSE is 1,065 bytes with digest sha256:945016bd37e1ba7211622ef60ee1d23ab727896ba7710edd21e8fbe983863969, MIT, with the one notice Copyright (c) 2026 Kun Chen, and is kept unchanged. No file under its src/ or test/ carries a copyright or licence header, and it has no NOTICE file. The two sample backlogs were re-expressed as Hive fixtures with invented identifiers and are recorded as translated portions; no fixture is copied byte for byte. No portion embeds text from a third source: the upstream's comments cite a design report of its own, which is not copied. The two runtime libraries are replaced and nothing of them is taken; the development dependencies are compiled into nothing, and the licence files of neither were read."
+  }
+}
