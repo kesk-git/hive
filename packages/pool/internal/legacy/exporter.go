@@ -60,9 +60,12 @@ func exportLegacy(c *cli.Call) (*cli.Result, error) {
 	if len(omitted) > 0 {
 		return nil, envelope.Common(envelope.CodeRecordMalformed, "a record of the Pool cannot be read, so the backlog cannot be rendered whole").With("record", omitted[0].ID)
 	}
+	// With normalize every item the selector matches is rendered canonically,
+	// as without a migration; without it a migration is exported whole.
 	if id, ok := body["migration_id"].(string); ok {
-		normalize, _ := body["normalize"].(bool)
-		return exportMigration(c, st, g, loc, id, normalize)
+		if normalize, _ := body["normalize"].(bool); !normalize {
+			return exportMigration(c, st, g, loc, id)
+		}
 	}
 	selected, err := selection(c, g)
 	if err != nil {
@@ -480,16 +483,16 @@ type movedEntry struct {
 }
 
 // exportMigration is the export-legacy of a migration: the source's preamble,
-// sections, free lines and entries in the source's order. An item unmodified
-// since its import is emitted from its exact original lines and a modified
-// one is written again canonically, with normalize every item is. Every item
+// sections, free lines and entries in the source's order, whole whatever the
+// selector. An item unmodified since its import is emitted from its exact
+// original lines and a modified one is written again canonically. Every item
 // is emitted in the section its present state maps to: one whose state still
 // maps to its source section keeps its place, and one whose state has changed
 // goes to the end of the first section of the file that maps to its present
 // state, or under a canonical header appended after the last section where
 // the file has none. An excluded entry, a duplicate and every free line are
 // emitted as they were.
-func exportMigration(c *cli.Call, st *cstore.Store, g *read.Graph, loc *time.Location, id string, normalize bool) (*cli.Result, error) {
+func exportMigration(c *cli.Call, st *cstore.Store, g *read.Graph, loc *time.Location, id string) (*cli.Result, error) {
 	m, err := LoadMigration(st, id)
 	switch {
 	case errors.Is(err, poolstore.ErrNotFound):
@@ -548,7 +551,7 @@ func exportMigration(c *cli.Call, st *cstore.Store, g *read.Graph, loc *time.Loc
 		}
 		inPlace := layout.Sections[secOf[i]].State == present
 		switch {
-		case !normalize && inPlace && unmodified(g, e.TaskID, e):
+		case inPlace && unmodified(g, e.TaskID, e):
 			verbatim[i] = true
 		case inPlace:
 			canonical[i] = RenderTaskLines(t)

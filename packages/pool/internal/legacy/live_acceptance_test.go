@@ -730,3 +730,39 @@ func TestExportFromAMigrationRendersAnItemWhoseHoldsChanged(t *testing.T) {
 		}
 	}
 }
+
+// With normalize a migration_id adds nothing: the selector applies, and the
+// items it matches are rendered canonically exactly as they are without a
+// migration, not in the file's layout. Without normalize the migration is
+// exported whole and the selector is ignored.
+func TestExportWithNormalizeIgnoresTheMigration(t *testing.T) {
+	h := newHome(t)
+	im := h.importFixture("backlog.md", "UTC")
+	id := im.migration["migration_id"].(string)
+	selector := map[string]any{"selector": map[string]any{"states": []any{"done"}}}
+
+	plain := ok(t, h.do("export-legacy", map[string]any{"zone": "UTC", "selector": selector["selector"]}))
+	normalized := h.exportMigration(id, map[string]any{"normalize": true, "selector": selector["selector"]})
+	if normalized["text"] != plain["text"] || normalized["digest"] != plain["digest"] || normalized["exact"] != false {
+		t.Errorf("the export with normalize differs from the export without a migration\n got %q\nwant %q", normalized["text"], plain["text"])
+	}
+	rows := normalized["items"].([]any)
+	if len(rows) != 4 {
+		t.Errorf("the selector matched %d items", len(rows))
+	}
+	for _, v := range rows {
+		if row := v.(map[string]any); row["form"] != "rendered" {
+			t.Errorf("%v", row)
+		}
+	}
+	// Nothing of the file's layout: no preamble, free line or excluded entry.
+	if text := normalized["text"].(string); strings.Contains(text, "keeps-gadget-h7") || strings.Contains(text, "Release domain") || strings.Contains(text, "cache-adopt ") {
+		t.Errorf("the export keeps the file's layout:\n%s", text)
+	}
+
+	// Without normalize the whole file is emitted and the selector ignored.
+	whole := h.exportMigration(id, selector)
+	if whole["text"] != string(im.data) || whole["exact"] != true {
+		t.Errorf("the export of the migration is not the whole file (exact %v)", whole["exact"])
+	}
+}
