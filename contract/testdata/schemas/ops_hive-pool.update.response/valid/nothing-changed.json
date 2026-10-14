@@ -1,0 +1,41 @@
+{
+  "item": {
+    "schema": "pool.item",
+    "schema_version": "1.0",
+    "record_revision": 1,
+    "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7d",
+    "scope_level": "project",
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+    "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+    "title": "Example item",
+    "level": "target",
+    "state": "queued",
+    "definition": "needed",
+    "deps": [
+      {
+        "type": "blocked-by",
+        "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7h",
+        "reason": "waits for the other target"
+      }
+    ],
+    "links": [],
+    "generations": [],
+    "created_at": "2026-10-12T09:00:00.000Z",
+    "updated_at": "2026-10-12T09:00:00.000Z",
+    "writer": {
+      "package": "pool",
+      "command": "hive-pool",
+      "operation": "add",
+      "implementation_version": "0.1.0"
+    },
+    "body": "Land the example roadmap outcome.",
+    "wave": {
+      "slug": "first-wave",
+      "title": "First wave",
+      "ordinal": 1
+    },
+    "specification_required": true
+  },
+  "changed": []
+}

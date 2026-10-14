@@ -1,0 +1,32 @@
+{
+  "title": "A hunt",
+  "level": "hunt",
+  "deliverable": "swarm",
+  "class": 3,
+  "priority": 2,
+  "placement_requested": "claude-cloud-session",
+  "delivery": {
+    "validation": "synapse",
+    "publication": "harvest",
+    "assimilation": "word"
+  },
+  "deps": [
+    {
+      "type": "parent",
+      "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7e"
+    }
+  ],
+  "links": [
+    {
+      "kind": "doc",
+      "path": "docs/a.md"
+    }
+  ],
+  "schedule": {
+    "kind": "gate",
+    "not_before": {
+      "at": "2026-10-12T10:00:00.000Z",
+      "zone": "UTC"
+    }
+  }
+}

@@ -41,6 +41,12 @@ Every identifier Hive mints is a registered prefix, an underscore and a ULID in 
 | `rcpt_` | a receipt | the package that writes it |
 | `evt_` | an event | the package that writes it |
 | `spoor_` | a Spoor, the reference to one secret under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section | `dispatch` |
+| `adm_` | an admission record | `pool` |
+| `spec_` | a specification | `pool` |
+| `rule_` | a rule | `pool` |
+| `hold_` | a hold on an item | `pool` |
+| `mem_` | a knowledge projection | `pool` |
+| `migr_` | a legacy migration | `pool` |
 
 A later stage registers a new prefix by adding a row here. A prefix is one to eight lowercase letters and digits, begins with a letter, and is never reused for another kind of thing.
 

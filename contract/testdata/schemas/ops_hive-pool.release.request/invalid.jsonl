@@ -1,0 +1,13 @@
+{"name":"evidence-digest-malformed","base":"with-evidence-and-reason.json","edits":[{"op":"replace","path":"/evidence/digest","value":"sha256:xyz"}]}
+{"name":"evidence-missing-id","base":"with-evidence-and-reason.json","edits":[{"op":"remove","path":"/evidence/id"}]}
+{"name":"evidence-missing-schema","base":"with-evidence-and-reason.json","edits":[{"op":"remove","path":"/evidence/schema"}]}
+{"name":"evidence-not-an-object","base":"with-evidence-and-reason.json","edits":[{"op":"replace","path":"/evidence","value":"receipt"}]}
+{"name":"evidence-record-revision-zero","base":"with-evidence-and-reason.json","edits":[{"op":"replace","path":"/evidence/record_revision","value":0}]}
+{"name":"hold-id-not-a-string","base":"hold-only.json","edits":[{"op":"replace","path":"/hold_id","value":1}]}
+{"name":"hold-id-upper-case","base":"hold-only.json","edits":[{"op":"replace","path":"/hold_id","value":"HOLD_01JC7D8E9F0G1H2J3K4M5N6P7M"}]}
+{"name":"hold-id-wrong-prefix","base":"hold-only.json","edits":[{"op":"replace","path":"/hold_id","value":"task_01jc7d8e9f0g1h2j3k4m5n6p7f"}]}
+{"name":"missing-hold-id","base":"hold-only.json","edits":[{"op":"remove","path":"/hold_id"}]}
+{"name":"reason-empty","base":"with-evidence-and-reason.json","edits":[{"op":"replace","path":"/reason","value":""}]}
+{"name":"reason-not-a-string","base":"with-evidence-and-reason.json","edits":[{"op":"replace","path":"/reason","value":[]}]}
+{"name":"root-not-an-object","base":"hold-only.json","edits":[{"op":"replace","path":"","value":[]}]}
+{"name":"task-id-not-accepted","base":"hold-only.json","edits":[{"op":"add","path":"/task_id","value":"task_01jc7d8e9f0g1h2j3k4m5n6p7f"}]}

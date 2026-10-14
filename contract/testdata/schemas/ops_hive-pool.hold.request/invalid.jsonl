@@ -1,0 +1,20 @@
+{"name":"future-set-by-replacing-kind","base":"parked.json","edits":[{"op":"replace","path":"/kind","value":"future"}]}
+{"name":"future-without-until","base":"future-with-until.json","edits":[{"op":"remove","path":"/until"}]}
+{"name":"kind-admission","base":"parked.json","edits":[{"op":"replace","path":"/kind","value":"admission"}]}
+{"name":"kind-definition","base":"parked.json","edits":[{"op":"replace","path":"/kind","value":"definition"}]}
+{"name":"kind-unknown","base":"parked.json","edits":[{"op":"replace","path":"/kind","value":"paused"}]}
+{"name":"kind-word","base":"parked.json","edits":[{"op":"replace","path":"/kind","value":"word"}]}
+{"name":"missing-kind","base":"parked.json","edits":[{"op":"remove","path":"/kind"}]}
+{"name":"missing-reason","base":"parked.json","edits":[{"op":"remove","path":"/reason"}]}
+{"name":"missing-task-id","base":"parked.json","edits":[{"op":"remove","path":"/task_id"}]}
+{"name":"reason-empty","base":"parked.json","edits":[{"op":"replace","path":"/reason","value":""}]}
+{"name":"reason-not-a-string","base":"parked.json","edits":[{"op":"replace","path":"/reason","value":5}]}
+{"name":"root-not-an-object","base":"parked.json","edits":[{"op":"replace","path":"","value":[]}]}
+{"name":"task-id-wrong-prefix","base":"parked.json","edits":[{"op":"replace","path":"/task_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7m"}]}
+{"name":"unknown-member","base":"parked.json","edits":[{"op":"add","path":"/hold_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7m"}]}
+{"name":"until-at-not-a-timestamp","base":"future-with-until.json","edits":[{"op":"replace","path":"/until/at","value":"tomorrow"}]}
+{"name":"until-date-malformed","base":"future-with-until.json","edits":[{"op":"replace","path":"/until/date","value":"2026/10/12"}]}
+{"name":"until-missing-at","base":"future-with-until.json","edits":[{"op":"remove","path":"/until/at"}]}
+{"name":"until-missing-zone","base":"future-with-until.json","edits":[{"op":"remove","path":"/until/zone"}]}
+{"name":"until-unknown-member","base":"future-with-until.json","edits":[{"op":"add","path":"/until/extra","value":1}]}
+{"name":"until-zone-invalid","base":"future-with-until.json","edits":[{"op":"replace","path":"/until/zone","value":"Not A Zone"}]}

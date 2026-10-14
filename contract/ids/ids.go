@@ -48,12 +48,20 @@ const (
 	// Spoor is the reference to one secret (the design's Secrets section),
 	// minted by dispatch. The record itself enters with dispatch in stage 4.
 	Spoor Prefix = "spoor"
+	// The stage 2 prefixes, each minted by pool (spec/pool.md, Identifiers).
+	Admission  Prefix = "adm"
+	Spec       Prefix = "spec"
+	Rule       Prefix = "rule"
+	Hold       Prefix = "hold"
+	Projection Prefix = "mem"
+	Migration  Prefix = "migr"
 )
 
 var registry = []Prefix{
 	Home, Workspace, Project, Clone, Session, Message, Input, Task, Question,
 	DecisionRound, Card, Lease, Review, FeedbackEvent, ReviewNote, Response,
-	Request, Correlation, Receipt, Event, Spoor,
+	Request, Correlation, Receipt, Event, Spoor, Admission, Spec, Rule, Hold,
+	Projection, Migration,
 }
 
 // Prefixes returns the registered prefixes in registration order.

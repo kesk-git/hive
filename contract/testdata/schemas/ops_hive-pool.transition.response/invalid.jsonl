@@ -1,0 +1,9 @@
+{"name":"from-missing","base":"from-queued.json","edits":[{"op":"remove","path":"/from"}]}
+{"name":"from-not-a-string","base":"from-queued.json","edits":[{"op":"replace","path":"/from","value":1}]}
+{"name":"from-unknown","base":"from-queued.json","edits":[{"op":"replace","path":"/from","value":"running"}]}
+{"name":"item-completed-false","base":"from-in-flight.json","edits":[{"op":"replace","path":"/item/completed","value":false}]}
+{"name":"item-done-without-completed","base":"from-in-flight.json","edits":[{"op":"remove","path":"/item/completed"}]}
+{"name":"item-missing","base":"from-queued.json","edits":[{"op":"remove","path":"/item"}]}
+{"name":"item-missing-task-id","base":"from-queued.json","edits":[{"op":"remove","path":"/item/task_id"}]}
+{"name":"response-unknown-member","base":"from-queued.json","edits":[{"op":"add","path":"/to","value":"in-flight"}]}
+{"name":"root-not-an-object","base":"from-queued.json","edits":[{"op":"replace","path":"","value":[]}]}

@@ -1,0 +1,15 @@
+{"name":"generation-closed-by-missing-id","base":"closed.json","edits":[{"op":"remove","path":"/generation/closed_by/id"}]}
+{"name":"generation-closed-without-closed-at","base":"closed.json","edits":[{"op":"remove","path":"/generation/closed_at"}]}
+{"name":"generation-closed-without-closed-by","base":"closed.json","edits":[{"op":"remove","path":"/generation/closed_by"}]}
+{"name":"generation-closed-without-outcome","base":"closed.json","edits":[{"op":"remove","path":"/generation/outcome"}]}
+{"name":"generation-missing","base":"closed.json","edits":[{"op":"remove","path":"/generation"}]}
+{"name":"generation-missing-admission","base":"closed.json","edits":[{"op":"remove","path":"/generation/admission_id"}]}
+{"name":"generation-number-zero","base":"closed.json","edits":[{"op":"replace","path":"/generation/generation","value":0}]}
+{"name":"generation-open-with-closing-fields","base":"closed.json","edits":[{"op":"replace","path":"/generation/state","value":"open"}]}
+{"name":"generation-outcome-unknown","base":"closed.json","edits":[{"op":"replace","path":"/generation/outcome","value":"succeeded"}]}
+{"name":"generation-state-unknown","base":"closed.json","edits":[{"op":"replace","path":"/generation/state","value":"ended"}]}
+{"name":"item-missing","base":"closed.json","edits":[{"op":"remove","path":"/item"}]}
+{"name":"item-missing-task-id","base":"closed.json","edits":[{"op":"remove","path":"/item/task_id"}]}
+{"name":"item-schema-wrong-const","base":"closed.json","edits":[{"op":"replace","path":"/item/schema","value":"pool.hold"}]}
+{"name":"response-unknown-member","base":"closed.json","edits":[{"op":"add","path":"/changed","value":[]}]}
+{"name":"root-not-an-object","base":"closed.json","edits":[{"op":"replace","path":"","value":[]}]}

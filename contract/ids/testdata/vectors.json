@@ -8,7 +8,13 @@
     {"name": "the example of the specification", "prefix": "ws", "time_ms": 1729886278806, "entropy": "2dcd83e51a4ef9df7c0a", "id": "ws_01jb2m3n4p5q6r7s8t9vwxyz0a"},
     {"name": "the ULID specification's example", "prefix": "proj", "time_ms": 1469922850259, "entropy": "d6764c61efb99302bd5b", "id": "proj_01arz3ndektsv4rrffq69g5fav"},
     {"name": "a one-letter prefix", "prefix": "q", "time_ms": 1, "entropy": "00000000000000000001", "id": "q_00000000010000000000000001"},
-    {"name": "the Spoor prefix", "prefix": "spoor", "time_ms": 2, "entropy": "00000000000000000002", "id": "spoor_00000000020000000000000002"}
+    {"name": "the Spoor prefix", "prefix": "spoor", "time_ms": 2, "entropy": "00000000000000000002", "id": "spoor_00000000020000000000000002"},
+    {"name": "the adm prefix", "prefix": "adm", "time_ms": 3, "entropy": "00000000000000000003", "id": "adm_00000000030000000000000003"},
+    {"name": "the spec prefix", "prefix": "spec", "time_ms": 4, "entropy": "00000000000000000004", "id": "spec_00000000040000000000000004"},
+    {"name": "the rule prefix", "prefix": "rule", "time_ms": 5, "entropy": "00000000000000000005", "id": "rule_00000000050000000000000005"},
+    {"name": "the hold prefix", "prefix": "hold", "time_ms": 6, "entropy": "00000000000000000006", "id": "hold_00000000060000000000000006"},
+    {"name": "the mem prefix", "prefix": "mem", "time_ms": 7, "entropy": "00000000000000000007", "id": "mem_00000000070000000000000007"},
+    {"name": "the migr prefix", "prefix": "migr", "time_ms": 8, "entropy": "00000000000000000008", "id": "migr_00000000080000000000000008"}
   ],
   "invalid": [
     {"name": "empty", "id": "", "error": "form"},

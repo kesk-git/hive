@@ -1,0 +1,12 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+  "generation": 2,
+  "outcome": "stopped",
+  "closed_by": {
+    "schema": "dispatch.session.ended",
+    "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7q",
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "record_revision": 1,
+    "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  }
+}

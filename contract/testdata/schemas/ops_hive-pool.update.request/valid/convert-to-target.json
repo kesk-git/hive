@@ -1,0 +1,12 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7h",
+  "patch": {
+    "level": "target",
+    "wave": {
+      "slug": "first-wave",
+      "title": "First wave",
+      "ordinal": 1
+    },
+    "clear_schedule": true
+  }
+}

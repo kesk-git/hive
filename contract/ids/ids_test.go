@@ -314,3 +314,80 @@ func FuzzParseNeverPanics(f *testing.F) {
 		}
 	})
 }
+
+// The six prefixes of stage 2, all minted by the Pool (spec/pool.md,
+// Identifiers). Each mints and parses, is a row of the identity table, and
+// agrees with its pattern in the shared definitions of records/pool.item.
+func TestStageTwoPrefixes(t *testing.T) {
+	data, err := spec.Schemas.ReadFile("schemas/records/pool.item.v1.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Defs map[string]struct {
+			Pattern string `json:"pattern"`
+		} `json:"$defs"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	table, err := os.ReadFile("../../spec/identities.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	clk := clock.NewFake(time.UnixMilli(1729886278806))
+	for _, c := range []struct {
+		prefix Prefix
+		def    string
+	}{
+		{"adm", "admission_id"},
+		{"spec", "specification_id"},
+		{"rule", "rule_id"},
+		{"hold", "hold_id"},
+		{"mem", "projection_id"},
+		{"migr", "migration_id"},
+	} {
+		t.Run(string(c.prefix), func(t *testing.T) {
+			if !Registered(c.prefix) {
+				t.Fatalf("prefix %q is not registered", c.prefix)
+			}
+			id, err := Mint(clk, c.prefix)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, err := Parse(id); err != nil || got != c.prefix {
+				t.Fatalf("Parse(%q) = %q, %v", id, got, err)
+			}
+			if err := Check(id, c.prefix); err != nil {
+				t.Fatal(err)
+			}
+			if err := Check(id, Task); !errors.Is(err, ErrWrongPrefix) {
+				t.Errorf("Check(%q, task) = %v; want ErrWrongPrefix", id, err)
+			}
+			pattern := doc.Defs[c.def].Pattern
+			if pattern == "" {
+				t.Fatalf("no %s definition in records/pool.item", c.def)
+			}
+			re := regexp.MustCompile(pattern)
+			if !re.MatchString(id) {
+				t.Errorf("minted %q does not match %s", id, pattern)
+			}
+			if re.MatchString(strings.ToUpper(id)) {
+				t.Error("pattern accepts upper case")
+			}
+			row := "| `" + string(c.prefix) + "_` |"
+			line := ""
+			for _, l := range strings.Split(string(table), "\n") {
+				if strings.HasPrefix(l, row) {
+					line = l
+				}
+			}
+			if line == "" {
+				t.Fatalf("no row for %q in the identity table", c.prefix)
+			}
+			if !strings.HasSuffix(line, "| `pool` |") {
+				t.Errorf("row %q is not minted by pool", line)
+			}
+		})
+	}
+}

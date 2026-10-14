@@ -1,0 +1,9 @@
+{"name":"hold-id-wrong-prefix","base":"released-parked.json","edits":[{"op":"replace","path":"/hold/hold_id","value":"task_01jc7d8e9f0g1h2j3k4m5n6p7f"}]}
+{"name":"hold-missing","base":"released-parked.json","edits":[{"op":"remove","path":"/hold"}]}
+{"name":"hold-missing-task-id","base":"released-parked.json","edits":[{"op":"remove","path":"/hold/task_id"}]}
+{"name":"hold-released-without-released-at","base":"released-parked.json","edits":[{"op":"remove","path":"/hold/released_at"}]}
+{"name":"hold-released-without-released-by","base":"released-parked.json","edits":[{"op":"remove","path":"/hold/released_by"}]}
+{"name":"hold-state-unknown","base":"released-parked.json","edits":[{"op":"replace","path":"/hold/state","value":"lifted"}]}
+{"name":"hold-unknown-member","base":"released-parked.json","edits":[{"op":"add","path":"/hold/extra","value":1}]}
+{"name":"response-unknown-member","base":"released-parked.json","edits":[{"op":"add","path":"/released","value":true}]}
+{"name":"root-not-an-object","base":"released-parked.json","edits":[{"op":"replace","path":"","value":[]}]}
