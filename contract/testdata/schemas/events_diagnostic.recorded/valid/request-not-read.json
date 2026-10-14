@@ -1,0 +1,8 @@
+{
+  "command": "hive-fleet",
+  "status": "unavailable",
+  "code": "source_unreadable",
+  "detail": [
+    "open a request file: file does not exist"
+  ]
+}

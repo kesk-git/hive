@@ -6,6 +6,7 @@ package entry
 import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/journal"
 )
 
 // Version is the implementation version of the executable.
@@ -32,6 +33,7 @@ func Executable() *cli.Executable {
 		Name:      "hive-spawning-pool",
 		Version:   Version,
 		Storeless: false,
+		Journal:   journal.Opener("spawning-pool"),
 	}
 	for _, c := range commands {
 		cmd := &cli.Command{Name: c.name}

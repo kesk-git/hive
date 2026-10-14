@@ -51,7 +51,7 @@ func (e *Executable) Main(argv []string, stdin io.Reader, stdout, stderr io.Writ
 	args := argv[1:]
 	c := e.command(name)
 	if c == nil {
-		return e.answer(nil, "", stdout, stderr, e.failure("", e.Name, "", envelope.Common(envelope.CodeUsage, fmt.Sprintf("%s does not own the command name %q", e.Name, name))))
+		return e.answer(nil, "", "", stdout, stderr, e.failure("", e.Name, "", envelope.Common(envelope.CodeUsage, fmt.Sprintf("%s does not own the command name it was started under, of %d bytes", e.Name, len(name)))))
 	}
 
 	// No argument is longer than the limit; a longer one exits 2 before
@@ -61,12 +61,12 @@ func (e *Executable) Main(argv []string, stdin io.Reader, stdout, stderr io.Writ
 		if int64(len(a)) > limit {
 			f := envelope.Common(envelope.CodeArgumentTooLarge, fmt.Sprintf("an argument is %d bytes; the limit is %d", len(a), limit))
 			f.With("limit_bytes", limit).With("actual_bytes", int64(len(a)))
-			return e.answer(c, "", stdout, stderr, e.failure("", c.Name, "", f))
+			return e.answer(c, "", "", stdout, stderr, e.failure("", c.Name, "", f))
 		}
 	}
 
 	usage := func(operation, msg string) int {
-		return e.answer(c, "", stdout, stderr, e.failure("", c.Name, operation, envelope.Common(envelope.CodeUsage, msg)))
+		return e.answer(c, "", "", stdout, stderr, e.failure("", c.Name, operation, envelope.Common(envelope.CodeUsage, msg)))
 	}
 	if len(args) == 0 {
 		return usage("", "usage: "+c.Name+" <operation> --home <directory> [--request-file <path>] [--response-file <path>] | capabilities | --version")
@@ -87,7 +87,7 @@ func (e *Executable) Main(argv []string, stdin io.Reader, stdout, stderr io.Writ
 			fmt.Fprintln(stderr, err)
 			return envelope.Failed.ExitCode()
 		}
-		return e.answer(c, "", stdout, stderr, resp)
+		return e.answer(c, "", "", stdout, stderr, resp)
 	}
 
 	// The operation is known before anything is read; the options read
@@ -95,23 +95,23 @@ func (e *Executable) Main(argv []string, stdin io.Reader, stdout, stderr io.Writ
 	operation := args[0]
 	opts, err := parseOptions(args[1:])
 	if !operationForm.MatchString(operation) {
-		return e.answer(c, opts.responseFile, stdout, stderr, e.failure("", c.Name, "", envelope.Common(envelope.CodeUnknownOperation, fmt.Sprintf("%q is not an operation name", operation))))
+		return e.answer(c, opts.responseFile, "", stdout, stderr, e.failure("", c.Name, "", envelope.Common(envelope.CodeUnknownOperation, fmt.Sprintf("argument 1, of %d bytes, is not an operation name", len(operation)))))
 	}
 	if c.operation(operation) == nil {
-		return e.answer(c, opts.responseFile, stdout, stderr, e.failure("", c.Name, operation, envelope.Common(envelope.CodeUnknownOperation, fmt.Sprintf("%s has no operation %q", c.Name, operation))))
+		return e.answer(c, opts.responseFile, "", stdout, stderr, e.failure("", c.Name, "", envelope.Common(envelope.CodeUnknownOperation, fmt.Sprintf("%s has no operation of the name in argument 1, of %d bytes", c.Name, len(operation)))))
 	}
 	if err != nil {
-		return e.answer(c, opts.responseFile, stdout, stderr, e.failure("", c.Name, operation, envelope.Common(envelope.CodeUsage, err.Error())))
+		return e.answer(c, opts.responseFile, "", stdout, stderr, e.failure("", c.Name, operation, envelope.Common(envelope.CodeUsage, err.Error())))
 	}
 	if opts.home == "" {
-		return e.answer(c, opts.responseFile, stdout, stderr, e.failure("", c.Name, operation, envelope.Common(envelope.CodeUsage, HomeOption+" is required: there is no default home")))
+		return e.answer(c, opts.responseFile, "", stdout, stderr, e.failure("", c.Name, operation, envelope.Common(envelope.CodeUsage, HomeOption+" is required: there is no default home")))
 	}
 
 	// The request: from the file or standard input, refused over the limit
 	// before it is parsed.
 	request, f := readRequest(opts.requestFile, stdin, c.Limits.Resolved().MaxRequestBytes)
 	if f != nil {
-		return e.answer(c, opts.responseFile, stdout, stderr, e.failure("", c.Name, operation, f))
+		return e.answer(c, opts.responseFile, opts.home, stdout, stderr, e.failure("", c.Name, operation, f))
 	}
 	out, err := e.Handle(Invocation{Command: c, Operation: operation, Home: opts.home, Request: request, Stderr: stderr})
 	if err != nil {
@@ -145,7 +145,7 @@ func parseOptions(args []string) (options, error) {
 	for i := 0; i < len(args); i++ {
 		name := args[i]
 		if !strings.HasPrefix(name, "--") {
-			return o, fmt.Errorf("unexpected argument %q: the request is never an argument; it is read from %s or standard input", args[i], RequestFileOption)
+			return o, fmt.Errorf("argument %d is not an option; the request is never an argument, it is read from %s or standard input", i+2, RequestFileOption)
 		}
 		var dst *string
 		switch name {
@@ -156,7 +156,7 @@ func parseOptions(args []string) (options, error) {
 		case ResponseFileOption:
 			dst = &o.responseFile
 		default:
-			return o, fmt.Errorf("unknown option %q", name)
+			return o, fmt.Errorf("argument %d, of %d bytes, is not an option this command takes", i+2, len(name))
 		}
 		if seen[name] {
 			return o, fmt.Errorf("%s is given twice", name)
@@ -183,27 +183,29 @@ func readRequest(file string, stdin io.Reader, limit int64) ([]byte, *envelope.F
 	if file != "" {
 		f, err := os.Open(file)
 		if err != nil {
-			return nil, envelope.Common(envelope.CodeSourceUnreadable, "the request file cannot be read: "+err.Error())
+			return nil, envelope.Common(envelope.CodeSourceUnreadable, "the request file cannot be read").Because(err)
 		}
 		defer f.Close()
 		r = f
 	}
 	data, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil {
-		return nil, envelope.Common(envelope.CodeSourceUnreadable, "the request cannot be read: "+err.Error())
+		return nil, envelope.Common(envelope.CodeSourceUnreadable, "the request cannot be read").Because(err)
 	}
 	if int64(len(data)) > limit {
 		rest, err := io.Copy(io.Discard, r)
 		if err != nil {
-			return nil, envelope.Common(envelope.CodeSourceUnreadable, "the request cannot be read: "+err.Error())
+			return nil, envelope.Common(envelope.CodeSourceUnreadable, "the request cannot be read").Because(err)
 		}
 		return nil, envelope.Oversize("request", limit, int64(len(data))+rest)
 	}
 	return data, nil
 }
 
-// answer stamps, encodes and writes a response made before Handle ran.
-func (e *Executable) answer(c *Command, responseFile string, stdout, stderr io.Writer, resp *envelope.Response) int {
+// answer stamps, encodes and writes a response made before Handle ran. home
+// is the directory the invocation named, where it named one: the failure's
+// detail goes to that home's journal before the response is written.
+func (e *Executable) answer(c *Command, responseFile, home string, stdout, stderr io.Writer, resp *envelope.Response) int {
 	if err := e.stamp(resp); err != nil {
 		fmt.Fprintln(stderr, err)
 		return envelope.Failed.ExitCode()
@@ -219,26 +221,32 @@ func (e *Executable) answer(c *Command, responseFile string, stdout, stderr io.W
 		fmt.Fprintln(stderr, err)
 		return envelope.Failed.ExitCode()
 	}
+	e.diagnose(home, nil, resp)
 	return e.write(c, resp, data, responseFile, stdout, stderr)
 }
 
 // write writes the encoded response to the response file, or to standard
-// output when there is none, and a diagnostic line to stderr for every
-// status but ok. It returns the exit code the response fixes, or 1 when
-// the response could not be written: the command then gave no response.
+// output when there is none, and then one line to stderr for every outcome but
+// ok: the command, the operation, the status, the code and the request_id, and
+// no message (spec/commands.md, Invocation). It returns the exit code the
+// response fixes, or 1 when the response could not be written: the command
+// then gave no response, and its one line is failed with io_failure.
 func (e *Executable) write(c *Command, resp *envelope.Response, data []byte, responseFile string, stdout, stderr io.Writer) int {
-	if resp.Status != envelope.Ok && resp.Error != nil {
-		fmt.Fprintf(stderr, "%s %s: %s (%s): %s\n", resp.Command, orDash(resp.Operation), resp.Status, resp.Error.Code, resp.Error.Message)
-	}
 	var err error
 	if responseFile != "" {
 		err = writeFile(responseFile, data)
 	} else {
 		_, err = io.Copy(stdout, bytes.NewReader(data))
 	}
+	line := func(status envelope.Status, code string) {
+		fmt.Fprintf(stderr, "%s %s: %s %s %s\n", resp.Command, orDash(resp.Operation), status, code, orDash(resp.RequestID))
+	}
 	if err != nil {
-		fmt.Fprintf(stderr, "%s: the response cannot be written: %v\n", resp.Command, err)
+		line(envelope.Failed, envelope.CodeIOFailure)
 		return envelope.Failed.ExitCode()
+	}
+	if resp.Status != envelope.Ok && resp.Error != nil {
+		line(resp.Status, resp.Error.Code)
 	}
 	return resp.ExitCode()
 }

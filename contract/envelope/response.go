@@ -21,6 +21,19 @@ type Response struct {
 	Receipts    []Receipt
 	Body        map[string]any
 	Error       *Error
+	// Diagnostic is what the failure behind the response holds beyond its
+	// message. It is never encoded: the harness records it in the home's
+	// journal, and a response read back has none.
+	Diagnostic *Diagnostic
+}
+
+// Failure is the Failure a response with an error says, with the detail it
+// holds, or nil for a response without one.
+func (r *Response) Failure() *Failure {
+	if r.Error == nil {
+		return nil
+	}
+	return &Failure{Status: r.Status, Err: *r.Error, Receipts: r.Receipts, diagnostic: r.Diagnostic}
 }
 
 // ExitCode is the exit code the response's status fixes.

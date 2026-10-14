@@ -9,6 +9,7 @@ package entry
 import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/journal"
 	"github.com/kesk-git/hive/packages/dispatch/internal/registry"
 )
 
@@ -47,6 +48,7 @@ func Executable() *cli.Executable {
 		Name:      "hive-dispatch",
 		Version:   Version,
 		Storeless: false,
+		Journal:   journal.Opener("dispatch"),
 	}
 	for _, c := range commands {
 		cmd := &cli.Command{Name: c.name}

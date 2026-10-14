@@ -4,7 +4,7 @@ This directory holds the contracts of the first two stages, with prospective lif
 
 [The design](../docs/design.md) says what Hive is and why. This specification says where each thing lives, who owns it and what proves it. Where the two differ, the design governs and the difference is a defect in this specification.
 
-Contract version: **1.28**. What each version changed is recorded under [versions/](versions/), one file per version.
+Contract version: **1.29**. What each version changed is recorded under [versions/](versions/), one file per version.
 
 ## What is defined
 
@@ -18,7 +18,7 @@ Contract version: **1.28**. What each version changed is recorded under [version
 | [records.md](records.md) | The on-disk record format: encoding, versioning, atomic replacement, where a home sits and its layout, the event journal and locks. |
 | [commands.md](commands.md) | The command contract: invocation, the request and response envelopes, exit and error states, size errors, replay and capability declarations. |
 | [receipts.md](receipts.md) | The receipt envelope, kind names and the rule that a receipt states one fact. |
-| [events.md](events.md) | The event envelope, the three times, ordering, deduplication and the journal. |
+| [events.md](events.md) | The event envelope, the three times, ordering, deduplication, the journal and the diagnostic event. |
 | [session-messages.md](session-messages.md) | The session message and the input receipt of the one supervisor conversation. |
 | [review.md](review.md) | The four files of a review directory. |
 | [test-targets.md](test-targets.md) | The test targets, what each runs and what each must prove, and the test contract a project declares. |

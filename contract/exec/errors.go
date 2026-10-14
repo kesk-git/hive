@@ -80,17 +80,29 @@ func (e *StartError) Result() Result { return Result{Outcome: NotStarted} }
 // over the platform's limit is too_large. A run that breaks a rule of the
 // path is the operation's own fault and is failed with internal: its
 // arguments are fixed by the operation, and nothing about the program is
-// known.
+// known. The message is one sentence naming the program by its declared name
+// and the reason; the error itself, with the file found or the platform's
+// error, is the failure's diagnostic.
 func (e *StartError) Failure() *envelope.Failure {
+	name := e.Program.Name
+	var f *envelope.Failure
 	switch e.Reason {
 	case Missing:
-		return unavailable(e.Program.Kind, envelope.CodeDependencyMissing, codePlatformUtilityMissing, e.Error())
-	case NotExecutable, BatchFile, BreakawayRefused, StartFailed:
-		return unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, e.Error())
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyMissing, codePlatformUtilityMissing, name+" was not found on the search path")
+	case NotExecutable:
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, name+" was found and is not executable")
+	case BatchFile:
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, name+" was found only as a batch file, which would run under cmd.exe, a shell")
+	case BreakawayRefused:
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, name+" was not started: the breakaway from every job was refused")
+	case StartFailed:
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, name+" could not be started")
 	case TooLarge:
-		return envelope.Oversize("the argument list", e.Limit, e.Actual)
+		f = envelope.Oversize("the argument list", e.Limit, e.Actual)
+	default:
+		f = envelope.Common(envelope.CodeInternal, name+" was refused by the rules of the process-execution path")
 	}
-	return envelope.Common(envelope.CodeInternal, e.Error())
+	return f.Because(e)
 }
 
 // The codes of a platform utility that is missing or unusable, which

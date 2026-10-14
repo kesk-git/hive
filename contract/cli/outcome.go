@@ -56,37 +56,37 @@ func readOutcome(st *store.Store, requestID string) (*recorded, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, envelope.Common(envelope.CodeRecordMalformed, fmt.Sprintf("the recorded outcome %s cannot be read: %v", rel, err))
+		return nil, envelope.Common(envelope.CodeRecordMalformed, "the recorded outcome of this request cannot be read").Because(fmt.Errorf("%s: %w", rel, err))
 	}
-	malformed := func(what string) error {
-		return envelope.Common(envelope.CodeRecordMalformed, fmt.Sprintf("the recorded outcome %s is malformed: %s", rel, what))
+	malformed := func(why error) error {
+		return envelope.Common(envelope.CodeRecordMalformed, "the recorded outcome of this request is malformed").Because(fmt.Errorf("%s: %w", rel, why))
 	}
 	v, perr := canon.Parse(data)
 	obj, _ := v.(map[string]any)
 	// A version this build does not read is not malformed; it is newer.
 	if perr == nil && obj["schema"] == outcomeSchema {
 		if version, _ := obj["schema_version"].(string); envelope.Newer(version, outcomeVersion) {
-			return nil, envelope.Common(envelope.CodeUnsupportedVersion, fmt.Sprintf("the recorded outcome %s is at version %s; this build reads up to %s", rel, version, outcomeVersion))
+			return nil, envelope.Common(envelope.CodeUnsupportedVersion, "the recorded outcome of this request is of a version this build does not read").Because(fmt.Errorf("%s is at version %s; this build reads up to %s", rel, version, outcomeVersion))
 		}
 	}
 	if err := envelope.Validate(outcomeSchemaID, data); err != nil {
-		return nil, malformed(err.Error())
+		return nil, malformed(err)
 	}
 	if obj["request_id"] != requestID {
-		return nil, malformed("it records another request")
+		return nil, malformed(errors.New("it records another request"))
 	}
 	digest := obj["request_digest"].(string)
 	tree := obj["response"].(map[string]any)
 	encoded, err := canon.Encode(tree)
 	if err != nil {
-		return nil, malformed(err.Error())
+		return nil, malformed(err)
 	}
 	resp, err := envelope.DecodeResponse(append(encoded, '\n'))
 	if err != nil {
-		return nil, malformed("its response is not a response: " + err.Error())
+		return nil, malformed(fmt.Errorf("its response is not a response: %w", err))
 	}
 	if resp.RequestID != requestID {
-		return nil, malformed("its response answers another request")
+		return nil, malformed(errors.New("its response answers another request"))
 	}
 	return &recorded{digest, resp}, nil
 }

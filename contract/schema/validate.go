@@ -173,7 +173,7 @@ func (n *node) check(v any, at string, out *sink) bool {
 		if n.closed {
 			for _, name := range slices.Sorted(maps.Keys(t)) {
 				if !n.hasProp(name) {
-					if !fail("additionalProperties", "has the member %q, which the schema does not list", name) {
+					if !fail("additionalProperties", "has a member the schema does not list") {
 						return false
 					}
 				}

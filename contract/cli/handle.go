@@ -50,7 +50,8 @@ func (e *Executable) Handle(inv Invocation) (*Outcome, error) {
 	if inv.Stderr == nil {
 		inv.Stderr = io.Discard
 	}
-	resp, after, err := e.handle(inv)
+	var read *envelope.Request
+	resp, after, err := e.handle(inv, &read)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +62,7 @@ func (e *Executable) Handle(inv Invocation) (*Outcome, error) {
 	if err != nil {
 		return nil, err
 	}
+	e.diagnose(inv.Home, read, resp)
 	return &Outcome{resp, data, after}, nil
 }
 
@@ -74,7 +76,7 @@ func (e *Executable) finish(c *Command, resp *envelope.Response) ([]byte, error)
 	}
 	if int64(len(data)) > limit {
 		f := envelope.Oversize("response", limit, int64(len(data)))
-		*resp = *e.failure(resp.RequestID, resp.Command, resp.Operation, f)
+		*resp = *e.instead(resp, f)
 		if err := e.stamp(resp); err != nil {
 			return nil, err
 		}
@@ -83,6 +85,19 @@ func (e *Executable) finish(c *Command, resp *envelope.Response) ([]byte, error)
 		}
 	}
 	return data, nil
+}
+
+// instead is the failure f given in place of the response resp: it keeps the
+// detail resp held, or where it held none, its code and message. A replayed
+// response holds no detail and gives none to what replaces it: a replay
+// writes nothing.
+func (e *Executable) instead(resp *envelope.Response, f *envelope.Failure) *envelope.Response {
+	if resp.Replayed {
+		out := e.failure(resp.RequestID, resp.Command, resp.Operation, f)
+		out.Diagnostic = nil
+		return out
+	}
+	return e.failure(resp.RequestID, resp.Command, resp.Operation, f.Carry(resp.Failure()))
 }
 
 // stamp sets completed_at to now where the response has none.
@@ -136,13 +151,14 @@ func (e *Executable) failure(requestID, command, operation string, f *envelope.F
 	err.Message = clip(err.Message, string(f.Status))
 	c := e.command(command)
 	return &envelope.Response{
-		RequestID: requestID,
-		Command:   command,
-		Operation: operation,
-		Status:    f.Status,
-		Responder: e.responder(c),
-		Receipts:  f.Receipts,
-		Error:     &err,
+		RequestID:  requestID,
+		Command:    command,
+		Operation:  operation,
+		Status:     f.Status,
+		Responder:  e.responder(c),
+		Receipts:   f.Receipts,
+		Error:      &err,
+		Diagnostic: f.Diagnostic(),
 	}
 }
 
@@ -150,7 +166,7 @@ func (e *Executable) failure(requestID, command, operation string, f *envelope.F
 func (e *Executable) capabilities(c *Command) *envelope.Response {
 	caps := e.Capabilities(c)
 	if err := caps.Check(); err != nil {
-		return e.failure("", c.Name, CapabilitiesOperation, envelope.Common(envelope.CodeInternal, "the capability declaration is not valid: "+err.Error()))
+		return e.failure("", c.Name, CapabilitiesOperation, envelope.Common(envelope.CodeInternal, "the capability declaration is not valid").Because(err))
 	}
 	return &envelope.Response{
 		Command:   c.Name,
@@ -164,15 +180,16 @@ func (e *Executable) capabilities(c *Command) *envelope.Response {
 // handle runs the harness for an operation invocation and returns the
 // response, with completed_at unset, and the continuation of a resident
 // operation. Its error is the one refusal that has no response: a mutating
-// operation whose command's response limit is below the floor.
-func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func() error, err error) {
+// operation whose command's response limit is below the floor. Once the
+// request is read, *read points to it.
+func (e *Executable) handle(inv Invocation, read **envelope.Request) (resp *envelope.Response, after func() error, err error) {
 	c := inv.Command
 	fail := func(requestID string, f *envelope.Failure) *envelope.Response {
 		return e.failure(requestID, c.Name, inv.Operation, f)
 	}
 	op := c.operation(inv.Operation)
 	if op == nil {
-		return fail("", envelope.Common(envelope.CodeUnknownOperation, fmt.Sprintf("%s has no operation %q", c.Name, inv.Operation))), nil, nil
+		return e.failure("", c.Name, "", envelope.Common(envelope.CodeUnknownOperation, fmt.Sprintf("%s has no operation of the name invoked, of %d bytes", c.Name, len(inv.Operation)))), nil, nil
 	}
 
 	// Size, before the request is parsed.
@@ -187,10 +204,11 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		f := envelope.AsFailure(err)
 		id := e.requestID(inv.Request)
 		if id == "" && f.Err.Code != envelope.CodeMalformedRequest {
-			f = envelope.Common(envelope.CodeMalformedRequest, "the request names no request_id that can be read: "+f.Err.Message)
+			f = envelope.Common(envelope.CodeMalformedRequest, "the request names no request_id that can be read").Carry(f)
 		}
 		return fail(id, f), nil, nil
 	}
+	*read = req
 	if err := req.Addressed(c.Name, op.Name); err != nil {
 		return fail(req.RequestID, envelope.AsFailure(err)), nil, nil
 	}
@@ -201,7 +219,7 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		return fail(req.RequestID, envelope.Common(envelope.CodeOperationParked, reason(op, "the operation is held closed by a recorded decision"))), nil, nil
 	}
 	if !slices.Contains(op.Versions, req.OperationVersion) {
-		return fail(req.RequestID, envelope.Common(envelope.CodeUnsupportedVersion, fmt.Sprintf("%s %s accepts body versions %v, not %s", c.Name, op.Name, op.Versions, req.OperationVersion))), nil, nil
+		return fail(req.RequestID, envelope.Common(envelope.CodeUnsupportedVersion, "the request's operation_version is not one this operation accepts").Because(fmt.Errorf("%s %s accepts body versions %v", c.Name, op.Name, op.Versions))), nil, nil
 	}
 	if op.RequestSchema == "" {
 		return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the operation declares no request schema")), nil, nil
@@ -269,7 +287,7 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	// every path of a mutating operation that runs after the store is
 	// touched answers through it.
 	settle := func(resp *envelope.Response, err error) *envelope.Response {
-		return e.settle(c, op, req.RequestID, resp, err, inv.Stderr, call)
+		return e.settle(c, op, req.RequestID, resp, err, call)
 	}
 	// bail is the answer to a failure of the harness's own after the
 	// operation ran: failed, when nothing of the request is durable, and
@@ -279,7 +297,9 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		if !call.intended {
 			return fail(req.RequestID, f)
 		}
-		return e.unknownAfterIntent(c, op, req.RequestID, f.Err.Message, call.intent)
+		resp := e.unknownAfterIntent(c, op, req.RequestID, f.Err.Message, call.intent)
+		resp.Diagnostic = f.Detail()
+		return resp
 	}
 
 	// A mutating operation. The floor first: the limit holds every answer a
@@ -300,7 +320,7 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	defer w.Release()
 	digest, err := envelope.Digest(inv.Request)
 	if err != nil {
-		return fail(req.RequestID, envelope.Common(envelope.CodeInternal, err.Error())), nil, nil
+		return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "the request cannot be digested").Because(err)), nil, nil
 	}
 	recorded, err := readOutcome(st, req.RequestID)
 	if err != nil {
@@ -326,7 +346,7 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 		if errors.As(err, &interrupted) && interrupted.RequestID == req.RequestID {
 			return settle(nil, err), nil, nil
 		}
-		f, own, record := e.afterIntent(envelope.AsFailure(err), call, inv.Stderr, c, op)
+		f, own, record := e.afterIntent(envelope.AsFailure(err), call)
 		resp, whole := failed(f)
 		// A refusal or a hold that leaves a record: the receipts and the
 		// outcome, in one transaction, once the response is known to be
@@ -344,7 +364,7 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	for i := range res.Records {
 		rec, _, err := call.Finalize(res.Records[i])
 		if err != nil {
-			return bail(envelope.Common(envelope.CodeInternal, "the operation returned a record that cannot be written: "+err.Error())), nil, nil
+			return bail(envelope.Common(envelope.CodeInternal, "the operation returned a record that cannot be written").Because(err)), nil, nil
 		}
 		res.Records[i] = rec
 	}
@@ -355,7 +375,7 @@ func (e *Executable) handle(inv Invocation) (resp *envelope.Response, after func
 	// something is behind, and the answer is unknown.
 	if bad := e.preflight(c, resp); bad != nil {
 		if call.intended {
-			return bail(envelope.Common(envelope.CodeInternal, bad.Error.Message)), nil, nil
+			return bail(bad.Failure()), nil, nil
 		}
 		return bad, nil, nil
 	}
@@ -375,18 +395,15 @@ func (c *recordClock) Now() time.Time { return c.at }
 // valid under the response schema and within the command's limit. It returns
 // the failure response to give in its place, or nil.
 func (e *Executable) preflight(c *Command, resp *envelope.Response) *envelope.Response {
-	instead := func(f *envelope.Failure) *envelope.Response {
-		return e.failure(resp.RequestID, resp.Command, resp.Operation, f)
-	}
 	if err := e.stamp(resp); err != nil {
-		return instead(envelope.Common(envelope.CodeInternal, err.Error()))
+		return e.instead(resp, envelope.Common(envelope.CodeInternal, "the response cannot be stamped").Because(err))
 	}
 	data, err := resp.Encode()
 	if err != nil {
-		return instead(envelope.Common(envelope.CodeInternal, "the response cannot be written: "+err.Error()))
+		return e.instead(resp, envelope.Common(envelope.CodeInternal, "the response cannot be written").Because(err))
 	}
 	if limit := c.Limits.Resolved().MaxResponseBytes; int64(len(data)) > limit {
-		return instead(envelope.Oversize("response", limit, int64(len(data))))
+		return e.instead(resp, envelope.Oversize("response", limit, int64(len(data))))
 	}
 	return nil
 }
@@ -414,8 +431,7 @@ func (e *Executable) requestID(data []byte) string {
 func (e *Executable) run(c *Call) (res *Result, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Fprintf(c.Stderr, "%s %s: panic: %v\n%s", c.Command.Name, c.Operation.Name, r, debug.Stack())
-			res, err = nil, envelope.Common(envelope.CodeInternal, fmt.Sprintf("the operation stopped unexpectedly: %v", r))
+			res, err = nil, envelope.Common(envelope.CodeInternal, "the operation stopped unexpectedly").Panicked(debug.Stack())
 		}
 	}()
 	if c.Operation.Handle == nil {
@@ -431,17 +447,17 @@ func (e *Executable) run(c *Call) (res *Result, err error) {
 		if f := envelope.AsFailure(err); f != nil {
 			f.Err.Message = clip(f.Err.Message, string(f.Status))
 			if cerr := f.Check(); cerr != nil {
-				return nil, envelope.Common(envelope.CodeInternal, "the operation returned a failure the contract does not admit: "+cerr.Error())
+				return nil, envelope.Common(envelope.CodeInternal, "the operation returned a failure the contract does not admit").Because(fmt.Errorf("%w: %w", f, cerr))
 			}
 			// Only a refusal or a hold of a mutating operation leaves receipts.
 			// An unknown outcome returns the receipts of the intents the call
 			// committed, which the harness attaches, and none of its own.
 			if len(f.Receipts) > 0 && (!c.Operation.Mutates || (f.Status != envelope.Refused && f.Status != envelope.Held)) {
-				return nil, envelope.Common(envelope.CodeInternal, "the operation returned receipts with a status that leaves none")
+				return nil, envelope.Common(envelope.CodeInternal, "the operation returned receipts with a status that leaves none").Carry(f)
 			}
 			return nil, f
 		}
-		return nil, envelope.Common(envelope.CodeInternal, err.Error())
+		return nil, envelope.Common(envelope.CodeInternal, "the operation failed for a reason of its own").Because(err)
 	}
 	if res == nil || res.Body == nil {
 		return nil, envelope.Common(envelope.CodeInternal, "the operation returned ok without a body")
@@ -449,7 +465,7 @@ func (e *Executable) run(c *Call) (res *Result, err error) {
 	// A command never answers with a body it would not itself accept.
 	if c.Operation.ResponseSchema != "" {
 		if err := envelope.ValidateBody(res.Body, c.Operation.ResponseSchema); err != nil {
-			return nil, envelope.Common(envelope.CodeInternal, "the operation returned a body that breaks its schema: "+envelope.AsFailure(err).Err.Message)
+			return nil, envelope.Common(envelope.CodeInternal, "the operation returned a body that breaks its schema").Because(err)
 		}
 	}
 	return res, nil
@@ -480,11 +496,11 @@ func homeFailure(err error) error {
 	case errors.Is(err, store.ErrInsideRepository):
 		return envelope.Common(envelope.CodeHomeInsideRepository, "a home is never inside a Git working tree")
 	case errors.Is(err, store.ErrUnsupportedVersion):
-		return envelope.Common(envelope.CodeUnsupportedVersion, err.Error())
+		return envelope.Common(envelope.CodeUnsupportedVersion, "the home or its store is of a version this build does not read").Because(err)
 	case errors.Is(err, store.ErrRecordMalformed), errors.Is(err, store.ErrLayout):
-		return envelope.Common(envelope.CodeRecordMalformed, err.Error())
+		return envelope.Common(envelope.CodeRecordMalformed, "the home record or the layout of the home is malformed").Because(err)
 	}
-	return envelope.Common(envelope.CodeIOFailure, err.Error())
+	return envelope.Common(envelope.CodeIOFailure, "the home cannot be read").Because(err)
 }
 
 // open opens the package's store in the home and takes its lock for the
@@ -495,7 +511,7 @@ func (e *Executable) open(home *store.Home, requestID string, clk clock.Clock) (
 	if e.Journal != nil {
 		j, err := e.Journal(home.Dir)
 		if err != nil {
-			return nil, nil, envelope.Common(envelope.CodeRecordMalformed, "the home journal cannot be opened: "+err.Error())
+			return nil, nil, envelope.Common(envelope.CodeRecordMalformed, "the home journal cannot be opened").Because(err)
 		}
 		journal = j
 	}
@@ -579,7 +595,7 @@ func (e *Executable) unknownCarries(c *Command, op *Operation, requestID string,
 // own and the outcome; any other status is answered as unknown, since the
 // effect after the intent may have happened. own are the receipts to write,
 // and record says whether a transaction records the outcome.
-func (e *Executable) afterIntent(f *envelope.Failure, call *Call, stderr io.Writer, c *Command, op *Operation) (resp *envelope.Failure, own []envelope.Receipt, record bool) {
+func (e *Executable) afterIntent(f *envelope.Failure, call *Call) (resp *envelope.Failure, own []envelope.Receipt, record bool) {
 	committed := call.intent
 	if !call.intended {
 		return f, f.Receipts, len(f.Receipts) > 0
@@ -593,8 +609,7 @@ func (e *Executable) afterIntent(f *envelope.Failure, call *Call, stderr io.Writ
 		out.Receipts = append(slices.Clone(committed), f.Receipts...)
 		return &out, f.Receipts, true
 	}
-	fmt.Fprintf(stderr, "%s %s: %s after its intent was committed; answered unknown: %s\n", c.Name, op.Name, f.Status, f.Err.Message)
-	u := envelope.Common(envelope.CodeOutcomeUnknown, clip("the operation ended "+string(f.Status)+" after its intent was committed, and its effect is not established; reconcile before any retry", string(envelope.Unknown)))
+	u := envelope.Common(envelope.CodeOutcomeUnknown, clip("the operation ended "+string(f.Status)+" after its intent was committed, and its effect is not established; reconcile before any retry", string(envelope.Unknown))).Carry(f)
 	u.Receipts = slices.Clone(committed)
 	return u, nil, false
 }
@@ -611,21 +626,22 @@ func (e *Executable) afterIntent(f *envelope.Failure, call *Call, stderr io.Writ
 // changed. An error that left nothing of the request behind is answered by
 // the code it carries, and too_large replaces that answer where it does not
 // fit. Sizing is done here, so that no entry can replace a durable answer.
-func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *envelope.Response, err error, stderr io.Writer, call *Call) *envelope.Response {
+func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *envelope.Response, err error, call *Call) *envelope.Response {
 	durable := true
 	if err != nil {
 		var interrupted *store.InterruptedError
 		durable = errors.As(err, &interrupted) && interrupted.RequestID == requestID
 		switch {
 		case durable:
-			fmt.Fprintln(stderr, err)
 			resp = e.unknownAnswer(c, op.Name, requestID, interruptedMessage)
 			resp.Receipts = slices.Clone(call.intent)
+			resp.Diagnostic = envelope.DiagnosticOf(err)
 		case call.intended:
 			// Nothing more of the request is durable, but its intent is, and
 			// an effect may have followed it.
-			fmt.Fprintln(stderr, err)
-			return e.unknownAfterIntent(c, op, requestID, "", call.intent)
+			resp = e.unknownAfterIntent(c, op, requestID, "", call.intent)
+			resp.Diagnostic = envelope.DiagnosticOf(err)
+			return resp
 		default:
 			resp = e.failure(requestID, c.Name, op.Name, storeFailure(err))
 		}
@@ -634,8 +650,7 @@ func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *e
 		if !durable {
 			return bad
 		}
-		fmt.Fprintf(stderr, "%s %s: the recorded response of %s is %s\n", c.Name, op.Name, requestID, bad.Error.Message)
-		return e.unknownAnswer(c, op.Name, requestID, oversizeReplayMessage)
+		return e.instead(resp, envelope.Common(envelope.CodeOutcomeUnknown, oversizeReplayMessage))
 	}
 	return resp
 }
@@ -650,22 +665,32 @@ func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *e
 func storeFailure(err error) *envelope.Failure {
 	var interrupted *store.InterruptedError
 	if errors.As(err, &interrupted) {
-		return envelope.Common(envelope.CodeRecordMalformed, "an earlier transaction of this store, "+interrupted.RequestID+", cannot be completed, and nothing of this request was written")
+		return envelope.Common(envelope.CodeRecordMalformed, "an earlier transaction of this store cannot be completed, and nothing of this request was written").Because(fmt.Errorf("the transaction of %s: %w", interrupted.RequestID, err))
 	}
 	if f := envelope.AsFailure(err); f != nil {
 		return f
 	}
 	if code := store.Code(err); code != "" {
-		f := envelope.Common(code, err.Error())
+		f := envelope.Common(code, storeMessages[code]).Because(err)
 		if code == envelope.CodeLockHeld {
 			f.Retry()
 		}
 		return f
 	}
 	if errors.Is(err, store.ErrNoJournal) {
-		return envelope.Common(envelope.CodeInternal, err.Error())
+		return envelope.Common(envelope.CodeInternal, "the transaction names events and the executable configures no journal").Because(err)
 	}
-	return envelope.Common(envelope.CodeIOFailure, err.Error())
+	return envelope.Common(envelope.CodeIOFailure, "the store cannot be read or written").Because(err)
+}
+
+// storeMessages is the sentence of each common code the store reports.
+var storeMessages = map[string]string{
+	envelope.CodeRecordMalformed:      "a record of the store is malformed",
+	envelope.CodeUnsupportedVersion:   "a record of the store is of a version this build does not read",
+	envelope.CodeRevisionConflict:     "a record is not at the revision the request expects",
+	envelope.CodeAlreadyExists:        "a record the request would create already exists",
+	envelope.CodeLockHeld:             "the store's lock is held by another request",
+	envelope.CodeHomeInsideRepository: "a home is never inside a Git working tree",
 }
 
 // commit writes the records, the receipts and the events of an invocation
@@ -674,11 +699,11 @@ func (e *Executable) commit(w *store.Writer, requestID, digest string, resp *env
 	tx := store.Tx{RequestID: requestID, Records: records, Events: events}
 	var err error
 	if tx.Receipts, err = encodeReceipts(receipts); err != nil {
-		return envelope.Common(envelope.CodeInternal, err.Error())
+		return envelope.Common(envelope.CodeInternal, "the receipts cannot be written").Because(err)
 	}
 	outcome, err := encodeOutcome(requestID, digest, resp)
 	if err != nil {
-		return envelope.Common(envelope.CodeInternal, err.Error())
+		return envelope.Common(envelope.CodeInternal, "the outcome cannot be written").Because(err)
 	}
 	tx.Outcome = outcome
 	_, err = w.Commit(tx)
