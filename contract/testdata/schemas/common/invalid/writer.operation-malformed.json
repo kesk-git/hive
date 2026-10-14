@@ -1,6 +1,0 @@
-{
-  "package": "dispatch",
-  "command": "hive-dispatch",
-  "operation": "Create",
-  "implementation_version": "0.1.0"
-}
