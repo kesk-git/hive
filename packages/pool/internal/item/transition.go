@@ -2,6 +2,7 @@ package item
 
 import (
 	"github.com/kesk-git/hive/contract/cli"
+	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/packages/pool/internal/read"
 )
@@ -13,10 +14,8 @@ func transition(c *cli.Call) (*cli.Result, error) {
 	body := c.Request.Body
 	taskID, _ := body["task_id"].(string)
 	to, _ := body["to"].(string)
-	if at, ok := body["at"].(string); ok {
-		if err := checkInstant("at", at); err != nil {
-			return nil, err
-		}
+	if at, ok := body["at"].(string); ok && !clock.Valid(at) {
+		return nil, envelope.Common(envelope.CodeSchemaViolation, "at is not a calendar instant")
 	}
 	g, err := loadGraph(c)
 	if err != nil {

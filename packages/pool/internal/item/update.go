@@ -71,7 +71,7 @@ func update(c *cli.Call) (*cli.Result, error) {
 		delete(next, "schedule")
 	}
 	if v, ok := patch["schedule"]; ok {
-		if err := checkInstant("schedule", v); err != nil {
+		if err := checkSchedule(v); err != nil {
 			return nil, err
 		}
 		next["schedule"] = copyValue(v)

@@ -1422,6 +1422,50 @@ func TestImpossibleInstantsAreRefusedAndNeverReadAsAbsent(t *testing.T) {
 	})
 }
 
+// A zone that is not in the IANA database is refused where it enters, and a
+// stored hold whose zone or date cannot be read is omitted, never read whole.
+func TestAnUnknownZoneIsRefusedAndAStoredOneIsNeverReadWhole(t *testing.T) {
+	h := newHome(t)
+	id := h.addID(leaf("An item"))
+	unknown := map[string]any{"at": "2026-12-01T00:00:00.000Z", "zone": "Europe/Istanbull"}
+	h.unchanged(func() {
+		for name, resp := range map[string]*envelope.Response{
+			"a hold until":     h.do("hold", map[string]any{"task_id": id, "kind": "future", "reason": "Later.", "until": unknown}),
+			"a gate on add":    h.do("add", map[string]any{"title": "x", "level": "prey", "schedule": map[string]any{"kind": "gate", "not_before": unknown}}),
+			"a gate on update": h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"schedule": map[string]any{"kind": "gate", "not_before": unknown}}}),
+			"a recurrence anchor": h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"schedule": map[string]any{
+				"kind": "recurrence", "recurrence": map[string]any{"interval": "P1D", "anchor": unknown}}}}),
+		} {
+			if resp.Status != envelope.Invalid || resp.Error == nil || resp.Error.Code != envelope.CodeSchemaViolation {
+				t.Errorf("%s: status %s, error %+v", name, resp.Status, resp.Error)
+			}
+		}
+	})
+	known := map[string]any{"at": "2026-12-01T00:00:00.000Z", "zone": "Europe/Istanbul"}
+	holdID := h.ok(h.do("hold", map[string]any{"task_id": id, "kind": "future", "reason": "Later.", "until": known}))["hold"].(map[string]any)["hold_id"].(string)
+	for name, until := range map[string]map[string]any{
+		"an unknown zone":      unknown,
+		"an impossible date":   {"at": "2026-12-01T00:00:00.000Z", "zone": "Europe/Istanbul", "date": "2026-02-31"},
+		"the zone named Local": {"at": "2026-12-01T00:00:00.000Z", "zone": "Local"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rec := h.stored("hold", holdID)
+			rec["until"] = until
+			h.plant("hold", holdID, rec)
+			for how, selector := range map[string]map[string]any{"by identity": {"id": holdID}, "by query": {"task_id": id}} {
+				body := h.ok(h.do("read", map[string]any{"kind": "hold", "selector": selector}))
+				if body["projection"].(map[string]any)["complete"] != false || len(body["records"].([]any)) != 0 {
+					t.Errorf("read %s: %v", how, body)
+				}
+			}
+			body := h.ok(h.do("read", map[string]any{"kind": "item", "selector": map[string]any{"id": id}}))
+			if body["projection"].(map[string]any)["complete"] != false {
+				t.Errorf("the item's facts read past the hold: %v", body)
+			}
+		})
+	}
+}
+
 // A record is written by the call that last wrote it.
 func TestARewrittenRecordNamesTheCallThatRewroteIt(t *testing.T) {
 	h := newHome(t)

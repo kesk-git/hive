@@ -11,11 +11,9 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
-	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
 	cstore "github.com/kesk-git/hive/contract/store"
@@ -296,32 +294,28 @@ func checkExpected(c *cli.Call) error {
 	return nil
 }
 
-// checkInstant refuses a time member of a body that is not a real calendar
-// instant: a timestamp, or the date a zoned time was written as. Both are
-// written before they are read by the Pool, so an impossible date is refused
-// where it enters.
-func checkInstant(what string, v any) error {
-	switch v := v.(type) {
-	case map[string]any:
-		for _, name := range []string{"at", "not_before", "anchor"} {
-			if x, ok := v[name]; ok {
-				if err := checkInstant(what+"."+name, x); err != nil {
-					return err
-				}
-			}
+// checkZoned refuses a zoned time of a body that is not a real instant in a
+// known zone, with a real calendar date where it gives one: it is refused
+// where it enters, before the Pool reads it.
+func checkZoned(what string, v any) error {
+	z, _ := v.(map[string]any)
+	if _, err := read.ZonedTime(z); err != nil {
+		return envelope.Common(envelope.CodeSchemaViolation, what+" is not a real instant in a known zone").Because(err)
+	}
+	return nil
+}
+
+// checkSchedule refuses a schedule whose not_before or recurrence anchor is not
+// a real instant in a known zone.
+func checkSchedule(v any) error {
+	s, _ := v.(map[string]any)
+	if z, ok := s["not_before"]; ok {
+		if err := checkZoned("schedule.not_before", z); err != nil {
+			return err
 		}
-		if d, ok := v["date"].(string); ok {
-			if _, err := time.Parse("2006-01-02", d); err != nil {
-				return envelope.Common(envelope.CodeSchemaViolation, what+".date is not a calendar date")
-			}
-		}
-		if r, ok := v["recurrence"]; ok {
-			return checkInstant(what+".recurrence", r)
-		}
-	case string:
-		if !clock.Valid(v) {
-			return envelope.Common(envelope.CodeSchemaViolation, what+" is not a calendar instant")
-		}
+	}
+	if r, ok := s["recurrence"].(map[string]any); ok {
+		return checkZoned("schedule.recurrence.anchor", r["anchor"])
 	}
 	return nil
 }

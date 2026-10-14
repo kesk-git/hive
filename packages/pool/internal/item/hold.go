@@ -15,7 +15,7 @@ func hold(c *cli.Call) (*cli.Result, error) {
 	body := c.Request.Body
 	taskID, _ := body["task_id"].(string)
 	if until, ok := body["until"]; ok {
-		if err := checkInstant("until", until); err != nil {
+		if err := checkZoned("until", until); err != nil {
 			return nil, err
 		}
 	}

@@ -1,8 +1,11 @@
 package read
 
 import (
+	"errors"
+	"fmt"
 	"slices"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/kesk-git/hive/contract/clock"
 	cstore "github.com/kesk-git/hive/contract/store"
@@ -107,22 +110,47 @@ func newNode(l store.Loaded) *Node {
 	return n
 }
 
-// newHold reads a hold record. A date it holds that is not a real instant is
-// an error: a hold whose date cannot be read is not read as one with none.
+// newHold reads a hold record. A date it holds that is not a real instant in
+// a known zone is an error: a hold whose date cannot be read is not read as one
+// with none.
 func newHold(l store.Loaded) (*Hold, error) {
 	h := &Hold{ID: l.ID, Data: l.Data, Revision: l.Revision}
 	h.TaskID, _ = l.Data["task_id"].(string)
 	h.Kind, _ = l.Data["kind"].(string)
 	h.State, _ = l.Data["state"].(string)
 	if until, ok := l.Data["until"].(map[string]any); ok {
-		if at, ok := until["at"].(string); ok {
-			var err error
-			if h.Until, err = clock.Parse(at); err != nil {
-				return nil, err
-			}
+		var err error
+		if h.Until, err = ZonedTime(until); err != nil {
+			return nil, err
 		}
 	}
 	return h, nil
+}
+
+// ZonedTime reads a wall-clock time in a declared zone: its at is a timestamp,
+// its zone a name of the IANA zone database the executable carries, whatever
+// the machine has installed, and its date, where it has one, a calendar date.
+// It returns the instant.
+func ZonedTime(z map[string]any) (time.Time, error) {
+	at, _ := z["at"].(string)
+	t, err := clock.Parse(at)
+	if err != nil {
+		return time.Time{}, err
+	}
+	zone, _ := z["zone"].(string)
+	if zone == "" || zone == "Local" {
+		return time.Time{}, fmt.Errorf("%q is not a zone", zone)
+	}
+	if _, err := time.LoadLocation(zone); err != nil {
+		return time.Time{}, err
+	}
+	if d, ok := z["date"]; ok {
+		date, _ := d.(string)
+		if _, err := time.Parse("2006-01-02", date); err != nil {
+			return time.Time{}, errors.New("the date is not a calendar date")
+		}
+	}
+	return t, nil
 }
 
 // Replace returns the graph as it would stand with the item's record

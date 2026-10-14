@@ -25,7 +25,7 @@ func add(c *cli.Call) (*cli.Result, error) {
 		return nil, err
 	}
 	if v, ok := body["schedule"]; ok {
-		if err := checkInstant("schedule", v); err != nil {
+		if err := checkSchedule(v); err != nil {
 			return nil, err
 		}
 	}
