@@ -155,10 +155,11 @@ func TestLookupOnWindows(t *testing.T) {
 	if _, err := find("windows", path, "git", fakeFS{nocase: true, files: map[string]fs.FileMode{at("c", "git.cmd"): 0o644}}.stat); err == nil || err.Reason != BatchFile || err.File != at("c", "git.cmd") {
 		t.Errorf("%+v", err)
 	}
-	// The failure of a batch file is dependency_unusable, naming the file.
+	// The failure of a batch file is dependency_unusable, naming the file in
+	// its diagnostic and never in its message.
 	_, err := win("tool")
 	f := err.Failure()
-	if f.Err.Code != "dependency_unusable" || !strings.Contains(f.Err.Message, "tool.cmd") {
+	if f.Err.Code != "dependency_unusable" || strings.Contains(f.Err.Message, "tool.cmd") || !strings.Contains(strings.Join(f.Diagnostic().Chain, "\n"), "tool.cmd") {
 		t.Errorf("%+v", f)
 	}
 }

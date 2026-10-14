@@ -472,3 +472,28 @@ func TestUnreadRequestWithARequestIDIsTheEventsRequest(t *testing.T) {
 		t.Errorf("event %v", e)
 	}
 }
+
+// A response that cannot be delivered gives no response and exactly one line
+// of standard error, written once that is known: failed with io_failure, and
+// no text of the file system.
+func TestUndeliveredResponseGivesOneLine(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	nowhere := filepath.Join(t.TempDir(), "absent", "response.json")
+	missing := filepath.Join(t.TempDir(), "no-such-request.json")
+	for name, c := range map[string]struct {
+		stdin []byte
+		args  []string
+		want  string
+	}{
+		"a failure": {nil, []string{"echo", HomeOption, home, RequestFileOption, missing, ResponseFileOption, nowhere}, "hive-fleet echo: failed io_failure -\n"},
+		"an answer": {request(t, "echo", 4, nil), []string{"echo", HomeOption, home, ResponseFileOption, nowhere}, "hive-fleet echo: failed io_failure " + id(ids.Request, 4) + "\n"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			code, out, stderr := h.run("hive-fleet", c.stdin, c.args...)
+			if code != envelope.Failed.ExitCode() || len(out) != 0 || stderr != c.want {
+				t.Errorf("exit %d, stdout %q, standard error %q, want %q", code, out, stderr, c.want)
+			}
+		})
+	}
+}

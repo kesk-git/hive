@@ -170,9 +170,10 @@ func TestNotStarted(t *testing.T) {
 			t.Errorf("%s: %+v", tc.err.Reason, f)
 		}
 	}
-	// A batch file's failure names the file.
-	if f := (&StartError{Reason: BatchFile, Program: Program{Core, "claude"}, File: `C:\npm\claude.cmd`}).Failure(); !strings.Contains(f.Err.Message, `C:\npm\claude.cmd`) {
-		t.Errorf("%q", f.Err.Message)
+	// A batch file's failure names the file in its diagnostic, never in its
+	// message.
+	if f := (&StartError{Reason: BatchFile, Program: Program{Core, "claude"}, File: `C:\npm\claude.cmd`}).Failure(); strings.Contains(f.Err.Message, `C:\npm\claude.cmd`) || !strings.Contains(strings.Join(f.Diagnostic().Chain, "\n"), `C:\npm\claude.cmd`) {
+		t.Errorf("%q, %q", f.Err.Message, f.Diagnostic().Chain)
 	}
 }
 

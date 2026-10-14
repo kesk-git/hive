@@ -226,24 +226,27 @@ func (e *Executable) answer(c *Command, responseFile, home string, stdout, stder
 }
 
 // write writes the encoded response to the response file, or to standard
-// output when there is none, and one line to stderr for every status but ok:
-// the command, the operation, the status, the code and the request_id, and no
-// message (spec/commands.md, Invocation). It returns the exit code the
+// output when there is none, and then one line to stderr for every outcome but
+// ok: the command, the operation, the status, the code and the request_id, and
+// no message (spec/commands.md, Invocation). It returns the exit code the
 // response fixes, or 1 when the response could not be written: the command
-// then gave no response.
+// then gave no response, and its one line is failed with io_failure.
 func (e *Executable) write(c *Command, resp *envelope.Response, data []byte, responseFile string, stdout, stderr io.Writer) int {
-	if resp.Status != envelope.Ok && resp.Error != nil {
-		fmt.Fprintf(stderr, "%s %s: %s %s %s\n", resp.Command, orDash(resp.Operation), resp.Status, resp.Error.Code, orDash(resp.RequestID))
-	}
 	var err error
 	if responseFile != "" {
 		err = writeFile(responseFile, data)
 	} else {
 		_, err = io.Copy(stdout, bytes.NewReader(data))
 	}
+	line := func(status envelope.Status, code string) {
+		fmt.Fprintf(stderr, "%s %s: %s %s %s\n", resp.Command, orDash(resp.Operation), status, code, orDash(resp.RequestID))
+	}
 	if err != nil {
-		fmt.Fprintf(stderr, "%s: the response cannot be written: %v\n", resp.Command, err)
+		line(envelope.Failed, envelope.CodeIOFailure)
 		return envelope.Failed.ExitCode()
+	}
+	if resp.Status != envelope.Ok && resp.Error != nil {
+		line(resp.Status, resp.Error.Code)
 	}
 	return resp.ExitCode()
 }
