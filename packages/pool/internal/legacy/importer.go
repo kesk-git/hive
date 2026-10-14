@@ -511,20 +511,36 @@ type importer struct {
 }
 
 // at is the instant of the start of the calendar date in the zone of the
-// import, or false for a date that is not one there. A date whose midnight a
-// change of offset skips starts at the change.
+// import, the earliest instant whose date there is that date, or false for a
+// date that is not one there. Such an instant is a midnight of the date in an
+// offset the zone keeps at that midnight, or the change to an offset where a
+// change skips the midnight; every local midnight of a date falls within 14
+// hours of its midnight in UTC.
 func (im *importer) at(date string) (string, bool) {
-	t, err := time.ParseInLocation("2006-01-02", date, im.loc)
+	day, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		return "", false
 	}
-	if t.Format("2006-01-02") < date {
-		_, t = t.ZoneBounds()
+	var first time.Time
+	for x := day.Add(-14 * time.Hour); x.Before(day.Add(14 * time.Hour)); {
+		local := x.In(im.loc)
+		_, offset := local.Zone()
+		start, end := local.ZoneBounds()
+		for _, c := range []time.Time{day.Add(-time.Duration(offset) * time.Second), start} {
+			inZone := !c.Before(start) && (end.IsZero() || c.Before(end))
+			if inZone && c.In(im.loc).Format("2006-01-02") == date && (first.IsZero() || c.Before(first)) {
+				first = c
+			}
+		}
+		if end.IsZero() {
+			break
+		}
+		x = end
 	}
-	if t.Format("2006-01-02") != date {
+	if first.IsZero() {
 		return "", false
 	}
-	s, err := clock.Format(t)
+	s, err := clock.Format(first.In(im.loc))
 	return s, err == nil
 }
 

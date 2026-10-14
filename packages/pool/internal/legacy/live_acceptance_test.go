@@ -438,6 +438,33 @@ func TestLiveImportOfADateWhoseMidnightIsSkipped(t *testing.T) {
 	}
 }
 
+// A date whose midnight a change from summer time repeats starts at the first
+// of the two: in Asia/Amman 2021-10-29 begins at midnight in summer time, at
+// 21:00 UTC the day before, and its midnight comes again an hour later.
+func TestLiveImportOfADateWhoseMidnightIsRepeated(t *testing.T) {
+	h := newHome(t)
+	const zone, first = "Asia/Amman", "2021-10-28T21:00:00.000Z"
+	text := "# Backlog\n\n## Queued\n- [ ] twice-a1 - wait (since 2021-10-29) (hold: until the change) (hold-kind: future) (hold-until: 2021-10-29)\n\n## Done\n- [x] twice-b2 - closed (since 2021-10-29) (done 2021-10-29)\n"
+	path, data, when := sourceBytes(t, []byte(text))
+	im := h.importPath(path, data, when, zone)
+	if a1 := im.items["twice-a1"]; a1["created_at"] != first {
+		t.Errorf("twice-a1: created_at %v; want %s", a1["created_at"], first)
+	}
+	if until, _ := im.holds["twice-a1"]["until"].(map[string]any); until["at"] != first || until["date"] != "2021-10-29" {
+		t.Errorf("twice-a1: hold until %v; want %s", until, first)
+	}
+	if b2 := im.items["twice-b2"]; b2["created_at"] != first || b2["closed_at"] != first {
+		t.Errorf("twice-b2: created_at %v, closed_at %v; want %s", b2["created_at"], b2["closed_at"], first)
+	}
+	out := ok(t, h.do("export-legacy", map[string]any{"zone": zone}))
+	rendered := out["text"].(string)
+	for _, want := range []string{"(since 2021-10-29)", "(done 2021-10-29)"} {
+		if !strings.Contains(rendered, want) {
+			t.Errorf("the export in %s does not write %s:\n%s", zone, want, rendered)
+		}
+	}
+}
+
 // A file with carriage returns, a header suffix, an unrecognized section and no
 // final newline is imported with its source kept exactly.
 func TestLiveImportOfCarriageReturnsASuffixAndAnUnrecognizedSection(t *testing.T) {
