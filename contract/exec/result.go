@@ -75,7 +75,9 @@ func (r Result) Passed() bool { return r.Outcome == Exited && r.Code == 0 }
 // started, outcome_unknown, reconciled before any retry; where it could
 // have had none, unavailable with dependency_unusable, or
 // platform_utility_unusable for a platform utility. A run that was not
-// started maps by its StartError instead and has no result here.
+// started maps by its StartError instead and has no result here. The message
+// names the program by its declared name and how the run ended; the result,
+// with its signal, status or error, is the failure's diagnostic.
 func (r Result) External(p Program, mayHaveHadEffect bool) (code int64, failure *envelope.Failure) {
 	switch r.Outcome {
 	case Exited:
@@ -83,11 +85,25 @@ func (r Result) External(p Program, mayHaveHadEffect bool) (code int64, failure 
 	case NotStarted:
 		return 0, envelope.Common(envelope.CodeInternal, "a run that was not started has no result to map; its StartError maps it")
 	}
+	detail := fmt.Errorf("%s %s", p, r)
 	if mayHaveHadEffect {
-		f := envelope.Common(envelope.CodeOutcomeUnknown, fmt.Sprintf("%s %s and gave no result; reconcile before any retry", p, r))
-		return 0, f
+		return 0, envelope.Common(envelope.CodeOutcomeUnknown, p.Name+" "+r.reason()+" and gave no result; reconcile before any retry").Because(detail)
 	}
-	return 0, unavailable(p.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, fmt.Sprintf("%s %s and gave no result", p, r))
+	return 0, unavailable(p.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, p.Name+" "+r.reason()+" and gave no result").Because(detail)
+}
+
+// reason is how a run that gave no result ended, in a fixed phrase that holds
+// no error's text, no signal and no status.
+func (r Result) reason() string {
+	switch r.Outcome {
+	case Ended:
+		return "was ended by the platform"
+	case StoppedByHive:
+		return "was stopped by Hive"
+	case Lost:
+		return "was lost, so how it ended cannot be known"
+	}
+	return "ended"
 }
 
 // HiveResult reads the result of another Hive command from its complete

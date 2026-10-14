@@ -233,7 +233,7 @@ func TestViolationsSayWhereAndWhy(t *testing.T) {
 		{"/m~0n/1", testID + "#/properties/m~0n/items/type", "is string, want integer"},
 		{"/m~0n/3", testID + "#/properties/m~0n/items/type", "is string, want integer"},
 		{"/q", testID + "#/$defs/d/pattern", "does not match the pattern ^x$"},
-		{"", testID + "#/additionalProperties", `has the member "extra", which the schema does not list`},
+		{"", testID + "#/additionalProperties", "has a member the schema does not list"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("violations:\n%v\nwant:\n%v", got, want)
@@ -255,11 +255,18 @@ func TestViolationsSayWhereAndWhy(t *testing.T) {
 	}
 }
 
-func TestExtraMembersAreReportedInOrder(t *testing.T) {
+// A member the schema does not list is reported by where it is, once for each,
+// and never by its name, which is the document's own text.
+func TestExtraMembersAreReportedWithoutTheirNames(t *testing.T) {
 	r := mustOne(t, `"type":"object","additionalProperties":false`)
 	got := violationsOf(t, r.Validate(testID, []byte(`{"c":1,"a":1,"b":1}`)))
-	if len(got) != 3 || !strings.Contains(got[0].Message, `"a"`) || !strings.Contains(got[2].Message, `"c"`) {
-		t.Errorf("%v", got)
+	if len(got) != 3 {
+		t.Fatalf("%v", got)
+	}
+	for _, v := range got {
+		if v.Instance != "" || v.Message != "has a member the schema does not list" {
+			t.Errorf("%+v", v)
+		}
 	}
 }
 

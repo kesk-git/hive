@@ -19,6 +19,7 @@ const registryDir = "dispatch/registry"
 // A registry record kind: where its records sit, the schema they follow and
 // the name and newest version this build reads.
 type registryKind struct {
+	name    string
 	dir     string
 	schema  string
 	record  string
@@ -27,9 +28,9 @@ type registryKind struct {
 }
 
 var (
-	workspaceKind = registryKind{"workspaces", "urn:hive:schema:workspace:v1", "hive.workspace", "1.0", "workspace_id"}
-	projectKind   = registryKind{"projects", "urn:hive:schema:project:v1", "hive.project", "1.0", "project_id"}
-	cloneKind     = registryKind{"clones", "urn:hive:schema:clone:v1", "hive.clone", "1.0", "clone_id"}
+	workspaceKind = registryKind{"workspace", "workspaces", "urn:hive:schema:workspace:v1", "hive.workspace", "1.0", "workspace_id"}
+	projectKind   = registryKind{"project", "projects", "urn:hive:schema:project:v1", "hive.project", "1.0", "project_id"}
+	cloneKind     = registryKind{"clone", "clones", "urn:hive:schema:clone:v1", "hive.clone", "1.0", "clone_id"}
 )
 
 // checkScope is the callee's scope check (spec/identities.md, Scope): the
@@ -105,45 +106,45 @@ func checkScope(home *store.Home, s envelope.Scope) error {
 // for a record that is not there.
 func readRegistry(home *store.Home, kind registryKind, id string) (map[string]any, error) {
 	rel := registryDir + "/" + kind.dir + "/" + id + ".json"
-	malformed := func(what string) error {
-		return envelope.Common(envelope.CodeRecordMalformed, fmt.Sprintf("the registry record %s is malformed: %s", rel, what))
+	malformed := func(why error) error {
+		return envelope.Common(envelope.CodeRecordMalformed, fmt.Sprintf("the registry record of the %s the request names is malformed", kind.name)).Because(fmt.Errorf("%s: %w", rel, why))
 	}
 	path, err := home.Path(rel)
 	if err != nil {
-		return nil, malformed(err.Error())
+		return nil, malformed(err)
 	}
 	data, err := store.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, malformed(err.Error())
+		return nil, malformed(err)
 	}
 	if err := canon.CheckFile(data); err != nil {
-		return nil, malformed(err.Error())
+		return nil, malformed(err)
 	}
 	v, err := canon.Parse(data)
 	if err != nil {
-		return nil, malformed(err.Error())
+		return nil, malformed(err)
 	}
 	obj, ok := v.(map[string]any)
 	if !ok {
-		return nil, malformed("a record is a JSON object")
+		return nil, malformed(errors.New("a record is a JSON object"))
 	}
 	if obj["schema"] == kind.record {
 		if version, _ := obj["schema_version"].(string); envelope.Newer(version, kind.version) {
-			return nil, envelope.Common(envelope.CodeUnsupportedVersion, fmt.Sprintf("the registry record %s is at version %s; this build reads up to %s", rel, version, kind.version))
+			return nil, envelope.Common(envelope.CodeUnsupportedVersion, fmt.Sprintf("the registry record of the %s the request names is of a version this build does not read", kind.name)).Because(fmt.Errorf("%s is at version %s; this build reads up to %s", rel, version, kind.version))
 		}
 	}
 	reg, err := schema.Embedded()
 	if err != nil {
-		return nil, envelope.Common(envelope.CodeInternal, err.Error())
+		return nil, envelope.Common(envelope.CodeInternal, "the embedded schemas do not load").Because(err)
 	}
 	if err := reg.Validate(kind.schema, data); err != nil {
-		return nil, malformed(err.Error())
+		return nil, malformed(err)
 	}
 	if obj[kind.idField] != id {
-		return nil, malformed("it names another identity than its file")
+		return nil, malformed(errors.New("it names another identity than its file"))
 	}
 	return obj, nil
 }

@@ -24,7 +24,7 @@ func provision(c *cli.Call) (*cli.Result, error) {
 	}
 	reg, err := schema.Embedded()
 	if err != nil {
-		return nil, envelope.Common(envelope.CodeInternal, err.Error())
+		return nil, envelope.Common(envelope.CodeInternal, "the embedded schemas do not load").Because(err)
 	}
 	home, err := lockedHome(c.Home.Dir, c.Request.HomeID)
 	if err != nil {
@@ -56,13 +56,13 @@ func lockedHome(dir, homeID string) (*store.Home, error) {
 	home, err := store.CheckHome(dir)
 	switch {
 	case errors.Is(err, store.ErrUnsupportedVersion):
-		return nil, envelope.Common(envelope.CodeUnsupportedVersion, err.Error())
+		return nil, envelope.Common(envelope.CodeUnsupportedVersion, "the home or its store is of a version this build does not read").Because(err)
 	case errors.Is(err, store.ErrRecordMalformed), errors.Is(err, store.ErrLayout):
-		return nil, envelope.Common(envelope.CodeRecordMalformed, err.Error())
+		return nil, envelope.Common(envelope.CodeRecordMalformed, "the home record or the layout of the home is malformed").Because(err)
 	case errors.Is(err, store.ErrInsideRepository):
 		return nil, envelope.Common(envelope.CodeHomeInsideRepository, "a home is never inside a Git working tree")
 	case err != nil:
-		return nil, envelope.Common(envelope.CodeIOFailure, err.Error())
+		return nil, envelope.Common(envelope.CodeIOFailure, "the home cannot be read").Because(err)
 	case home.HomeID != "" && home.HomeID != homeID:
 		return nil, envelope.Common(envelope.CodeHomeMismatch, "the request names another home than the one the command was pointed at")
 	}
@@ -159,7 +159,7 @@ func (p *provisioner) home(role, name, parentID string) (map[string]any, bool, e
 			return nil, false, err
 		}
 		if rec == nil {
-			return nil, false, malformed(store.HomeFilePath, "the home record cannot be read")
+			return nil, false, malformed(homeKind, store.HomeFilePath, errors.New("the home record cannot be read"))
 		}
 		if rec["role"] != role {
 			return nil, false, envelope.Common(envelope.CodeAlreadyExists, "the home already exists with another role; a home's role is fixed")
@@ -193,7 +193,7 @@ func (p *provisioner) workspace(id string, spec map[string]any, parentID string)
 			return nil, false, err
 		}
 		if rec == nil {
-			return nil, false, malformed(workspaceKind.path(id), "the home names a workspace the registry does not hold")
+			return nil, false, malformed(workspaceKind, workspaceKind.path(id), errors.New("the home names a workspace the registry does not hold"))
 		}
 		if rec["slug"] != spec["slug"] {
 			return nil, false, envelope.Common(envelope.CodeAlreadyExists, "the home already holds a workspace with another slug; a workspace's slug is fixed")
@@ -328,23 +328,23 @@ func (p *provisioner) write(k kind, id string, rec map[string]any, receiptKind s
 	}
 	content, err := canon.Encode(rec)
 	if err != nil {
-		return nil, envelope.Common(envelope.CodeInternal, "a record cannot be written: "+err.Error())
+		return nil, envelope.Common(envelope.CodeInternal, "the "+k.record+" record cannot be written").Because(err)
 	}
 	w, digest, err := p.call.Finalize(store.RecordWrite{Path: k.path(id), Content: content, Expected: 0})
 	if err != nil {
-		return nil, envelope.Common(envelope.CodeInternal, err.Error())
+		return nil, envelope.Common(envelope.CodeInternal, "the "+k.record+" record cannot be stamped").Because(err)
 	}
 	if err := p.reg.Validate(k.schema, w.Content); err != nil {
-		return nil, envelope.Common(envelope.CodeSchemaViolation, "the "+k.record+" record cannot be kept whole: "+err.Error())
+		return nil, envelope.Common(envelope.CodeSchemaViolation, "the "+k.record+" record breaks its schema").Because(err)
 	}
 	stored, err := canon.Parse(w.Content)
 	if err != nil {
-		return nil, envelope.Common(envelope.CodeInternal, err.Error())
+		return nil, envelope.Common(envelope.CodeInternal, "the "+k.record+" record cannot be read back").Because(err)
 	}
 	subject := &envelope.RecordRef{Schema: k.record, ID: id, HomeID: p.homeID, RecordRevision: 1, Digest: digest}
 	receipt, err := p.call.NewReceipt(receiptKind, "1.0", subject, nil, nil)
 	if err != nil {
-		return nil, envelope.Common(envelope.CodeInternal, err.Error())
+		return nil, envelope.Common(envelope.CodeInternal, "the receipt of the "+k.record+" record cannot be made").Because(err)
 	}
 	p.fresh[id] = true
 	p.records = append(p.records, w)
@@ -357,11 +357,11 @@ func (p *provisioner) write(k kind, id string, rec map[string]any, receiptKind s
 func recordedAt(c *cli.Call) (string, error) {
 	w, _, err := c.Finalize(store.RecordWrite{Path: store.HomeFilePath, Content: []byte("{}")})
 	if err != nil {
-		return "", envelope.Common(envelope.CodeInternal, err.Error())
+		return "", envelope.Common(envelope.CodeInternal, "the time of the records cannot be stamped").Because(err)
 	}
 	v, err := canon.Parse(w.Content)
 	if err != nil {
-		return "", envelope.Common(envelope.CodeInternal, err.Error())
+		return "", envelope.Common(envelope.CodeInternal, "the time of the records cannot be read").Because(err)
 	}
 	at, _ := v.(map[string]any)["updated_at"].(string)
 	return at, nil

@@ -37,6 +37,14 @@
 // name as id, and its correlation_id is that of the first event of the
 // append that found the tail.
 //
+// The kind <package>.diagnostic.recorded, which every package writes as its
+// own, has one body schema for all seven, events/diagnostic.recorded.v1; the
+// journal resolves it for the subject and fact diagnostic.recorded whichever
+// package the kind names, and the body schema of any other kind by its exact
+// name. The journal says, through ChecksValues, whether its own validation
+// applies the no-value check to a body; it does not yet, and a writer of free
+// text, as the diagnostic event is, appends only through a journal that does.
+//
 // Reading takes no lock. A Reader resumes after a cursor, the last
 // home_sequence its consumer handled, validates every line through the
 // embedded schemas, requires the sequence to rise by exactly one across

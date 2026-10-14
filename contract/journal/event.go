@@ -24,6 +24,10 @@ const (
 	// event's basis names with the segment's file name as id.
 	RecordSchema = "hive.journal"
 
+	// DiagnosticFact is the subject and fact of the one kind common to every
+	// package, <package>.diagnostic.recorded, whose body schema is shared.
+	DiagnosticFact = "diagnostic.recorded"
+
 	repairKindVersion = "1.0"
 	eventSchemaPrefix = "urn:hive:schema:events:"
 )
@@ -133,9 +137,22 @@ func checkRepairEvent(obj map[string]any, segment string) error {
 	return nil
 }
 
+// bodySchema is the schema that registers the body of a kind at a major
+// version: spec/schemas/events/<kind>.v<major>.schema.json, except that the
+// diagnostic kind of any of the seven packages is registered once, as
+// diagnostic.recorded.
+func (j *Journal) bodySchema(kind, major string) string {
+	if owner, fact, ok := strings.Cut(kind, "."); ok && fact == DiagnosticFact {
+		if name, err := canon.Encode(owner); err == nil && j.reg.Validate(packageName, name) == nil {
+			kind = fact
+		}
+	}
+	return eventSchemaPrefix + kind + ":v" + major
+}
+
 // checkBody validates the body against the schema registered for the kind
-// at its major version, spec/schemas/events/<kind>.v<major>.schema.json, or
-// requires it to be empty when the kind registers none.
+// at its major version, or requires it to be empty when the kind registers
+// none.
 func (j *Journal) checkBody(obj map[string]any) error {
 	kind, _ := obj["kind"].(string)
 	kindVersion, _ := obj["kind_version"].(string)
@@ -145,7 +162,7 @@ func (j *Journal) checkBody(obj map[string]any) error {
 	if err != nil {
 		return fmt.Errorf("body: %w", err)
 	}
-	err = j.reg.Validate(eventSchemaPrefix+kind+":v"+major, data)
+	err = j.reg.Validate(j.bodySchema(kind, major), data)
 	switch {
 	case errors.Is(err, schema.ErrUnknownSchema):
 		if len(body) > 0 {

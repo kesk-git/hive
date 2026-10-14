@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -39,6 +40,10 @@ var (
 	projectID   = id(ids.Project, 1)
 	cloneID     = id(ids.Clone, 1)
 )
+
+// chainPath is the path a lower layer names in the error the fail operation
+// returns for "chain".
+const chainPath = "/srv/hive-test/records/thing.json"
 
 // The schemas the test operations declare: the provision request body as a
 // request body, and the common definitions, which admit any object, as a
@@ -160,11 +165,24 @@ type fakeJournal struct {
 	// fail, when set, is the error Append and Recover return without
 	// appending.
 	fail error
+	// checks is what the journal says of whether its own validation applies
+	// the no-value check, and dislikes, when set, the text such a validation
+	// refuses a body for: the event holding it is refused whole.
+	checks   bool
+	dislikes string
 }
+
+// ChecksValues says whether the journal applies the no-value check.
+func (j *fakeJournal) ChecksValues() bool { return j.checks }
 
 func (j *fakeJournal) Append(events []store.Event) error {
 	if j.fail != nil {
 		return j.fail
+	}
+	for _, e := range events {
+		if j.dislikes != "" && bytes.Contains(e.Content, []byte(j.dislikes)) {
+			return errors.New("the body holds a value")
+		}
 	}
 	for _, e := range events {
 		if _, ok := j.lines[e.ID]; ok {
@@ -194,7 +212,7 @@ type harness struct {
 // with the operations the tests drive, and hive-park with none.
 func newHarness(t testing.TB) *harness {
 	t.Helper()
-	h := &harness{clk: clock.NewFake(epoch), journal: &fakeJournal{lines: map[string][]byte{}}, calls: map[string]int{}}
+	h := &harness{clk: clock.NewFake(epoch), journal: &fakeJournal{lines: map[string][]byte{}, checks: true}, calls: map[string]int{}}
 	count := func(name string, f func(*Call) (*Result, error)) func(*Call) (*Result, error) {
 		return func(c *Call) (*Result, error) {
 			h.calls[name]++
@@ -395,6 +413,8 @@ func newHarness(t testing.TB) *harness {
 			switch c.Request.Body["home"].(map[string]any)["name"] {
 			case "panic":
 				panic("boom")
+			case "chain":
+				return nil, fmt.Errorf("reading %s: %w", chainPath, fmt.Errorf("open %s: %w", chainPath, fs.ErrNotExist))
 			case "unknown":
 				return nil, envelope.Common(envelope.CodeOutcomeUnknown, "the adapter did not answer")
 			case "bad failure":

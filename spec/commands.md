@@ -25,7 +25,7 @@ hive-<command> --version
 - A command reads no environment variable as an input to the contract. It uses the environment only as any process does: to find the external executables it runs, and for those executables' own configuration. A command sets a child's environment only through Tendril, the launch primitive of the [one process-execution path](distribution.md#what-a-hive-executable-may-run), and a value it resolved appears in no argument, response, receipt or log, under the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section.
 - No argument is longer than 4,096 bytes. A longer one exits 2 before anything is read.
 - `--version` prints the implementation version as one line of text and exits 0. It is the only invocation that answers without a response document.
-- Standard error carries diagnostics for a person. It is never parsed, and nothing in it is part of the contract. Like every log, it carries no value.
+- Standard error carries diagnostics for a person. For a response whose status is not `ok` it is exactly one line, `<command> <operation>: <status> <code> <request_id>`, with `-` for an absent operation or `request_id` and no message text, written once the response is out; a response that cannot be delivered gives instead that one line with `failed` and `io_failure`, exit 1, and a failure that gives no response at all, exit 1, keeps its own one line. A panic's stack never goes to standard error. It is never parsed, and nothing in it is part of the contract. Like every log, it carries no value.
 
 No command offers a short form, for a person at a terminal or for any caller: the request document is the one form, as [decision 8](decisions.md#8-requests-never-travel-as-arguments-and-the-home-is-always-named) states, and no flag or positional argument beyond those of the invocation above builds a request. A shape the design writes, such as `hive-assimilate <task-id> <harvest-url>`, names for illustration the identities the request document carries, and is not a command line. Calls between packages always send the request document.
 
@@ -57,14 +57,14 @@ One JSON document, following `response.v1`, for every invocation that gets as fa
 
 | Field | Meaning |
 | --- | --- |
-| `request_id`, `command`, `operation` | Echo the request. `request_id` is null only when none could be read. |
+| `request_id`, `command`, `operation` | Echo the request. `request_id` is null only when none could be read. `operation` is null when the invocation names an operation the command does not declare: that name is the caller's own text, and neither the response nor standard error repeats it. |
 | `status`, `exit_code` | The outcome, as the table below fixes it. |
 | `responder` | The package, command, implementation version and contract version that answered. |
 | `completed_at` | When the response was written. |
 | `replayed` | True when this repeats the recorded outcome of an earlier invocation. |
 | `receipts` | Every [receipt](receipts.md) the invocation wrote, in full. |
 | `body` | The operation's own response. Present only with `ok`. |
-| `error` | Present with every other status: a `code`, a `message` for a person, `retryable`, and the fields the status requires. `message` and `detail` hold no value and never the text of a request: a refusal names what it refused by field and shape only. |
+| `error` | Present with every other status: a `code`, a `message` for a person, `retryable`, and the fields the status requires. `message` is one sentence naming the field and shape that failed. It carries no lower-layer error chain, no typed text and no panic value. `message` and `detail` hold no value and never the text of a request: a refusal names what it refused by field and shape only, or by position and byte length, never by quoting an argument, an option, a command name or an operation name. What a failure holds beyond its message goes to the home's event journal, as [events.md](events.md#diagnostic-events) states. |
 
 **A response is complete or it is not a response.** It is one document followed by a line feed. A caller accepts it only if the whole document parses, follows the schema, echoes the caller's `request_id` and agrees with the process's exit code. A `request_id` that is not null is the caller's in every case. A null `request_id` is accepted for a request only with a status the callee reaches before it can read the request's identity: `usage`; `invalid` with code `malformed_request`; and `too_large` that names the request as what exceeded the limit, with code `record_too_large`, `detail.record` of `request` and `actual_bytes` above `limit_bytes`. Any other response with a null `request_id`, a `too_large` about the response included, is `unknown`. The `capabilities` invocation takes no request, and its response is accepted only with a null `request_id` and the operation `capabilities`; no other response is accepted against a request's identity as a capabilities response. Empty output, output that does not parse, or a status that disagrees with the exit code is treated as `unknown`, never as success and never as an empty result. With any status but `ok` there is no `body`: no partial result is ever returned.
 
@@ -87,7 +87,7 @@ One JSON document, following `response.v1`, for every invocation that gets as fa
 - Exit codes 11 to 63 are reserved for this contract. Hive never exits with 64 or above, so no code a platform gives a process that something else ended is mistaken for one of Hive's: on macOS and Linux a shell reports a signal as 128 plus its number, and on Windows a process ended by an exception or by Control-C exits with a status of `0xC0000000` or above.
 - An outcome is read from a complete response that agrees with the exit code, never from an exit code alone. A process that ends without a complete response has given no response, whatever its exit code, and the caller treats the outcome as `unknown`: one ended by a signal on macOS or Linux; one ended on Windows by `TerminateProcess` or `TerminateJobObject`, whose exit code is whatever the terminator chose, and is 1, Hive's `failed`, when Go's own `Kill` chose it; and one ended by a caller's timeout. How the [one process-execution path](distribution.md#what-a-run-reports) reports every way a run can end is stated there.
 - `ok` means what the operation defines and no more. An operation that records a launch and receives the adapter's acceptance returns `ok` for exactly that; it says nothing of the worker running, finishing or delivering.
-- `refused`, `held` and `unknown` may leave a record: the refusal, the hold or the intent. Every such record is a receipt returned in `receipts`. No other non-`ok` status leaves anything.
+- `refused`, `held` and `unknown` may leave a record: the refusal, the hold or the intent. Every such record is a receipt returned in `receipts`. No other non-`ok` status leaves anything. The single exception, for every non-`ok` status, is the one [diagnostic event](events.md#diagnostic-events) of a failure that has detail beyond its message, written to the home's event journal; it is neither a record nor a receipt, and no response carries it.
 - `retryable` is true only when repeating the same request unchanged can succeed without anyone acting first, as with `lock_held`. It is false for `unknown`: an unknown outcome is reconciled, not retried.
 
 ### Common error codes
@@ -125,7 +125,7 @@ Adding a code is a minor change. A code is never reused for another meaning. `se
 - The same `request_id` with the same digest returns the recorded response with `replayed` true, and writes nothing.
 - The same `request_id` with a different digest is a `conflict` with code `replay_mismatch`.
 - A request that ended `unknown` is not recorded as complete. Sending it again makes the command reconcile first: it establishes what happened from its intent and from the outside system, and only then completes, refuses or reports `unknown` again. It never repeats an outside effect it cannot rule out.
-- Read-only operations record nothing and may be repeated freely.
+- Read-only operations record nothing, apart from the one [diagnostic event](events.md#diagnostic-events) of a failure that has detail, and may be repeated freely.
 - Recorded outcomes are kept for at least as long as the task or session the request is bound to, and their retention beyond that is the owning package's configuration.
 
 ### A command with no store

@@ -213,7 +213,7 @@ func git(dir string, args ...string) ([]byte, int64, error) {
 		if errors.As(err, &se) {
 			return nil, 0, se.Failure()
 		}
-		return nil, 0, envelope.Common(envelope.CodeInternal, err.Error())
+		return nil, 0, envelope.Common(envelope.CodeInternal, "git cannot be started").Because(err)
 	}
 	defer run.Close()
 	// Standard error is drained at once, so that a full pipe never holds Git.
@@ -236,7 +236,7 @@ func git(dir string, args ...string) ([]byte, int64, error) {
 		return nil, 0, failure
 	}
 	if rerr != nil {
-		return nil, 0, envelope.Common(envelope.CodeSourceUnreadable, "git's answer cannot be read: "+rerr.Error())
+		return nil, 0, envelope.Common(envelope.CodeSourceUnreadable, "git's answer cannot be read").Because(rerr)
 	}
 	return out, code, nil
 }

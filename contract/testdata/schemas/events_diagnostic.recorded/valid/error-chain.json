@@ -1,0 +1,12 @@
+{
+  "command": "hive-fleet",
+  "operation": "put",
+  "status": "failed",
+  "code": "internal",
+  "request_id": "req_00000000000000000000000007",
+  "detail": [
+    "reading a record: open a record: file does not exist",
+    "open a record: file does not exist",
+    "file does not exist"
+  ]
+}

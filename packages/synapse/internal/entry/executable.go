@@ -8,6 +8,7 @@ package entry
 import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/journal"
 )
 
 // Version is the implementation version the executable reports.
@@ -34,6 +35,7 @@ func Executable() *cli.Executable {
 		Name:      "hive-synapse",
 		Version:   Version,
 		Storeless: false,
+		Journal:   journal.Opener("synapse"),
 	}
 	for _, c := range commands {
 		cmd := &cli.Command{Name: c.name}
