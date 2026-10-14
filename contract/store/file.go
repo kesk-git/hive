@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/kesk-git/hive/contract/canon"
+	"github.com/kesk-git/hive/contract/internal/flushseam"
 )
 
 // tempSuffix ends the name of every temporary file, which sits in the store's
@@ -155,7 +156,7 @@ func (s *Store) writeFile(rel, requestID string, data []byte) error {
 		f.Close()
 		return err
 	}
-	if err := f.Sync(); err != nil {
+	if err := Flush(f); err != nil {
 		f.Close()
 		os.Remove(tmp)
 		return fmt.Errorf("store: flushing %s: %w", rel, err)
@@ -209,6 +210,21 @@ func (s *Store) syncChain(rel string) error {
 		}
 	}
 }
+
+// Flush flushes the open file f to the medium, as the writes of a record and
+// of a journal segment do before they go on. It is the one place the store
+// and the journal ask the file system to flush a file; a test binary may turn
+// the real flush off through contract/internal/flushseam, and every step
+// around it stays.
+func Flush(f *os.File) error {
+	if flushseam.Skip {
+		return nil
+	}
+	return f.Sync()
+}
+
+// syncDir flushes a directory of the home, as SyncDir does for the store.
+func syncDir(dir string) error { return SyncDir("store", dir) }
 
 // relDir names a directory by its slash path below the home, for the steps
 // of a test.

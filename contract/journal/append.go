@@ -330,7 +330,7 @@ func (j *Journal) writeLine(name string, off int64, data []byte, cut bool) error
 		f.Close()
 		return err
 	}
-	if err := f.Sync(); err != nil {
+	if err := store.Flush(f); err != nil {
 		f.Close()
 		return fmt.Errorf("journal: flushing %s: %w", name, err)
 	}

@@ -34,16 +34,17 @@ func (s *Store) publish(f *os.File, tmp, full, rel string) error {
 	return nil
 }
 
-// syncDir flushes a directory, so that a rename or a removal in it is
-// durable. Go's flush on macOS is the full flush to the medium.
-func syncDir(dir string) error {
+// SyncDir flushes the directory at dir, so that a file created, renamed or
+// removed in it is durable. The errors are those of the package named owner,
+// the package that asks. Go's flush on macOS is the full flush to the medium.
+func SyncDir(owner, dir string) error {
 	d, err := os.Open(dir)
 	if err != nil {
-		return fmt.Errorf("store: %w", err)
+		return fmt.Errorf("%s: %w", owner, err)
 	}
 	defer d.Close()
-	if err := d.Sync(); err != nil {
-		return fmt.Errorf("store: flushing %s: %w", dir, err)
+	if err := Flush(d); err != nil {
+		return fmt.Errorf("%s: flushing %s: %w", owner, dir, err)
 	}
 	return nil
 }

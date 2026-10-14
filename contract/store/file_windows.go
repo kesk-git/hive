@@ -109,7 +109,7 @@ func (s *Store) publish(f *os.File, tmp, full, rel string) error {
 		os.Remove(tmp)
 		return fmt.Errorf("store: %w", err)
 	}
-	if err := f.Sync(); err != nil {
+	if err := Flush(f); err != nil {
 		f.Close()
 		return fmt.Errorf("store: flushing %s: %w", rel, err)
 	}
@@ -163,10 +163,10 @@ func renameRefused(err error) bool {
 	return err == syscall.ERROR_ACCESS_DENIED || err == errorSharingViolation || err == errorLockViolation
 }
 
-// syncDir does nothing on Windows, which offers no directory handle that can
+// SyncDir does nothing on Windows, which offers no directory handle that can
 // be flushed: the flush of the renamed file in publish stands for it
 // (spec/records.md, Writing one record).
-func syncDir(dir string) error { return nil }
+func SyncDir(owner, dir string) error { return nil }
 
 // syncFile flushes the file at path through a handle opened with write
 // access.
@@ -176,7 +176,7 @@ func syncFile(path string) error {
 		return fmt.Errorf("store: %w", err)
 	}
 	defer f.Close()
-	if err := f.Sync(); err != nil {
+	if err := Flush(f); err != nil {
 		return fmt.Errorf("store: flushing %s: %w", path, err)
 	}
 	return nil

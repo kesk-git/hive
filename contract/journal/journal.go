@@ -463,8 +463,8 @@ func (j *Journal) syncDirs() error {
 	if err != nil {
 		return err
 	}
-	if err := syncDir(dir); err != nil {
+	if err := store.SyncDir("journal", dir); err != nil {
 		return err
 	}
-	return syncDir(j.Home.Dir)
+	return store.SyncDir("journal", j.Home.Dir)
 }
