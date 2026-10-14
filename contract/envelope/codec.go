@@ -83,15 +83,22 @@ func registry() (*schema.Registry, error) {
 
 // violation is the Failure of a document or body that breaks a schema: one
 // sentence naming where the first violation is and what is wrong there, never
-// a member's name or a value of the document, and the whole list of violations
-// as its detail.
+// a member's name or a value of the document. A document the command could not
+// read as a request keeps the whole list of violations as its detail, which
+// the diagnostic event records (spec/events.md, Diagnostic events); a body of a
+// request that was read is a validation refusal naming the field, whose message
+// already says everything, and keeps none.
 func violation(what, ref string, ve *schema.ValidationError) *Failure {
 	v := ve.Violations[0]
 	at := "the " + what
 	if v.Instance != "" {
 		at = v.Instance
 	}
-	return Common(CodeSchemaViolation, fmt.Sprintf("the %s breaks %s at %s (%s)", what, ref, at, v.Message)).Because(ve)
+	f := Common(CodeSchemaViolation, fmt.Sprintf("the %s breaks %s at %s (%s)", what, ref, at, v.Message))
+	if what == "body" {
+		return f
+	}
+	return f.Because(ve)
 }
 
 // decodeDocument reads data as the document of the named schema: a Hive
