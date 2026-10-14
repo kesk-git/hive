@@ -1398,7 +1398,7 @@ func TestStorelessExecutable(t *testing.T) {
 	say.Handle = func(c *Call) (*Result, error) { return &Result{Body: map[string]any{}}, nil }
 	word.Commands = []*Command{{Name: "hive-word", Operations: []*Operation{read, &say}}}
 	err := word.Check()
-	if err == nil || !strings.Contains(err.Error(), "delegating handoff") {
+	if err == nil || !strings.Contains(err.Error(), "callee") {
 		t.Errorf("Check: %v", err)
 	}
 	var stdout, stderr bytes.Buffer

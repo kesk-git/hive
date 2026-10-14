@@ -58,15 +58,25 @@ func readOutcome(st *store.Store, requestID string) (*recorded, error) {
 	if err != nil {
 		return nil, envelope.Common(envelope.CodeRecordMalformed, "the recorded outcome of this request cannot be read").Because(fmt.Errorf("%s: %w", rel, err))
 	}
+	return parseOutcome(rel, data, requestID)
+}
+
+// parseOutcome reads a recorded outcome of the request from the bytes of its
+// record, wherever they were read: the store's own file, or the record a
+// callee's read of kind request-outcome gives a command with no store. where
+// names the source for the lower-layer error. A record that breaks its
+// schema, records another request or holds a response that is not one is
+// record_malformed; one of a newer version is unsupported_version.
+func parseOutcome(where string, data []byte, requestID string) (*recorded, error) {
 	malformed := func(why error) error {
-		return envelope.Common(envelope.CodeRecordMalformed, "the recorded outcome of this request is malformed").Because(fmt.Errorf("%s: %w", rel, why))
+		return envelope.Common(envelope.CodeRecordMalformed, "the recorded outcome of this request is malformed").Because(fmt.Errorf("%s: %w", where, why))
 	}
 	v, perr := canon.Parse(data)
 	obj, _ := v.(map[string]any)
 	// A version this build does not read is not malformed; it is newer.
 	if perr == nil && obj["schema"] == outcomeSchema {
 		if version, _ := obj["schema_version"].(string); envelope.Newer(version, outcomeVersion) {
-			return nil, envelope.Common(envelope.CodeUnsupportedVersion, "the recorded outcome of this request is of a version this build does not read").Because(fmt.Errorf("%s is at version %s; this build reads up to %s", rel, version, outcomeVersion))
+			return nil, envelope.Common(envelope.CodeUnsupportedVersion, "the recorded outcome of this request is of a version this build does not read").Because(fmt.Errorf("%s is at version %s; this build reads up to %s", where, version, outcomeVersion))
 		}
 	}
 	if err := envelope.Validate(outcomeSchemaID, data); err != nil {
