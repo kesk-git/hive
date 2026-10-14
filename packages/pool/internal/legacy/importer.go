@@ -83,12 +83,13 @@ func importLegacy(c *cli.Call) (*cli.Result, error) {
 	if want, ok := body["expected_digest"].(string); ok && want != digest {
 		return nil, envelope.Common(envelope.CodeRevisionConflict, "the file is not the one the caller inspected: its digest differs from expected_digest")
 	}
+	// A file whose text holds a credential is refused whole before anything is
+	// made of it, in the dry run as in the import; so is a second import of the
+	// same text.
+	if err := refuseCredential(src); err != nil {
+		return nil, err
+	}
 	if !dry {
-		// A request whose text holds a credential is refused whole before
-		// anything is made of it, and so is a second import of the same text.
-		if err := refuseCredential(src); err != nil {
-			return nil, err
-		}
 		if err := refuseSecondImport(c, digest); err != nil {
 			return nil, err
 		}

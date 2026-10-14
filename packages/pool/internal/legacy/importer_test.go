@@ -436,31 +436,42 @@ func TestDryRunRefusesASectionHeaderThatIsNotUTF8(t *testing.T) {
 // credential is a string of a credential shape the response never carries.
 var credential = "ghp_" + strings.Repeat("a", 36)
 
-// secretShape checks that a dry run of the text is refused, naming the line
-// and the field and never the credential.
-func (h *home) secretShape(text string, line int64, field string) {
+// secretShape checks that a dry run of the text is refused as the import is,
+// with secret_shape_recognized, naming the line and the shape and never the
+// credential, and writes nothing.
+func (h *home) secretShape(text string, line int64) {
 	h.t.Helper()
-	resp := h.unrepresentable(text, line, field)
+	path, data, when := sourceBytes(h.t, []byte(text))
+	before := snapshot(h.t, h.dir)
+	resp := h.do("import-legacy", map[string]any{"path": path, "zone": "UTC", "dry_run": true})
+	refused(h.t, resp, envelope.Invalid, envelope.CodeSecretShapeRecognized)
+	if resp.Error.Detail["line"] != line || resp.Error.Detail["shape"] != "github.pat-classic" {
+		h.t.Errorf("the refusal names %v; want line %d and the shape github.pat-classic", resp.Error.Detail, line)
+	}
 	if strings.Contains(resp.Error.Message, credential) || strings.Contains(fmt.Sprint(resp.Error.Detail), credential) {
 		h.t.Errorf("the refusal repeats the credential: %+v", resp.Error)
 	}
+	if after := snapshot(h.t, h.dir); !equal(before, after) {
+		h.t.Errorf("a refused dry run wrote in the home: before %v, after %v", before, after)
+	}
+	unchanged(h.t, path, data, when)
 }
 
 // An identifier of a credential shape is refused, naming its line.
 func TestDryRunRefusesAnIdentifierOfACredentialShape(t *testing.T) {
-	newHome(t).secretShape("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] "+credential+" - a secret\n\n## Done\n", 5, "legacy_id")
+	newHome(t).secretShape("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] "+credential+" - a secret\n\n## Done\n", 5)
 }
 
 // A section header whose suffix is of a credential shape is refused, naming
 // the header's line.
 func TestDryRunRefusesAHeaderSuffixOfACredentialShape(t *testing.T) {
-	newHome(t).secretShape("# Backlog\n\n## Queued\n\n## Done "+credential+"\n- [x] done-a1 - closed (done 2026-10-01)\n", 5, "section")
+	newHome(t).secretShape("# Backlog\n\n## Queued\n\n## Done "+credential+"\n- [x] done-a1 - closed (done 2026-10-01)\n", 5)
 }
 
 // A dangling dependency on an identifier of a credential shape is refused,
-// naming the line of the entry that names it.
+// naming the line that holds it.
 func TestDryRunRefusesADanglingDependencyOfACredentialShape(t *testing.T) {
-	newHome(t).secretShape("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] dep-b2 - waits blocked-by: "+credential+"\n\n## Done\n", 5, "warnings")
+	newHome(t).secretShape("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] dep-b2 - waits blocked-by: "+credential+"\n\n## Done\n", 5)
 }
 
 // expected_digest makes the caller import what it inspected.
