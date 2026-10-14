@@ -1,0 +1,1 @@
+{"name":"keyringmac","executes":{"core":["git"],"transitional":[],"optional":[],"project":false},"platform":[],"calls":[],"libraries":[{"module":"github.com/zalando/go-keyring","import_id":"go-keyring"}],"commands":[{"name":"hive-keyringmac"}]}

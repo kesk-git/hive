@@ -43,7 +43,7 @@ One file, `imports/<import_id>.json`. The `import_id` is a short name fixed at f
 
 The upstream's licence and notice texts are kept unchanged under `packages/<owner>/upstream/<import_id>/`. A file that holds imported material keeps the upstream's copyright header where it had one.
 
-The root `NOTICE` is the notices of all records together. It is committed, and `check-imports` fails if it differs from what the records produce.
+The root `NOTICE` is the notices of all records together. It is committed, and `check-imports` fails if it differs from what the records produce, byte for byte. A function of the repository produces it: a fixed header, then one block for each record in `import_id` order, which names the record, its upstream, its SPDX expression and the kept licence texts, and gives the copyright notices of its `licence` verbatim. With no record it is the header and one sentence that no import record exists yet. The artefact's assembler calls the same function and stops if the committed file differs ([distribution.md](distribution.md#how-the-artefact-is-assembled)).
 
 ## Maintaining an import
 

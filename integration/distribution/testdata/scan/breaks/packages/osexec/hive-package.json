@@ -1,0 +1,1 @@
+{"name":"osexec","executes":{"core":["git"],"transitional":[],"optional":[],"project":false},"platform":[],"calls":[],"commands":[{"name":"hive-osexec"}]}

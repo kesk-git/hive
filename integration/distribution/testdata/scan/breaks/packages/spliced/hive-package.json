@@ -1,0 +1,1 @@
+{"name":"spliced","executes":{"core":["git"],"transitional":[],"optional":[],"project":false},"platform":[],"calls":[],"commands":[{"name":"hive-spliced"}]}

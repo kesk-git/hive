@@ -1,0 +1,1 @@
+{"name":"wrongrecord","executes":{"core":[],"transitional":[],"optional":[],"project":false},"platform":[],"calls":[],"libraries":[{"module":"github.com/zalando/go-keyring","import_id":"other-dep"}],"commands":[{"name":"hive-wrongrecord"}]}
