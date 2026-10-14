@@ -1,0 +1,27 @@
+{
+  "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+  "text": "A prose-only revision of the example specification.",
+  "criteria": [
+    {
+      "criterion_id": "counter-resets",
+      "text": "The counter resets after its sample is collected.",
+      "evidence": "A test reads the counter twice."
+    },
+    {
+      "criterion_id": "sample-kept",
+      "text": "The collected sample is kept for one day.",
+      "evidence": "A test reads the sample a day later.",
+      "requirements": [
+        {
+          "kind": "doc",
+          "path": "docs/example-notes.md"
+        },
+        {
+          "kind": "report",
+          "url": "https://example.invalid/reports/12"
+        }
+      ]
+    }
+  ],
+  "touched_subjects": []
+}

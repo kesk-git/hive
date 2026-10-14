@@ -1,0 +1,179 @@
+{
+  "schema": "pool.specification",
+  "schema_version": "1.2",
+  "record_revision": 3,
+  "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+  "scope_level": "project",
+  "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+  "workspace_id": "ws_01hf4k2m8q9r3s5t6v7w0x1yb2",
+  "project_id": "proj_01hf4k2m8q9r3s5t6v7w0x1yc3",
+  "title": "Example specification",
+  "current_revision": 2,
+  "revisions": [
+    {
+      "revision": 1,
+      "text": "The example counter resets after its sample is collected.",
+      "criteria": [
+        {
+          "criterion_id": "counter-resets",
+          "text": "The counter resets after its sample is collected.",
+          "evidence": "A test reads the counter twice."
+        },
+        {
+          "criterion_id": "sample-kept",
+          "text": "The collected sample is kept.",
+          "evidence": "A test reads the sample after reset.",
+          "requirements": [
+            {
+              "kind": "doc",
+              "path": "docs/example-notes.md"
+            },
+            {
+              "kind": "report",
+              "url": "https://example.invalid/reports/12"
+            },
+            {
+              "kind": "harvest",
+              "url": "https://example.invalid/harvest/7"
+            },
+            {
+              "kind": "record",
+              "ref": {
+                "schema": "pool.item",
+                "id": "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+                "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+                "record_revision": 2,
+                "digest": "sha256:4a33eacd5fa65f2b2e2871cd131286b53c415b131666d71173bb6e3fe59361b3"
+              }
+            }
+          ]
+        }
+      ],
+      "digest": "sha256:adfb5ac7ec3bde25e96166bfb00d9f2c024891457a131935efb2bf54c59f0981",
+      "defined_at": "2026-10-12T09:00:00.000Z",
+      "defined_by": {
+        "kind": "supervisor",
+        "session_id": "sess_01hf4k2m8q9r3s5t6v7w0x1yn2",
+        "session_generation": 1
+      },
+      "authority": {
+        "kind": "word",
+        "ref": {
+          "schema": "pool.note",
+          "id": "note_01hf4k2m8q9r3s5t6v7w0x1yp3",
+          "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+          "record_revision": 1,
+          "digest": "sha256:edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8"
+        }
+      },
+      "request_id": "req_01hf4k2m8q9r3s5t6v7w0x1yh8",
+      "touched_subjects": [
+        "subj_01hf4k2m8q9r3s5t6v7w0x1yg7"
+      ]
+    },
+    {
+      "revision": 2,
+      "text": "The example counter resets after its sample is collected.",
+      "criteria": [
+        {
+          "criterion_id": "counter-resets",
+          "text": "The counter resets after its sample is collected.",
+          "evidence": "A test reads the counter twice."
+        },
+        {
+          "criterion_id": "sample-kept",
+          "text": "The collected sample is kept for one day.",
+          "evidence": "A test reads the sample a day later.",
+          "requirements": [
+            {
+              "kind": "doc",
+              "path": "docs/example-notes.md"
+            },
+            {
+              "kind": "report",
+              "url": "https://example.invalid/reports/12"
+            }
+          ]
+        }
+      ],
+      "changed_criteria": [
+        "sample-kept"
+      ],
+      "digest": "sha256:455f909fa47ff77d8e08e71bcd4232c425380da8ddbe9405909fa9c9aacb385a",
+      "defined_at": "2026-10-12T10:30:00.000Z",
+      "defined_by": {
+        "kind": "supervisor",
+        "session_id": "sess_01hf4k2m8q9r3s5t6v7w0x1yn2",
+        "session_generation": 1
+      },
+      "authority": {
+        "kind": "word",
+        "ref": {
+          "schema": "pool.note",
+          "id": "note_01hf4k2m8q9r3s5t6v7w0x1yp3",
+          "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+          "record_revision": 1,
+          "digest": "sha256:edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8"
+        }
+      },
+      "request_id": "req_01hf4k2m8q9r3s5t6v7w0x1yh8",
+      "touched_subjects": [
+        "subj_01hf4k2m8q9r3s5t6v7w0x1yg7",
+        "subj_01hf4k2m8q9r3s5t6v7w0x1yg8"
+      ],
+      "product_rules": [
+        {
+          "rule_id": "rule_01hf4k2m8q9r3s5t6v7w0x1yf6",
+          "record_revision": 1
+        },
+        {
+          "rule_id": "rule_01hf4k2m8q9r3s5t6v7w0x1yf7",
+          "record_revision": 4
+        }
+      ],
+      "plan_stage": 7
+    }
+  ],
+  "acceptances": [
+    {
+      "revision": 2,
+      "task_id": "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+      "digest": "sha256:5e3cf12147cca0b3d28c67be8bd1c482d2a84c03096cebbb57c83963cef60f46",
+      "state": "accepted",
+      "accepted_at": "2026-10-12T10:30:00.000Z",
+      "accepted_by": {
+        "kind": "supervisor",
+        "session_id": "sess_01hf4k2m8q9r3s5t6v7w0x1yn2",
+        "session_generation": 1
+      },
+      "receipt_id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj9",
+      "need_test": {
+        "outcome": "Counter reset is covered.",
+        "coverage": "existing",
+        "reason": "An accepted specification already proves the reset.",
+        "covering_specification": {
+          "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd5",
+          "revision": 2,
+          "digest": "sha256:3fa405a8301ace34d11cf44a816080b8f0e49a48fbd048b8aef1543a8c58bdb6"
+        }
+      },
+      "open_product_questions": [
+        "q_01hf4k2m8q9r3s5t6v7w0x1ym1",
+        "q_01hf4k2m8q9r3s5t6v7w0x1ym2"
+      ],
+      "admission": {
+        "schema": "pool.admission",
+        "id": "adm_01hf4k2m8q9r3s5t6v7w0x1yr5"
+      }
+    }
+  ],
+  "closures": [],
+  "created_at": "2026-10-12T09:00:00.000Z",
+  "updated_at": "2026-10-13T08:15:00.000Z",
+  "writer": {
+    "package": "pool",
+    "command": "hive-spec",
+    "operation": "define",
+    "implementation_version": "0.1.0"
+  }
+}

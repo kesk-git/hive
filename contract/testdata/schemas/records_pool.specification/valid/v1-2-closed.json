@@ -1,0 +1,138 @@
+{
+  "schema": "pool.specification",
+  "schema_version": "1.2",
+  "record_revision": 1,
+  "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+  "scope_level": "project",
+  "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+  "workspace_id": "ws_01hf4k2m8q9r3s5t6v7w0x1yb2",
+  "project_id": "proj_01hf4k2m8q9r3s5t6v7w0x1yc3",
+  "title": "Example specification",
+  "current_revision": 1,
+  "revisions": [
+    {
+      "revision": 1,
+      "text": "The example counter resets after its sample is collected.",
+      "criteria": [
+        {
+          "criterion_id": "counter-resets",
+          "text": "The counter resets after its sample is collected.",
+          "evidence": "A test reads the counter twice."
+        },
+        {
+          "criterion_id": "sample-kept",
+          "text": "The collected sample is kept.",
+          "evidence": "A test reads the sample after reset.",
+          "requirements": [
+            {
+              "kind": "doc",
+              "path": "docs/example-notes.md"
+            },
+            {
+              "kind": "report",
+              "url": "https://example.invalid/reports/12"
+            },
+            {
+              "kind": "harvest",
+              "url": "https://example.invalid/harvest/7"
+            },
+            {
+              "kind": "record",
+              "ref": {
+                "schema": "pool.item",
+                "id": "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+                "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+                "record_revision": 2,
+                "digest": "sha256:4a33eacd5fa65f2b2e2871cd131286b53c415b131666d71173bb6e3fe59361b3"
+              }
+            }
+          ]
+        }
+      ],
+      "digest": "sha256:386706bf1f6ba515d60d6a3e5ab8e610177f518a162849c959431cd8535ec1df",
+      "defined_at": "2026-10-12T09:00:00.000Z",
+      "defined_by": {
+        "kind": "supervisor",
+        "session_id": "sess_01hf4k2m8q9r3s5t6v7w0x1yn2",
+        "session_generation": 1
+      },
+      "authority": {
+        "kind": "word",
+        "ref": {
+          "schema": "pool.note",
+          "id": "note_01hf4k2m8q9r3s5t6v7w0x1yp3",
+          "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+          "record_revision": 1,
+          "digest": "sha256:edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8"
+        }
+      },
+      "request_id": "req_01hf4k2m8q9r3s5t6v7w0x1yh8",
+      "touched_subjects": [
+        "subj_01hf4k2m8q9r3s5t6v7w0x1yg8"
+      ]
+    }
+  ],
+  "acceptances": [
+    {
+      "revision": 1,
+      "task_id": "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+      "digest": "sha256:386706bf1f6ba515d60d6a3e5ab8e610177f518a162849c959431cd8535ec1df",
+      "state": "accepted",
+      "accepted_at": "2026-10-12T10:30:00.000Z",
+      "accepted_by": {
+        "kind": "supervisor",
+        "session_id": "sess_01hf4k2m8q9r3s5t6v7w0x1yn2",
+        "session_generation": 1
+      },
+      "receipt_id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj9",
+      "need_test": {
+        "outcome": "Sample collection is newly covered.",
+        "coverage": "new-definition",
+        "reason": "No accepted specification covered this outcome before this define step."
+      }
+    }
+  ],
+  "closures": [
+    {
+      "revision": 1,
+      "task_id": "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+      "generation": 2,
+      "landed_revision": "3d3b60b2c381f8873f294894ef8428319a3b8546",
+      "landing": {
+        "schema": "hive.receipt",
+        "id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj8",
+        "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1"
+      },
+      "proof": [
+        {
+          "schema": "hive.receipt",
+          "id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj7",
+          "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+          "record_revision": 1,
+          "digest": "sha256:c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"
+        }
+      ],
+      "resolved_findings": [
+        {
+          "schema": "review.finding",
+          "id": "fnd_01hf4k2m8q9r3s5t6v7w0x1yq4"
+        }
+      ],
+      "closed_at": "2026-10-14T11:45:00.000Z",
+      "closed_by": {
+        "kind": "supervisor",
+        "session_id": "sess_01hf4k2m8q9r3s5t6v7w0x1yn2",
+        "session_generation": 1
+      },
+      "receipt_id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj6"
+    }
+  ],
+  "created_at": "2026-10-12T09:00:00.000Z",
+  "updated_at": "2026-10-13T08:15:00.000Z",
+  "writer": {
+    "package": "pool",
+    "command": "hive-spec",
+    "operation": "define",
+    "implementation_version": "0.1.0"
+  }
+}

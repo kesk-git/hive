@@ -1,0 +1,105 @@
+{
+  "specification": {
+    "schema": "pool.specification",
+    "schema_version": "1.2",
+    "record_revision": 1,
+    "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+    "scope_level": "workspace",
+    "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+    "workspace_id": "ws_01hf4k2m8q9r3s5t6v7w0x1yb2",
+    "title": "Example specification",
+    "current_revision": 1,
+    "revisions": [
+      {
+        "revision": 1,
+        "text": "The example counter resets after its sample is collected.",
+        "criteria": [
+          {
+            "criterion_id": "counter-resets",
+            "text": "The counter resets after its sample is collected.",
+            "evidence": "A test reads the counter twice."
+          }
+        ],
+        "digest": "sha256:386706bf1f6ba515d60d6a3e5ab8e610177f518a162849c959431cd8535ec1df",
+        "defined_at": "2026-10-12T09:00:00.000Z",
+        "defined_by": {
+          "kind": "supervisor",
+          "session_id": "sess_01hf4k2m8q9r3s5t6v7w0x1yn2",
+          "session_generation": 1
+        },
+        "authority": {
+          "kind": "word",
+          "ref": {
+            "schema": "pool.note",
+            "id": "note_01hf4k2m8q9r3s5t6v7w0x1yp3",
+            "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+            "record_revision": 1,
+            "digest": "sha256:edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8"
+          }
+        },
+        "request_id": "req_01hf4k2m8q9r3s5t6v7w0x1yh8",
+        "touched_subjects": []
+      }
+    ],
+    "acceptances": [
+      {
+        "revision": 1,
+        "task_id": "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+        "digest": "sha256:386706bf1f6ba515d60d6a3e5ab8e610177f518a162849c959431cd8535ec1df",
+        "state": "accepted",
+        "accepted_at": "2026-10-12T10:30:00.000Z",
+        "accepted_by": {
+          "kind": "supervisor",
+          "session_id": "sess_01hf4k2m8q9r3s5t6v7w0x1yn2",
+          "session_generation": 1
+        },
+        "receipt_id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj9",
+        "need_test": {
+          "outcome": "Sample collection is newly covered.",
+          "coverage": "new-definition",
+          "reason": "No accepted specification covered this outcome before this define step."
+        },
+        "open_product_questions": []
+      }
+    ],
+    "closures": [],
+    "created_at": "2026-10-12T09:00:00.000Z",
+    "updated_at": "2026-10-13T08:15:00.000Z",
+    "writer": {
+      "package": "pool",
+      "command": "hive-spec",
+      "operation": "define",
+      "implementation_version": "0.1.0"
+    }
+  },
+  "item": {
+    "schema": "pool.item",
+    "schema_version": "1.0",
+    "record_revision": 4,
+    "task_id": "task_01hf4k2m8q9r3s5t6v7w0x1ye6",
+    "scope_level": "workspace",
+    "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+    "workspace_id": "ws_01hf4k2m8q9r3s5t6v7w0x1yb2",
+    "title": "Workspace target",
+    "level": "target",
+    "state": "queued",
+    "definition": "accepted",
+    "deps": [],
+    "links": [],
+    "generations": [],
+    "created_at": "2026-10-12T09:00:00.000Z",
+    "updated_at": "2026-10-13T08:15:00.000Z",
+    "writer": {
+      "package": "pool",
+      "command": "hive-spec",
+      "operation": "accept",
+      "implementation_version": "0.1.0"
+    },
+    "specification": {
+      "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+      "revision": 2,
+      "digest": "sha256:455f909fa47ff77d8e08e71bcd4232c425380da8ddbe9405909fa9c9aacb385a"
+    },
+    "specification_required": true
+  }
+}

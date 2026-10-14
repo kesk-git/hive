@@ -1,0 +1,10 @@
+{
+  "text": "The example counter resets after its sample is collected.",
+  "criteria": [
+    {
+      "criterion_id": "counter-resets",
+      "text": "The counter resets after its sample is collected.",
+      "evidence": "A test reads the counter twice."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+  "revision": 1,
+  "task_id": "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+  "generation": 2,
+  "landed_revision": "3d3b60b2c381f8873f294894ef8428319a3b8546",
+  "landing": {
+    "schema": "hive.receipt",
+    "id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj8",
+    "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1"
+  },
+  "proof": [
+    {
+      "schema": "hive.receipt",
+      "id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj7",
+      "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+      "record_revision": 1,
+      "digest": "sha256:c1cda26362828b69266512052b97cb3729e3b052e4ade47c0a1e3383defe73c7"
+    }
+  ],
+  "resolved_findings": [
+    {
+      "schema": "review.finding",
+      "id": "fnd_01hf4k2m8q9r3s5t6v7w0x1yq4"
+    }
+  ]
+}
