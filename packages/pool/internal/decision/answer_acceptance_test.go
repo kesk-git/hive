@@ -2,7 +2,9 @@ package decision_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
 )
@@ -593,6 +595,7 @@ func TestASupersedingAnswerKeepsTheSupersededOneAsWritten(t *testing.T) {
 	h.ok(h.operator(r.question, withText(keep, "Keep it.")))
 	written := answers(h.stored("question", r.question))[0]
 	beforeRound := h.stored("decision-round", r.round)
+	h.exe.Clock.(*clock.Fake).Advance(time.Hour)
 
 	resp := h.operator(r.question, withText(map[string]any{"supersedes": int64(1), "option_id": "switch", "option_label": "Option switch"}, "On reflection, switch."))
 	got := h.ok(resp)

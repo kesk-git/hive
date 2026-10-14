@@ -131,7 +131,7 @@ func apply(q *Question, card *Card, round *Round, a Answer, now string) (roundCh
 		q.State, q.Applied, q.Deferral = StateAnswered, &Applied{AnswerSequence: a.Sequence, RecordRevision: a.RecordRevision}, nil
 		card.State, card.AnswerSequence = CardAnswered, a.Sequence
 		round.UpdatedAt = now
-		if !anyOpen(round) {
+		if round.State != RoundClosed && !anyOpen(round) {
 			round.State, round.ClosedAt = RoundClosed, now
 		}
 		roundChanged = true
