@@ -1,0 +1,2 @@
+{"name":"caller-budget-refused","base":"minimal.json","edits":[{"op":"add","path":"/budgets","value":{"max_bytes":999999}}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

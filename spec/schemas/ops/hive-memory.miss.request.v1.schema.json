@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.miss.request:v1",
+  "title": "hive-memory miss: request body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rule",
+    "actor",
+    "step",
+    "provenance",
+    "observed_at"
+  ],
+  "properties": {
+    "rule": {
+      "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/rendering/properties/rules/items"
+    },
+    "actor": {
+      "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/consumer_ref"
+    },
+    "step": {
+      "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/step"
+    },
+    "provenance": {
+      "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/provenance"
+    },
+    "observed_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "miss_id": {
+      "$ref": "urn:hive:schema:records:pool.miss:v1#/properties/miss_id"
+    }
+  }
+}

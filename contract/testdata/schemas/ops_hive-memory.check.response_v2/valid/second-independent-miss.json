@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-11T08:00:00.000Z",
+  "projections": [],
+  "budget_revision": 9007199254740991,
+  "subjects": [
+    {
+      "subject_id": "subj_01000000000000000000000000",
+      "independent_misses": 2,
+      "misses": [
+        "miss_01000000000000000000000000"
+      ],
+      "decision_due": true
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "projection_id": "mem_01000000000000000000000000",
+  "consumer": {
+    "kind": "session",
+    "session_id": "sess_01j9xk3m2nq4r5s6t7v8w9xyza",
+    "session_generation": 9007199254740991
+  },
+  "step": "received",
+  "rendering": 9007199254740991,
+  "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab",
+  "at": "2026-10-11T08:00:00.000Z"
+}

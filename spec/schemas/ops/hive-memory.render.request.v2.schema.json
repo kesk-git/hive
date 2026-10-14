@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.render.request:v2",
+  "title": "hive-memory render: request body",
+  "description": "Renders one tier and role audience using the authoritative budget configuration; subject tier requires a subject identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "audience",
+    "tier"
+  ],
+  "properties": {
+    "audience": {
+      "$ref": "urn:hive:schema:records:pool.rule:v2#/$defs/role"
+    },
+    "at": {
+      "description": "The instant the rules are resolved for. Absent means the command's clock.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "tier": {
+      "$ref": "urn:hive:schema:records:pool.rule:v2#/properties/tier"
+    },
+    "subject_id": {
+      "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/subject_id"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "tier": {
+            "const": "always"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "subject_id": false,
+          "audience": {
+            "enum": [
+              "hive",
+              "fleet"
+            ]
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "subject_id"
+        ]
+      }
+    }
+  ]
+}

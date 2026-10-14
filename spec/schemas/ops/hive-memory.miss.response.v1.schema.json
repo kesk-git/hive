@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.miss.response:v1",
+  "title": "hive-memory miss: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "recorded"
+  ],
+  "oneOf": [
+    {
+      "properties": {
+        "recorded": {
+          "const": true
+        }
+      },
+      "required": [
+        "miss"
+      ]
+    },
+    {
+      "properties": {
+        "recorded": {
+          "const": false
+        }
+      },
+      "not": {
+        "required": [
+          "miss"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "recorded": {
+      "type": "boolean"
+    },
+    "miss": {
+      "$ref": "urn:hive:schema:records:pool.miss:v1"
+    }
+  }
+}

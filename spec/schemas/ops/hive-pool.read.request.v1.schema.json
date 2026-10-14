@@ -25,7 +25,8 @@
         "decision-round",
         "request-outcome",
         "subject",
-        "budget"
+        "budget",
+        "miss"
       ]
     },
     "selector": {

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:hive:schema:records:pool.projection:v1",
+  "$id": "urn:hive:schema:records:pool.projection:v2",
   "title": "Knowledge projection",
-  "description": "One generated knowledge projection for one scope and audience, at pool/records/projection/<projection_id>.json: the rendered instructions, the sources at the revisions they were rendered from, the renderer and digest, and what each consumer received and acknowledged. A projection is derived and never authority, and its freshness is not stored: it is computed at each read and check from the rules in force at that moment. See spec/pool.md, Generated knowledge.",
+  "description": "A generated always or subject projection for one scope and role audience, with revision-bound rules in every rendering and durable receipt history. See spec/pool.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,7 +17,11 @@
     "consumers",
     "created_at",
     "updated_at",
-    "writer"
+    "writer",
+    "tier",
+    "budget_revision",
+    "receipt_history",
+    "history"
   ],
   "properties": {
     "schema": {
@@ -25,7 +29,7 @@
     },
     "schema_version": {
       "enum": [
-        "1.0"
+        "2.0"
       ]
     },
     "record_revision": {
@@ -47,21 +51,17 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
     },
     "audience": {
-      "description": "shared: instructions every supervisor of this home loads. fleet: a Fleet's own. project: one project's. One projection exists per scope and audience.",
-      "enum": [
-        "shared",
-        "fleet",
-        "project"
-      ]
+      "$ref": "urn:hive:schema:records:pool.rule:v2#/$defs/role"
     },
     "current": {
-      "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/rendering"
+      "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/rendering",
+      "description": "Current rendering; each prior rendering is retained in history so delivery receipts remain bound to their exact rule inventories."
     },
     "consumers": {
       "description": "Per-consumer propagation: what each received and what each acknowledged, by digest.",
       "type": "array",
       "items": {
-        "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/consumer"
+        "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/consumer"
       }
     },
     "created_at": {
@@ -75,11 +75,57 @@
     },
     "unknown": {
       "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    },
+    "tier": {
+      "$ref": "urn:hive:schema:records:pool.rule:v2#/properties/tier"
+    },
+    "subject_id": {
+      "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/subject_id"
+    },
+    "budget_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "receipt_history": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/consumer"
+      }
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/rendering"
+      }
     }
   },
   "allOf": [
     {
       "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    },
+    {
+      "if": {
+        "properties": {
+          "tier": {
+            "const": "always"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "subject_id": false,
+          "audience": {
+            "enum": [
+              "hive",
+              "fleet"
+            ]
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "subject_id"
+        ]
+      }
     }
   ],
   "$defs": {
@@ -111,7 +157,8 @@
         "sources",
         "text",
         "digest",
-        "bytes"
+        "bytes",
+        "rules"
       ],
       "properties": {
         "rendering": {
@@ -125,15 +172,15 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/implementation_version"
         },
         "rules_digest": {
-          "description": "The resolved-rule digest the rendering was made from. A rendering is fresh while the rules now in force for its scope resolve to this digest.",
+          "description": "The resolved-rule digest the rendering was made from. A rendering is fresh while the rules now in force for its scope resolve to this digest and every non-rule source revision and the budget revision agrees.",
           "$ref": "urn:hive:schema:common:v1#/$defs/digest"
         },
         "sources": {
           "type": "array",
           "items": {
-            "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/source"
+            "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/source"
           },
-          "description": "Every rule the resolution applied at the instant it was made, at the revision read."
+          "description": "Every effective rule, canonical subject and budget configuration at the exact revisions consumed."
         },
         "text": {
           "description": "The rendered instructions.",
@@ -145,6 +192,25 @@
         },
         "bytes": {
           "$ref": "urn:hive:schema:common:v1#/$defs/byte_count"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rule_id",
+              "record_revision"
+            ],
+            "properties": {
+              "rule_id": {
+                "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+              },
+              "record_revision": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+              }
+            }
+          }
         }
       }
     },
@@ -159,8 +225,7 @@
         "kind": {
           "enum": [
             "session",
-            "generation",
-            "file"
+            "generation"
           ]
         },
         "session_id": {
@@ -174,10 +239,6 @@
         },
         "generation": {
           "$ref": "urn:hive:schema:common:v1#/$defs/generation"
-        },
-        "path": {
-          "description": "For a file: where it was written, relative to the home.",
-          "$ref": "urn:hive:schema:common:v1#/$defs/home_relative_path"
         }
       },
       "allOf": [
@@ -210,20 +271,6 @@
               "generation"
             ]
           }
-        },
-        {
-          "if": {
-            "properties": {
-              "kind": {
-                "const": "file"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "path"
-            ]
-          }
         }
       ]
     },
@@ -236,14 +283,14 @@
       ],
       "properties": {
         "consumer": {
-          "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/consumer_ref"
+          "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/consumer_ref"
         },
         "received": {
-          "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/propagation_step"
+          "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/propagation_step"
         },
         "acknowledged": {
           "description": "Absent until the consumer acknowledged a digest. A consumer acknowledged at an older digest than current is drift.",
-          "$ref": "urn:hive:schema:records:pool.projection:v1#/$defs/propagation_step"
+          "$ref": "urn:hive:schema:records:pool.projection:v2#/$defs/propagation_step"
         }
       }
     },

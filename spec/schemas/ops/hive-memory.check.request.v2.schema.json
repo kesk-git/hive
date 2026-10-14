@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.check.request:v2",
+  "title": "hive-memory check: request body",
+  "description": "Checks the authoritative budget record, source revisions, received histories and independent per-subject misses. Caller budget overrides do not exist.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {
+    "projection_id": {
+      "description": "Check one projection. Absent checks every projection in scope.",
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
+    }
+  }
+}
