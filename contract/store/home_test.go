@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/kesk-git/hive/contract/internal/testsupport"
 )
 
 // fullHome builds a home with every entry of the table in spec/records.md.
@@ -128,7 +130,7 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			return p
 		}, ErrLayout},
 		{"a home open to others", func(t *testing.T, home string) string {
-			grantOthers(t, home, 0o755)
+			testsupport.GrantOthers(t, home, 0o755)
 			return home
 		}, ErrLayout},
 		{"a home open to its group", func(t *testing.T, home string) string {
@@ -150,7 +152,7 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			return home
 		}, ErrLayout},
 		{"a known directory open to others", func(t *testing.T, home string) string {
-			grantOthers(t, filepath.Join(home, locksDir), 0o755)
+			testsupport.GrantOthers(t, filepath.Join(home, locksDir), 0o755)
 			return home
 		}, ErrLayout},
 		{"home.json that is a directory", func(t *testing.T, home string) string {
@@ -159,7 +161,7 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			return home
 		}, ErrLayout},
 		{"home.json open to others", func(t *testing.T, home string) string {
-			grantOthers(t, filepath.Join(home, homeFile), 0o644)
+			testsupport.GrantOthers(t, filepath.Join(home, homeFile), 0o644)
 			return home
 		}, ErrLayout},
 		{"home.json without its line feed", func(t *testing.T, home string) string {

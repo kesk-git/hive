@@ -9,7 +9,7 @@ import (
 
 // diagnosticEvent is the n-th diagnostic event of pkg with the body given.
 func diagnosticEvent(pkg string, n int, body map[string]any) map[string]any {
-	m := envelope(pkg, n)
+	m := eventEnvelope(pkg, n)
 	m["kind"] = pkg + "." + DiagnosticFact
 	m["basis"] = map[string]any{"kind": "observation", "ref": map[string]any{"schema": "hive.request", "id": id(ids.Request, n)}}
 	m["body"] = body

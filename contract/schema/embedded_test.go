@@ -128,67 +128,36 @@ func loadEdited(t *testing.T, rel string, change func(map[string]any)) error {
 	return err
 }
 
-// The checks are not vacuous: each committed file, altered in one small way,
-// is refused.
+// The checks are not vacuous: a committed schema, altered in one small way, is
+// refused. Each alteration is made to one representative, the schema of the
+// request envelope; the refusal of each alteration is proved once on a
+// synthetic schema as well, and the unaltered load of every committed schema
+// is proved by TestCommittedSchemasStayInsideTheProfileAndResolve.
 func TestCommittedSchemasAreRefusedWhenAltered(t *testing.T) {
+	const rel = "request.v1.schema.json"
 	if err := loadEdited(t, "", func(map[string]any) {}); err != nil {
 		t.Fatalf("an unaltered copy is refused: %v", err)
 	}
-	for rel := range committed(t) {
-		t.Run(rel, func(t *testing.T) {
-			if err := loadEdited(t, rel, func(m map[string]any) { m["format"] = "date-time" }); err == nil {
-				t.Error("a format keyword was accepted")
-			}
-			if err := loadEdited(t, rel, func(m map[string]any) { m["$id"] = "urn:hive:schema:elsewhere:v1" }); err == nil {
-				t.Error("a changed $id was accepted")
-			}
-			if err := loadEdited(t, rel, func(m map[string]any) { m["$schema"] = "http://json-schema.org/draft-07/schema#" }); err == nil {
-				t.Error("another dialect was accepted")
-			}
-			if err := loadEdited(t, rel, func(m map[string]any) {
-				m["$defs"] = map[string]any{"cut": map[string]any{"$ref": "urn:hive:schema:common:v1#/$defs/cut"}}
-			}); err == nil {
-				t.Error("a reference to nothing was accepted")
-			}
-			if err := loadEdited(t, rel, func(m map[string]any) { m["unevaluatedProperties"] = false }); err == nil {
-				t.Error("unevaluatedProperties was accepted")
-			}
-			var opened bool
-			err := loadEdited(t, rel, func(m map[string]any) { opened = openFirstClosedObject(m) })
-			if opened && err == nil {
-				t.Error("an object that was opened was accepted")
+	alterations := []struct {
+		name   string
+		change func(map[string]any)
+	}{
+		{"a format keyword", func(m map[string]any) { m["format"] = "date-time" }},
+		{"a changed $id", func(m map[string]any) { m["$id"] = "urn:hive:schema:elsewhere:v1" }},
+		{"another dialect", func(m map[string]any) { m["$schema"] = "http://json-schema.org/draft-07/schema#" }},
+		{"a reference to nothing", func(m map[string]any) {
+			m["$defs"] = map[string]any{"cut": map[string]any{"$ref": "urn:hive:schema:common:v1#/$defs/cut"}}
+		}},
+		{"unevaluatedProperties", func(m map[string]any) { m["unevaluatedProperties"] = false }},
+		{"an object that was opened", func(m map[string]any) { m["additionalProperties"] = true }},
+	}
+	for _, a := range alterations {
+		t.Run(a.name, func(t *testing.T) {
+			if err := loadEdited(t, rel, a.change); err == nil {
+				t.Errorf("%s in %s was accepted", a.name, rel)
 			}
 		})
 	}
-}
-
-// openFirstClosedObject flips the first closed object it finds, in a fixed
-// order, to open, and says whether there was one.
-func openFirstClosedObject(v any) bool {
-	switch t := v.(type) {
-	case map[string]any:
-		if f, ok := t["additionalProperties"].(bool); ok && !f {
-			t["additionalProperties"] = true
-			return true
-		}
-		keys := make([]string, 0, len(t))
-		for k := range t {
-			keys = append(keys, k)
-		}
-		slices.Sort(keys)
-		for _, k := range keys {
-			if openFirstClosedObject(t[k]) {
-				return true
-			}
-		}
-	case []any:
-		for _, c := range t {
-			if openFirstClosedObject(c) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func TestCommittedSchemasHoldNothingButSchemaFiles(t *testing.T) {

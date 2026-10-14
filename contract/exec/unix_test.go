@@ -31,18 +31,6 @@ func kill(id ProcessID) {
 	}
 }
 
-// waitGone waits for the process to be gone.
-func waitGone(t testing.TB, id ProcessID) {
-	t.Helper()
-	for i := 0; i < 500; i++ {
-		if !alive(id) {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("process %d is still running", id.PID)
-}
-
 // Nothing else Hive holds open reaches the child: a descriptor the process
 // was started with, which is not close-on-exec, is closed when the program
 // starts.

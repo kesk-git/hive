@@ -5,6 +5,8 @@ package journal
 import (
 	"fmt"
 	"os"
+
+	"github.com/kesk-git/hive/contract/store"
 )
 
 // syncSegment flushes a segment as it is, so that the lines in it, whoever
@@ -23,13 +25,8 @@ func (j *Journal) syncSegment(name string) error {
 		return fmt.Errorf("journal: %w", err)
 	}
 	defer f.Close()
-	if err := f.Sync(); err != nil {
+	if err := store.Flush(f); err != nil {
 		return fmt.Errorf("journal: flushing %s: %w", name, err)
 	}
 	return nil
 }
-
-// syncDir does nothing on Windows, which offers no directory handle that can
-// be flushed: a segment is flushed through its own handle, as it is written
-// and by syncSegment (spec/records.md, Writing one record).
-func syncDir(dir string) error { return nil }

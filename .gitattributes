@@ -1,0 +1,2 @@
+# Keep every committed text file as committed, with its line feeds, in every checkout on every platform.
+* -text

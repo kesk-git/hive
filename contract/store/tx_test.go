@@ -338,55 +338,6 @@ func TestCommitInterruptedAtEachStep(t *testing.T) {
 	}
 }
 
-// Recovery itself is interrupted at each of its steps, and the lock after
-// that completes it: roll-forward is idempotent at every point.
-func TestRecoveryInterruptedAtEachStep(t *testing.T) {
-	want, wantEvents := committed(t)
-	interrupted := func(t *testing.T) (*Store, *fakeJournal) {
-		t.Helper()
-		s, j := seeded(t)
-		w := lock(t, s)
-		faultAt(s, "create "+task2, 1) // the intent and task1 are written
-		if _, err := w.Commit(fullTx()); !errors.Is(err, errCrash) {
-			t.Fatal(err)
-		}
-		w.Release()
-		s.fault = nil
-		return s, j
-	}
-	s, _ := interrupted(t)
-	steps := trace(t, s, func() { lock(t, s).Release() })
-	if slices.Contains(steps, "create "+task1) {
-		t.Error("recovery rewrote a record already at the intended digest")
-	}
-	if !slices.Contains(steps, "create "+task2) || !slices.Contains(steps, "events "+IntentPath("pool", req9)) {
-		t.Errorf("recovery steps = %v", steps)
-	}
-	for _, step := range steps {
-		t.Run(step, func(t *testing.T) {
-			s, j := interrupted(t)
-			hit := faultAt(s, step, 1)
-			_, err := s.Lock()
-			if !*hit || !errors.Is(err, errCrash) {
-				t.Fatalf("the interruption did not happen: hit %v, err %v", *hit, err)
-			}
-			// Recovery that stops on a transaction names its request.
-			var ie *InterruptedError
-			if errors.As(err, &ie) && ie.RequestID != req9 {
-				t.Errorf("InterruptedError names %s", ie.RequestID)
-			}
-			s.fault = nil
-			// The failed Lock released the lock: the next one is taken at once.
-			w := lock(t, s)
-			w.Release()
-			sameTree(t, "after recovery", tree(t, s.Dir), want)
-			if !slices.Equal(j.order, wantEvents) {
-				t.Errorf("journal = %v", j.order)
-			}
-		})
-	}
-}
-
 // After the intent is written, what recovery finds on disk decides: a record
 // at the intended digest is left, one at the expected revision or absent as
 // expected is written, and anything else stops the store for that

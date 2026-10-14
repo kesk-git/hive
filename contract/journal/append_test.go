@@ -12,6 +12,7 @@ import (
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 	"github.com/kesk-git/hive/contract/store"
 )
 
@@ -59,7 +60,7 @@ func TestAppendSequence(t *testing.T) {
 			t.Errorf("line %d recorded_at = %v, want %s", i+1, obj["recorded_at"], stamps[i])
 		}
 		// The rest of the envelope is as the caller gave it.
-		want := envelope("pool", i+1)
+		want := eventEnvelope("pool", i+1)
 		for k, v := range want {
 			if k == "source" || k == "basis" || k == "body" {
 				continue
@@ -74,12 +75,12 @@ func TestAppendSequence(t *testing.T) {
 	}
 	// The journal's files are the owner's only, and the lock is where the
 	// specification puts it.
-	for _, p := range []string{filepath.Join(home, journalDir), filepath.Join(home, journalDir, first)} {
+	for p, mode := range map[string]os.FileMode{filepath.Join(home, journalDir): dirMode, filepath.Join(home, journalDir, first): fileMode} {
 		info, err := os.Stat(p)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !isOwnerOnly(info, p) {
+		if !access.HasMode(info, p, mode) {
 			t.Errorf("%s is open beyond its owner: %v", p, info.Mode())
 		}
 	}
@@ -119,7 +120,7 @@ func TestSegments(t *testing.T) {
 	}
 	// A line larger than a segment goes alone into a segment of its own, and
 	// the line after it begins another.
-	big := envelope("pool", 6)
+	big := eventEnvelope("pool", 6)
 	big["kind"] = "pool." + strings.Repeat("x", int(3*one)) + ".happened"
 	append_(t, j, encoded(t, big), event(t, "pool", 7))
 	want = append(want, SegmentName(6), SegmentName(7))
@@ -317,7 +318,7 @@ func TestAppendRefusals(t *testing.T) {
 	before := segmentBytes(t, home, SegmentName(1))
 
 	alter := func(f func(m map[string]any)) store.Event {
-		m := envelope("pool", 2)
+		m := eventEnvelope("pool", 2)
 		f(m)
 		return encoded(t, m)
 	}
@@ -365,7 +366,7 @@ func TestAppendRefusals(t *testing.T) {
 	}
 	// A source the package observes is its own.
 	append_(t, j, encoded(t, func() map[string]any {
-		m := envelope("pool", 4)
+		m := eventEnvelope("pool", 4)
 		m["source"] = map[string]any{"package": "pool", "source_id": "pool:feed:x/y", "source_sequence": int64(1)}
 		return m
 	}()))
@@ -517,7 +518,7 @@ func TestAppendNeedsTheHomeRecord(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bare, "home.json"), data, fileMode); err != nil {
 		t.Fatal(err)
 	}
-	other := envelope("pool", 2)
+	other := eventEnvelope("pool", 2)
 	other["home_id"] = id(ids.Home, 9)
 	wantErr(t, "another home", j.Append([]store.Event{encoded(t, other)}), ErrEvent)
 	append_(t, j, event(t, "pool", 1))

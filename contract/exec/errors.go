@@ -88,15 +88,15 @@ func (e *StartError) Failure() *envelope.Failure {
 	var f *envelope.Failure
 	switch e.Reason {
 	case Missing:
-		f = unavailable(e.Program.Kind, envelope.CodeDependencyMissing, codePlatformUtilityMissing, name+" was not found on the search path")
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyMissing, envelope.CodePlatformUtilityMissing, name+" was not found on the search path")
 	case NotExecutable:
-		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, name+" was found and is not executable")
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, envelope.CodePlatformUtilityUnusable, name+" was found and is not executable")
 	case BatchFile:
-		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, name+" was found only as a batch file, which would run under cmd.exe, a shell")
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, envelope.CodePlatformUtilityUnusable, name+" was found only as a batch file, which would run under cmd.exe, a shell")
 	case BreakawayRefused:
-		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, name+" was not started: the breakaway from every job was refused")
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, envelope.CodePlatformUtilityUnusable, name+" was not started: the breakaway from every job was refused")
 	case StartFailed:
-		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, codePlatformUtilityUnusable, name+" could not be started")
+		f = unavailable(e.Program.Kind, envelope.CodeDependencyUnusable, envelope.CodePlatformUtilityUnusable, name+" could not be started")
 	case TooLarge:
 		f = envelope.Oversize("the argument list", e.Limit, e.Actual)
 	default:
@@ -104,13 +104,6 @@ func (e *StartError) Failure() *envelope.Failure {
 	}
 	return f.Because(e)
 }
-
-// The codes of a platform utility that is missing or unusable, which
-// spec/commands.md lists among the common codes of unavailable.
-const (
-	codePlatformUtilityMissing  = "platform_utility_missing"
-	codePlatformUtilityUnusable = "platform_utility_unusable"
-)
 
 // unavailable makes the unavailable failure of a program of the kind: the
 // code of a dependency, or of a platform utility.

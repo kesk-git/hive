@@ -10,6 +10,7 @@ import (
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 	"github.com/kesk-git/hive/contract/journal"
 	"github.com/kesk-git/hive/contract/store"
 )
@@ -235,7 +236,7 @@ func TestDetailIsDroppedWhereNothingCanReceiveIt(t *testing.T) {
 
 	// A directory with no home record, or none at all, has no home_id to
 	// write the event under.
-	for name, home := range map[string]string{"no home record": emptyHome(t), "no directory": filepath.Join(t.TempDir(), "absent")} {
+	for name, home := range map[string]string{"no home record": access.EmptyHome(t), "no directory": filepath.Join(t.TempDir(), "absent")} {
 		t.Run(name, func(t *testing.T) {
 			h := newHarness(t)
 			missing := filepath.Join(t.TempDir(), "no-such-request.json")

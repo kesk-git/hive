@@ -274,3 +274,15 @@ func readLine(t testing.TB, r io.Reader) string {
 }
 
 func hexOf(s string) string { return hex.EncodeToString([]byte(s)) }
+
+// waitGone waits for the process to be gone.
+func waitGone(t testing.TB, id ProcessID) {
+	t.Helper()
+	for i := 0; i < 500; i++ {
+		if !alive(id) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("process %d is still running", id.PID)
+}

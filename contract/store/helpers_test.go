@@ -2,9 +2,6 @@ package store
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,35 +11,17 @@ import (
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/clock"
-	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/internal/testsupport"
 )
 
 var epoch = time.Date(2026, 10, 11, 8, 0, 0, 0, time.UTC)
 
-// alphabet is Crockford base 32 in lowercase, for invented identifiers.
-const alphabet = "0123456789abcdefghjkmnpqrstvwxyz"
-
-// id invents the n-th identifier of kind p: a valid, lowercase ULID whose
-// last two characters count n.
-func id(p ids.Prefix, n int) string {
-	s := string(p) + "_0" + strings.Repeat("0", 23) + string(alphabet[n/32%32]) + string(alphabet[n%32])
-	if err := ids.Check(s, p); err != nil {
-		panic(err)
-	}
-	return s
-}
-
-// newHome makes an empty home under a temporary directory, which the test
-// removes.
-func newHome(t testing.TB) string {
-	t.Helper()
-	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, dirMode); err != nil {
-		t.Fatal(err)
-	}
-	secureHome(t, dir)
-	return dir
-}
+// The helpers the tests of the contract share.
+var (
+	id     = testsupport.ID
+	tree   = testsupport.Tree
+	parsed = testsupport.Parsed
+)
 
 // fakeJournal stands in for the home journal: it keeps each event once, by
 // event_id, in the order appended. appends counts the calls of either
@@ -102,30 +81,6 @@ func lock(t testing.TB, s *Store) *Writer {
 		t.Fatal(err)
 	}
 	return w
-}
-
-// tree is the state of a directory: every file by slash path below it, with
-// the digest of its bytes.
-func tree(t testing.TB, dir string) map[string]string {
-	t.Helper()
-	out := map[string]string{}
-	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		data, err := os.ReadFile(p)
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(dir, p)
-		sum := sha256.Sum256(data)
-		out[filepath.ToSlash(rel)] = hex.EncodeToString(sum[:])
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return out
 }
 
 // sameTree fails the test when two states differ.
@@ -213,20 +168,6 @@ func record(t testing.TB, members map[string]any, rev int64, stamp string) []byt
 		t.Fatal(err)
 	}
 	return append(out, '\n')
-}
-
-// parsed reads a JSON object.
-func parsed(t testing.TB, data []byte) map[string]any {
-	t.Helper()
-	v, err := canon.Parse(data)
-	if err != nil {
-		t.Fatalf("%v: %q", err, data)
-	}
-	m, ok := v.(map[string]any)
-	if !ok {
-		t.Fatalf("not an object: %q", data)
-	}
-	return m
 }
 
 // trace runs fn with every step of the store recorded and nothing faulted.

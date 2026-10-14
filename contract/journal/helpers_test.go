@@ -5,13 +5,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/internal/testsupport"
+	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 	"github.com/kesk-git/hive/contract/store"
 )
 
@@ -30,25 +31,17 @@ const testHomeID = "home_01arz3ndektsv4rrffq69g5fav"
 // alphabet is Crockford base 32 in lowercase, for invented identifiers.
 const alphabet = "0123456789abcdefghjkmnpqrstvwxyz"
 
-// id invents the n-th identifier of kind p: a valid, lowercase ULID whose
-// last two characters count n.
-func id(p ids.Prefix, n int) string {
-	s := string(p) + "_0" + strings.Repeat("0", 23) + string(alphabet[n/32%32]) + string(alphabet[n%32])
-	if err := ids.Check(s, p); err != nil {
-		panic(err)
-	}
-	return s
-}
+// The helpers the tests of the contract share.
+var (
+	id     = testsupport.ID
+	parsed = testsupport.Parsed
+)
 
 // newHome makes a home under a temporary directory, with the home record of
 // testdata/ unless bare is set.
 func newHome(t testing.TB, bare bool) string {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, dirMode); err != nil {
-		t.Fatal(err)
-	}
-	secureHome(t, dir)
+	dir := access.EmptyHome(t)
 	if bare {
 		return dir
 	}
@@ -89,9 +82,9 @@ func stamp(t testing.TB, c clock.Clock) string {
 	return s
 }
 
-// envelope is the content of the n-th test event of pkg, without the two
+// eventEnvelope is the content of the n-th test event of pkg, without the two
 // members the journal sets, as a map a test may alter.
-func envelope(pkg string, n int) map[string]any {
+func eventEnvelope(pkg string, n int) map[string]any {
 	return map[string]any{
 		"schema":            "hive.event",
 		"schema_version":    "1.0",
@@ -113,7 +106,7 @@ func envelope(pkg string, n int) map[string]any {
 // event is the n-th test event of pkg as the store hands it to the journal.
 func event(t testing.TB, pkg string, n int) store.Event {
 	t.Helper()
-	return encoded(t, envelope(pkg, n))
+	return encoded(t, eventEnvelope(pkg, n))
 }
 
 // encoded is an envelope as a store.Event, in canonical form.
@@ -200,20 +193,6 @@ func lines(data []byte) (whole [][]byte, torn []byte) {
 		whole = bytes.Split(data[:end-1], []byte("\n"))
 	}
 	return whole, data[end:]
-}
-
-// parsed reads a JSON object.
-func parsed(t testing.TB, data []byte) map[string]any {
-	t.Helper()
-	v, err := canon.Parse(data)
-	if err != nil {
-		t.Fatalf("%v: %q", err, data)
-	}
-	m, ok := v.(map[string]any)
-	if !ok {
-		t.Fatalf("not an object: %q", data)
-	}
-	return m
 }
 
 // sequences reads home_sequence from every whole line of a segment.

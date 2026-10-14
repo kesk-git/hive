@@ -83,37 +83,43 @@ func (s Status) Changed() bool {
 // The common error codes of spec/commands.md, each written bare. A package's
 // own codes are written <package>.<code> and never redefine one of these.
 const (
-	CodeInternal              = "internal"
-	CodeIOFailure             = "io_failure"
-	CodeUsage                 = "usage"
-	CodeUnknownOperation      = "unknown_operation"
-	CodeArgumentTooLarge      = "argument_too_large"
-	CodeMalformedRequest      = "malformed_request"
-	CodeSchemaViolation       = "schema_violation"
-	CodeUnsupportedVersion    = "unsupported_version"
-	CodeEnvelopeMismatch      = "envelope_mismatch"
-	CodeUnsupportedOperation  = "unsupported_operation"
-	CodeOperationParked       = "operation_parked"
-	CodeAuthorityMissing      = "authority_missing"
-	CodeAuthorityInsufficient = "authority_insufficient"
-	CodeHomeMismatch          = "home_mismatch"
-	CodeHomeInsideRepository  = "home_inside_repository"
-	CodeScopeMismatch         = "scope_mismatch"
-	CodeCloneIdentityMismatch = "clone_identity_mismatch"
-	CodeRevisionConflict      = "revision_conflict"
-	CodeLockHeld              = "lock_held"
-	CodeAlreadyExists         = "already_exists"
-	CodeReplayMismatch        = "replay_mismatch"
-	CodeNotFound              = "not_found"
-	CodeHomeNotFound          = "home_not_found"
-	CodeRecordTooLarge        = "record_too_large"
-	CodeDependencyMissing     = "dependency_missing"
-	CodeDependencyUnusable    = "dependency_unusable"
-	CodeAuthenticationRefused = "authentication_refused"
-	CodeSourceUnreadable      = "source_unreadable"
-	CodeRecordMalformed       = "record_malformed"
-	CodeOutcomeUnknown        = "outcome_unknown"
-	CodeHeld                  = "held"
+	CodeInternal                = "internal"
+	CodeIOFailure               = "io_failure"
+	CodeUsage                   = "usage"
+	CodeUnknownOperation        = "unknown_operation"
+	CodeArgumentTooLarge        = "argument_too_large"
+	CodeMalformedRequest        = "malformed_request"
+	CodeSchemaViolation         = "schema_violation"
+	CodeUnsupportedVersion      = "unsupported_version"
+	CodeEnvelopeMismatch        = "envelope_mismatch"
+	CodeSecretShapeRecognized   = "secret_shape_recognized"
+	CodeUnsupportedOperation    = "unsupported_operation"
+	CodeOperationParked         = "operation_parked"
+	CodeAuthorityMissing        = "authority_missing"
+	CodeAuthorityInsufficient   = "authority_insufficient"
+	CodeHomeMismatch            = "home_mismatch"
+	CodeHomeInsideRepository    = "home_inside_repository"
+	CodeScopeMismatch           = "scope_mismatch"
+	CodeCloneIdentityMismatch   = "clone_identity_mismatch"
+	CodeRevisionConflict        = "revision_conflict"
+	CodeLockHeld                = "lock_held"
+	CodeAlreadyExists           = "already_exists"
+	CodeReplayMismatch          = "replay_mismatch"
+	CodeNotFound                = "not_found"
+	CodeHomeNotFound            = "home_not_found"
+	CodeRecordTooLarge          = "record_too_large"
+	CodeDependencyMissing       = "dependency_missing"
+	CodeDependencyUnusable      = "dependency_unusable"
+	CodeAuthenticationRefused   = "authentication_refused"
+	CodeSourceUnreadable        = "source_unreadable"
+	CodeRecordMalformed         = "record_malformed"
+	CodeSecretStoreLocked       = "secret_store_locked"
+	CodeSecretMissing           = "secret_missing"
+	CodePlatformUtilityMissing  = "platform_utility_missing"
+	CodePlatformUtilityUnusable = "platform_utility_unusable"
+	CodeSecretStoreUnsupported  = "secret_store_unsupported"
+	CodeOutcomeUnknown          = "outcome_unknown"
+	CodeHeld                    = "held"
 )
 
 // commonCodes maps each common code to its status, in the order of the table.
@@ -130,6 +136,7 @@ var commonCodes = []struct {
 	{CodeSchemaViolation, Invalid},
 	{CodeUnsupportedVersion, Invalid},
 	{CodeEnvelopeMismatch, Invalid},
+	{CodeSecretShapeRecognized, Invalid},
 	{CodeUnsupportedOperation, Refused},
 	{CodeOperationParked, Refused},
 	{CodeAuthorityMissing, Refused},
@@ -150,6 +157,11 @@ var commonCodes = []struct {
 	{CodeAuthenticationRefused, Unavailable},
 	{CodeSourceUnreadable, Unavailable},
 	{CodeRecordMalformed, Unavailable},
+	{CodeSecretStoreLocked, Unavailable},
+	{CodeSecretMissing, Unavailable},
+	{CodePlatformUtilityMissing, Unavailable},
+	{CodePlatformUtilityUnusable, Unavailable},
+	{CodeSecretStoreUnsupported, Unavailable},
 	{CodeOutcomeUnknown, Unknown},
 	{CodeHeld, Held},
 }

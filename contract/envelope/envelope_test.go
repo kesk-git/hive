@@ -99,31 +99,68 @@ func TestElevenExitStates(t *testing.T) {
 	}
 }
 
-// Every common code belongs to the status its table row gives, and the
-// table holds every code of spec/commands.md once.
-func TestCommonCodesMapToTheirStatus(t *testing.T) {
-	table := map[Status][]string{
-		Failed:      {"internal", "io_failure"},
-		Usage:       {"usage", "unknown_operation", "argument_too_large"},
-		Invalid:     {"malformed_request", "schema_violation", "unsupported_version", "envelope_mismatch"},
-		Refused:     {"unsupported_operation", "operation_parked", "authority_missing", "authority_insufficient", "home_mismatch", "home_inside_repository", "scope_mismatch", "clone_identity_mismatch"},
-		Conflict:    {"revision_conflict", "lock_held", "already_exists", "replay_mismatch"},
-		NotFound:    {"not_found", "home_not_found"},
-		TooLarge:    {"record_too_large"},
-		Unavailable: {"dependency_missing", "dependency_unusable", "authentication_refused", "source_unreadable", "record_malformed"},
-		Unknown:     {"outcome_unknown"},
-		Held:        {"held"},
+// specCommonCodes reads the table of the "Common error codes" section of
+// spec/commands.md: for each status, the codes its row lists.
+func specCommonCodes(t *testing.T) map[Status][]string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "spec", "commands.md"))
+	if err != nil {
+		t.Fatal(err)
 	}
+	table := map[Status][]string{}
+	in := false
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "#") {
+			in = strings.TrimSpace(strings.TrimLeft(line, "#")) == "Common error codes"
+			continue
+		}
+		if !in || !strings.HasPrefix(line, "|") {
+			continue
+		}
+		cells := strings.Split(strings.Trim(strings.TrimSpace(line), "|"), "|")
+		if len(cells) != 2 {
+			t.Fatalf("a row of the common codes table has %d cells: %q", len(cells), line)
+		}
+		status := strings.Trim(strings.TrimSpace(cells[0]), "`")
+		if status == "Status" || strings.HasPrefix(status, "-") {
+			continue
+		}
+		for _, code := range strings.Split(cells[1], ",") {
+			code = strings.Trim(strings.TrimSpace(code), "`")
+			if code == "" {
+				t.Fatalf("an empty code in the row of %s", status)
+			}
+			table[Status(status)] = append(table[Status(status)], code)
+		}
+	}
+	if len(table) == 0 {
+		t.Fatal("spec/commands.md holds no common codes table")
+	}
+	return table
+}
+
+// Every common code belongs to the status its table row gives, and the
+// table holds every code of spec/commands.md once and no other.
+func TestCommonCodesMapToTheirStatus(t *testing.T) {
+	table := specCommonCodes(t)
 	count := 0
+	listed := map[string]bool{}
 	for status, codes := range table {
 		for _, code := range codes {
 			count++
+			if listed[code] {
+				t.Errorf("%s: the spec lists it twice", code)
+			}
+			listed[code] = true
 			got, ok := StatusOfCode(code)
 			if !ok || got != status {
-				t.Errorf("%s: status %s, want %s", code, got, status)
+				t.Errorf("%s: status %q, want %s", code, got, status)
 			}
 			if !ValidCode(code) {
 				t.Errorf("%s: not a valid code", code)
+			}
+			if !ok {
+				continue
 			}
 			if f := Common(code, "x"); f.Status != status || f.Err.Code != code {
 				t.Errorf("Common(%s): %s/%s", code, f.Status, f.Err.Code)
@@ -132,7 +169,7 @@ func TestCommonCodesMapToTheirStatus(t *testing.T) {
 	}
 	all := CommonCodes()
 	if len(all) != count {
-		t.Errorf("%d common codes, the table has %d", len(all), count)
+		t.Errorf("%d common codes, the spec table has %d", len(all), count)
 	}
 	seen := map[string]bool{}
 	for _, c := range all {
@@ -140,6 +177,9 @@ func TestCommonCodesMapToTheirStatus(t *testing.T) {
 			t.Errorf("%s is listed twice", c)
 		}
 		seen[c] = true
+		if !listed[c] {
+			t.Errorf("%s is a common code the spec does not list", c)
+		}
 	}
 	if _, ok := StatusOfCode("pool.full"); ok {
 		t.Error("a package code is a common code")

@@ -6,11 +6,11 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/kesk-git/hive/contract/canon"
+	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/schema"
 )
 
@@ -36,8 +36,6 @@ const (
 	homeVersion = "1.0"
 )
 
-var versionForm = regexp.MustCompile(`^([1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
-
 // checkVersion refuses, as ErrUnsupportedVersion, a record of the schema
 // name whose schema_version is newer than known, in its major or its minor
 // part. A record that is of another schema or has no version of the form
@@ -47,22 +45,10 @@ func checkVersion(obj map[string]any, name, known string) error {
 		return nil
 	}
 	v, _ := obj["schema_version"].(string)
-	got, want := versionForm.FindStringSubmatch(v), versionForm.FindStringSubmatch(known)
-	if got == nil || want == nil {
-		return nil
-	}
-	if c := cmpNumbers(got[1], want[1]); c > 0 || c == 0 && cmpNumbers(got[2], want[2]) > 0 {
+	if envelope.Newer(v, known) {
 		return fmt.Errorf("%w: %s is at version %s, this build reads up to %s", ErrUnsupportedVersion, name, v, known)
 	}
 	return nil
-}
-
-// cmpNumbers compares two decimal numbers written without leading zeros.
-func cmpNumbers(a, b string) int {
-	if len(a) != len(b) {
-		return len(a) - len(b)
-	}
-	return strings.Compare(a, b)
 }
 
 // dirMode and fileMode are the access of every directory and file of a home

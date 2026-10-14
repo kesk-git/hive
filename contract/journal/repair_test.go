@@ -341,7 +341,7 @@ func TestRepairBodyFixtures(t *testing.T) {
 // repairEvent is a well-formed repair event of segment 1, as a map a test
 // may alter.
 func repairEvent() map[string]any {
-	m := envelope("pool", 1)
+	m := eventEnvelope("pool", 1)
 	m["kind"], m["source"] = RepairKind, map[string]any{"package": "pool", "source_id": RepairSourceID}
 	m["home_sequence"], m["recorded_at"] = int64(1), m["observed_at"]
 	m["basis"] = map[string]any{"kind": "record", "ref": map[string]any{"schema": RecordSchema, "id": SegmentName(1)}}

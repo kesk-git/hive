@@ -13,6 +13,8 @@ import (
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/internal/testsupport"
+	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 	"github.com/kesk-git/hive/contract/store"
 )
 
@@ -645,7 +647,7 @@ func TestNotFound(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "nowhere")
 	resp := h.invoke(t, missing, "echo", request(t, "echo", 1, nil))
 	expect(t, resp, envelope.NotFound, "home_not_found")
-	empty := emptyHome(t)
+	empty := access.EmptyHome(t)
 	resp = h.invoke(t, empty, "echo", request(t, "echo", 1, nil))
 	expect(t, resp, envelope.NotFound, "home_not_found")
 	resp = h.invoke(t, empty, "put", request(t, "put", 1, nil))
@@ -764,7 +766,7 @@ func TestUnavailable(t *testing.T) {
 	record(t, broken, "home.json", func() map[string]any { m := homeRecord(homeID); m["schema_version"] = "1.1"; return m }())
 	expect(t, h.invoke(t, broken, "echo", request(t, "echo", 1, nil)), envelope.Invalid, "unsupported_version")
 	record(t, broken, "home.json", homeRecord(homeID))
-	grantOthers(t, filepath.Join(broken, "home.json"), 0o644)
+	testsupport.GrantOthers(t, filepath.Join(broken, "home.json"), 0o644)
 	expect(t, h.invoke(t, broken, "echo", request(t, "echo", 1, nil)), envelope.Unavailable, "record_malformed")
 
 	home := newHome(t)
@@ -879,7 +881,7 @@ func TestTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 	expect(t, resp, envelope.Ok, "")
-	if info, _ := os.Stat(respFile); !hasMode(info, respFile, 0o600) {
+	if info, _ := os.Stat(respFile); !access.HasMode(info, respFile, 0o600) {
 		t.Errorf("response file mode %o", info.Mode().Perm())
 	}
 	if bytes.Count(written, []byte("\n")) != 1 || written[len(written)-1] != '\n' {
