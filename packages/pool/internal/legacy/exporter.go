@@ -325,11 +325,13 @@ func (r *renderer) task(id string) (*Task, error) {
 		return nil, malformed(err)
 	}
 	t.Body, _ = data["body"].(string)
-	if kind := legacyMember(data, "kind"); kind != "" {
+	_, imported := data["legacy"].(map[string]any)
+	switch kind := legacyMember(data, "kind"); {
+	case kind != "":
 		if t.Kind, err = NormalizeTagValue(kind, "kind"); err != nil {
 			return nil, malformed(err)
 		}
-	} else {
+	case !imported:
 		t.Kind = LeadingKind(t.Title)
 	}
 	if repo := legacyMember(data, "repo"); repo != "" {

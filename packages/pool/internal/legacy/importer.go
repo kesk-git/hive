@@ -512,35 +512,30 @@ type importer struct {
 
 // at is the instant of the start of the calendar date in the zone of the
 // import, the earliest instant whose date there is that date, or false for a
-// date that is not one there. Such an instant is a midnight of the date in an
-// offset the zone keeps at that midnight, or the change to an offset where a
-// change skips the midnight; every local midnight of a date falls within 14
-// hours of its midnight in UTC.
+// date that is not one there. From the midnight Go gives for the date it steps
+// a minute at a time, forward out of the day before where a change of offset
+// skips the midnight and back to the first where a change repeats it, never
+// more than a day and two hours.
 func (im *importer) at(date string) (string, bool) {
-	day, err := time.Parse("2006-01-02", date)
+	t, err := time.ParseInLocation("2006-01-02", date, im.loc)
 	if err != nil {
 		return "", false
 	}
-	var first time.Time
-	for x := day.Add(-14 * time.Hour); x.Before(day.Add(14 * time.Hour)); {
-		local := x.In(im.loc)
-		_, offset := local.Zone()
-		start, end := local.ZoneBounds()
-		for _, c := range []time.Time{day.Add(-time.Duration(offset) * time.Second), start} {
-			inZone := !c.Before(start) && (end.IsZero() || c.Before(end))
-			if inZone && c.In(im.loc).Format("2006-01-02") == date && (first.IsZero() || c.Before(first)) {
-				first = c
-			}
+	day := func(t time.Time) string { return t.In(im.loc).Format("2006-01-02") }
+	const steps = 26 * 60
+	if day(t) < date {
+		for i := 0; i < steps && day(t) < date; i++ {
+			t = t.Add(time.Minute)
 		}
-		if end.IsZero() {
-			break
+	} else {
+		for i := 0; i < steps && day(t.Add(-time.Minute)) == date; i++ {
+			t = t.Add(-time.Minute)
 		}
-		x = end
 	}
-	if first.IsZero() {
+	if day(t) != date {
 		return "", false
 	}
-	s, err := clock.Format(first.In(im.loc))
+	s, err := clock.Format(t.In(im.loc))
 	return s, err == nil
 }
 

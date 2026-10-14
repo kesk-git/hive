@@ -465,6 +465,44 @@ func TestLiveImportOfADateWhoseMidnightIsRepeated(t *testing.T) {
 	}
 }
 
+// The start of a date is found, and the import returns, for a date far ahead
+// in a zone whose offsets after its last recorded change follow a rule.
+func TestLiveImportOfAFutureHoldInAZoneWithARecurringRule(t *testing.T) {
+	h := newHome(t)
+	text := "# Backlog\n\n## Queued\n- [ ] far-a1 - wait (hold: until the far date) (hold-kind: future) (hold-until: 2040-12-31)\n\n## Done\n"
+	path, data, when := sourceBytes(t, []byte(text))
+	im := h.importPath(path, data, when, "America/New_York")
+	if until, _ := im.holds["far-a1"]["until"].(map[string]any); until["at"] != "2040-12-31T05:00:00.000Z" || until["date"] != "2040-12-31" {
+		t.Errorf("far-a1: hold until %v", until)
+	}
+}
+
+// An empty kind tag overrides the kind the title's leading word implies, and
+// an item imported with one is written with it again once it is modified, so
+// that it imports again with no kind.
+func TestExportKeepsAnEmptyKindOverrideOfAnImportedItem(t *testing.T) {
+	h := newHome(t)
+	text := "# Backlog\n\n## Queued\n- [ ] kindless-a1 - SCOUT work (kind: )\n\n## Done\n"
+	path, data, when := sourceBytes(t, []byte(text))
+	im := h.importPath(path, data, when, "UTC")
+	if kind := legacyMember(im.items["kindless-a1"], "kind"); kind != "" {
+		t.Fatalf("kindless-a1 imports with the kind %q", kind)
+	}
+	ok(t, h.do("update", map[string]any{"task_id": im.taskID("kindless-a1"), "patch": map[string]any{"priority": int64(2)}}))
+	normalized := ok(t, h.do("export-legacy", map[string]any{"zone": "UTC"}))["text"].(string)
+	migrated := h.exportMigration(im.migration["migration_id"].(string), nil)["text"].(string)
+	for name, rendered := range map[string]string{"normalized": normalized, "from the migration": migrated} {
+		if !strings.Contains(rendered, "- [ ] kindless-a1 - SCOUT work (kind: ) (priority: 2)") {
+			t.Errorf("the %s export drops the empty kind:\n%s", name, rendered)
+		}
+		again, againData, againWhen := sourceBytes(t, []byte(rendered))
+		im2 := newHome(t).importPath(again, againData, againWhen, "UTC")
+		if rec := im2.items["kindless-a1"]; legacyMember(rec, "kind") != "" || rec["priority"] != int64(2) {
+			t.Errorf("the %s export imports again as %v", name, rec)
+		}
+	}
+}
+
 // A file with carriage returns, a header suffix, an unrecognized section and no
 // final newline is imported with its source kept exactly.
 func TestLiveImportOfCarriageReturnsASuffixAndAnUnrecognizedSection(t *testing.T) {
