@@ -45,7 +45,15 @@ func TestImportingThePackageBuildsTheReaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ps := (&declare.Set{Packages: []*declare.Package{p}}).Agree(e); len(ps) != 0 {
+	data, err = os.ReadFile(filepath.Join("..", "..", "..", "word", "hive-package.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	word, err := declare.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ps := (&declare.Set{Packages: []*declare.Package{p, word}}).Agree(e); len(ps) != 0 {
 		t.Fatal(ps)
 	}
 }

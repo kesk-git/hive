@@ -62,7 +62,7 @@ func TestReadIsBuiltOnceAKindHasAReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ps := (&declare.Set{Packages: []*declare.Package{p}}).Agree(e); len(ps) != 0 {
+	if ps := (&declare.Set{Packages: []*declare.Package{p, wordDeclaration(t)}}).Agree(e); len(ps) != 0 {
 		t.Fatal(ps)
 	}
 
