@@ -32,6 +32,10 @@ type Archive struct {
 // section, so the bullet is all that says what the entry was: a ticked
 // checkbox is done, a bold identifier was in flight, and an empty checkbox is
 // read as queued, though an in-flight entry written that way reads the same.
+// The legacy form is silent on the state of an archived entry. This reading is
+// the upstream's own: its prune writes the entries of any state into the
+// archive in the bullet form the backlog uses, and an archive is never read
+// back as a section, so no entry is taken to be done for sitting in one.
 func anyBullet(line string) *bullet {
 	if b := matchOne(line, doneRe, StateDone); b != nil {
 		return b

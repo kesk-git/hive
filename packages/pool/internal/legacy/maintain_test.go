@@ -145,6 +145,10 @@ func TestNormalizeCountsTheTasks(t *testing.T) {
 // Beyond the upstream's cases: how Hive reads the archive files.
 // ---------------------------------------------------------------------------
 
+// TestArchiveFixtureReadsEveryBulletForm holds the reading of an archived
+// entry's state: the legacy form is silent on it and an archive has no
+// section, so it is read from the entry's own bullet, as the upstream wrote it,
+// and no entry is taken to be done for sitting in an archive.
 func TestArchiveFixtureReadsEveryBulletForm(t *testing.T) {
 	src := readFixture(t, "done-archive.md")
 	a, err := ParseArchive([]byte(src))
