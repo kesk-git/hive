@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"maps"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -403,5 +404,71 @@ func TestMessagesQuoteNothingTyped(t *testing.T) {
 				t.Errorf("standard error %q is not one line without the message", stderr)
 			}
 		})
+	}
+}
+
+// A failure that replaces the one an operation returned with receipts its
+// status leaves none of keeps that failure's reason.
+func TestReceiptStatusReplacementKeepsTheReason(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	expect(t, h.invoke(t, home, "effect", effectRequest(t, 1, "unknown with a receipt")), envelope.Unknown, "outcome_unknown")
+	events := h.diagnostics(t)
+	if len(events) != 1 {
+		t.Fatalf("%d diagnostic events", len(events))
+	}
+	detail, _ := events[0]["body"].(map[string]any)["detail"].([]any)
+	if len(detail) != 1 || detail[0] != "outcome_unknown: the adapter did not answer" {
+		t.Errorf("detail %v", detail)
+	}
+}
+
+// A replay writes nothing: a recorded refusal answered unknown because it no
+// longer fits leaves no diagnostic event, however often it is sent.
+func TestReplayThatNoLongerFitsWritesNoEvent(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	fleet := h.exe.command("hive-fleet")
+	req := request(t, "refuse", 1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "record it" })
+	expect(t, h.invoke(t, home, "refuse", req), envelope.Refused, "authority_missing")
+	fleet.Limits.MaxResponseBytes = floorOf(t, h.exe, fleet)
+	for range 2 {
+		expectUnknown(t, h.invoke(t, home, "refuse", req))
+	}
+	if n := len(h.diagnostics(t)); n != 0 {
+		t.Errorf("%d diagnostic events", n)
+	}
+}
+
+// A request that cannot be read whole but whose request_id can is the event's
+// request: its request_id, its causation and its basis, under a correlation_id
+// minted for the event in the hive scope, since neither was read.
+func TestUnreadRequestWithARequestIDIsTheEventsRequest(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	req := request(t, "fail", 5, func(m map[string]any) {
+		m["extra"] = "x"
+		m["scope_level"] = "workspace"
+		m["workspace_id"] = id(ids.Workspace, 1)
+	})
+	expect(t, h.invoke(t, home, "fail", req), envelope.Invalid, "schema_violation")
+	events := h.diagnostics(t)
+	if len(events) != 1 {
+		t.Fatalf("%d diagnostic events", len(events))
+	}
+	e := events[0]
+	body, _ := e["body"].(map[string]any)
+	if body["request_id"] != id(ids.Request, 5) {
+		t.Errorf("body %v", body)
+	}
+	ref := map[string]any{"schema": "hive.request", "id": id(ids.Request, 5)}
+	causation, _ := e["causation"].(map[string]any)
+	basis, _ := e["basis"].(map[string]any)
+	if !maps.Equal(causation, ref) || basis["kind"] != "observation" || !maps.Equal(basis["ref"].(map[string]any), ref) {
+		t.Errorf("causation %v, basis %v", causation, basis)
+	}
+	corr, _ := e["correlation_id"].(string)
+	if ids.Check(corr, ids.Correlation) != nil || corr == id(ids.Correlation, 1) || e["scope_level"] != "hive" || e["workspace_id"] != nil {
+		t.Errorf("event %v", e)
 	}
 }

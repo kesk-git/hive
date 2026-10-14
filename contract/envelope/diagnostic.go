@@ -1,9 +1,6 @@
 package envelope
 
-import (
-	"errors"
-	"unicode/utf8"
-)
+import "unicode/utf8"
 
 // The bounds of a diagnostic (spec/events.md, Kinds): the chain holds at most
 // MaxDiagnosticDetail strings of at most MaxDetailBytes bytes each, and the
@@ -33,16 +30,43 @@ func (d *Diagnostic) Empty() bool {
 func (f *Failure) Diagnostic() *Diagnostic { return f.diagnostic }
 
 // DiagnosticOf is the diagnostic of an error chain, outermost first, or nil
-// for no error.
+// for no error. A Failure in the chain keeps its own diagnostic there, beneath
+// it.
 func DiagnosticOf(err error) *Diagnostic {
 	if err == nil {
 		return nil
 	}
-	var chain []string
-	for e := err; e != nil && len(chain) < MaxDiagnosticDetail; e = errors.Unwrap(e) {
-		chain = append(chain, clipBytes(e.Error(), MaxDetailBytes))
+	d := &Diagnostic{}
+	d.add(err)
+	return d
+}
+
+// add appends err to the chain and then what lies beneath it: the errors it
+// wraps, in order, or the diagnostic of a Failure, which wraps none.
+func (d *Diagnostic) add(err error) {
+	if len(d.Chain) >= MaxDiagnosticDetail {
+		return
 	}
-	return &Diagnostic{Chain: chain}
+	d.Chain = append(d.Chain, clipBytes(err.Error(), MaxDetailBytes))
+	switch e := err.(type) {
+	case *Failure:
+		if e.diagnostic != nil {
+			d.Chain = append(d.Chain, e.diagnostic.Chain[:min(len(e.diagnostic.Chain), MaxDiagnosticDetail-len(d.Chain))]...)
+			if d.Stack == "" {
+				d.Stack = e.diagnostic.Stack
+			}
+		}
+	case interface{ Unwrap() []error }:
+		for _, w := range e.Unwrap() {
+			if w != nil {
+				d.add(w)
+			}
+		}
+	case interface{ Unwrap() error }:
+		if w := e.Unwrap(); w != nil {
+			d.add(w)
+		}
+	}
 }
 
 // Because records the error chain of err, outermost first, as the detail of

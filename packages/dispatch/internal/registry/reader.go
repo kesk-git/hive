@@ -51,8 +51,11 @@ type reader struct {
 	reg  *schema.Registry
 }
 
-func malformed(rel, what string) error {
-	return envelope.Common(envelope.CodeRecordMalformed, fmt.Sprintf("the registry record %s is malformed: %s", rel, what))
+// malformed is the failure of a record of the kind that cannot be read or
+// fails its schema: one sentence naming the kind, and the record's path and
+// what is wrong with it as the detail.
+func malformed(k kind, rel string, why error) error {
+	return envelope.Common(envelope.CodeRecordMalformed, "a "+k.record+" record is malformed").Because(fmt.Errorf("%s: %w", rel, why))
 }
 
 // read returns the record of the kind with the id, or nil when none is there.
@@ -63,36 +66,36 @@ func (r *reader) read(k kind, id string) (map[string]any, error) {
 func (r *reader) readPath(k kind, rel, id string) (map[string]any, error) {
 	path, err := r.home.Path(rel)
 	if err != nil {
-		return nil, malformed(rel, err.Error())
+		return nil, malformed(k, rel, err)
 	}
 	data, err := store.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, malformed(rel, err.Error())
+		return nil, malformed(k, rel, err)
 	}
 	if err := canon.CheckFile(data); err != nil {
-		return nil, malformed(rel, err.Error())
+		return nil, malformed(k, rel, err)
 	}
 	v, err := canon.Parse(data)
 	if err != nil {
-		return nil, malformed(rel, err.Error())
+		return nil, malformed(k, rel, err)
 	}
 	obj, ok := v.(map[string]any)
 	if !ok {
-		return nil, malformed(rel, "a record is a JSON object")
+		return nil, malformed(k, rel, errors.New("a record is a JSON object"))
 	}
 	if obj["schema"] == k.record {
 		if version, _ := obj["schema_version"].(string); envelope.Newer(version, k.version) {
-			return nil, envelope.Common(envelope.CodeUnsupportedVersion, fmt.Sprintf("the registry record %s is at version %s; this build reads up to %s", rel, version, k.version))
+			return nil, envelope.Common(envelope.CodeUnsupportedVersion, "a "+k.record+" record is of a version this build does not read").Because(fmt.Errorf("%s is at version %s; this build reads up to %s", rel, version, k.version))
 		}
 	}
 	if err := r.reg.Validate(k.schema, data); err != nil {
-		return nil, malformed(rel, err.Error())
+		return nil, malformed(k, rel, err)
 	}
 	if obj[k.idField] != id {
-		return nil, malformed(rel, "it names another identity than its file")
+		return nil, malformed(k, rel, errors.New("it names another identity than its file"))
 	}
 	return obj, nil
 }
@@ -104,14 +107,14 @@ func (r *reader) all(k kind) ([]map[string]any, error) {
 	rel := registryDir + "/" + k.dir
 	dir, err := r.home.Path(rel)
 	if err != nil {
-		return nil, malformed(rel, err.Error())
+		return nil, malformed(k, rel, err)
 	}
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, malformed(rel, err.Error())
+		return nil, malformed(k, rel, err)
 	}
 	var out []map[string]any
 	for _, e := range entries {

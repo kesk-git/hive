@@ -79,3 +79,29 @@ func TestCarryTakesTheDetail(t *testing.T) {
 		t.Errorf("diagnostic %+v", got)
 	}
 }
+
+// A Failure wrapped by another error keeps its own diagnostic beneath it,
+// whether it is wrapped alone or beside another error.
+func TestAWrappedFailureKeepsItsDiagnostic(t *testing.T) {
+	inner := Common(CodeSchemaViolation, "the body breaks a schema").Because(errors.New("every violation"))
+	d := Common(CodeInternal, "x").Because(inner).Diagnostic()
+	if len(d.Chain) != 2 || d.Chain[0] != inner.Error() || d.Chain[1] != "every violation" {
+		t.Errorf("chain %q", d.Chain)
+	}
+	check := errors.New("the check")
+	d = DiagnosticOf(fmt.Errorf("%w: %w", inner, check))
+	if len(d.Chain) != 4 || d.Chain[1] != inner.Error() || d.Chain[2] != "every violation" || d.Chain[3] != "the check" {
+		t.Errorf("chain %q", d.Chain)
+	}
+	panicked := Common(CodeInternal, "stopped").Panicked([]byte("goroutine 1"))
+	if d := DiagnosticOf(fmt.Errorf("wrapped: %w", panicked)); d.Stack != "goroutine 1" || len(d.Chain) != 2 {
+		t.Errorf("diagnostic %+v", d)
+	}
+	var deep error = Common(CodeInternal, "x").Because(errors.New(strings.Repeat("y", 10)))
+	for i := 0; i < 20; i++ {
+		deep = fmt.Errorf("layer %d: %w", i, deep)
+	}
+	if n := len(DiagnosticOf(deep).Chain); n != MaxDiagnosticDetail {
+		t.Errorf("%d strings", n)
+	}
+}

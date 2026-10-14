@@ -88,8 +88,15 @@ func (e *Executable) finish(c *Command, resp *envelope.Response) ([]byte, error)
 }
 
 // instead is the failure f given in place of the response resp: it keeps the
-// detail resp held, or where it held none, its code and message.
+// detail resp held, or where it held none, its code and message. A replayed
+// response holds no detail and gives none to what replaces it: a replay
+// writes nothing.
 func (e *Executable) instead(resp *envelope.Response, f *envelope.Failure) *envelope.Response {
+	if resp.Replayed {
+		out := e.failure(resp.RequestID, resp.Command, resp.Operation, f)
+		out.Diagnostic = nil
+		return out
+	}
 	return e.failure(resp.RequestID, resp.Command, resp.Operation, f.Carry(resp.Failure()))
 }
 
@@ -446,7 +453,7 @@ func (e *Executable) run(c *Call) (res *Result, err error) {
 			// An unknown outcome returns the receipts of the intents the call
 			// committed, which the harness attaches, and none of its own.
 			if len(f.Receipts) > 0 && (!c.Operation.Mutates || (f.Status != envelope.Refused && f.Status != envelope.Held)) {
-				return nil, envelope.Common(envelope.CodeInternal, "the operation returned receipts with a status that leaves none")
+				return nil, envelope.Common(envelope.CodeInternal, "the operation returned receipts with a status that leaves none").Carry(f)
 			}
 			return nil, f
 		}
@@ -643,9 +650,7 @@ func (e *Executable) settle(c *Command, op *Operation, requestID string, resp *e
 		if !durable {
 			return bad
 		}
-		replaced := e.unknownAnswer(c, op.Name, requestID, oversizeReplayMessage)
-		replaced.Diagnostic = resp.Failure().Detail()
-		return replaced
+		return e.instead(resp, envelope.Common(envelope.CodeOutcomeUnknown, oversizeReplayMessage))
 	}
 	return resp
 }

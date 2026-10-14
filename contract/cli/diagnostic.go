@@ -14,7 +14,8 @@ const (
 	diagnosticFact        = "diagnostic.recorded"
 	diagnosticKindVersion = "1.0"
 	// invocationSchema is the schema of the basis of a diagnostic event whose
-	// request could not be read: the invocation itself, observed.
+	// request has no request_id that could be read: the invocation itself,
+	// observed.
 	invocationSchema = "hive.invocation"
 	requestSchema    = "hive.request"
 )
@@ -58,10 +59,12 @@ func (e *Executable) diagnose(dir string, req *envelope.Request, resp *envelope.
 	_ = j.Append([]store.Event{event})
 }
 
-// diagnosticEvent makes the diagnostic event of a failed response. A request
-// that was read gives the event its scope and correlation_id, causes it, and
-// is its basis; one that was not gives it a correlation_id of its own, the
-// hive scope of the home, and the invocation, observed, as its basis.
+// diagnosticEvent makes the diagnostic event of a failed response. The
+// request_id the response carries is the event's, and that request causes the
+// event and is its basis. A request that was read gives the event its scope and
+// correlation_id; one that was not gives it a correlation_id of its own and the
+// hive scope of the home, and where not even its request_id was read, the
+// invocation, observed, is the event's basis.
 func (e *Executable) diagnosticEvent(homeID string, req *envelope.Request, resp *envelope.Response) (store.Event, error) {
 	eventID, err := ids.Mint(e.clock(), ids.Event)
 	if err != nil {
@@ -104,12 +107,14 @@ func (e *Executable) diagnosticEvent(homeID string, req *envelope.Request, resp 
 		"observed_at":    at,
 		"body":           body,
 	}
-	if req != nil {
-		body["request_id"] = req.RequestID
-		ref := map[string]any{"schema": requestSchema, "id": req.RequestID}
-		m["correlation_id"] = req.CorrelationID
+	if resp.RequestID != "" {
+		body["request_id"] = resp.RequestID
+		ref := map[string]any{"schema": requestSchema, "id": resp.RequestID}
 		m["causation"] = ref
 		m["basis"] = map[string]any{"kind": "observation", "ref": ref}
+	}
+	if req != nil {
+		m["correlation_id"] = req.CorrelationID
 		m["scope_level"] = req.Scope.Level
 		for k, v := range map[string]string{"workspace_id": req.WorkspaceID, "project_id": req.ProjectID, "clone_id": req.CloneID, "task_id": req.TaskID} {
 			if v != "" {
@@ -125,7 +130,9 @@ func (e *Executable) diagnosticEvent(homeID string, req *envelope.Request, resp 
 			return store.Event{}, err
 		}
 		m["correlation_id"] = corr
-		m["basis"] = map[string]any{"kind": "observation", "ref": map[string]any{"schema": invocationSchema, "id": corr}}
+		if resp.RequestID == "" {
+			m["basis"] = map[string]any{"kind": "observation", "ref": map[string]any{"schema": invocationSchema, "id": corr}}
+		}
 	}
 	content, err := canon.Encode(m)
 	if err != nil {
