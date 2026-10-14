@@ -2,6 +2,7 @@ package proof_test
 
 import (
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -31,8 +32,9 @@ func mustFind(t *testing.T, findings []string, pkg, expect string) {
 }
 
 // A module whose packages run only what they declare, through contract/exec,
-// and whose words, comments and platform-specific third-party import are all
-// in order, passes every source check. It catches a check that rejects sound
+// and whose words, comments and platform-specific third-party import, which
+// its package declares as a library with its record, are all in order, passes
+// every source check. It catches a check that rejects sound
 // code, a word that is also a call name among them.
 func TestSourceChecksPassSoundCode(t *testing.T) {
 	root := scanRoot("good")
@@ -116,8 +118,15 @@ func TestPlatformUtilitiesFindsAListThatIsNotAllowed(t *testing.T) {
 	mustFind(t, findings, "noreason", "without a reason")
 }
 
-// A third-party module needs a record that names the starts of a process, and
-// a package that builds for macOS never imports go-keyring.
+// A third-party module is linked only where it is declared: the package that
+// imports it lists it under libraries, with the import record that is the
+// dependency record of that module, and the record names the starts of a
+// process. A package that imports a module it does not list, one that lists it
+// with the record of another module, one that lists a module with no record,
+// and a file that imports one outside every package are each found, as is a
+// package that builds for macOS and imports go-keyring. It catches a check
+// that takes a record alone, or another package's declaration, for a
+// declaration of the package that links the module.
 func TestLibrariesFindsAnExceptionUsedWrongly(t *testing.T) {
 	findings, err := proof.Libraries(scanRoot("breaks"))
 	if err != nil {
@@ -126,6 +135,15 @@ func TestLibrariesFindsAnExceptionUsedWrongly(t *testing.T) {
 	mustFind(t, findings, "keyringmac", "no macOS executable holds")
 	mustFind(t, findings, "keyringmac", "does not name the starts of a process")
 	mustFind(t, findings, "thirdparty", "example.org/anything, which has no dependency record")
+	mustFind(t, findings, "unlisted", "which the declaration of unlisted does not list under libraries")
+	mustFind(t, findings, "wrongrecord", `names the import record "other-dep", which is not the dependency record of github.com/zalando/go-keyring`)
+	outside := "tools/helper/keyring_linux.go imports github.com/zalando/go-keyring, and is in no package whose declaration lists it under libraries"
+	if !slices.Contains(findings, outside) {
+		t.Errorf("no finding says %q; findings: %q", outside, findings)
+	}
+	if len(findings) != 6 {
+		t.Errorf("%d findings, want two for keyringmac and one for each of the other four breaks: %q", len(findings), findings)
+	}
 }
 
 // A build file of another toolchain is found wherever it sits in the tree,

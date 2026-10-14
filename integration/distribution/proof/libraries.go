@@ -34,9 +34,8 @@ type record struct {
 	} `json:"audit"`
 }
 
-// dependencyRecords reads the records of kind dependency under imports/, by
-// the module path they pin.
-func dependencyRecords(root string) (map[string]record, error) {
+// importRecords reads the records under imports/, by import_id.
+func importRecords(root string) (map[string]record, error) {
 	files, err := filepath.Glob(filepath.Join(root, "imports", "*.json"))
 	if err != nil {
 		return nil, err
@@ -51,11 +50,28 @@ func dependencyRecords(root string) (map[string]record, error) {
 		if err := json.Unmarshal(data, &r); err != nil {
 			return nil, fmt.Errorf("%s: %w", f, err)
 		}
-		if r.Kind == "dependency" && r.Upstream.Module != nil {
-			out[r.Upstream.Module.Path] = r
-		}
+		out[r.ImportID] = r
 	}
 	return out, nil
+}
+
+// pins says whether the record is the dependency record of the module.
+func (r record) pins(module string) bool {
+	return r.Kind == "dependency" && r.Upstream.Module != nil && r.Upstream.Module.Path == module
+}
+
+// listed is the library of a declaration that an import path belongs to: the
+// module itself or a package of it. A package with no declaration lists none.
+func (d *declaration) listed(importPath string) (library, bool) {
+	if d == nil {
+		return library{}, false
+	}
+	for _, l := range d.Libraries {
+		if importPath == l.Module || strings.HasPrefix(importPath, l.Module+"/") {
+			return l, true
+		}
+	}
+	return library{}, false
 }
 
 // thirdParty says whether an import path is a module that is neither the
@@ -66,19 +82,28 @@ func thirdParty(importPath, module string) bool {
 }
 
 // Libraries is the part of How it is proved item 3 that concerns the two
-// named exceptions of the toolchain. A third-party module that a source file
-// of the repository imports passes only where its import record names each
-// start of a process it holds and the condition that keeps Hive from reaching
-// it; the record's local changes or audit must speak of the process, which is
-// as much as a program can read of a statement that a reviewer weighs. And a
-// macOS executable that holds go-keyring fails: no package that builds for
-// macOS imports it.
+// named exceptions of the toolchain, and the row of test-distribution that a
+// module of them is linked only where it is declared. A third-party module
+// that a source file of the repository imports passes only where the
+// declaration of the package the file is in lists the module under libraries,
+// the import record that entry names is the dependency record of that module,
+// and the record names each start of a process the module holds and the
+// condition that keeps Hive from reaching it; the record's local changes or
+// audit must speak of the process, which is as much as a program can read of a
+// statement that a reviewer weighs. A module another package declares, or one
+// only a record covers, is not declared where it is linked. And a macOS
+// executable that holds go-keyring fails: no package that builds for macOS
+// imports it.
 func Libraries(root string) ([]string, error) {
 	module, err := modulePath(root)
 	if err != nil {
 		return nil, err
 	}
-	records, err := dependencyRecords(root)
+	records, err := importRecords(root)
+	if err != nil {
+		return nil, err
+	}
+	decls, err := declarations(root)
 	if err != nil {
 		return nil, err
 	}
@@ -97,20 +122,24 @@ func Libraries(root string) ([]string, error) {
 		if err != nil {
 			return err
 		}
+		own := owner(path.Dir(rel))
 		for _, p := range imports {
 			if !thirdParty(p, module) {
 				continue
 			}
-			var rec *record
-			for mod, r := range records {
-				if p == mod || strings.HasPrefix(p, mod+"/") {
-					r := r
-					rec = &r
+			lib, ok := decls[own].listed(p)
+			if !ok {
+				if decls[own] == nil {
+					found = append(found, fmt.Sprintf("%s imports %s, and is in no package whose declaration lists it under libraries", rel, p))
+				} else {
+					found = append(found, fmt.Sprintf("%s imports %s, which the declaration of %s does not list under libraries", rel, p, own))
 				}
+				continue
 			}
+			rec, ok := records[lib.ImportID]
 			switch {
-			case rec == nil:
-				found = append(found, fmt.Sprintf("%s imports %s, which has no dependency record", rel, p))
+			case !ok || !rec.pins(lib.Module):
+				found = append(found, fmt.Sprintf("%s imports %s, which has no dependency record: the declaration of %s names the import record %q, which is not the dependency record of %s", rel, p, own, lib.ImportID, lib.Module))
 			case !strings.Contains(strings.ToLower(rec.LocalChanges+" "+rec.Audit.Statement), "process"):
 				found = append(found, fmt.Sprintf("%s imports %s, and its record %s does not name the starts of a process it holds and the condition that keeps Hive from reaching them", rel, p, rec.ImportID))
 			}

@@ -34,6 +34,14 @@ type declaration struct {
 		Name   string `json:"name"`
 		Reason string `json:"reason"`
 	} `json:"platform"`
+	Libraries []library `json:"libraries"`
+}
+
+// library is one third-party module a declaration lists as linked by its
+// package, with the import record that covers it.
+type library struct {
+	Module   string `json:"module"`
+	ImportID string `json:"import_id"`
 }
 
 // declarations reads the declaration of each package and of the contract

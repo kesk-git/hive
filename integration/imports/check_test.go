@@ -101,6 +101,12 @@ func TestCheckCatchesEachBreak(t *testing.T) {
 		{"a declaration that names a record that does not exist", 4, `"ghost"`, 0, func(m fstest.MapFS) {
 			m["packages/spawning-pool/hive-package.json"].Data = []byte(`{"libraries":[],"imports":["ghost"]}`)
 		}},
+		{"a library listed with the record of another import", 4, `lists the library example.invalid/dep with the import record "example-lib"`, 0, func(m fstest.MapFS) {
+			m["packages/dispatch/hive-package.json"].Data = []byte(`{"libraries":[{"module":"example.invalid/dep","import_id":"example-lib"}],"imports":[]}`)
+		}},
+		{"a library listed under a module its record does not pin", 4, `lists the library example.invalid/other with the import record "a-dep"`, 0, func(m fstest.MapFS) {
+			m["packages/dispatch/hive-package.json"].Data = []byte(`{"libraries":[{"module":"example.invalid/other","import_id":"a-dep"}],"imports":[]}`)
+		}},
 		{"records without the root licence", 5, "LICENSE", 0, func(m fstest.MapFS) {
 			delete(m, "LICENSE")
 		}},

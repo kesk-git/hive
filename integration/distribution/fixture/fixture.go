@@ -47,8 +47,8 @@ func Good(executables []string, goos, goarch string) Fake {
 }
 
 // Root is a temporary repository root holding what an assembly reads of the
-// repository: the package declarations, the LICENSE and the NOTICE, and an
-// imports directory with no record.
+// repository: the package declarations, the LICENSE and the NOTICE, and the
+// imports directory with every record the NOTICE is produced from.
 func Root(t testing.TB) string {
 	t.Helper()
 	real, err := proof.RepoRoot()
@@ -74,8 +74,17 @@ func Root(t testing.TB) string {
 		rel, _ := filepath.Rel(real, f)
 		copyTo(rel)
 	}
-	for _, rel := range []string{"contract/hive-package.json", "LICENSE", "NOTICE", "imports/README.md"} {
+	for _, rel := range []string{"contract/hive-package.json", "LICENSE", "NOTICE"} {
 		copyTo(rel)
+	}
+	records, err := os.ReadDir(filepath.Join(real, "imports"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range records {
+		if !e.IsDir() {
+			copyTo("imports/" + e.Name())
+		}
 	}
 	return root
 }

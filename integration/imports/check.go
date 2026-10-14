@@ -161,7 +161,8 @@ type declared struct {
 
 // checkModules is the fourth check: every module go.mod requires has a
 // dependency record that pins it, and every library and import a package
-// declaration lists names an existing record.
+// declaration lists names an existing record, which for a library is the
+// dependency record of the module it is listed with.
 func checkModules(fsys fs.FS, records []Record) []Problem {
 	var problems []Problem
 	if gomod, err := fs.ReadFile(fsys, "go.mod"); err != nil {
@@ -203,6 +204,18 @@ func checkModules(fsys fs.FS, records []Record) []Problem {
 		for _, id := range ids {
 			if !exists(fsys, path.Join(Dir, id+".json")) {
 				problems = append(problems, Problem{4, f, fmt.Sprintf("names the import record %q, and %s/%s.json does not exist", id, Dir, id)})
+			}
+		}
+		for _, l := range d.Libraries {
+			if !exists(fsys, path.Join(Dir, l.ImportID+".json")) {
+				continue
+			}
+			pinned := false
+			for _, r := range records {
+				pinned = pinned || r.ImportID == l.ImportID && r.Kind == "dependency" && r.Upstream.Module != nil && r.Upstream.Module.Path == l.Module
+			}
+			if !pinned {
+				problems = append(problems, Problem{4, f, fmt.Sprintf("lists the library %s with the import record %q, which is not the dependency record of that module", l.Module, l.ImportID)})
 			}
 		}
 	}

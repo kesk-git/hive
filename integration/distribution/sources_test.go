@@ -27,9 +27,11 @@ func expectNone(t *testing.T, findings []string, err error) {
 
 // Item 3: no Go package outside contract/exec imports os/exec, calls
 // os.StartProcess or a process-creation function of syscall, or reaches a
-// process-creation call through a system library, and no macOS executable
-// holds go-keyring or any third-party module whose record does not name its
-// starts. The fixture modules beside the checks show that each break is found.
+// process-creation call through a system library; no package links a
+// third-party module its own declaration does not list with that module's
+// record, or one whose record does not name its starts; and no macOS
+// executable holds go-keyring. The fixture modules beside the checks show
+// that each break is found.
 func TestOnlyTheOnePathStartsAProcess(t *testing.T) {
 	findings, err := proof.Starts(repo(t))
 	expectNone(t, findings, err)

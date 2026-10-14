@@ -1,1 +1,1 @@
-{"name":"thirdparty","executes":{"core":["git"],"transitional":[],"optional":[],"project":false},"platform":[],"calls":[],"commands":[{"name":"hive-thirdparty"}]}
+{"name":"thirdparty","executes":{"core":["git"],"transitional":[],"optional":[],"project":false},"platform":[],"calls":[],"libraries":[{"module":"example.org/anything","import_id":"anything"}],"commands":[{"name":"hive-thirdparty"}]}
