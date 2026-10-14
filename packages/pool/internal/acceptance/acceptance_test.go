@@ -157,11 +157,13 @@ func request(t testing.TB, command, operation string) []byte {
 // that are not the decision intake's, with the read of their kinds, and the
 // operations hold-question, revise-question, answer-question, release-question,
 // complete-question and close-question, and the dry-run import and export of
-// the legacy backlog, and hive-admit approve. Every other operation of the
-// declaration is declared and refused.
+// the legacy backlog, hive-admit approve, and the operations define, accept and
+// close of hive-spec. Every other operation of the declaration is declared and
+// refused.
 var built = map[string][]string{
 	"hive-pool":  {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question", "release-question", "complete-question", "close-question", "import-legacy", "export-legacy"},
 	"hive-admit": {"approve"},
+	"hive-spec":  {"define", "accept", "close"},
 }
 
 // Every command name of the package answers capabilities: exit 0, one
