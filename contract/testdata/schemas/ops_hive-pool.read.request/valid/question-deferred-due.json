@@ -1,0 +1,10 @@
+{
+  "kind": "question",
+  "selector": {
+    "states": [
+      "deferred"
+    ],
+    "due_before": "2026-10-20T09:00:00.000Z",
+    "limit": 10
+  }
+}

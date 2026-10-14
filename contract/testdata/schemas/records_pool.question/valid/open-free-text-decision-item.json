@@ -1,0 +1,48 @@
+{
+  "schema": "pool.question",
+  "schema_version": "1.0",
+  "record_revision": 1,
+  "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+  "scope_level": "workspace",
+  "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+  "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+  "held_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7g",
+  "held_item": "decision-item",
+  "hold_id": "hold_01jc7d8e9f0g1h2j3k4m5n6p7m",
+  "decision_round_id": "dr_01jc7d8e9f0g1h2j3k4m5n6p7r",
+  "card_id": "card_01jc7d8e9f0g1h2j3k4m5n6p7s",
+  "origin": {
+    "kind": "spend",
+    "ref": {
+      "schema": "pool.item",
+      "id": "task_01jc7d8e9f0g1h2j3k4m5n6p7g"
+    }
+  },
+  "current_revision": 1,
+  "revisions": [
+    {
+      "revision": 1,
+      "text": "Which vendor should the integration use?",
+      "consequence": "Without an answer the integration work stays held.",
+      "options": [],
+      "amount": "40 EUR a month",
+      "asked_at": "2026-10-12T09:00:00.000Z",
+      "asked_by": {
+        "kind": "package",
+        "package": "word",
+        "command": "hive-word"
+      },
+      "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7p"
+    }
+  ],
+  "state": "open",
+  "answers": [],
+  "created_at": "2026-10-12T09:00:00.000Z",
+  "updated_at": "2026-10-12T09:00:00.000Z",
+  "writer": {
+    "package": "pool",
+    "command": "hive-pool",
+    "operation": "hold-question",
+    "implementation_version": "0.1.0"
+  }
+}

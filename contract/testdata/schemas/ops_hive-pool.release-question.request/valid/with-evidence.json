@@ -1,0 +1,16 @@
+{
+  "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+  "note": "Moved the work to the chosen vendor.",
+  "evidence": [
+    {
+      "schema": "pool.item",
+      "id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+      "record_revision": 2
+    }
+  ],
+  "requested_by": {
+    "kind": "package",
+    "package": "word",
+    "command": "hive-word"
+  }
+}

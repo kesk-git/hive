@@ -1,0 +1,17 @@
+{"name":"evidence-empty","base":"item-archived.json","edits":[{"op":"replace","path":"/evidence","value":[]}]}
+{"name":"evidence-kind-unknown","base":"item-archived.json","edits":[{"op":"replace","path":"/evidence/0/kind","value":"item-done"}]}
+{"name":"evidence-missing-kind","base":"item-archived.json","edits":[{"op":"remove","path":"/evidence/0/kind"}]}
+{"name":"evidence-missing-ref","base":"item-archived.json","edits":[{"op":"remove","path":"/evidence/0/ref"}]}
+{"name":"evidence-not-an-array","base":"item-archived.json","edits":[{"op":"replace","path":"/evidence","value":{"kind":"item-archived"}}]}
+{"name":"evidence-ref-id-empty","base":"item-archived.json","edits":[{"op":"replace","path":"/evidence/0/ref/id","value":""}]}
+{"name":"evidence-ref-missing-id","base":"item-archived.json","edits":[{"op":"remove","path":"/evidence/0/ref/id"}]}
+{"name":"evidence-unknown-member","base":"item-archived.json","edits":[{"op":"add","path":"/evidence/0/note","value":"x"}]}
+{"name":"missing-evidence","base":"item-archived.json","edits":[{"op":"remove","path":"/evidence"}]}
+{"name":"missing-question-id","base":"item-archived.json","edits":[{"op":"remove","path":"/question_id"}]}
+{"name":"missing-reason","base":"item-archived.json","edits":[{"op":"remove","path":"/reason"}]}
+{"name":"missing-requested-by","base":"item-archived.json","edits":[{"op":"remove","path":"/requested_by"}]}
+{"name":"question-id-wrong-prefix","base":"item-archived.json","edits":[{"op":"replace","path":"/question_id","value":"card_01jc7d8e9f0g1h2j3k4m5n6p7q"}]}
+{"name":"reason-empty","base":"item-archived.json","edits":[{"op":"replace","path":"/reason","value":""}]}
+{"name":"requested-by-kind-unknown","base":"item-archived.json","edits":[{"op":"replace","path":"/requested_by/kind","value":"bot"}]}
+{"name":"requested-by-package-without-package","base":"item-archived.json","edits":[{"op":"remove","path":"/requested_by/package"}]}
+{"name":"unknown-member","base":"item-archived.json","edits":[{"op":"add","path":"/note","value":"x"}]}

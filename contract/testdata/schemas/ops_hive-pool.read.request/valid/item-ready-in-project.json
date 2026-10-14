@@ -1,0 +1,11 @@
+{
+  "kind": "item",
+  "selector": {
+    "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+    "states": [
+      "queued"
+    ],
+    "ready": true,
+    "limit": 20
+  }
+}

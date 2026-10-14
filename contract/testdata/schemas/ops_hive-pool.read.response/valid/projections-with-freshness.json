@@ -1,0 +1,76 @@
+{
+  "projection": {
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "read_at": "2026-10-12T11:00:00.000Z",
+    "journal_cursor": 42,
+    "complete": true
+  },
+  "kind": "projection",
+  "records": [
+    {
+      "schema": "pool.projection",
+      "schema_version": "1.0",
+      "record_revision": 2,
+      "projection_id": "mem_01jc7d8e9f0g1h2j3k4m5n6p7e",
+      "scope_level": "project",
+      "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+      "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+      "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+      "audience": "project",
+      "current": {
+        "rendering": 2,
+        "rendered_at": "2026-10-12T09:30:00.000Z",
+        "renderer_version": "0.1.0",
+        "rules_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "sources": [
+          {
+            "ref": {
+              "schema": "pool.rule",
+              "id": "rule_01jc7d8e9f0g1h2j3k4m5n6p7k",
+              "record_revision": 1
+            },
+            "owner": "pool"
+          }
+        ],
+        "text": "Answer in the language of the question.\n",
+        "digest": "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+        "bytes": 40
+      },
+      "consumers": [
+        {
+          "consumer": {
+            "kind": "file",
+            "path": "project/AGENTS.md"
+          },
+          "received": {
+            "rendering": 2,
+            "digest": "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+            "at": "2026-10-12T10:00:00.000Z",
+            "receipt_id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7y"
+          }
+        }
+      ],
+      "created_at": "2026-10-12T09:00:00.000Z",
+      "updated_at": "2026-10-12T10:00:00.000Z",
+      "writer": {
+        "package": "pool",
+        "command": "hive-memory",
+        "operation": "render",
+        "implementation_version": "0.1.0"
+      }
+    }
+  ],
+  "derived": [
+    {
+      "projection_id": "mem_01jc7d8e9f0g1h2j3k4m5n6p7e",
+      "state": "stale",
+      "stale_sources": [
+        {
+          "schema": "pool.rule",
+          "id": "rule_01jc7d8e9f0g1h2j3k4m5n6p7k",
+          "record_revision": 2
+        }
+      ]
+    }
+  ]
+}

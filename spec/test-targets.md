@@ -51,24 +51,10 @@ Every committed schema requires at least one accepted example and one refused ex
 | `ops/hive-memory.propagate.response.v1.schema.json` | stage 2 |
 | `ops/hive-memory.render.request.v1.schema.json` | stage 2 |
 | `ops/hive-memory.render.response.v1.schema.json` | stage 2 |
-| `ops/hive-pool.answer-question.request.v1.schema.json` | stage 2 |
-| `ops/hive-pool.answer-question.response.v1.schema.json` | stage 2 |
-| `ops/hive-pool.close-question.request.v1.schema.json` | stage 2 |
-| `ops/hive-pool.close-question.response.v1.schema.json` | stage 2 |
-| `ops/hive-pool.complete-question.request.v1.schema.json` | stage 2 |
-| `ops/hive-pool.complete-question.response.v1.schema.json` | stage 2 |
 | `ops/hive-pool.export-legacy.request.v1.schema.json` | stage 2 |
 | `ops/hive-pool.export-legacy.response.v1.schema.json` | stage 2 |
-| `ops/hive-pool.hold-question.request.v1.schema.json` | stage 2 |
-| `ops/hive-pool.hold-question.response.v1.schema.json` | stage 2 |
 | `ops/hive-pool.import-legacy.request.v1.schema.json` | stage 2 |
 | `ops/hive-pool.import-legacy.response.v1.schema.json` | stage 2 |
-| `ops/hive-pool.read.request.v1.schema.json` | stage 2 |
-| `ops/hive-pool.read.response.v1.schema.json` | stage 2 |
-| `ops/hive-pool.release-question.request.v1.schema.json` | stage 2 |
-| `ops/hive-pool.release-question.response.v1.schema.json` | stage 2 |
-| `ops/hive-pool.revise-question.request.v1.schema.json` | stage 2 |
-| `ops/hive-pool.revise-question.response.v1.schema.json` | stage 2 |
 | `ops/hive-rule.amend.request.v1.schema.json` | stage 2 |
 | `ops/hive-rule.amend.response.v1.schema.json` | stage 2 |
 | `ops/hive-rule.expire.request.v1.schema.json` | stage 2 |
@@ -98,11 +84,9 @@ Every committed schema requires at least one accepted example and one refused ex
 | `ops/hive-word.verify.request.v1.schema.json` | stage 2 |
 | `ops/hive-word.verify.response.v1.schema.json` | stage 2 |
 | `records/pool.admission.v1.schema.json` | stage 2 |
-| `records/pool.decision-round.v1.schema.json` | stage 2 |
 | `records/pool.imperative.v1.schema.json` | stage 2 |
 | `records/pool.migration.v1.schema.json` | stage 2 |
 | `records/pool.projection.v1.schema.json` | stage 2 |
-| `records/pool.question.v1.schema.json` | stage 2 |
 | `records/pool.rule.v1.schema.json` | stage 2 |
 | `records/pool.specification.v1.schema.json` | stage 2 |
 

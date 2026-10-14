@@ -1,0 +1,41 @@
+{
+  "projection": {
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "read_at": "2026-10-12T11:00:00.000Z",
+    "journal_cursor": 42,
+    "complete": true
+  },
+  "kind": "request-outcome",
+  "records": [
+    {
+      "schema": "hive.request-outcome",
+      "schema_version": "1.0",
+      "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7p",
+      "request_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "response": {
+        "schema": "hive.response",
+        "schema_version": "1.0",
+        "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7p",
+        "command": "hive-pool",
+        "operation": "hold-question",
+        "status": "ok",
+        "exit_code": 0,
+        "responder": {
+          "package": "pool",
+          "command": "hive-pool",
+          "implementation_version": "0.1.0",
+          "contract_version": "1.0"
+        },
+        "completed_at": "2026-10-12T09:00:00.000Z",
+        "replayed": false,
+        "receipts": [],
+        "body": {
+          "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+          "decision_round_id": "dr_01jc7d8e9f0g1h2j3k4m5n6p7r",
+          "card_id": "card_01jc7d8e9f0g1h2j3k4m5n6p7s",
+          "hold_id": "hold_01jc7d8e9f0g1h2j3k4m5n6p7m"
+        }
+      }
+    }
+  ]
+}

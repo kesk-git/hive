@@ -1,0 +1,10 @@
+{"name":"missing-question","base":"second-revision.json","edits":[{"op":"remove","path":"/question"}]}
+{"name":"missing-round","base":"second-revision.json","edits":[{"op":"remove","path":"/round"}]}
+{"name":"question-missing-current-revision","base":"second-revision.json","edits":[{"op":"remove","path":"/question/current_revision"}]}
+{"name":"question-not-an-object","base":"second-revision.json","edits":[{"op":"replace","path":"/question","value":"q"}]}
+{"name":"question-revisions-empty","base":"second-revision.json","edits":[{"op":"replace","path":"/question/revisions","value":[]}]}
+{"name":"question-state-unknown","base":"second-revision.json","edits":[{"op":"replace","path":"/question/state","value":"revised"}]}
+{"name":"round-card-revision-zero","base":"second-revision.json","edits":[{"op":"replace","path":"/round/cards/0/card_revision","value":0}]}
+{"name":"round-cards-empty","base":"second-revision.json","edits":[{"op":"replace","path":"/round/cards","value":[]}]}
+{"name":"round-missing-complete","base":"second-revision.json","edits":[{"op":"remove","path":"/round/complete"}]}
+{"name":"unknown-member","base":"second-revision.json","edits":[{"op":"add","path":"/hold","value":{"created_at":"2026-10-12T09:00:00.000Z","hold_id":"hold_01jc7d8e9f0g1h2j3k4m5n6p7m","home_id":"home_01jc7d8e9f0g1h2j3k4m5n6p7a","kind":"word","placed_at":"2026-10-12T09:00:00.000Z","placed_by":{"caller":{"command":"hive-word","kind":"package","package":"word"},"request_id":"req_01jc7d8e9f0g1h2j3k4m5n6p7p"},"project_id":"proj_01jc7d8e9f0g1h2j3k4m5n6p7c","reason":"Which vendor should the integration use?","record_revision":1,"schema":"pool.hold","schema_version":"1.0","scope_level":"project","state":"active","task_id":"task_01jc7d8e9f0g1h2j3k4m5n6p7f","updated_at":"2026-10-12T09:00:00.000Z","workspace_id":"ws_01jc7d8e9f0g1h2j3k4m5n6p7b","writer":{"command":"hive-pool","implementation_version":"0.1.0","operation":"hold-question","package":"pool"}}}]}

@@ -1,0 +1,48 @@
+{
+  "projection": {
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "read_at": "2026-10-12T11:00:00.000Z",
+    "journal_cursor": 0,
+    "complete": true
+  },
+  "kind": "decision-round",
+  "records": [
+    {
+      "schema": "pool.decision-round",
+      "schema_version": "1.0",
+      "record_revision": 1,
+      "decision_round_id": "dr_01jc7d8e9f0g1h2j3k4m5n6p7r",
+      "scope_level": "project",
+      "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+      "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+      "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+      "origin": {
+        "kind": "supervisor"
+      },
+      "cards": [
+        {
+          "card_id": "card_01jc7d8e9f0g1h2j3k4m5n6p7s",
+          "card_revision": 1,
+          "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+          "question_revision": 1,
+          "held_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+          "held_task_revision": 1,
+          "presented_at": "2026-10-12T09:00:00.000Z",
+          "state": "open"
+        }
+      ],
+      "attachments": [],
+      "complete": true,
+      "state": "open",
+      "opened_at": "2026-10-12T09:00:00.000Z",
+      "created_at": "2026-10-12T09:00:00.000Z",
+      "updated_at": "2026-10-12T09:00:00.000Z",
+      "writer": {
+        "package": "pool",
+        "command": "hive-pool",
+        "operation": "hold-question",
+        "implementation_version": "0.1.0"
+      }
+    }
+  ]
+}

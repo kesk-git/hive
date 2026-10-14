@@ -1,0 +1,52 @@
+{
+  "projection": {
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "read_at": "2026-10-12T11:00:00.000Z",
+    "journal_cursor": 7,
+    "complete": false,
+    "omitted": [
+      {
+        "id": "hold_01jc7d8e9f0g1h2j3k4m5n6p7n",
+        "reason": "limit"
+      },
+      {
+        "id": "hold_01jc7d8e9f0g1h2j3k4m5n6p7p",
+        "reason": "record_malformed"
+      }
+    ]
+  },
+  "kind": "hold",
+  "records": [
+    {
+      "schema": "pool.hold",
+      "schema_version": "1.0",
+      "record_revision": 1,
+      "hold_id": "hold_01jc7d8e9f0g1h2j3k4m5n6p7m",
+      "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+      "scope_level": "project",
+      "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+      "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+      "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+      "kind": "word",
+      "reason": "Which vendor should the integration use?",
+      "state": "active",
+      "placed_at": "2026-10-12T09:00:00.000Z",
+      "placed_by": {
+        "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7p",
+        "caller": {
+          "kind": "package",
+          "package": "word",
+          "command": "hive-word"
+        }
+      },
+      "created_at": "2026-10-12T09:00:00.000Z",
+      "updated_at": "2026-10-12T09:00:00.000Z",
+      "writer": {
+        "package": "pool",
+        "command": "hive-pool",
+        "operation": "hold-question",
+        "implementation_version": "0.1.0"
+      }
+    }
+  ]
+}

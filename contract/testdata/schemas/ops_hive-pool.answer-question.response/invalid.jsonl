@@ -1,0 +1,17 @@
+{"name":"answer-sequence-not-an-integer","base":"accepted.json","edits":[{"op":"replace","path":"/answer_sequence","value":"1"}]}
+{"name":"answer-sequence-zero","base":"accepted.json","edits":[{"op":"replace","path":"/answer_sequence","value":0}]}
+{"name":"disposition-moot","base":"accepted.json","edits":[{"op":"replace","path":"/disposition","value":"moot"}]}
+{"name":"disposition-unknown","base":"accepted.json","edits":[{"op":"replace","path":"/disposition","value":"applied"}]}
+{"name":"duplicate-not-a-boolean","base":"accepted.json","edits":[{"op":"replace","path":"/duplicate","value":"no"}]}
+{"name":"hold-missing-hold-id","base":"accepted.json","edits":[{"op":"remove","path":"/hold/hold_id"}]}
+{"name":"hold-not-an-object","base":"accepted.json","edits":[{"op":"replace","path":"/hold","value":[]}]}
+{"name":"missing-answer-sequence","base":"accepted.json","edits":[{"op":"remove","path":"/answer_sequence"}]}
+{"name":"missing-disposition","base":"accepted.json","edits":[{"op":"remove","path":"/disposition"}]}
+{"name":"missing-duplicate","base":"accepted.json","edits":[{"op":"remove","path":"/duplicate"}]}
+{"name":"missing-hold","base":"accepted.json","edits":[{"op":"remove","path":"/hold"}]}
+{"name":"missing-question","base":"accepted.json","edits":[{"op":"remove","path":"/question"}]}
+{"name":"missing-round","base":"accepted.json","edits":[{"op":"remove","path":"/round"}]}
+{"name":"question-answered-without-applied","base":"accepted.json","edits":[{"op":"remove","path":"/question/applied"}]}
+{"name":"question-schema-wrong-const","base":"accepted.json","edits":[{"op":"replace","path":"/question/schema","value":"pool.hold"}]}
+{"name":"round-closed-without-closed-at","base":"accepted.json","edits":[{"op":"remove","path":"/round/closed_at"}]}
+{"name":"unknown-member","base":"accepted.json","edits":[{"op":"add","path":"/receipts","value":[]}]}

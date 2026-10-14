@@ -1,0 +1,36 @@
+{
+  "question": {
+    "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+    "held_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+    "origin": {
+      "kind": "supervisor"
+    },
+    "text": "Which vendor should the integration use?",
+    "consequence": "Without an answer the integration work stays held.",
+    "recommendation": "keep-vendor",
+    "options": [
+      {
+        "option_id": "keep-vendor",
+        "label": "Keep the vendor",
+        "consequence": "The integration stays on the current vendor and the migration is dropped."
+      },
+      {
+        "option_id": "switch-vendor",
+        "label": "Switch vendor",
+        "consequence": "The integration moves to the second vendor and the work is re-planned."
+      }
+    ],
+    "asked_at": "2026-10-12T09:00:00.000Z"
+  },
+  "round": {
+    "decision_round_id": "dr_01jc7d8e9f0g1h2j3k4m5n6p7r",
+    "new": false
+  },
+  "card_id": "card_01jc7d8e9f0g1h2j3k4m5n6p7s",
+  "hold_reason": "Waiting for the vendor decision.",
+  "requested_by": {
+    "kind": "package",
+    "package": "word",
+    "command": "hive-word"
+  }
+}

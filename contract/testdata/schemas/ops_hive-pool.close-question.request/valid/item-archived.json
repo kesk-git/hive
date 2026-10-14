@@ -1,0 +1,18 @@
+{
+  "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+  "reason": "The work was dropped, so nothing is left for the hold to gate.",
+  "evidence": [
+    {
+      "kind": "item-archived",
+      "ref": {
+        "schema": "pool.item",
+        "id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f"
+      }
+    }
+  ],
+  "requested_by": {
+    "kind": "package",
+    "package": "word",
+    "command": "hive-word"
+  }
+}
