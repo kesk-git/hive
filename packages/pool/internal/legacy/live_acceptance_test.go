@@ -694,28 +694,45 @@ func TestExportFromAMigrationEmitsAnUnmodifiedEntryThatCannotBeRenderedCanonical
 }
 
 // One legacy identifier that two imports gave to two items is never written
-// for a rendered item: the export is refused naming it, rather than a file
-// that would read back as one item.
-func TestExportFromAMigrationRefusesALegacyIdentifierOfTwoItems(t *testing.T) {
+// for both in one rendering: an export that would emit it for both is refused
+// naming it, rather than a file that would read back as one item, and the
+// export of one migration, which emits it for one, is not.
+func TestExportRefusesALegacyIdentifierOfTwoItemsInOneRendering(t *testing.T) {
 	h := newHome(t)
 	pathA, dataA, whenA := sourceBytes(t, []byte("# Backlog\n\n## Queued\n- [ ] dup-a1 - first\n\n## Done\n"))
 	imA := h.importPath(pathA, dataA, whenA, "UTC")
 	pathB, dataB, whenB := sourceBytes(t, []byte("# Backlog\n\n## Queued\n- [ ] dup-a1 - second\n\n## Done\n"))
 	h.importPath(pathB, dataB, whenB, "UTC")
 	id := imA.migration["migration_id"].(string)
-	if out := h.exportMigration(id, nil); out["exact"] != true {
-		t.Fatalf("the export of an unmodified import is not exact: %v", out)
-	}
 	ok(t, h.do("update", map[string]any{"task_id": imA.taskID("dup-a1"), "patch": map[string]any{"priority": int64(3)}}))
-	for name, extra := range map[string]map[string]any{"from the migration": nil, "with normalize": {"normalize": true}} {
+
+	out := h.exportMigration(id, nil)
+	if text := out["text"].(string); out["exact"] != false || !strings.Contains(text, "- [ ] dup-a1 - first (priority: 3)") || strings.Contains(text, "second") {
+		t.Errorf("the export of the migration does not render its own item alone (exact %v):\n%s", out["exact"], text)
+	}
+	resp := h.do("export-legacy", map[string]any{"migration_id": id, "zone": "UTC", "normalize": true})
+	refused(t, resp, envelope.Invalid, "pool.legacy_malformed")
+	if resp.Error.Detail["legacy_id"] != "dup-a1" {
+		t.Errorf("the refusal names %v", resp.Error.Detail)
+	}
+}
+
+// An item whose new state moves it behind a later entry of its identifier, a
+// duplicate or an excluded entry, would not be read back as the item: the
+// export is refused naming the identifier.
+func TestExportFromAMigrationRefusesAnItemMovedBehindAnotherEntryOfItsIdentifier(t *testing.T) {
+	for name, text := range map[string]string{
+		"a duplicate":       "# Backlog\n\n## Queued\n- [ ] twin-a1 - current\n- [ ] twin-a1 - stale\n\n## Done\n",
+		"an excluded entry": "# Backlog\n\n## Queued\n- [ ] twin-a1 - current\n\n## Done\n- [x] twin-a1 - PERSISTENT SECONDMATE owns the project (done 2026-10-01)\n",
+	} {
 		t.Run(name, func(t *testing.T) {
-			body := map[string]any{"migration_id": id, "zone": "UTC"}
-			for k, v := range extra {
-				body[k] = v
-			}
-			resp := h.do("export-legacy", body)
+			h := newHome(t)
+			path, data, when := sourceBytes(t, []byte(text))
+			im := h.importPath(path, data, when, "UTC")
+			ok(t, h.do("transition", map[string]any{"task_id": im.taskID("twin-a1"), "to": "done", "at": "2026-10-10T12:00:00.000Z"}))
+			resp := h.do("export-legacy", map[string]any{"migration_id": im.migration["migration_id"].(string), "zone": "UTC"})
 			refused(t, resp, envelope.Invalid, "pool.legacy_malformed")
-			if resp.Error.Detail["legacy_id"] != "dup-a1" {
+			if resp.Error.Detail["legacy_id"] != "twin-a1" {
 				t.Errorf("the refusal names %v", resp.Error.Detail)
 			}
 		})

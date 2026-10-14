@@ -252,9 +252,11 @@ func legacyMember(data map[string]any, key string) string {
 
 // renderer reads items out of a graph into the legacy form.
 type renderer struct {
-	g      *read.Graph
-	loc    *time.Location
-	owners map[string][]string
+	g   *read.Graph
+	loc *time.Location
+	// named is the item each identifier the rendering writes stands for, or
+	// "" for an edge the import kept to an identifier it held no item for.
+	named map[string]string
 }
 
 // identity is the identifier an item is written under: its legacy one, and for
@@ -268,27 +270,25 @@ func (r *renderer) identity(taskID string) string {
 	return taskID
 }
 
-// name is the identifier an item is written under, refused when another item
-// of the Pool is written under it too: a file that held it twice would be
-// read back as one item.
+// name is the identifier an item is written under, refused when the rendering
+// writes it for another item too: a file that held it for two would be read
+// back as one.
 func (r *renderer) name(taskID string) (string, error) {
 	id := r.identity(taskID)
-	if len(r.ownersOf(id)) > 1 {
-		return "", envelope.Fail(envelope.Invalid, codeLegacyMalformed, "the legacy identifier "+id+" stands for more than one item").With("task_id", taskID).With("legacy_id", id)
-	}
-	return id, nil
+	return id, r.claim(id, taskID)
 }
 
-// ownersOf is the items written under the identifier.
-func (r *renderer) ownersOf(id string) []string {
-	if r.owners == nil {
-		r.owners = map[string][]string{}
-		for _, taskID := range r.g.Order {
-			name := r.identity(taskID)
-			r.owners[name] = append(r.owners[name], taskID)
-		}
+// claim records that the identifier stands for the item where the rendering
+// writes it, or for none, and refuses it where it already stands for another.
+func (r *renderer) claim(id, taskID string) error {
+	if prior, ok := r.named[id]; ok && prior != taskID {
+		return envelope.Fail(envelope.Invalid, codeLegacyMalformed, "the legacy identifier "+id+" would stand for more than one item").With("legacy_id", id)
 	}
-	return r.owners[id]
+	if r.named == nil {
+		r.named = map[string]string{}
+	}
+	r.named[id] = taskID
+	return nil
 }
 
 // section is the state of the section an item stands in. An item that has
@@ -379,12 +379,12 @@ func (r *renderer) task(id string) (*Task, error) {
 		if id, reason, found := strings.Cut(value, " - "); found {
 			dep.ID, dep.Reason = id, reason
 		}
-		if len(r.ownersOf(dep.ID)) > 0 {
-			return nil, envelope.Fail(envelope.Invalid, codeLegacyMalformed, "the legacy identifier "+dep.ID+" names an item the edge was not made to").With("task_id", id).With("legacy_id", dep.ID)
-		}
 		d, err := NormalizeDep(t.ID, dep)
 		if err != nil {
 			return nil, malformed(err)
+		}
+		if err := r.claim(d.ID, ""); err != nil {
+			return nil, err
 		}
 		t.Deps = append(t.Deps, d)
 	}
@@ -568,6 +568,9 @@ func exportMigration(c *cli.Call, st *cstore.Store, g *read.Graph, loc *time.Loc
 		if e.Disposition != DispositionItem {
 			continue
 		}
+		if _, err := r.name(e.TaskID); err != nil {
+			return nil, err
+		}
 		present := r.section(e.TaskID)
 		inPlace := layout.Sections[secOf[i]].State == present
 		if inPlace && unmodified(g, e.TaskID, e) {
@@ -593,6 +596,8 @@ func exportMigration(c *cli.Call, st *cstore.Store, g *read.Graph, loc *time.Loc
 		state  State
 		lines  []string
 		rows   []any
+		// entries are the entries the section emits, in their order.
+		entries []int
 		// newSection says that the file had no section for the state.
 		newSection bool
 	}
@@ -608,6 +613,9 @@ func exportMigration(c *cli.Call, st *cstore.Store, g *read.Graph, loc *time.Loc
 	for _, sec := range layout.Sections {
 		os := &outSection{header: sec.Header, state: sec.State}
 		for _, b := range sec.Blocks {
+			if b.Entry >= 0 && !isMoved[b.Entry] {
+				os.entries = append(os.entries, b.Entry)
+			}
 			switch {
 			case b.Entry < 0 || m.Entries[b.Entry].Disposition != DispositionItem:
 				os.lines = append(os.lines, b.Lines...)
@@ -637,6 +645,20 @@ func exportMigration(c *cli.Call, st *cstore.Store, g *read.Graph, loc *time.Loc
 		}
 		os.lines = slices.Insert(os.lines, at, canonical[mv.entry]...)
 		os.rows = append(os.rows, row(mv.entry, "rendered"))
+		os.entries = append(os.entries, mv.entry)
+	}
+	// An import makes its item of the first entry of an identifier, and an
+	// excluded entry excludes those after it: an item emitted after another
+	// entry of its identifier would not be read back.
+	seen := map[string]bool{}
+	for _, os := range out {
+		for _, i := range os.entries {
+			e := m.Entries[i]
+			if e.Disposition == DispositionItem && seen[e.LegacyID] {
+				return nil, envelope.Fail(envelope.Invalid, codeLegacyMalformed, "the legacy identifier "+e.LegacyID+" would be read back from an entry other than its item's").With("task_id", e.TaskID).With("legacy_id", e.LegacyID)
+			}
+			seen[e.LegacyID] = true
+		}
 	}
 
 	lines := slicesClone(layout.Preamble)
