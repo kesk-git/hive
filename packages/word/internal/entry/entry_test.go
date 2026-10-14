@@ -86,10 +86,10 @@ func TestTheExecutableAgreesWithTheDeclaration(t *testing.T) {
 
 // built are the operations that persist through one handoff to the Pool; the
 // others are declared and not built yet.
-var built = []string{"hold", "revise", "release", "complete", "close"}
+var built = []string{"hold", "revise", "answer", "release", "complete", "close"}
 
 // Every command name, as the executable is started under it, answers
-// capabilities for that command and no other. The five handoffs are supported
+// capabilities for that command and no other. The six handoffs are supported
 // mutating operations that call hive-pool and write no receipt of their own;
 // the rest are unsupported.
 func TestEachNameAnswersCapabilities(t *testing.T) {
