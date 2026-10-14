@@ -346,9 +346,9 @@ func TestASecondAnswerWithTheSameSourceIsOneAnswer(t *testing.T) {
 		t.Fatal("the two answers share a request")
 	}
 	if len(secondResp.Receipts) != len(firstResp.Receipts) || len(firstResp.Receipts) == 0 {
-		t.Fatalf("receipts %v, want %v", secondResp.Receipts, firstResp.Receipts)
+		t.Errorf("receipts %v, want the first answer's %v", secondResp.Receipts, firstResp.Receipts)
 	}
-	for i := range firstResp.Receipts {
+	for i := range min(len(firstResp.Receipts), len(secondResp.Receipts)) {
 		if secondResp.Receipts[i].ReceiptID != firstResp.Receipts[i].ReceiptID || secondResp.Receipts[i].Kind != firstResp.Receipts[i].Kind {
 			t.Errorf("receipt %d is %s %s, want the first answer's %s %s", i, secondResp.Receipts[i].Kind, secondResp.Receipts[i].ReceiptID, firstResp.Receipts[i].Kind, firstResp.Receipts[i].ReceiptID)
 		}
