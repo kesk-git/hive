@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -39,6 +40,10 @@ var (
 	projectID   = id(ids.Project, 1)
 	cloneID     = id(ids.Clone, 1)
 )
+
+// chainPath is the path a lower layer names in the error the fail operation
+// returns for "chain".
+const chainPath = "/srv/hive-test/records/thing.json"
 
 // The schemas the test operations declare: the provision request body as a
 // request body, and the common definitions, which admit any object, as a
@@ -395,6 +400,8 @@ func newHarness(t testing.TB) *harness {
 			switch c.Request.Body["home"].(map[string]any)["name"] {
 			case "panic":
 				panic("boom")
+			case "chain":
+				return nil, fmt.Errorf("reading %s: %w", chainPath, fmt.Errorf("open %s: %w", chainPath, fs.ErrNotExist))
 			case "unknown":
 				return nil, envelope.Common(envelope.CodeOutcomeUnknown, "the adapter did not answer")
 			case "bad failure":
