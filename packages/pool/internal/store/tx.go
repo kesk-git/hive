@@ -170,6 +170,9 @@ func compare(st *cstore.Store, rw cstore.RecordWrite) error {
 		}
 		return err
 	}
+	if err := regular(st, rw.Path); err != nil {
+		return err
+	}
 	cur, err := st.ReadRecord(rw.Path)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):

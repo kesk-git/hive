@@ -52,6 +52,9 @@ func Load(st *cstore.Store, kind, id string) (*Loaded, *Omission, error) {
 }
 
 func load(st *cstore.Store, k Kind, path, id string) (*Loaded, *Omission, error) {
+	if err := regular(st, path); err != nil {
+		return nil, &Omission{id, ReasonMalformed}, nil
+	}
 	rec, err := st.ReadRecord(path)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
@@ -74,6 +77,24 @@ func load(st *cstore.Store, k Kind, path, id string) (*Loaded, *Omission, error)
 		return nil, &Omission{id, ReasonMalformed}, nil
 	}
 	return &Loaded{ID: id, Data: v.(map[string]any), Revision: rec.Revision}, nil, nil
+}
+
+// regular refuses, by its entry and without opening it, anything at a record
+// path that is not a regular file, such as a directory, a link or a FIFO: it
+// is cstore.ErrRecordMalformed, as is a path the store refuses to resolve. An
+// absent record is not refused.
+func regular(st *cstore.Store, path string) error {
+	full, err := st.Path(path)
+	if err == nil {
+		var info fs.FileInfo
+		if info, err = os.Lstat(full); err == nil && !info.Mode().IsRegular() {
+			err = errors.New("not a regular file")
+		}
+	}
+	if err == nil || errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return fmt.Errorf("%w: %s: %v", cstore.ErrRecordMalformed, path, err)
 }
 
 // LoadAll reads every record of the kind, in the order of their identities,
