@@ -57,7 +57,7 @@ One JSON document, following `response.v1`, for every invocation that gets as fa
 
 | Field | Meaning |
 | --- | --- |
-| `request_id`, `command`, `operation` | Echo the request. `request_id` is null only when none could be read. |
+| `request_id`, `command`, `operation` | Echo the request. `request_id` is null only when none could be read. `operation` is null when the invocation names an operation the command does not declare: that name is the caller's own text, and neither the response nor standard error repeats it. |
 | `status`, `exit_code` | The outcome, as the table below fixes it. |
 | `responder` | The package, command, implementation version and contract version that answered. |
 | `completed_at` | When the response was written. |

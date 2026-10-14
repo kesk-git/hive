@@ -81,6 +81,19 @@ func registry() (*schema.Registry, error) {
 	return r, nil
 }
 
+// violation is the Failure of a document or body that breaks a schema: one
+// sentence naming where the first violation is and what is wrong there, never
+// a member's name or a value of the document, and the whole list of violations
+// as its detail.
+func violation(what, ref string, ve *schema.ValidationError) *Failure {
+	v := ve.Violations[0]
+	at := "the " + what
+	if v.Instance != "" {
+		at = v.Instance
+	}
+	return Common(CodeSchemaViolation, fmt.Sprintf("the %s breaks %s at %s (%s)", what, ref, at, v.Message)).Because(ve)
+}
+
 // decodeDocument reads data as the document of the named schema: a Hive
 // record (malformed_request otherwise), of a version this build reads
 // (unsupported_version otherwise) and valid under the schema
@@ -89,7 +102,7 @@ func registry() (*schema.Registry, error) {
 func decodeDocument(data []byte, name, id, known string) (map[string]any, error) {
 	v, err := schema.Decode(data)
 	if err != nil {
-		return nil, Common(CodeMalformedRequest, "the document is not a record: "+err.Error())
+		return nil, Common(CodeMalformedRequest, "the document is not a Hive record").Because(err)
 	}
 	obj, ok := v.(map[string]any)
 	if !ok {
@@ -97,7 +110,7 @@ func decodeDocument(data []byte, name, id, known string) (map[string]any, error)
 	}
 	if obj["schema"] == name {
 		if version, _ := obj["schema_version"].(string); Newer(version, known) {
-			return nil, Common(CodeUnsupportedVersion, fmt.Sprintf("%s is at version %s; this build reads up to %s", name, version, known))
+			return nil, Common(CodeUnsupportedVersion, "the document is of a version this build does not read").Because(fmt.Errorf("%s is at version %s; this build reads up to %s", name, version, known))
 		}
 	}
 	reg, err := registry()
@@ -107,7 +120,7 @@ func decodeDocument(data []byte, name, id, known string) (map[string]any, error)
 	if err := reg.Validate(id, data); err != nil {
 		var ve *schema.ValidationError
 		if errors.As(err, &ve) {
-			return nil, Common(CodeSchemaViolation, "the document breaks "+id+": "+ve.Error())
+			return nil, violation("document", id, ve)
 		}
 		return nil, Common(CodeInternal, "the document cannot be checked against "+id).Because(err)
 	}
@@ -165,7 +178,7 @@ func ValidateBody(body map[string]any, ref string) error {
 	if err := reg.Validate(ref, out); err != nil {
 		var ve *schema.ValidationError
 		if errors.As(err, &ve) {
-			return Common(CodeSchemaViolation, "the body breaks "+ref+": "+ve.Error())
+			return violation("body", ref, ve)
 		}
 		return Common(CodeInternal, "the body cannot be checked against "+ref).Because(err)
 	}

@@ -159,16 +159,20 @@ func TestProvisionCreatesTheFourIdentityRecordsAndAReplayWritesNothing(t *testin
 		t.Errorf("%d receipt files on disk", onDisk)
 	}
 
-	// Nothing else: the home holds only its record, dispatch's own part and the
-	// locks, and the clone and its Git directory are as they were.
+	// Nothing else: the home holds only its record, dispatch's own part, the
+	// locks and the journal, which holds no event, and the clone and its Git
+	// directory are as they were.
 	entries, err := os.ReadDir(home)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, e := range entries {
-		if e.Name() != "home.json" && e.Name() != "dispatch" && e.Name() != "locks" {
+		if e.Name() != "home.json" && e.Name() != "dispatch" && e.Name() != "locks" && e.Name() != "journal" {
 			t.Errorf("the home holds %s", e.Name())
 		}
+	}
+	if lines, err := os.ReadDir(filepath.Join(home, "journal")); err != nil || len(lines) != 0 {
+		t.Errorf("the journal holds %d entries (%v)", len(lines), err)
 	}
 	if !reflect.DeepEqual(before, snapshot(t, clone)) {
 		t.Error("the clone changed")

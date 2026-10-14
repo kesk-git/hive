@@ -54,3 +54,23 @@ func TestOtherFactsDoNotBorrowTheDiagnosticSchema(t *testing.T) {
 		t.Error("a longer kind borrowed the diagnostic schema")
 	}
 }
+
+// The journal landed in stage 1 does not apply the no-value check, and says
+// so; Opener opens it for the package named.
+func TestJournalSaysItDoesNotYetApplyTheNoValueCheck(t *testing.T) {
+	home := newHome(t, false)
+	j, err := Opener("pool")(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, ok := j.(interface{ ChecksValues() bool })
+	if !ok || c.ChecksValues() {
+		t.Errorf("the journal says it applies the check: %v", ok)
+	}
+	if jj, _ := j.(*Journal); jj == nil || jj.Package() != "pool" {
+		t.Errorf("journal %v", j)
+	}
+	if _, err := Opener("nothing")(home); err == nil {
+		t.Error("a package of no name was opened")
+	}
+}

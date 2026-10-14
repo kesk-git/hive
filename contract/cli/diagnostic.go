@@ -19,16 +19,23 @@ const (
 	requestSchema    = "hive.request"
 )
 
+// valueChecker is a journal that says whether its own validation applies the
+// no-value check of the design's Secrets section to a body.
+type valueChecker interface{ ChecksValues() bool }
+
 // diagnose records, in the journal of the home at dir, the detail of a failed
 // invocation that holds some beyond its message: a lower-layer error chain or a
 // panic (spec/commands.md, Invocation). req is the request where it was read.
 //
+// No free text is kept before the no-value check is in force: the event is
+// appended only through a journal that says its validation applies that check.
 // Nothing is written for an ok response, a replayed one or a failure whose
-// message says everything, and nothing where the executable configures no
-// journal, dir is not a directory whose home record reads, or the journal does
-// not open. The append is made after the response is decided and before it is
-// written, and a failure of it changes nothing: the detail is dropped, and the
-// response, its status, its exit code and standard error stand.
+// message says everything, and nothing where the executable gives no journal,
+// dir is not a directory whose home record reads, the journal does not open or
+// does not apply the check. The append is made after the response is decided
+// and before it is written, and a failure of it, a body the check refuses
+// included, changes nothing: the detail is dropped whole, and the response, its
+// status, its exit code and standard error stand.
 func (e *Executable) diagnose(dir string, req *envelope.Request, resp *envelope.Response) {
 	if e.Journal == nil || dir == "" || resp.Status == envelope.Ok || resp.Error == nil || resp.Replayed || resp.Diagnostic.Empty() {
 		return
@@ -37,11 +44,14 @@ func (e *Executable) diagnose(dir string, req *envelope.Request, resp *envelope.
 	if err != nil || home.HomeID == "" {
 		return
 	}
-	event, err := e.diagnosticEvent(home.HomeID, req, resp)
+	j, err := e.Journal(home.Dir)
 	if err != nil {
 		return
 	}
-	j, err := e.Journal(home.Dir)
+	if c, ok := j.(valueChecker); !ok || !c.ChecksValues() {
+		return
+	}
+	event, err := e.diagnosticEvent(home.HomeID, req, resp)
 	if err != nil {
 		return
 	}
@@ -79,9 +89,6 @@ func (e *Executable) diagnosticEvent(homeID string, req *envelope.Request, resp 
 	}
 	if d.Stack != "" {
 		body["stack"] = d.Stack
-	}
-	if d.PanicType != "" {
-		body["panic_type"] = d.PanicType
 	}
 
 	m := map[string]any{

@@ -175,6 +175,25 @@ func (j *Journal) path(name string) (string, error) {
 // Package is the package the journal was opened by, or "".
 func (j *Journal) Package() string { return j.pkg }
 
+// ChecksValues says whether the journal's own validation of an event applies
+// the no-value check of the design's Secrets section to its body. It does not
+// yet: the fixed list of credential shapes enters the schema package with the
+// first writer of stage 2, and with it this returns true. A writer of free text
+// appends it only through a journal that says so.
+func (j *Journal) ChecksValues() bool { return false }
+
+// Opener is the function that opens the journal of a home for the package pkg,
+// as an executable's Journal configures it.
+func Opener(pkg string) func(dir string) (store.Journal, error) {
+	return func(dir string) (store.Journal, error) {
+		j, err := Open(dir, Options{Package: pkg})
+		if err != nil {
+			return nil, err
+		}
+		return j, nil
+	}
+}
+
 // Head returns the home_sequence of the last durable line, or 0 while the
 // journal holds none. A torn tail does not count. Head takes no lock, and
 // reads the last line of the last segment by the rule of the Reader: it counts

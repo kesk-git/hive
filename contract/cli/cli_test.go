@@ -175,9 +175,9 @@ func TestUsage(t *testing.T) {
 	}{
 		{"unknown command name", "hive-nest", []string{"echo", "--home", home}, "usage", ""},
 		{"no arguments", "hive-fleet", nil, "usage", ""},
-		{"unknown operation", "hive-fleet", []string{"fly", "--home", home}, "unknown_operation", "fly"},
+		{"unknown operation", "hive-fleet", []string{"fly", "--home", home}, "unknown_operation", ""},
 		{"operation of no form", "hive-fleet", []string{"Fly!", "--home", home}, "unknown_operation", ""},
-		{"capabilities of a command without the operation", "hive-park", []string{"echo", "--home", home}, "unknown_operation", "echo"},
+		{"capabilities of a command without the operation", "hive-park", []string{"echo", "--home", home}, "unknown_operation", ""},
 		{"missing home", "hive-fleet", []string{"echo"}, "usage", "echo"},
 		{"home without a value", "hive-fleet", []string{"echo", "--home"}, "usage", "echo"},
 		{"home given twice", "hive-fleet", []string{"echo", "--home", home, "--home", home}, "usage", "echo"},

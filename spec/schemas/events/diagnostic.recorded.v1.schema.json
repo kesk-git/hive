@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:hive:schema:events:diagnostic.recorded:v1",
   "title": "Event body: <package>.diagnostic.recorded",
-  "description": "The detail of a failed command that its error message does not carry: the lower-layer error chain, outermost first, or a panic's stack and the Go type of its value. The one body schema shared by the kind every package writes as its own, <package>.diagnostic.recorded. It holds no value and never the text of a request, an argument or an option. The event's basis is the observation of the request that failed (schema hive.request, the request_id), or, when the request could not be read, of the invocation (schema hive.invocation, the event's own correlation_id). See spec/events.md.",
+  "description": "The detail of a failed command that its error message does not carry: the lower-layer error chain, outermost first, or a panic's stack. The one body schema shared by the kind every package writes as its own, <package>.diagnostic.recorded. It holds no value and never the text of a request, an argument or an option. The event's basis is the observation of the request that failed (schema hive.request, the request_id), or, when the request could not be read, of the invocation (schema hive.invocation, the event's own correlation_id). See spec/events.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -55,12 +55,6 @@
       "description": "The stack of a panic, clipped to 8,192 bytes. Present only for a panic.",
       "type": "string",
       "maxLength": 8192
-    },
-    "panic_type": {
-      "description": "The Go type of a panic's value, never the value. Present only for a panic.",
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 200
     }
   }
 }

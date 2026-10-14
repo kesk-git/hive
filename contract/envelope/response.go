@@ -27,6 +27,15 @@ type Response struct {
 	Diagnostic *Diagnostic
 }
 
+// Failure is the Failure a response with an error says, with the detail it
+// holds, or nil for a response without one.
+func (r *Response) Failure() *Failure {
+	if r.Error == nil {
+		return nil
+	}
+	return &Failure{Status: r.Status, Err: *r.Error, Receipts: r.Receipts, diagnostic: r.Diagnostic}
+}
+
 // ExitCode is the exit code the response's status fixes.
 func (r *Response) ExitCode() int { return r.Status.ExitCode() }
 

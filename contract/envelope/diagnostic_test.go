@@ -15,7 +15,7 @@ func TestBecauseKeepsTheChainApartFromTheMessage(t *testing.T) {
 	err := fmt.Errorf("reading a record: %w", fmt.Errorf("open a path: %w", fs.ErrNotExist))
 	f := Common(CodeIOFailure, "the record cannot be read").Because(err)
 	d := f.Diagnostic()
-	if d == nil || len(d.Chain) != 3 || d.Chain[0] != err.Error() || d.Chain[2] != fs.ErrNotExist.Error() || d.Stack != "" || d.PanicType != "" {
+	if d == nil || len(d.Chain) != 3 || d.Chain[0] != err.Error() || d.Chain[2] != fs.ErrNotExist.Error() || d.Stack != "" {
 		t.Fatalf("diagnostic %+v", d)
 	}
 	if f.Err.Message != "the record cannot be read" {
@@ -40,8 +40,7 @@ func TestBecauseKeepsTheChainApartFromTheMessage(t *testing.T) {
 }
 
 // The chain is cut to sixteen strings of at most 1,024 bytes, on a character
-// boundary, and the stack of a panic to 8,192 bytes; the panic's type is
-// kept and its value is not.
+// boundary, and the stack of a panic to 8,192 bytes; its value is never kept.
 func TestDiagnosticIsBounded(t *testing.T) {
 	var err error = errors.New(strings.Repeat("é", 800))
 	for i := 0; i < 20; i++ {
@@ -56,24 +55,27 @@ func TestDiagnosticIsBounded(t *testing.T) {
 		t.Errorf("a string of %d bytes, valid %v", len(long), utf8.ValidString(long))
 	}
 
-	f := Common(CodeInternal, "x").Panicked("sk-live-secret", []byte(strings.Repeat("é", 5000)))
-	d = f.Diagnostic()
-	if d.PanicType != "string" || len(d.Stack) > MaxStackBytes || !utf8.ValidString(d.Stack) || len(d.Chain) != 0 {
-		t.Errorf("type %q, stack %d bytes", d.PanicType, len(d.Stack))
-	}
-	if strings.Contains(d.PanicType+d.Stack, "secret") {
-		t.Error("the value is kept")
-	}
-	if got := Common(CodeInternal, "x").Panicked(errors.New("secret"), nil).Diagnostic().PanicType; got != "*errors.errorString" {
-		t.Errorf("type %q", got)
+	d = Common(CodeInternal, "x").Panicked([]byte(strings.Repeat("é", 5000))).Diagnostic()
+	if len(d.Stack) > MaxStackBytes || !utf8.ValidString(d.Stack) || len(d.Chain) != 0 {
+		t.Errorf("stack %d bytes", len(d.Stack))
 	}
 }
 
-// A failure that answers in place of another takes its detail.
+// A failure that answers in place of another takes its detail, or where it has
+// none its code and message, and keeps a detail of its own.
 func TestCarryTakesTheDetail(t *testing.T) {
 	from := Common(CodeInternal, "x").Because(errors.New("lower layer"))
 	to := Common(CodeOutcomeUnknown, "y").Carry(from)
 	if to.Diagnostic() != from.Diagnostic() || Common(CodeInternal, "z").Carry(nil).Diagnostic() != nil {
 		t.Error("detail not carried")
+	}
+	bare := Common(CodeDependencyMissing, "the program is gone")
+	d := Common(CodeOutcomeUnknown, "y").Carry(bare).Diagnostic()
+	if d == nil || len(d.Chain) != 1 || d.Chain[0] != "dependency_missing: the program is gone" {
+		t.Errorf("diagnostic %+v", d)
+	}
+	own := Common(CodeOutcomeUnknown, "y").Because(errors.New("own"))
+	if got := own.Carry(from).Diagnostic(); got.Chain[0] != "own" {
+		t.Errorf("diagnostic %+v", got)
 	}
 }

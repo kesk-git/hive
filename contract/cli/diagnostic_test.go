@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -121,8 +120,8 @@ func (h *harness) diagnostics(t testing.TB) []map[string]any {
 	return out
 }
 
-// A panic answers with a sentence that holds no value; its stack and the type
-// of its value go to the event, and nothing of it to standard error.
+// A panic answers with a sentence that holds no value; its stack goes to the
+// event, and nothing of it to standard error.
 func TestPanicDetailGoesToTheJournalOnly(t *testing.T) {
 	h := newHarness(t)
 	home := newHome(t)
@@ -146,7 +145,7 @@ func TestPanicDetailGoesToTheJournalOnly(t *testing.T) {
 		t.Fatalf("%d diagnostic events", len(events))
 	}
 	body, _ := events[0]["body"].(map[string]any)
-	if body["panic_type"] != "string" || !strings.Contains(body["stack"].(string), "goroutine") || body["detail"] != nil {
+	if !strings.Contains(body["stack"].(string), "goroutine") || body["detail"] != nil || body["panic_type"] != nil {
 		t.Errorf("body %v", body)
 	}
 	if line := string(h.journal.lines[events[0]["event_id"].(string)]); strings.Contains(line, "boom") {
@@ -212,6 +211,8 @@ func TestDetailIsDroppedWhereNothingCanReceiveIt(t *testing.T) {
 			h.exe.Journal = func(string) (store.Journal, error) { return nil, errors.New("the journal is gone") }
 		}},
 		{"the append fails", func(h *harness) { h.journal.fail = errors.New("the journal is full") }},
+		{"the journal does not apply the no-value check", func(h *harness) { h.journal.checks = false }},
+		{"the check refuses the body", func(h *harness) { h.journal.dislikes = chainPath }},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			h := newHarness(t)
@@ -270,41 +271,97 @@ func TestNoEventWithoutDetail(t *testing.T) {
 	}
 }
 
-// The event is one the contract library's journal admits: it resolves the one
-// shared body schema, and reads back from the home.
-func TestDiagnosticEventIsAdmittedByTheJournal(t *testing.T) {
+// The journal landed in stage 1 does not apply the no-value check, so through
+// it no detail is kept: nothing is appended, and the response and its one line
+// of standard error stand.
+func TestLandedJournalKeepsNoDetail(t *testing.T) {
 	h := newHarness(t)
-	h.exe.Journal = func(dir string) (store.Journal, error) {
-		return journal.Open(dir, journal.Options{Package: "dispatch", Clock: h.clk})
-	}
+	h.exe.Journal = journal.Opener("dispatch")
 	home := newHome(t)
 	for n, name := range []string{"chain", "panic"} {
 		req := request(t, "fail", n+1, func(m map[string]any) {
 			m["body"].(map[string]any)["home"].(map[string]any)["name"] = name
 		})
-		expect(t, h.invoke(t, home, "fail", req), envelope.Failed, "internal")
+		code, out, stderr := h.run("hive-fleet", req, "fail", HomeOption, home)
+		resp, err := envelope.AcceptResponse(out, code, id(ids.Request, n+1))
+		if err != nil {
+			t.Fatal(err)
+		}
+		expect(t, resp, envelope.Failed, "internal")
+		if want := "hive-fleet fail: failed internal " + id(ids.Request, n+1) + "\n"; stderr != want {
+			t.Errorf("standard error = %q, want %q", stderr, want)
+		}
 	}
 	j, err := journal.Open(home, journal.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := j.Reader(0)
-	if err != nil {
-		t.Fatal(err)
+	if head, err := j.Head(); err != nil || head != 0 {
+		t.Errorf("the journal holds %d events (%v)", head, err)
 	}
-	var got []string
-	for {
-		e, err := r.Next()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if e == nil {
-			break
-		}
-		got = append(got, e.Kind)
+}
+
+// A journal that applies the no-value check keeps the event; one that refuses
+// the body drops it whole, with the response standing.
+func TestRefusedDetailIsDroppedWhole(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	h.journal.dislikes = chainPath
+	req := request(t, "fail", 7, func(m map[string]any) {
+		m["body"].(map[string]any)["home"].(map[string]any)["name"] = "chain"
+	})
+	expect(t, h.invoke(t, home, "fail", req), envelope.Failed, "internal")
+	if n := len(h.diagnostics(t)); n != 0 {
+		t.Fatalf("%d diagnostic events", n)
 	}
-	if want := []string{"dispatch.diagnostic.recorded", "dispatch.diagnostic.recorded"}; !slices.Equal(got, want) {
-		t.Errorf("the journal holds %v", got)
+	h.journal.dislikes = ""
+	expect(t, h.invoke(t, home, "fail", req), envelope.Failed, "internal")
+	if n := len(h.diagnostics(t)); n != 1 {
+		t.Errorf("%d diagnostic events", n)
+	}
+}
+
+// A failure that replaces another keeps the reason of the one it replaces: the
+// effect that ends unavailable after its intent is answered unknown, and the
+// event holds its code and message.
+func TestReplacedFailureKeepsItsReason(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	expect(t, h.invoke(t, home, "effect", effectRequest(t, 1, "unavailable")), envelope.Unknown, "outcome_unknown")
+	events := h.diagnostics(t)
+	if len(events) != 1 {
+		t.Fatalf("%d diagnostic events", len(events))
+	}
+	body, _ := events[0]["body"].(map[string]any)
+	detail, _ := body["detail"].([]any)
+	if len(detail) != 1 || detail[0] != "dependency_missing: the program is gone" || body["code"] != "outcome_unknown" {
+		t.Errorf("body %v", body)
+	}
+}
+
+// A request that breaks its schema is answered with one sentence naming where,
+// never with a member's name or a value of the request, and its detail goes to
+// the journal.
+func TestSchemaViolationQuotesNothingOfTheRequest(t *testing.T) {
+	const typed = "sk-live-0123456789abcdefSECRET"
+	for name, edit := range map[string]func(m map[string]any){
+		"envelope member": func(m map[string]any) { m[typed] = "x" },
+		"body member":     func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)[typed] = "x" },
+		"body value":      func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["role"] = typed },
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t)
+			home := newHome(t)
+			code, out, stderr := h.run("hive-fleet", request(t, "fail", 5, edit), "fail", HomeOption, home)
+			resp, err := envelope.AcceptResponse(out, code, id(ids.Request, 5))
+			if err != nil {
+				t.Fatal(err)
+			}
+			expect(t, resp, envelope.Invalid, "schema_violation")
+			if strings.Contains(string(out), typed) || strings.Contains(stderr, typed) || strings.Contains(resp.Error.Message, "\n") {
+				t.Errorf("message %q, standard error %q", resp.Error.Message, stderr)
+			}
+		})
 	}
 }
 
@@ -319,15 +376,12 @@ func TestMessagesQuoteNothingTyped(t *testing.T) {
 		command string
 		args    []string
 		message string
-		// echoed is true where the response's operation member, which names
-		// the operation an undeclared invocation asked for, carries it.
-		echoed bool
 	}{
-		{"command name", "hive-" + typed, []string{"echo", HomeOption, home}, "does not own the command name it was started under, of 35 bytes", false},
-		{"operation of no form", "hive-fleet", []string{"Fly" + typed, HomeOption, home}, "argument 1, of 33 bytes, is not an operation name", false},
-		{"operation not declared", "hive-fleet", []string{"fly-" + strings.ToLower(typed), HomeOption, home}, "has no operation of the name in argument 1, of 34 bytes", true},
-		{"unexpected argument", "hive-fleet", []string{"echo", HomeOption, home, typed}, "argument 4 is not an option; the request is never an argument", false},
-		{"unknown option", "hive-fleet", []string{"echo", HomeOption, home, "--" + typed, "x"}, "argument 4, of 32 bytes, is not an option this command takes", false},
+		{"command name", "hive-" + typed, []string{"echo", HomeOption, home}, "does not own the command name it was started under, of 35 bytes"},
+		{"operation of no form", "hive-fleet", []string{"Fly" + typed, HomeOption, home}, "argument 1, of 33 bytes, is not an operation name"},
+		{"operation not declared", "hive-fleet", []string{"fly-" + strings.ToLower(typed), HomeOption, home}, "has no operation of the name in argument 1, of 34 bytes"},
+		{"unexpected argument", "hive-fleet", []string{"echo", HomeOption, home, typed}, "argument 4 is not an option; the request is never an argument"},
+		{"unknown option", "hive-fleet", []string{"echo", HomeOption, home, "--" + typed, "x"}, "argument 4, of 32 bytes, is not an option this command takes"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -339,8 +393,11 @@ func TestMessagesQuoteNothingTyped(t *testing.T) {
 			if !strings.Contains(resp.Error.Message, c.message) {
 				t.Errorf("message %q lacks %q", resp.Error.Message, c.message)
 			}
-			if strings.Contains(strings.ToLower(resp.Error.Message), strings.ToLower(typed)) || !c.echoed && strings.Contains(strings.ToLower(string(out)+stderr), strings.ToLower(typed)) {
+			if strings.Contains(strings.ToLower(resp.Error.Message), strings.ToLower(typed)) || strings.Contains(strings.ToLower(string(out)+stderr), strings.ToLower(typed)) {
 				t.Errorf("the typed text is in the response %s or standard error %q", out, stderr)
+			}
+			if c.name == "operation not declared" && resp.Operation != "" {
+				t.Errorf("the response names the operation %q", resp.Operation)
 			}
 			if strings.Count(stderr, "\n") != 1 || strings.Contains(stderr, resp.Error.Message) {
 				t.Errorf("standard error %q is not one line without the message", stderr)

@@ -61,8 +61,9 @@ type Executable struct {
 	// executable with a supported mutating operation.
 	Storeless bool
 	// Journal opens the home journal of the home at dir for a transaction
-	// that appends events. Nil means the executable appends none; a
-	// transaction that names events then fails.
+	// that appends events, and for the diagnostic event of a failure. Nil
+	// means the executable appends none; a transaction that names events
+	// then fails.
 	Journal func(dir string) (store.Journal, error)
 	// Fault, when set by a test, is installed on every store the executable
 	// opens, which calls it before each step of a write or of a recovery with

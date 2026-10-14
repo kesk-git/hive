@@ -5,7 +5,10 @@
 // to hive-package.json.
 package entry
 
-import "github.com/kesk-git/hive/contract/cli"
+import (
+	"github.com/kesk-git/hive/contract/cli"
+	"github.com/kesk-git/hive/contract/journal"
+)
 
 // Version is the implementation version the executable reports.
 const Version = "0.1.0"
@@ -18,6 +21,7 @@ func Executable() *cli.Executable {
 		Name:      "hive-ui",
 		Version:   Version,
 		Storeless: false,
+		Journal:   journal.Opener("ui"),
 		Commands:  []*cli.Command{{Name: "hive-ui"}},
 	}
 }

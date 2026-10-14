@@ -1,7 +1,0 @@
-{
-  "command": "hive-fleet",
-  "operation": "put",
-  "status": "failed",
-  "code": "internal",
-  "panic_type": "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
-}
