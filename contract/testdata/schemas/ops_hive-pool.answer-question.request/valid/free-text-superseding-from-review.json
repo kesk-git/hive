@@ -1,0 +1,31 @@
+{
+  "card": {
+    "card_id": "card_01jc7d8e9f0g1h2j3k4m5n6p7s",
+    "card_revision": 1,
+    "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+    "question_revision": 1,
+    "held_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+    "held_task_revision": 1,
+    "decision_round_id": "dr_01jc7d8e9f0g1h2j3k4m5n6p7r",
+    "decision_round_revision": 1,
+    "owner_home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "owner_task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7h"
+  },
+  "text": "Switch after all.",
+  "source": {
+    "kind": "review-submission",
+    "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7h",
+    "generation": 1,
+    "review_id": "rev_01jc7d8e9f0g1h2j3k4m5n6p7b",
+    "round_id": 1,
+    "feedback_event_id": "fev_01jc7d8e9f0g1h2j3k4m5n6p7c"
+  },
+  "answered_at": "2026-10-12T10:00:00.000Z",
+  "supersedes": 1,
+  "reconciles": 2,
+  "requested_by": {
+    "kind": "package",
+    "package": "word",
+    "command": "hive-word"
+  }
+}

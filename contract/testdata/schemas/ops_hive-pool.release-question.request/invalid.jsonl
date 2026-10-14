@@ -1,0 +1,14 @@
+{"name":"evidence-not-an-array","base":"with-evidence.json","edits":[{"op":"replace","path":"/evidence","value":{"id":"task_01jc7d8e9f0g1h2j3k4m5n6p7f","schema":"pool.item"}}]}
+{"name":"evidence-ref-digest-malformed","base":"with-evidence.json","edits":[{"op":"add","path":"/evidence/0/digest","value":"md5:abc"}]}
+{"name":"evidence-ref-missing-id","base":"with-evidence.json","edits":[{"op":"replace","path":"/evidence/0","value":{"schema":"pool.item"}}]}
+{"name":"evidence-ref-revision-zero","base":"with-evidence.json","edits":[{"op":"replace","path":"/evidence/0/record_revision","value":0}]}
+{"name":"evidence-ref-schema-malformed","base":"with-evidence.json","edits":[{"op":"replace","path":"/evidence/0/schema","value":"Pool"}]}
+{"name":"missing-note","base":"with-evidence.json","edits":[{"op":"remove","path":"/note"}]}
+{"name":"missing-question-id","base":"with-evidence.json","edits":[{"op":"remove","path":"/question_id"}]}
+{"name":"missing-requested-by","base":"with-evidence.json","edits":[{"op":"remove","path":"/requested_by"}]}
+{"name":"note-empty","base":"with-evidence.json","edits":[{"op":"replace","path":"/note","value":""}]}
+{"name":"note-not-a-string","base":"with-evidence.json","edits":[{"op":"replace","path":"/note","value":3}]}
+{"name":"question-id-wrong-prefix","base":"with-evidence.json","edits":[{"op":"replace","path":"/question_id","value":"dr_01jc7d8e9f0g1h2j3k4m5n6p7q"}]}
+{"name":"requested-by-kind-unknown","base":"with-evidence.json","edits":[{"op":"replace","path":"/requested_by/kind","value":"bot"}]}
+{"name":"requested-by-package-without-command","base":"with-evidence.json","edits":[{"op":"remove","path":"/requested_by/command"}]}
+{"name":"unknown-member","base":"with-evidence.json","edits":[{"op":"add","path":"/answer_sequence","value":1}]}

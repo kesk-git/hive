@@ -1,0 +1,41 @@
+{
+  "question": {
+    "question_id": "q_01jc7d8e9f0g1h2j3k4m5n6p7q",
+    "new_item": {
+      "title": "Decide on the vendor budget",
+      "body": "The budget needs a ruling before any work is planned."
+    },
+    "origin": {
+      "kind": "spend"
+    },
+    "text": "May the integration spend more than planned?",
+    "consequence": "The planning of the integration cannot start.",
+    "options": [],
+    "amount": "40 EUR a month",
+    "asked_at": "2026-10-12T09:00:00.000Z"
+  },
+  "round": {
+    "decision_round_id": "dr_01jc7d8e9f0g1h2j3k4m5n6p7r",
+    "new": true,
+    "origin": {
+      "kind": "spend"
+    },
+    "attachments": [
+      {
+        "file": {
+          "path": "word/rounds/notes.md",
+          "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "bytes": 2048
+        },
+        "fetched": "complete"
+      }
+    ],
+    "complete": true
+  },
+  "card_id": "card_01jc7d8e9f0g1h2j3k4m5n6p7s",
+  "requested_by": {
+    "kind": "package",
+    "package": "word",
+    "command": "hive-word"
+  }
+}
