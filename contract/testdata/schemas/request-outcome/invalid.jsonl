@@ -1,0 +1,15 @@
+{"name":"missing-request-digest","base":"ok.json","edits":[{"op":"remove","path":"/request_digest"}]}
+{"name":"missing-request-id","base":"ok.json","edits":[{"op":"remove","path":"/request_id"}]}
+{"name":"missing-response","base":"ok.json","edits":[{"op":"remove","path":"/response"}]}
+{"name":"missing-schema","base":"ok.json","edits":[{"op":"remove","path":"/schema"}]}
+{"name":"missing-schema-version","base":"ok.json","edits":[{"op":"remove","path":"/schema_version"}]}
+{"name":"not-an-object","base":"ok.json","edits":[{"op":"replace","path":"","value":[]}]}
+{"name":"request-digest-malformed","base":"ok.json","edits":[{"op":"replace","path":"/request_digest","value":"sha256:abc"}]}
+{"name":"request-id-malformed","base":"ok.json","edits":[{"op":"replace","path":"/request_id","value":"req_nope"}]}
+{"name":"request-id-null","base":"ok.json","edits":[{"op":"replace","path":"/request_id","value":null}]}
+{"name":"response-breaks-its-schema","base":"ok.json","edits":[{"op":"replace","path":"/response/exit_code","value":3}]}
+{"name":"response-not-an-object","base":"ok.json","edits":[{"op":"replace","path":"/response","value":[]}]}
+{"name":"schema-version-not-a-string","base":"ok.json","edits":[{"op":"replace","path":"/schema_version","value":1}]}
+{"name":"schema-version-unknown","base":"ok.json","edits":[{"op":"replace","path":"/schema_version","value":"1.1"}]}
+{"name":"schema-wrong","base":"ok.json","edits":[{"op":"replace","path":"/schema","value":"hive.response"}]}
+{"name":"unknown-member","base":"ok.json","edits":[{"op":"add","path":"/extra","value":true}]}
