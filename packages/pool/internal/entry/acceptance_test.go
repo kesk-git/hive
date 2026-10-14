@@ -269,8 +269,9 @@ func equal(a, b map[string]string) bool {
 func TestASharedReadRecoversAnInterruptedTransaction(t *testing.T) {
 	p := newPool(t)
 	id, body := p.hold()
+	eventID := mint(t, ids.Event)
 	event, err := canon.Encode(map[string]any{
-		"schema": "hive.event", "schema_version": "1.0", "event_id": mint(t, ids.Event),
+		"schema": "hive.event", "schema_version": "1.0", "event_id": eventID,
 		"kind": "pool.hold.placed", "kind_version": "1.0",
 		"source":      map[string]any{"package": "pool", "source_id": "pool"},
 		"scope_level": "hive", "home_id": p.homeID, "correlation_id": mint(t, ids.Correlation),
@@ -289,11 +290,11 @@ func TestASharedReadRecoversAnInterruptedTransaction(t *testing.T) {
 	}
 	resp := p.write(poolstore.Transaction{
 		Records: []poolstore.Write{{Kind: "hold", ID: id, Body: body}},
-		Events:  []store.Event{{ID: mint(t, ids.Event), Content: event}},
+		Events:  []store.Event{{ID: eventID, Content: event}},
 	})
 	p.exe.Fault = nil
 	if resp.Status != envelope.Unknown {
-		t.Fatalf("an interrupted write is %s, not unknown", resp.Status)
+		t.Fatalf("an interrupted write is %s, not unknown: %+v", resp.Status, resp.Error)
 	}
 	if _, err := os.Stat(filepath.Join(p.dir, filepath.FromSlash(holdPath(id)))); err == nil {
 		t.Fatal("the record was written before the crash")
@@ -303,8 +304,16 @@ func TestASharedReadRecoversAnInterruptedTransaction(t *testing.T) {
 		t.Fatalf("read: %s %+v", resp.Status, resp.Error)
 	}
 	header, _ := resp.Body["projection"].(map[string]any)
-	if header["home_id"] != p.homeID || header["complete"] != true || header["journal_cursor"] != int64(1) || !clock.Valid(header["read_at"].(string)) {
-		t.Errorf("projection header %v", header)
+	lines, placed := 0, false
+	for _, text := range p.files("journal") {
+		lines += strings.Count(text, "\n")
+		placed = placed || strings.Contains(text, `"kind":"pool.hold.placed"`)
+	}
+	if !placed {
+		t.Error("the recovery did not append the event of the transaction")
+	}
+	if header["home_id"] != p.homeID || header["complete"] != true || header["journal_cursor"] != int64(lines) || lines == 0 || !clock.Valid(header["read_at"].(string)) {
+		t.Errorf("projection header %v over a journal of %d lines", header, lines)
 	}
 	records, _ := resp.Body["records"].([]any)
 	if len(records) != 1 || records[0].(map[string]any)["hold_id"] != id || resp.Body["kind"] != "hold" {
