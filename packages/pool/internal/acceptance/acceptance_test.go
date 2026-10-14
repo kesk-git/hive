@@ -155,11 +155,12 @@ func request(t testing.TB, command, operation string) []byte {
 
 // built are the operations built so far, by command: the items and the holds
 // that are not the decision intake's, with the read of their kinds, and the
-// operations hold-question, revise-question and answer-question, and the dry-run
-// import and export of the legacy backlog. Every other operation of the
-// declaration is declared and refused.
+// operations hold-question, revise-question, answer-question, release-question,
+// complete-question and close-question, and the dry-run import and export of
+// the legacy backlog. Every other operation of the declaration is declared and
+// refused.
 var built = map[string][]string{
-	"hive-pool": {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question", "import-legacy", "export-legacy"},
+	"hive-pool": {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question", "release-question", "complete-question", "close-question", "import-legacy", "export-legacy"},
 }
 
 // Every command name of the package answers capabilities: exit 0, one
