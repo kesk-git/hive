@@ -1,0 +1,16 @@
+{
+  "revision": 2,
+  "revision_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "renderer_version": "0.2.0",
+  "text": "You are a worker. Stay inside the boundary below and stop where the Definition of done says.\n\n# Task\nMake the nightly export stop retrying forever.\n\n# Setup\nPlacement: mac\n\n# Rules\nBoundary: the export worker.\n\n# Definition of done\nA branch with the change.\n",
+  "text_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "text_bytes": 258,
+  "launch_parameters": {
+    "role": "lictor",
+    "harness": "policy",
+    "placement_requested": "codex-cloud",
+    "class": 0,
+    "validation": "direct",
+    "publication": "local-only"
+  }
+}

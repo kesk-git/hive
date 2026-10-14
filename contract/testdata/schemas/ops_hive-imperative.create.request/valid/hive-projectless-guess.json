@@ -1,0 +1,117 @@
+{
+  "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7g",
+  "class": 0,
+  "task": {
+    "intent": "Make the nightly export stop retrying forever when the vendor is down.",
+    "object": {
+      "text": "The nightly export job of the widget service.",
+      "artifact": "The retry loop in the export worker.",
+      "confidence": {
+        "level": "guess",
+        "question": "Which export file is meant?",
+        "consequence": "The wrong file would be changed."
+      }
+    },
+    "standard": {
+      "conditions": "The retry path gives up after three attempts and leaves the queue unchanged.",
+      "evidence": [
+        "The test log of the retry package.",
+        "The diff of the queue worker."
+      ],
+      "rules_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "confidence": {
+        "level": "high"
+      }
+    }
+  },
+  "setup": {
+    "base_branch": "main",
+    "base_revision": "3f5a9c1e7b2d4860a1c3e5f708192a3b4c5d6e7f",
+    "source_branch": "main",
+    "output_branch_rule": "A branch named hive/<task> cut from the source branch.",
+    "role": "lictor",
+    "harness": "policy",
+    "dependencies": [
+      "The vendor sandbox is reachable."
+    ],
+    "tools": [
+      "git",
+      "go-test"
+    ],
+    "access": {
+      "credentials": []
+    },
+    "isolation": [
+      "The working directory is the clone root.",
+      "The repository top level matches the binding."
+    ],
+    "repository": {
+      "kind": "local-only"
+    }
+  },
+  "rules": {
+    "boundary": {
+      "scope": "The export worker and its tests.",
+      "exclusions": [
+        "The vendor client library.",
+        "Deployment files."
+      ],
+      "allowed_effects": [
+        "Edit files in the clone.",
+        "Run the package tests."
+      ],
+      "resources": "One CPU hour of local test time.",
+      "permissions": "Read and write inside the clone only.",
+      "stop_conditions": [
+        "A test outside the worker fails for an unrelated reason."
+      ],
+      "repair_scope": "The worker and its own tests.",
+      "retry_limit": 3,
+      "sensitive": [],
+      "confidence": {
+        "level": "high"
+      }
+    },
+    "validation_commands": [
+      {
+        "name": "export-tests",
+        "argv": [
+          "go",
+          "test",
+          "./export/..."
+        ],
+        "working_directory": "services/export"
+      },
+      {
+        "name": "lint",
+        "argv": [
+          "make",
+          "lint"
+        ]
+      }
+    ],
+    "channels": {
+      "delivery": "Commit to the output branch.",
+      "decisions": "Ask the supervisor through a question.",
+      "blocker_owner": "The supervising session."
+    }
+  },
+  "definition_of_done": {
+    "output": {
+      "deliverable": "A branch holding the retry change and its tests.",
+      "recipient": "The supervising session.",
+      "validation": "direct",
+      "publication": "local-only",
+      "completion_evidence": [
+        "The passing test output.",
+        "The branch name and head revision."
+      ],
+      "confidence": {
+        "level": "guess",
+        "question": "Is a Harvest wanted?",
+        "consequence": "A Harvest would be published."
+      }
+    },
+    "stopping_point": "The branch is pushed and the evidence is written; the worker stops there."
+  }
+}

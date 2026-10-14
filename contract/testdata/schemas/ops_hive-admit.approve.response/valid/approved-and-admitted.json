@@ -1,0 +1,134 @@
+{
+  "admission": {
+    "schema": "pool.admission",
+    "schema_version": "1.0",
+    "record_revision": 4,
+    "admission_id": "adm_01jc7d8e9f0g1h2j3k4m5n6p7h",
+    "task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7f",
+    "scope_level": "project",
+    "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+    "workspace_id": "ws_01jc7d8e9f0g1h2j3k4m5n6p7b",
+    "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7c",
+    "imperative_revision": 1,
+    "imperative_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "request": {
+      "words": "Run the export retry fix now, and keep the vendor client as it is.",
+      "caller": {
+        "kind": "package",
+        "package": "word",
+        "command": "hive-word"
+      },
+      "authority": {
+        "kind": "instruction",
+        "ref": {
+          "schema": "dispatch.instruction",
+          "id": "standing-export-fix"
+        }
+      },
+      "received_at": "2026-10-12T09:00:00.000Z",
+      "source": {
+        "schema": "word.intake",
+        "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7v",
+        "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+        "record_revision": 1,
+        "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    "checks": [
+      {
+        "sequence": 1,
+        "checked_at": "2026-10-12T09:30:00.000Z",
+        "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7s",
+        "imperative_revision": 1,
+        "item_revision": 3,
+        "placement": {
+          "kind": "requested",
+          "value": "claude-cloud-session"
+        },
+        "source_branch": {
+          "branch": "hive/export-retry",
+          "pushed": "unknown",
+          "observed_at": "2026-10-12T09:00:00.000Z"
+        },
+        "specification": {
+          "specification_id": "spec_01jc7d8e9f0g1h2j3k4m5n6p7r",
+          "revision": 1,
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "rules_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "result": "held",
+        "findings": [
+          {
+            "code": "source_branch_not_pushed",
+            "field": "setup.source_branch",
+            "message": "A field holds a guess that would change what gets built."
+          },
+          {
+            "code": "pool.authority_required",
+            "field": "rules.boundary",
+            "message": "A field holds a guess that would change what gets built."
+          }
+        ],
+        "hold_id": "hold_01jc7d8e9f0g1h2j3k4m5n6p7k",
+        "receipt_id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7m"
+      },
+      {
+        "sequence": 2,
+        "checked_at": "2026-10-12T09:30:00.000Z",
+        "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7w",
+        "imperative_revision": 1,
+        "item_revision": 3,
+        "placement": {
+          "kind": "resolved",
+          "value": "claude-cloud-session",
+          "resolved_by": {
+            "schema": "dispatch.policy",
+            "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7w"
+          }
+        },
+        "source_branch": {
+          "branch": "hive/export-retry",
+          "pushed": "true",
+          "observed_at": "2026-10-12T09:00:00.000Z",
+          "revision": "3f5a9c1e7b2d4860a1c3e5f708192a3b4c5d6e7f",
+          "evidence": {
+            "schema": "dispatch.observation",
+            "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7x"
+          }
+        },
+        "specification": {
+          "specification_id": "spec_01jc7d8e9f0g1h2j3k4m5n6p7r",
+          "revision": 1,
+          "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "rules_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "result": "admitted",
+        "findings": [],
+        "receipt_id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7n"
+      }
+    ],
+    "approval": {
+      "authority": {
+        "kind": "word",
+        "ref": {
+          "schema": "pool.question",
+          "id": "q_01jc7d8e9f0g1h2j3k4m5n6p7s",
+          "home_id": "home_01jc7d8e9f0g1h2j3k4m5n6p7a",
+          "record_revision": 2,
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "recorded_at": "2026-10-12T09:30:00.000Z",
+      "request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7v"
+    },
+    "state": "admitted",
+    "created_at": "2026-10-12T09:00:00.000Z",
+    "updated_at": "2026-10-12T09:30:00.000Z",
+    "writer": {
+      "package": "pool",
+      "command": "hive-admit",
+      "operation": "approve",
+      "implementation_version": "0.2.0"
+    }
+  }
+}

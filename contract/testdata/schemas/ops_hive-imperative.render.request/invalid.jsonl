@@ -1,0 +1,17 @@
+{"name":"missing-task-id","base":"specific-revision.json","edits":[{"op":"remove","path":"/task_id"}]}
+{"name":"revision-negative","base":"specific-revision.json","edits":[{"op":"replace","path":"/revision","value":-1}]}
+{"name":"revision-null","base":"specific-revision.json","edits":[{"op":"replace","path":"/revision","value":null}]}
+{"name":"revision-string-current","base":"specific-revision.json","edits":[{"op":"replace","path":"/revision","value":"current"}]}
+{"name":"revision-zero","base":"specific-revision.json","edits":[{"op":"replace","path":"/revision","value":0}]}
+{"name":"task-id-bad-alphabet","base":"specific-revision.json","edits":[{"op":"replace","path":"/task_id","value":"task_01jc7d8e9f0g1h2j3k4m5n6p7i"}]}
+{"name":"task-id-empty","base":"specific-revision.json","edits":[{"op":"replace","path":"/task_id","value":""}]}
+{"name":"task-id-not-string","base":"specific-revision.json","edits":[{"op":"replace","path":"/task_id","value":7}]}
+{"name":"task-id-too-short","base":"specific-revision.json","edits":[{"op":"replace","path":"/task_id","value":"task_01jc7d8e9f0g1h2j3k4m5n6p7"}]}
+{"name":"task-id-uppercase","base":"specific-revision.json","edits":[{"op":"replace","path":"/task_id","value":"TASK_01JC7D8E9F0G1H2J3K4M5N6P7A"}]}
+{"name":"task-id-wrong-prefix","base":"specific-revision.json","edits":[{"op":"replace","path":"/task_id","value":"adm_01jc7d8e9f0g1h2j3k4m5n6p7f"}]}
+{"name":"unknown-member-class","base":"specific-revision.json","edits":[{"op":"add","path":"/class","value":"x"}]}
+{"name":"unknown-member-expected_revision","base":"specific-revision.json","edits":[{"op":"add","path":"/expected_revision","value":"x"}]}
+{"name":"unknown-member-placement","base":"specific-revision.json","edits":[{"op":"add","path":"/placement","value":"x"}]}
+{"name":"unknown-member-renderer_version","base":"specific-revision.json","edits":[{"op":"add","path":"/renderer_version","value":"x"}]}
+{"name":"unknown-member-rules","base":"specific-revision.json","edits":[{"op":"add","path":"/rules","value":"x"}]}
+{"name":"unknown-member-specification","base":"specific-revision.json","edits":[{"op":"add","path":"/specification","value":"x"}]}

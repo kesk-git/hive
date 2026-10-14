@@ -1,0 +1,12 @@
+{"name":"admission-id-bad-alphabet","base":"approve-held-admission.json","edits":[{"op":"replace","path":"/admission_id","value":"adm_01jc7d8e9f0g1h2j3k4m5n6p7i"}]}
+{"name":"admission-id-empty","base":"approve-held-admission.json","edits":[{"op":"replace","path":"/admission_id","value":""}]}
+{"name":"admission-id-not-string","base":"approve-held-admission.json","edits":[{"op":"replace","path":"/admission_id","value":7}]}
+{"name":"admission-id-too-short","base":"approve-held-admission.json","edits":[{"op":"replace","path":"/admission_id","value":"adm_01jc7d8e9f0g1h2j3k4m5n6p7"}]}
+{"name":"admission-id-uppercase","base":"approve-held-admission.json","edits":[{"op":"replace","path":"/admission_id","value":"ADM_01JC7D8E9F0G1H2J3K4M5N6P7A"}]}
+{"name":"admission-id-wrong-prefix","base":"approve-held-admission.json","edits":[{"op":"replace","path":"/admission_id","value":"hold_01jc7d8e9f0g1h2j3k4m5n6p7k"}]}
+{"name":"missing-admission-id","base":"approve-held-admission.json","edits":[{"op":"remove","path":"/admission_id"}]}
+{"name":"unknown-member-authority","base":"approve-held-admission.json","edits":[{"op":"add","path":"/authority","value":"x"}]}
+{"name":"unknown-member-question_id","base":"approve-held-admission.json","edits":[{"op":"add","path":"/question_id","value":"x"}]}
+{"name":"unknown-member-request_id","base":"approve-held-admission.json","edits":[{"op":"add","path":"/request_id","value":"x"}]}
+{"name":"unknown-member-ruling","base":"approve-held-admission.json","edits":[{"op":"add","path":"/ruling","value":"x"}]}
+{"name":"unknown-member-words","base":"approve-held-admission.json","edits":[{"op":"add","path":"/words","value":"x"}]}
