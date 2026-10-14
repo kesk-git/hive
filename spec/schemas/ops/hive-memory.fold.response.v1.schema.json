@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.fold.response:v1",
+  "title": "hive-memory fold: response body",
+  "$ref": "urn:hive:schema:receipts:pool.memory.folded:v1"
+}

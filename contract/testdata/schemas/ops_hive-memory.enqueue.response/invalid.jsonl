@@ -1,0 +1,4 @@
+{"name":"minimal-missing-notes","base":"minimal.json","edits":[{"op":"remove","path":"/notes"}]}
+{"name":"minimal-missing-queue","base":"minimal.json","edits":[{"op":"remove","path":"/queue"}]}
+{"name":"minimal-terminal-note","base":"minimal.json","edits":[{"op":"replace","path":"/notes/0/state","value":"routed"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

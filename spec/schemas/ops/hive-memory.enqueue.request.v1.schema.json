@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.enqueue.request:v1",
+  "title": "hive-memory enqueue: request body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "notes"
+  ],
+  "properties": {
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "provenance",
+          "origin"
+        ],
+        "properties": {
+          "text": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+          },
+          "subject_id": {
+            "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/subject_id"
+          },
+          "fact_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
+          },
+          "provenance": {
+            "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/provenance"
+          },
+          "origin": {
+            "enum": [
+              "stow",
+              "swarm-report",
+              "lictor-report"
+            ]
+          }
+        }
+      },
+      "minItems": 1
+    }
+  }
+}

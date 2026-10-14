@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:receipts:pool.memory.folded:v1",
+  "title": "Maintenance queue drained receipt body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "queue_revision_before",
+    "queue_revision_after",
+    "notes",
+    "facts",
+    "items",
+    "remaining"
+  ],
+  "properties": {
+    "queue_revision_before": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "queue_revision_after": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.note:v1#/$defs/note_id"
+      }
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "note_id",
+          "subject_id",
+          "fact_id"
+        ],
+        "properties": {
+          "note_id": {
+            "$ref": "urn:hive:schema:records:pool.note:v1#/$defs/note_id"
+          },
+          "subject_id": {
+            "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/subject_id"
+          },
+          "fact_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
+          }
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "note_id",
+          "task_id",
+          "reason"
+        ],
+        "properties": {
+          "note_id": {
+            "$ref": "urn:hive:schema:records:pool.note:v1#/$defs/note_id"
+          },
+          "task_id": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+          },
+          "reason": {
+            "enum": [
+              "subject-unknown",
+              "over-budget",
+              "fact-conflict"
+            ]
+          }
+        }
+      }
+    },
+    "remaining": {
+      "const": 0
+    }
+  }
+}

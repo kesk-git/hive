@@ -29,6 +29,8 @@
         "request-outcome",
         "subject",
         "budget",
+        "note",
+        "maintenance-queue",
         "miss"
       ]
     },
@@ -53,12 +55,6 @@
             "$ref": "urn:hive:schema:records:pool.specification:v1"
           },
           {
-            "$ref": "urn:hive:schema:records:pool.rule:v2"
-          },
-          {
-            "$ref": "urn:hive:schema:records:pool.projection:v2"
-          },
-          {
             "$ref": "urn:hive:schema:records:pool.migration:v1"
           },
           {
@@ -77,7 +73,19 @@
             "$ref": "urn:hive:schema:records:pool.budget:v1"
           },
           {
+            "$ref": "urn:hive:schema:records:pool.note:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.maintenance-queue:v1"
+          },
+          {
             "$ref": "urn:hive:schema:records:pool.miss:v1"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.rule:v2"
+          },
+          {
+            "$ref": "urn:hive:schema:records:pool.projection:v2"
           }
         ]
       }
