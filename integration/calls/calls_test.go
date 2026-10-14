@@ -19,13 +19,13 @@ import (
 // file or on standard input, and a response read from standard output or a
 // file, accepted under the rules of spec/commands.md.
 //
-// At this stage no operation of a callee is built, so each call is proved up
-// to the refusal the contract states for it (unsupported_operation, exit 4,
-// for an operation declared and not built; operation_parked for a parked
-// one), and the size proof for it arrives with the stage that builds the
-// operation. An operation that a callee has built and declares supported is
-// proved only up to what no body decides: its capability declaration, its
-// addressing, and the refusals that come before a request is read.
+// Each call to an operation declared and not built is proved up to the
+// refusal the contract states for it (unsupported_operation, exit 4;
+// operation_parked for a parked one), and the size proof for it arrives with
+// the stage that builds the operation. An operation that a callee has built
+// and declares supported is proved only up to what no body decides: its
+// capability declaration, its addressing, and the refusals that come before a
+// request is read.
 
 var declaredCalls = []struct{ caller, callee string }{
 	{"word", "pool"},
