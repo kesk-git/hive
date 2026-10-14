@@ -277,7 +277,7 @@ func (e *Executable) handle(inv Invocation, read **envelope.Request) (resp *enve
 			resp, _ := failed(envelope.AsFailure(err))
 			return resp, nil, nil
 		}
-		if len(res.Records)+len(res.Receipts)+len(res.Events) > 0 {
+		if len(res.Records)+len(res.Receipts)+len(res.Events)+len(res.Durable) > 0 {
 			return fail(req.RequestID, envelope.Common(envelope.CodeInternal, "a read-only operation records nothing, and it returned records")), nil, nil
 		}
 		return ok(res.Body, nil), res.After, nil
@@ -371,6 +371,21 @@ func (e *Executable) handle(inv Invocation, read **envelope.Request) (resp *enve
 		}
 		return settle(resp, e.commit(w, req.RequestID, digest, resp, nil, own, nil)), nil, nil
 	}
+	// A receipt already durable is returned, never written again: it cannot
+	// also be one this request writes.
+	written := map[string]bool{}
+	for _, r := range call.intent {
+		written[r.ReceiptID] = true
+	}
+	for _, r := range res.Receipts {
+		written[r.ReceiptID] = true
+	}
+	for _, r := range res.Durable {
+		if written[r.ReceiptID] {
+			return bail(envelope.Common(envelope.CodeInternal, "the operation returned a receipt as already durable that it also writes")), nil, nil
+		}
+		written[r.ReceiptID] = true
+	}
 	// The records are final before anything is sealed.
 	for i := range res.Records {
 		rec, _, err := call.Finalize(res.Records[i])
@@ -379,8 +394,10 @@ func (e *Executable) handle(inv Invocation, read **envelope.Request) (resp *enve
 		}
 		res.Records[i] = rec
 	}
-	// Every receipt of the request is returned: those of the intents first.
-	resp = ok(res.Body, append(slices.Clone(call.intent), res.Receipts...))
+	// Every receipt of the request is returned: those of the intents first,
+	// then those written now, then those already durable, which are in the
+	// response and not in the transaction.
+	resp = ok(res.Body, slices.Concat(call.intent, res.Receipts, res.Durable))
 	// The response is checked and sized before anything is written, so that a
 	// response too large to return leaves nothing behind. After an intent
 	// something is behind, and the answer is unknown.

@@ -251,6 +251,13 @@ type Result struct {
 	Records  []store.RecordWrite
 	Receipts []envelope.Receipt
 	Events   []store.Event
+	// Durable are receipts that are already durable, returned in the
+	// response's receipts after the receipts of the intents and Receipts, so
+	// that a response can carry what an earlier request wrote. They are held
+	// to the same response checks as the others and are never committed or
+	// written again, so none of them may share an identity with a receipt this
+	// request writes. A read-only operation returns none.
+	Durable []envelope.Receipt
 	// After runs once the response has been written and flushed, for a
 	// resident operation, which then runs until stopped. Its error ends the
 	// process with exit code 1.

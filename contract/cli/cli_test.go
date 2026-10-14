@@ -1428,3 +1428,114 @@ func TestCommandName(t *testing.T) {
 		}
 	}
 }
+
+// A receipt already durable is returned in the response after the receipts
+// the request writes, and is never written again: the transaction holds only
+// what the request wrote, the outcome records the whole response, and a replay
+// returns it.
+func TestDurableReceiptsAreReturnedNotWritten(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	put := func(n int, name string) *envelope.Response {
+		return h.invoke(t, home, "put", request(t, "put", n, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = name }))
+	}
+	recap := put
+	first := put(1, "first")
+	expect(t, first, envelope.Ok, "")
+	h.durable = first.Receipts
+
+	// With nothing of its own to write, the response carries the earlier
+	// receipts, and the store gains the outcome and nothing else.
+	before := tree(t, home)
+	resp := recap(2, "recap")
+	expect(t, resp, envelope.Ok, "")
+	if len(resp.Receipts) != 1 || resp.Receipts[0].ReceiptID != first.Receipts[0].ReceiptID || resp.Receipts[0].RequestID != id(ids.Request, 1) || resp.Replayed {
+		t.Fatalf("receipts %+v", resp.Receipts)
+	}
+	after := tree(t, home)
+	added := []string{}
+	for p := range after {
+		if _, had := before[p]; !had {
+			added = append(added, p)
+		}
+	}
+	if want := store.OutcomePath("dispatch", id(ids.Request, 2)); len(added) != 1 || added[0] != want {
+		t.Errorf("the request wrote %v, want only %s", added, want)
+	}
+	for p, content := range before {
+		if after[p] != content {
+			t.Errorf("%s changed", p)
+		}
+	}
+	if len(h.journal.order) != 1 {
+		t.Errorf("events appended: %v", h.journal.order)
+	}
+
+	// The outcome records the response with them, and a replay returns them.
+	again := recap(2, "recap")
+	expect(t, again, envelope.Ok, "")
+	if !again.Replayed || len(again.Receipts) != 1 || again.Receipts[0].ReceiptID != first.Receipts[0].ReceiptID || h.calls["put"] != 2 {
+		t.Errorf("replay %+v", again)
+	}
+	same(t, after, tree(t, home))
+
+	// Receipts written now come first, then the durable ones.
+	mixed := recap(3, "second")
+	expect(t, mixed, envelope.Ok, "")
+	if len(mixed.Receipts) != 2 || mixed.Receipts[0].Subject == nil || mixed.Receipts[0].Subject.ID != "second" || mixed.Receipts[1].ReceiptID != first.Receipts[0].ReceiptID {
+		t.Fatalf("receipts %+v", mixed.Receipts)
+	}
+	// The one receipt this request wrote is the only one added.
+	if n := countFiles(after, "receipts") + 1; countFiles(tree(t, home), "receipts") != n {
+		t.Errorf("receipts in the store: want %d", n)
+	}
+}
+
+// A durable receipt that the request also writes, a durable receipt from a
+// read-only operation, and a response too large with them each leave nothing
+// behind.
+func TestDurableReceiptsAreHeldToTheChecks(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	first := h.invoke(t, home, "put", request(t, "put", 1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "first" }))
+	expect(t, first, envelope.Ok, "")
+	h.durable = first.Receipts
+	before := tree(t, home)
+
+	clash := h.invoke(t, home, "put", request(t, "put", 2, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "clash" }))
+	expect(t, clash, envelope.Failed, "internal")
+	same(t, before, tree(t, home))
+
+	recall := h.invoke(t, home, "echo", request(t, "echo", 3, nil))
+	expect(t, recall, envelope.Failed, "internal")
+	same(t, before, tree(t, home))
+
+	// Enough of them make a response the command's limit does not admit.
+	h.durable = nil
+	for n := 0; n < 40; n++ {
+		rc := first.Receipts[0]
+		rc.ReceiptID = id(ids.Receipt, 100+n)
+		h.durable = append(h.durable, rc)
+	}
+	big := h.invoke(t, home, "put", request(t, "put", 4, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "third" }))
+	expect(t, big, envelope.TooLarge, "record_too_large")
+	same(t, before, tree(t, home))
+
+	// Two of them with one identity are one receipt returned twice.
+	h.durable = first.Receipts
+	h.durable = append(h.durable, first.Receipts[0])
+	twice := h.invoke(t, home, "put", request(t, "put", 5, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "recap" }))
+	expect(t, twice, envelope.Failed, "internal")
+	same(t, before, tree(t, home))
+}
+
+// countFiles is the number of files of the tree whose path holds the segment.
+func countFiles(files map[string]string, segment string) int {
+	n := 0
+	for p := range files {
+		if strings.Contains(p, "/"+segment+"/") {
+			n++
+		}
+	}
+	return n
+}
