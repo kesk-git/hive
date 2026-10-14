@@ -48,6 +48,22 @@
       "disposition": "translated"
     },
     {
+      "hive_path": "packages/pool/internal/legacy/importer.go",
+      "upstream_paths": [
+        "src/backends/markdown.ts",
+        "src/config.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/legacy/exporter.go",
+      "upstream_paths": [
+        "src/backends/markdown.ts",
+        "src/commands/maintain.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
       "hive_path": "packages/pool/internal/item/links.go",
       "upstream_paths": [
         "src/pr-url.ts",
@@ -202,7 +218,7 @@
     },
     {
       "upstream_path": "src/config.ts, test/config.test.ts",
-      "reason": "Configuration from flags, environment variables and configuration files; Hive reads none as an input to the contract."
+      "reason": "Configuration from flags, environment variables and configuration files; Hive reads none as an input to the contract. Only the two default backlog names of src/config.ts are carried, as documentation of what a caller may point the importer at; the request names the path."
     },
     {
       "upstream_path": "src/errors.ts",
@@ -221,8 +237,8 @@
       "reason": "Minting of slug-xx identifiers; Hive mints ULIDs. Only the identifier pattern the parser accepts is carried."
     },
     {
-      "upstream_path": "src/backends/markdown.ts (the store: load, create, update, remove, moveTo, moveManyTo, transition, addDep, removeDep, prune, render's writing, locking and atomic writes)",
-      "reason": "Not taken by this portion. The pure normalization and the archive lookup are translated; the store verbs belong to the later lanes of the import or are left behind, and prune is not carried for Hive's records."
+      "upstream_path": "src/backends/markdown.ts (the store: create, update, remove, moveTo, moveManyTo, transition, addDep, removeDep, prune, the writing of render, locking and atomic writes)",
+      "reason": "Not taken by these portions. The pure normalization, the archive lookup, the reading of a file whole and its report, and the render of items in the legacy form are translated; the store verbs belong to the later lanes of the import or are left behind, and prune is not carried for Hive's records."
     },
     {
       "upstream_path": "test/backends/markdown.test.ts, test/commands/state.test.ts, test/commands/crud.test.ts, test/derive.test.ts",
@@ -245,7 +261,7 @@
       "reason": "Documentation; none is quoted."
     }
   ],
-  "local_changes": "The grammar, its byte-exact round trip, the normalization of titles, tags, links, holds, dates and dependency reasons, the archive lookup, the recognition of pull request URLs and the legacy identifier are the upstream's behaviour, re-expressed in Go. Hive changes: the parse reads bytes and keeps them (a file that is not UTF-8 round-trips); the JavaScript white space and line terminators the upstream's patterns relied on are written out, since Go's differ; the trailing dependency edge, which the upstream matches with a look-ahead, is matched by hand with the same result; the public-followup marker is kept as body text and never decoded, so the grammar refuses nothing; an archive file is read with the same grammar and its entries resolve by identifier, the state of an archived entry coming from its bullet; nothing is pruned, written or locked; the two groups of tests are carried as Go tests with Hive hosts, dates and identifiers, and the two sample backlogs are re-expressed as Go-side fixtures with Hive's identifiers and wording, recorded as translated portions. Verified against the upstream's compiled parser on generated documents outside the repository.",
+  "local_changes": "The grammar, its byte-exact round trip, the normalization of titles, tags, links, holds, dates and dependency reasons, the archive lookup, the recognition of pull request URLs and the legacy identifier are the upstream's behaviour, re-expressed in Go. Hive changes: the parse reads bytes and keeps them (a file that is not UTF-8 round-trips); the JavaScript white space and line terminators the upstream's patterns relied on are written out, since Go's differ; the trailing dependency edge, which the upstream matches with a look-ahead, is matched by hand with the same result; the public-followup marker is kept as body text and never decoded, so the grammar refuses nothing; an archive file is read with the same grammar and its entries resolve by identifier, the state of an archived entry coming from its bullet; nothing is pruned, written or locked; the two groups of tests are carried as Go tests with Hive hosts, dates and identifiers, and the two sample backlogs are re-expressed as Go-side fixtures with Hive's identifiers and wording, recorded as translated portions. Verified against the upstream's compiled parser on generated documents outside the repository. The dry-run import reads the file whole and reports it with the grammar's parse and its byte-exact render; a persistent supervisor entry (the grammar's secondmate kind) is excluded rather than made an item, and a later entry with an identity already seen is a duplicate. The export renders the Pool's items, which have no source file, canonically and in the section of each item's state: a landed item is read as done, hold tags are written for active holds only, with captain for a word hold and load for a resource hold, and the legacy kind, repo and identifier come from the item's legacy member.",
   "audit": {
     "audited_on": "2026-10-14",
     "statement": "The upstream was read at revision 9401ff899c0d1d8ae6b4fd8727b9025abda2032c (tag tasks-axi-v0.2.6), read-only. Its root LICENSE is 1,065 bytes with digest sha256:945016bd37e1ba7211622ef60ee1d23ab727896ba7710edd21e8fbe983863969, MIT, with the one notice Copyright (c) 2026 Kun Chen, and is kept unchanged. No file under its src/ or test/ carries a copyright or licence header, and it has no NOTICE file. The two sample backlogs were re-expressed as Hive fixtures with invented identifiers and are recorded as translated portions; no fixture is copied byte for byte. No portion embeds text from a third source: the upstream's comments cite a design report of its own, which is not copied. The two runtime libraries are replaced and nothing of them is taken; the development dependencies are compiled into nothing, and the licence files of neither were read."

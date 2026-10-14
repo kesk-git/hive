@@ -9,6 +9,7 @@ import (
 	_ "github.com/kesk-git/hive/packages/pool/internal/decision"
 	"github.com/kesk-git/hive/packages/pool/internal/entry"
 	_ "github.com/kesk-git/hive/packages/pool/internal/item"
+	_ "github.com/kesk-git/hive/packages/pool/internal/legacy"
 )
 
 func main() {
