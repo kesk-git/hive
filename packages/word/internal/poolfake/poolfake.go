@@ -22,15 +22,16 @@ import (
 	"github.com/kesk-git/hive/contract/ids"
 )
 
-// Operations are the hive-pool operations the five handoffs reach, and for
-// each the receipt kind its example answer carries and the example of the
-// response schema it answers with.
+// Operations are the hive-pool operations the handoffs reach, and for each the
+// receipt kind its example answer carries and the example of the response
+// schema it answers with.
 var Operations = map[string]struct{ Receipt, Example string }{
 	"hold-question":     {"pool.question.held", "work-item"},
 	"revise-question":   {"pool.question.revised", "second-revision"},
 	"release-question":  {"pool.question.released", "hold-released"},
 	"complete-question": {"pool.question.completed", "hold-released"},
 	"close-question":    {"pool.question.mooted", "moot-hold-released"},
+	"answer-question":   {"pool.answer.accepted", "accepted"},
 }
 
 const (
@@ -57,6 +58,10 @@ type Pool struct {
 	// instead of the example, as a Pool that finds the records as they stand
 	// would give. Such an answer records no outcome.
 	Refuse func(req *envelope.Request) *envelope.Failure
+	// Disposition, when set, is the disposition the fake gives an
+	// answer-question request: accepted, deferred or unreconciled. Unset, an
+	// answer is accepted.
+	Disposition func(req *envelope.Request) string
 	// Hide makes a read find nothing, as the read of a request that looked
 	// before another reached the Pool.
 	Hide bool
@@ -138,10 +143,21 @@ func (p *Pool) Send(c *cli.Call, request []byte) ([]byte, int, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	if req.Operation == "answer-question" {
+		disposition := "accepted"
+		if p.Disposition != nil {
+			disposition = p.Disposition(req)
+		}
+		body["disposition"], body["duplicate"] = disposition, false
+	}
 	if err := envelope.ValidateBody(body, fmt.Sprintf(responseSchema, req.Operation)); err != nil {
 		return nil, 0, err
 	}
-	receipt, err := Receipt(req, op.Receipt)
+	kind := op.Receipt
+	if req.Operation == "answer-question" {
+		kind = answerReceipt[body["disposition"].(string)]
+	}
+	receipt, err := Receipt(req, kind)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -155,6 +171,12 @@ func (p *Pool) Send(c *cli.Call, request []byte) ([]byte, int, error) {
 	}
 	p.outcomes[req.RequestID] = recorded{cause.Digest, resp}
 	return out, exit, nil
+}
+
+// answerReceipt is the receipt kind the Pool writes for an answer of each
+// disposition.
+var answerReceipt = map[string]string{
+	"accepted": "pool.answer.accepted", "deferred": "pool.question.deferred", "unreconciled": "pool.answer.unreconciled",
 }
 
 // answer is the response to the request, completed as the Pool completes one,
@@ -252,9 +274,13 @@ func example(req *envelope.Request) (map[string]any, error) {
 		}
 		return body, nil
 	}
-	question["question_id"] = req.Body["question_id"]
+	id := req.Body["question_id"]
+	if req.Operation == "answer-question" {
+		id = req.Body["card"].(map[string]any)["question_id"]
+	}
+	question["question_id"] = id
 	if card != nil {
-		card["question_id"] = req.Body["question_id"]
+		card["question_id"] = id
 	}
 	return body, nil
 }
