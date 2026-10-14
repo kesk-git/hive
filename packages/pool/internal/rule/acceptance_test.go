@@ -119,7 +119,9 @@ func TestAQualifyingRuleStaysBesideTheRuleItQualifies(t *testing.T) {
 
 	h = newHome(t)
 	first := h.rule("dispatch.model", "hive", nil)
-	second := h.rule("dispatch.model", "hive", changes(first, "qualifies"))
+	qualifying := changes(first, "qualifies")
+	qualifying["effective_at"] = d05
+	second := h.rule("dispatch.model", "hive", qualifying)
 	body = h.resolved("class-3", "", nil)
 	same(t, "at one scope", applied(body), []string{first, second})
 	if len(conflicts(body)) != 0 || !hasDigest(body) {
