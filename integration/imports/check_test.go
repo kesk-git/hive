@@ -83,6 +83,15 @@ func TestCheckCatchesEachBreak(t *testing.T) {
 		{"an upstream file no record names", 3, "no record names it", 0, func(m fstest.MapFS) {
 			m["packages/pool/upstream/stray/NOTICE"] = &fstest.MapFile{Data: []byte("stray\n")}
 		}},
+		{"an upstream file no record names, in a testdata directory", 3, "no record names it", 0, func(m fstest.MapFS) {
+			m["packages/pool/upstream/stray/testdata/NOTICE"] = &fstest.MapFile{Data: []byte("stray\n")}
+		}},
+		{"an upstream file no record names, in a dist directory", 3, "no record names it", 0, func(m fstest.MapFS) {
+			m["packages/pool/upstream/stray/dist/NOTICE"] = &fstest.MapFile{Data: []byte("stray\n")}
+		}},
+		{"an upstream file no record names, under a nested .git", 3, "no record names it", 0, func(m fstest.MapFS) {
+			m["packages/pool/upstream/stray/.git/NOTICE"] = &fstest.MapFile{Data: []byte("stray\n")}
+		}},
 		{"a module without a dependency record", 4, "requires example.invalid/other v0.1.0", 0, func(m fstest.MapFS) {
 			m["go.mod"].Data = append(m["go.mod"].Data, []byte("\nrequire example.invalid/other v0.1.0\n")...)
 		}},

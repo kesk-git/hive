@@ -47,6 +47,7 @@ test:
 	$(MAKE) test-ui
 	$(MAKE) build
 	$(MAKE) test-integration
+	$(MAKE) assemble
 	$(MAKE) test-distribution
 	$(MAKE) check-imports
 

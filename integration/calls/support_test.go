@@ -183,12 +183,12 @@ func stageAll(t testing.TB) error {
 // link gives exe another name when the directory lacks it: the executable
 // itself under its own name, and every other command name a link to it, as the
 // delivered bin/ directory does. A name that is present is never replaced or
-// written: it must be exe, or lead to it, otherwise it is an error, so that a
-// file left by an earlier build, or a different program of that name, is never
-// what runs.
+// written: it must be exe, lead to it or, on Windows, be a byte-identical copy
+// of it, otherwise it is an error, so that a file left by an earlier build, or
+// a different program of that name, is never what runs.
 func link(exe, name string) error {
 	if _, err := os.Lstat(name); err == nil {
-		if !sameFile(name, exe) {
+		if !isTheExecutable(name, exe) {
 			return fmt.Errorf("%s is present but is not the executable %s or a link to it", name, exe)
 		}
 		return nil

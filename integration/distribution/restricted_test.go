@@ -47,7 +47,7 @@ func listed(t *testing.T, dirs []string, name string) string {
 // What the restricted search path reaches is its three directories and
 // nothing else: the probe, started under that path by the same launcher the
 // integration run uses, finds each of the programs in the first of the
-// artefact's bin/, the fakes and Git's directory that holds it, and the path
+// artefact's bin/, the fakes and the directory of Git alone that holds it, and the path
 // it reports is exactly those three. It catches a path that keeps the
 // toolchain's directory or any of the test's own, a program that is found
 // where the listing does not hold it, and one the listing holds that is not
@@ -100,6 +100,11 @@ func TestRestrictedSearchPathReachesOnlyItsThreeDirectories(t *testing.T) {
 	for _, name := range []string{"gh", "claude", "codex", "no-mistakes"} {
 		if report.Found[name] != r.Fakes {
 			t.Errorf("%s is found in %q, not in the fakes %q", name, report.Found[name], r.Fakes)
+		}
+	}
+	for _, name := range []string{"go", "make", "gcc", "sh", "bash", "cmd", "powershell", "node", "npm", "python3", "tmux", "curl", "hive-nonexistent"} {
+		if got := report.Found[name]; got != "" {
+			t.Errorf("%s, a program beyond the listed ones, is reachable in %q", name, got)
 		}
 	}
 	if report.Found["git"] != r.Git {
@@ -256,5 +261,30 @@ func TestIntegrationTestsPassUnderTheRestrictedSearchPath(t *testing.T) {
 	out, err := r.Integration(t)
 	if err != nil {
 		t.Fatalf("%v\n%s", err, out)
+	}
+}
+
+// The real Git runs from the directory that holds only it: it starts, by its
+// bare name under the restricted search path, and keeps a repository, which
+// needs none of the other programs of the directory it was linked from.
+func TestRealGitRunsFromItsOwnDirectory(t *testing.T) {
+	r, root := restricted(t)
+	if got := listed(t, []string{r.Git}, "git"); got != r.Git {
+		t.Fatalf("git is not in %q", r.Git)
+	}
+	entries, err := os.ReadDir(r.Git)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("the directory of Git alone holds %d entries, want 1: %v", len(entries), err)
+	}
+	repo := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q", repo},
+		{"-C", repo, "-c", "user.name=hive", "-c", "user.email=hive@example.org", "commit", "-q", "--allow-empty", "-m", "x"},
+		{"-C", repo, "rev-parse", "--verify", "HEAD"},
+	} {
+		out, code, err := r.Run(t, root, "git", args...)
+		if err != nil || code != 0 {
+			t.Fatalf("git %v: code %d, %v\n%s", args, code, err, out)
+		}
 	}
 }

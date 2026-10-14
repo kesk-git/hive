@@ -3,6 +3,7 @@ package proof
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -96,9 +97,16 @@ func (c *collector) top(dir string, w Want) {
 		return
 	}
 	c.sameNames("the artefact", got, []string{"bin", "LICENSE", "NOTICE", "manifest.json"})
+	for _, n := range []string{"LICENSE", "NOTICE", "manifest.json"} {
+		c.regular(dir, n)
+	}
 	for _, n := range []string{"LICENSE", "NOTICE"} {
+		if !slices.Contains(got, n) || !isRegular(filepath.Join(dir, n)) {
+			continue
+		}
 		have, err := os.ReadFile(filepath.Join(dir, n))
 		if err != nil {
+			c.addf("%s of the artefact cannot be read: %v", n, err)
 			continue
 		}
 		want, err := os.ReadFile(filepath.Join(w.Root, n))
@@ -112,6 +120,26 @@ func (c *collector) top(dir string, w Want) {
 	}
 	if fi, err := os.Lstat(filepath.Join(dir, "bin")); err == nil && !fi.IsDir() {
 		c.addf("bin is not a directory")
+	}
+}
+
+// isRegular says whether a path is a regular file itself, not a link to one.
+func isRegular(path string) bool {
+	fi, err := os.Lstat(path)
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// regular reports a member of the artefact that is there but is not a regular
+// file inside it: a directory, or a link, which may lead out of the artefact.
+// A member that is not there is reported by the comparison of names.
+func (c *collector) regular(dir, name string) {
+	fi, err := os.Lstat(filepath.Join(dir, name))
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+	case err != nil:
+		c.addf("%s of the artefact cannot be inspected: %v", name, err)
+	case !fi.Mode().IsRegular():
+		c.addf("%s of the artefact is not a regular file (%v)", name, fi.Mode().Type())
 	}
 }
 
@@ -227,9 +255,13 @@ type linkEntry struct {
 }
 
 func (c *collector) manifest(dir string, w Want) {
+	if !isRegular(filepath.Join(dir, "manifest.json")) {
+		return // reported as missing or as not a regular file
+	}
 	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	if err != nil {
-		return // reported as missing
+		c.addf("manifest.json cannot be read: %v", err)
+		return
 	}
 	if err := canon.CheckFile(data); err != nil {
 		c.addf("manifest.json: %v", err)
@@ -276,8 +308,11 @@ func (c *collector) manifest(dir string, w Want) {
 // the artefact, except manifest.json itself.
 func (c *collector) manifestFiles(dir string, listed []fileEntry) {
 	have := map[string]fileEntry{}
-	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !d.Type().IsRegular() {
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !d.Type().IsRegular() {
 			return nil
 		}
 		rel, _ := filepath.Rel(dir, path)
@@ -287,11 +322,14 @@ func (c *collector) manifestFiles(dir string, listed []fileEntry) {
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return nil
+			return err
 		}
 		have[rel] = fileEntry{Path: rel, Size: int64(len(data)), Digest: canon.FileDigest(data)}
 		return nil
 	})
+	if err != nil {
+		c.addf("the files of the artefact cannot be inspected: %v", err)
+	}
 	seen := map[string]bool{}
 	for i, f := range listed {
 		if seen[f.Path] {

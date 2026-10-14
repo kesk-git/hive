@@ -81,19 +81,26 @@ func GitDir() (string, error) {
 
 // Restricted is the world of the integration run: a search path of the
 // artefact's bin/, the directory of the recorded fakes, which also holds the
-// test-only callees, and Git's directory, and a home of the run's own.
+// test-only callees, and a directory of its own that holds only the real Git,
+// and a home of the run's own.
 type Restricted struct {
 	Bin, Fakes, Git string
 	Home            string
 }
 
 // NewRestricted makes the world of an integration run for the artefact in dir,
-// with the fakes built and a home created under a temporary directory.
+// with the fakes built, the real Git linked alone into a directory of its own,
+// so that no other program of Git's directory is reachable, and a home created
+// under a temporary directory.
 func NewRestricted(t testing.TB, artefact string) Restricted {
 	t.Helper()
-	git, err := GitDir()
+	gitDir, err := GitDir()
 	if err != nil {
 		t.Fatal(err)
+	}
+	git := t.TempDir()
+	if err := os.Symlink(filepath.Join(gitDir, "git"+Suffix()), filepath.Join(git, "git"+Suffix())); err != nil {
+		t.Fatalf("the real Git cannot be exposed alone: %v", err)
 	}
 	r := Restricted{Bin: filepath.Join(artefact, "bin"), Fakes: t.TempDir(), Git: git, Home: t.TempDir()}
 	BuildFakes(t, r.Fakes)

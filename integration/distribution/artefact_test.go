@@ -1,9 +1,11 @@
 package distribution
 
 import (
+	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/kesk-git/hive/integration/distribution/harness"
 	"github.com/kesk-git/hive/integration/distribution/proof"
 )
 
@@ -35,9 +37,12 @@ func TestArtefactMatchesTheContract(t *testing.T) {
 }
 
 // The identity the manifest states is the one the executables carry: the Go
-// release, the platform, the revision and the versions of the source. It
-// catches a manifest that states what the assembler assumed instead of what
-// the executables hold, and an executable built from a modified tree.
+// release, the platform and the revision of their build information, and the
+// version, the contract version and the source revision each reports when it
+// is run, through the launcher of the integration run, under a search path of
+// the artefact's bin/ alone. It catches a manifest that states what the
+// assembler assumed instead of what the executables report, and an executable
+// built from a modified tree.
 func TestArtefactIdentityIsTheExecutables(t *testing.T) {
 	root, err := proof.RepoRoot()
 	if err != nil {
@@ -51,7 +56,23 @@ func TestArtefactIdentityIsTheExecutables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range proof.Identity(dir, proof.Want{Root: root, GOOS: runtime.GOOS, Executables: executables, Links: links}) {
+	var reports []proof.Reported
+	for _, e := range executables {
+		run := func(arg string) string {
+			out, code, err := harness.Launch(t, filepath.Join(dir, "bin"), t.TempDir(), root, e, arg)
+			if err != nil || code != 0 {
+				t.Fatalf("%s %s: code %d, %v\n%s", e, arg, code, err, out)
+			}
+			return out
+		}
+		r, err := proof.ParseReported(e, run("--version"), run("capabilities"))
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		reports = append(reports, r)
+	}
+	for _, p := range proof.Identity(dir, proof.Want{Root: root, GOOS: runtime.GOOS, Executables: executables, Links: links}, reports) {
 		t.Error(p)
 	}
 }

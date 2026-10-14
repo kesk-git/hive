@@ -75,16 +75,17 @@ func checkPaths(fsys fs.FS, records []Record) []Problem {
 	return problems
 }
 
-// walk calls fn for every file of the tree outside the directories no check
-// reads: Git's own, the build output and test data.
+// walk calls fn for every file of the tree outside the three directories no
+// check reads, each named by its path from the root of the tree: Git's own,
+// the build output, and this checker's own fixture trees.
 func walk(fsys fs.FS, fn func(name string)) error {
 	return fs.WalkDir(fsys, ".", func(name string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.IsDir() {
-			switch d.Name() {
-			case ".git", "dist", "testdata":
+			switch name {
+			case ".git", "dist", "integration/imports/testdata":
 				return fs.SkipDir
 			}
 			return nil

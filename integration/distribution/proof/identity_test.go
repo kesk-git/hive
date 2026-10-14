@@ -55,31 +55,49 @@ func TestBuiltIdentityCatchesEachDeparture(t *testing.T) {
 	}
 }
 
-// The stated identity is the source's: every package's version, and the
-// contract version the library declares.
-func TestSourceIdentity(t *testing.T) {
-	versions := map[string]string{"pool": "0.1.0", "word": "0.1.0"}
-	if got := proof.CheckSource(stated, versions, "1.5", 2); len(got) != 0 {
-		t.Errorf("a manifest that agrees with its source: %q", got)
+// The stated identity is the one every executable reports when run: its
+// version by --version and in its capabilities, the contract version and the
+// source revision.
+func TestReportedIdentity(t *testing.T) {
+	sound := func(name string) proof.Reported {
+		return proof.Reported{Name: name, Version: "0.1.0", ImplementationVersion: "0.1.0", ContractVersion: "1.5", SourceRevision: "abc123"}
+	}
+	reports := []proof.Reported{sound("hive-pool"), sound("hive-word")}
+	if got := proof.CheckReported(stated, reports, 2); len(got) != 0 {
+		t.Errorf("a manifest that agrees with what the executables report: %q", got)
+	}
+	with := func(change func(r *proof.Reported)) []proof.Reported {
+		r := sound("hive-word")
+		change(&r)
+		return []proof.Reported{sound("hive-pool"), r}
 	}
 	cases := []struct {
 		name, expect string
 		st           proof.Stated
-		versions     map[string]string
-		contract     string
+		reports      []proof.Reported
 		packages     int
 	}{
-		{"a version the source does not declare", "the source of word declares 0.1.1", stated, map[string]string{"pool": "0.1.0", "word": "0.1.1"}, "1.5", 2},
-		{"a contract version the library does not declare", "declares that built code meets 1.6", stated, versions, "1.6", 2},
-		{"a package with no version", "for 2 packages", stated, versions, "1.5", 3},
-		{"an unknown revision", "states no source revision", proof.Stated{HiveVersion: "0.1.0", ContractVersion: "1.5"}, versions, "1.5", 2},
+		{"a version --version does not print", `hive-word reports the version "0.1.1" with --version`, stated, with(func(r *proof.Reported) { r.Version = "0.1.1" }), 2},
+		{"a version the capabilities do not declare", `reports the version "0.1.1" in its capabilities`, stated, with(func(r *proof.Reported) { r.ImplementationVersion = "0.1.1" }), 2},
+		{"a contract version the executable does not report", `reports the contract version "1.6"`, stated, with(func(r *proof.Reported) { r.ContractVersion = "1.6" }), 2},
+		{"another source revision", `reports the source revision "def456"`, stated, with(func(r *proof.Reported) { r.SourceRevision = "def456" }), 2},
+		{"an executable that was not run", "1 executables were run, not 2", stated, reports[:1], 2},
+		{"an unknown revision", "states no source revision", proof.Stated{HiveVersion: "0.1.0", ContractVersion: "1.5"}, reports, 2},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := proof.CheckSource(c.st, c.versions, c.contract, c.packages)
+			got := proof.CheckReported(c.st, c.reports, c.packages)
 			if !strings.Contains(strings.Join(got, "\n"), c.expect) {
 				t.Errorf("no problem says %q: %q", c.expect, got)
 			}
 		})
+	}
+}
+
+// What an executable prints that is not a complete capabilities response is
+// an error, not an empty report.
+func TestParseReportedRefusesAnIncompleteResponse(t *testing.T) {
+	if r, err := proof.ParseReported("hive-pool", "0.1.0\n", `{"status":"ok"`); err == nil {
+		t.Errorf("a truncated document was read: %+v", r)
 	}
 }

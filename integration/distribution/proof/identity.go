@@ -4,75 +4,12 @@ import (
 	"debug/buildinfo"
 	"encoding/json"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
+	"strings"
+
+	"github.com/kesk-git/hive/contract/envelope"
 )
-
-// constString reads the value of a package-level string constant of a Go
-// source file, or "" where the file declares none by that name.
-func constString(file *ast.File, name string) string {
-	for _, d := range file.Decls {
-		g, ok := d.(*ast.GenDecl)
-		if !ok || g.Tok != token.CONST {
-			continue
-		}
-		for _, s := range g.Specs {
-			v := s.(*ast.ValueSpec)
-			for i, n := range v.Names {
-				if n.Name != name || i >= len(v.Values) {
-					continue
-				}
-				if lit, ok := v.Values[i].(*ast.BasicLit); ok && lit.Kind == token.STRING {
-					if s, err := strconv.Unquote(lit.Value); err == nil {
-						return s
-					}
-				}
-			}
-		}
-	}
-	return ""
-}
-
-// SourceVersions are the implementation versions the source of the seven
-// packages declares, by package, read from the Version constant of each
-// package's entry package without running anything.
-func SourceVersions(root string) (map[string]string, error) {
-	files, err := filepath.Glob(filepath.Join(root, "packages", "*", "internal", "entry", "*.go"))
-	if err != nil {
-		return nil, err
-	}
-	out := map[string]string{}
-	for _, f := range files {
-		file, err := parser.ParseFile(token.NewFileSet(), f, nil, parser.SkipObjectResolution)
-		if err != nil {
-			return nil, err
-		}
-		if v := constString(file, "Version"); v != "" {
-			pkg := filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(f))))
-			out[pkg] = v
-		}
-	}
-	return out, nil
-}
-
-// SourceContractVersion is the contract version the library's envelope
-// package declares that built code meets, read from its source.
-func SourceContractVersion(root string) (string, error) {
-	f := filepath.Join(root, "contract", "envelope", "codec.go")
-	file, err := parser.ParseFile(token.NewFileSet(), f, nil, parser.SkipObjectResolution)
-	if err != nil {
-		return "", err
-	}
-	if v := constString(file, "ContractVersion"); v != "" {
-		return v, nil
-	}
-	return "", fmt.Errorf("%s declares no ContractVersion", f)
-}
 
 // Stated is the identity manifest.json states.
 type Stated struct {
@@ -84,28 +21,62 @@ type Stated struct {
 	Arch            string `json:"arch"`
 }
 
-// CheckSource compares the identity stated with the source the executables
-// are built from: the version each package declares and the contract version
-// the library declares that built code meets.
-func CheckSource(st Stated, versions map[string]string, contract string, packages int) []string {
+// Reported is what one executable says of itself when it is run: the line
+// `--version` prints, and the implementation version, the contract version and
+// the source revision its capabilities declare.
+type Reported struct {
+	Name                  string
+	Version               string
+	ImplementationVersion string
+	ContractVersion       string
+	SourceRevision        string
+}
+
+// ParseReported reads what an executable printed for `--version` and for
+// `capabilities`. Output that is not a complete capabilities response is an
+// error, never an empty report.
+func ParseReported(name, version, capabilities string) (Reported, error) {
+	r := Reported{Name: name, Version: strings.TrimRight(version, "\r\n")}
+	resp, err := envelope.AcceptCapabilities([]byte(capabilities), 0)
+	if err != nil {
+		return r, fmt.Errorf("%s: its capabilities are not a complete response: %w", name, err)
+	}
+	caps, err := envelope.DecodeCapabilities(resp.Body)
+	if err != nil {
+		return r, fmt.Errorf("%s: its capabilities cannot be read: %w", name, err)
+	}
+	r.ImplementationVersion = caps.ImplementationVersion
+	r.ContractVersion = caps.ContractVersion
+	r.SourceRevision = caps.SourceRevision
+	return r, nil
+}
+
+// CheckReported compares the identity stated with what each of the
+// executables reports when it is run: its version by `--version` and in its
+// capabilities, the contract version and the source revision of its
+// capabilities.
+func CheckReported(st Stated, reports []Reported, packages int) []string {
 	var problems []string
 	addf := func(format string, args ...any) { problems = append(problems, fmt.Sprintf(format, args...)) }
 	if st.SourceRevision == "" {
 		addf("manifest.json states no source revision: an unknown identity does not qualify")
 	}
-	var seen []string
-	for pkg, v := range versions {
-		seen = append(seen, pkg+"="+v)
-		if v != st.HiveVersion {
-			addf("manifest.json states the version %s; the source of %s declares %s", st.HiveVersion, pkg, v)
+	if len(reports) != packages {
+		addf("%d executables were run, not %d", len(reports), packages)
+	}
+	for _, r := range reports {
+		if r.Version != st.HiveVersion {
+			addf("%s reports the version %q with --version; manifest.json states %q", r.Name, r.Version, st.HiveVersion)
 		}
-	}
-	sort.Strings(seen)
-	if len(versions) != packages {
-		addf("the source declares a version for %d packages (%v), not %d", len(versions), seen, packages)
-	}
-	if contract != st.ContractVersion {
-		addf("manifest.json states the contract version %s; the library declares that built code meets %s", st.ContractVersion, contract)
+		if r.ImplementationVersion != st.HiveVersion {
+			addf("%s reports the version %q in its capabilities; manifest.json states %q", r.Name, r.ImplementationVersion, st.HiveVersion)
+		}
+		if r.ContractVersion != st.ContractVersion {
+			addf("%s reports the contract version %q; manifest.json states %q", r.Name, r.ContractVersion, st.ContractVersion)
+		}
+		if r.SourceRevision != st.SourceRevision {
+			addf("%s reports the source revision %q in its capabilities; manifest.json states %q", r.Name, r.SourceRevision, st.SourceRevision)
+		}
 	}
 	return problems
 }
@@ -133,13 +104,13 @@ func CheckBuilt(name string, info *buildinfo.BuildInfo, st Stated) []string {
 }
 
 // Identity checks the identity manifest.json states against what the
-// executables themselves carry, without running any of them: the Go release,
-// the platform and the source revision from the build information the
-// toolchain embedded in each, and the versions from the source they were
-// built from. An executable whose build information marks a modified tree, or
-// holds no revision, is not a release and fails
-// (spec/distribution.md, Packaged build identity).
-func Identity(dir string, w Want) []string {
+// executables themselves carry: the Go release, the platform and the source
+// revision from the build information the toolchain embedded in each, read
+// without running any of them, and the versions and the source revision each
+// reports when it is run, given as reports. An executable whose build
+// information marks a modified tree, or holds no revision, is not a release
+// and fails (spec/distribution.md, Packaged build identity).
+func Identity(dir string, w Want, reports []Reported) []string {
 	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	if err != nil {
 		return []string{fmt.Sprintf("manifest.json cannot be read: %v", err)}
@@ -148,15 +119,7 @@ func Identity(dir string, w Want) []string {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return []string{fmt.Sprintf("manifest.json does not parse: %v", err)}
 	}
-	versions, err := SourceVersions(w.Root)
-	if err != nil {
-		return []string{err.Error()}
-	}
-	contract, err := SourceContractVersion(w.Root)
-	if err != nil {
-		return []string{err.Error()}
-	}
-	problems := CheckSource(st, versions, contract, len(w.Executables))
+	problems := CheckReported(st, reports, len(w.Executables))
 	for _, e := range w.Executables {
 		info, err := buildinfo.ReadFile(filepath.Join(dir, "bin", e+w.suffix()))
 		if err != nil {

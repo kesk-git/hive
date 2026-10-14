@@ -1,9 +1,11 @@
 package calls
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -78,6 +80,25 @@ func sameFile(a, b string) bool {
 	return os.SameFile(fa, fb)
 }
 
+// isTheExecutable reports whether name is the executable exe: the same file
+// or a link to it and, on Windows, where a link is a hard link or a
+// byte-identical copy, a regular file with exactly its bytes.
+func isTheExecutable(name, exe string) bool {
+	if sameFile(name, exe) {
+		return true
+	}
+	if runtime.GOOS != "windows" {
+		return false
+	}
+	fa, err := os.Stat(name)
+	if err != nil || !fa.Mode().IsRegular() {
+		return false
+	}
+	a, errA := os.ReadFile(name)
+	b, errB := os.ReadFile(exe)
+	return errA == nil && errB == nil && bytes.Equal(a, b)
+}
+
 // requireOnPath fails unless the directory of the executables and the callee's
 // are both on the search path, so that a run that was not started with them
 // on it fails loudly here and says what to run. They need
@@ -111,11 +132,38 @@ func requireFoundIn(name, want string) error {
 		}
 		path := filepath.Join(dir, name+suffix())
 		if fi, err := os.Stat(path); err == nil && fi.Mode().IsRegular() {
-			if !sameFile(path, want) {
+			if !isTheExecutable(path, want) {
 				return fmt.Errorf("%s is found on the search path as %s, not as the built %s", name, path, want)
 			}
 			return nil
 		}
 	}
 	return fmt.Errorf("%s is not found on the search path; expected the built %s", name, want)
+}
+
+// A name is the executable where it is the same file or a link to it, and on
+// Windows also where it is a byte-identical copy; a file with other bytes is
+// never the executable.
+func TestIsTheExecutable(t *testing.T) {
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "hive-pool"+suffix())
+	copied := filepath.Join(dir, "hive-admit"+suffix())
+	other := filepath.Join(dir, "hive-word"+suffix())
+	for name, data := range map[string]string{exe: "the executable", copied: "the executable", other: "another program"} {
+		if err := os.WriteFile(name, []byte(data), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !isTheExecutable(exe, exe) {
+		t.Error("an executable is not itself")
+	}
+	if got, want := isTheExecutable(copied, exe), runtime.GOOS == "windows"; got != want {
+		t.Errorf("a byte-identical copy is the executable: %v, want %v on %s", got, want, runtime.GOOS)
+	}
+	if isTheExecutable(other, exe) {
+		t.Error("a file with other bytes is the executable")
+	}
+	if isTheExecutable(filepath.Join(dir, "gone"+suffix()), exe) {
+		t.Error("a file that is not there is the executable")
+	}
 }

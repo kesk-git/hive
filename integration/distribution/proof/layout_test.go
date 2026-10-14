@@ -111,6 +111,30 @@ var breakages = []breakage{
 	{"a NOTICE that is not the committed one", "NOTICE of the artefact differs", nil, func(t *testing.T, dir, goos string) {
 		file(t, filepath.Join(dir, "NOTICE"), "another notice\n")
 	}},
+	{"a LICENSE that is a directory", "LICENSE of the artefact is not a regular file", nil, func(t *testing.T, dir, goos string) {
+		os.Remove(filepath.Join(dir, "LICENSE"))
+		os.Mkdir(filepath.Join(dir, "LICENSE"), 0o755)
+	}},
+	{"a NOTICE that is a directory", "NOTICE of the artefact is not a regular file", nil, func(t *testing.T, dir, goos string) {
+		os.Remove(filepath.Join(dir, "NOTICE"))
+		os.Mkdir(filepath.Join(dir, "NOTICE"), 0o755)
+	}},
+	{"a NOTICE that is a link to a file outside the artefact", "NOTICE of the artefact is not a regular file", nil, func(t *testing.T, dir, goos string) {
+		if runtime.GOOS == "windows" {
+			t.Skip("a symbolic link needs rights a Windows host may not give; the case is shown on the hosts that make one")
+		}
+		outside := filepath.Join(t.TempDir(), "NOTICE")
+		data, _ := os.ReadFile(filepath.Join(dir, "NOTICE"))
+		file(t, outside, string(data))
+		os.Remove(filepath.Join(dir, "NOTICE"))
+		if err := os.Symlink(outside, filepath.Join(dir, "NOTICE")); err != nil {
+			t.Fatal(err)
+		}
+	}},
+	{"a manifest that is a directory", "manifest.json of the artefact is not a regular file", nil, func(t *testing.T, dir, goos string) {
+		os.Remove(filepath.Join(dir, "manifest.json"))
+		os.Mkdir(filepath.Join(dir, "manifest.json"), 0o755)
+	}},
 	{"a manifest that is gone", "lacks manifest.json", nil, func(t *testing.T, dir, goos string) { os.Remove(filepath.Join(dir, "manifest.json")) }},
 	{"a manifest that is not canonical", "canonical form", nil, func(t *testing.T, dir, goos string) {
 		p := filepath.Join(dir, "manifest.json")

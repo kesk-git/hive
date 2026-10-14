@@ -21,7 +21,7 @@ Owner: each package owns its target; the contract library owns `test-contract`; 
 | `check-imports` | The checks under `integration/imports/` | The six checks of [imports.md](imports.md#what-check-imports-proves): every import record is valid, every path it names exists, every third-party module and every file under an `upstream/` directory is covered by a record, the root licence is present if any record is, and `NOTICE` matches the records. |
 | `check` | The Go formatter in check mode and the Go vet tool over the whole module, run for the host and for `GOOS=windows` and `GOOS=linux` | Formatting and vet cleanliness, and that the module compiles for Windows and Linux. |
 | `build` | The build of all seven executables into `dist/` | That the module builds, with the settings [distribution.md](distribution.md#the-artefact) fixes. |
-| `test` | `check`, `test-contract`, the seven package targets, `build`, `test-integration`, `test-distribution`, `check-imports`, in that order | Everything. |
+| `test` | `check`, `test-contract`, the seven package targets, `build`, `test-integration`, `assemble`, `test-distribution`, `check-imports`, in that order | Everything. |
 
 The seven package targets and their scopes are the design's. What each must prove grows with its stage: a stage adds its proofs to its package's row here in the change that defines its contracts.
 

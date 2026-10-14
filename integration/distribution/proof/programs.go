@@ -13,6 +13,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/kesk-git/hive/contract/exec/starts"
 )
 
 // declaration is the part of a package declaration these checks read.
@@ -131,7 +133,7 @@ func parseTree(root string) (map[string]*goPackage, error) {
 					v := s.(*ast.ValueSpec)
 					for i, n := range v.Names {
 						if i < len(v.Values) {
-							if s, ok := evalString(v.Values[i]); ok {
+							if s, ok := starts.EvalString(v.Values[i]); ok {
 								p.consts[n.Name] = s
 							}
 						}
@@ -154,7 +156,7 @@ type resolver struct {
 // str reads an expression that names a string: a literal, a concatenation, a
 // constant of the same package or a constant of another package of the module.
 func (r resolver) str(e ast.Expr) (string, bool) {
-	if s, ok := evalString(e); ok {
+	if s, ok := starts.EvalString(e); ok {
 		return s, true
 	}
 	switch e := e.(type) {
@@ -187,7 +189,7 @@ func (r resolver) kind(e ast.Expr, execName string) (string, bool) {
 			return sel.Sel.Name, true
 		}
 	}
-	if s, ok := evalString(e); ok {
+	if s, ok := starts.EvalString(e); ok {
 		for _, k := range kinds {
 			if strings.EqualFold(s, k) {
 				return k, true
@@ -271,7 +273,7 @@ func Programs(root string) ([]string, error) {
 		sort.Strings(names)
 		for _, name := range names {
 			file := pkg.files[name]
-			local, _ := importPaths(file)
+			local, _ := starts.ImportPaths(file)
 			execName := ""
 			for n, p := range local {
 				if p == execImport {
