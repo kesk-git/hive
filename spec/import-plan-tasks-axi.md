@@ -2,7 +2,7 @@
 
 This is the plan for the one import stage 2 makes: the translation of tasks-axi's backlog grammar, store rules, transitions and archives into the `pool` package. The upstream's multi-item move is not translated at this stage; see the exclusions below. It follows [imports.md](imports.md) and the [`import-record.v1`](schemas/import-record.v1.schema.json) schema field by field, so that the build can write the record from it. Nothing is imported by this plan: no source, test, fixture or documentation of the upstream is in this repository, and none enters it before the record does.
 
-**Who writes the record.** Story 2, lane a, of the stage's build writes `imports/tasks-axi.json`, the kept licence text under `packages/pool/upstream/tasks-axi/LICENSE` and the root `NOTICE`, in the same commit as the first translated source file, or an earlier one, and adds `tasks-axi` to the `imports` list of `packages/pool/hive-package.json` in that commit. `check-imports` holds the record to paths that exist, which is why this definition does not write it: no translated source exists yet.
+**Who writes the record.** Story 2, lane a, of the stage's build writes `imports/tasks-axi.json`, the kept licence text under `packages/pool/upstream/tasks-axi/LICENSE` and the root `NOTICE`, in the same commit as the first translated source file, or an earlier one, and adds `tasks-axi` to the `imports` list of `packages/pool/hive-package.json` in that commit. `check-imports` holds the record to paths that exist, which is why this definition does not write it: when it was written no translated source existed. Lane a has since written the record, in the commit of the first translated files.
 
 ## The record, field by field
 
@@ -91,9 +91,9 @@ The development dependencies (`@eslint/js`, `@types/node`, `eslint`, `globals`, 
 
 The translated material keeps the grammar, the round-trip rule, the transitions, the dependency and hold semantics, and the archive lookup of the upstream. Hive changes: identities are ULIDs, with the legacy identifier kept on the item; dates are UTC instants with the zone they were read in and the date as written; the three legacy states gain `archived`, and `rm` becomes a transition to `archived`; holds are records of their own with Hive's kinds, `captain` read as `word` and `load` as `resource`; prune is not carried for Hive's records and survives only as archive lookup for import; a persistent-supervisor entry is excluded from import rather than made an item; and every write goes through the contract library's atomic record and transaction instead of the upstream's temporary-file rename and lock.
 
-## The audit still owed
+## The audit
 
-Before the first translated file is committed, story 2, lane a:
+Lane a made this audit before the first translated file was committed, and its date and statement are in `imports/tasks-axi.json`. It:
 
 1. Reads the upstream at the exact revision, read-only, and confirms the licence file's digest and the absence of per-file headers, as stated above.
 2. Confirms that the two fixtures, if any is taken as an asset, carry no private name, path or figure, and otherwise re-expresses them.
