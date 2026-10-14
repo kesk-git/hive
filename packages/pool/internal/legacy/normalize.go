@@ -43,8 +43,18 @@ func CheckID(id string) error {
 	return nil
 }
 
+// readBack reads a plain title with the one tag given written after it, as
+// canonical rendering writes it, and reports whether the title came back
+// whole: a tag that holds a dependency edge or reads as another tag does not.
+func readBack(tag string) (Tags, bool) {
+	t := ExtractTags("x " + tag)
+	return t, t.Title == "x"
+}
+
 // NormalizeTitle is the title trimmed. It must be one line, not empty, and must
-// not end in canonical tags, which a re-parse would take off it.
+// read back whole with a tag written after it: it must not end in canonical
+// tags, which a re-parse would take off it, nor in the start of one, which
+// would take in the tags written after it.
 func NormalizeTitle(title string) (string, error) {
 	if hasLineEnd(title) {
 		return "", invalid("Task title must be a single line")
@@ -53,19 +63,29 @@ func NormalizeTitle(title string) (string, error) {
 	if trimmed == "" {
 		return "", invalid("Task title must not be empty")
 	}
-	if ExtractTags(trimmed).Title != trimmed {
-		return "", invalid("Task title must not end with canonical task tags")
+	if ExtractTags(trimmed+" (priority: 0)").Title != trimmed {
+		return "", invalid("Task title must not end with canonical task tags or the start of one")
 	}
 	return trimmed, nil
 }
 
 // NormalizeTagValue is the value of a kind or repo tag trimmed, or "" when it
-// is blank. It must be one line without parentheses. field names the tag.
+// is blank. It must be one line without parentheses and read back as itself in
+// its tag. field names the tag.
 func NormalizeTagValue(value, field string) (string, error) {
 	if strings.ContainsAny(value, "()"+lineEnds) {
 		return "", invalid("Task %s must be a single line without parentheses", field)
 	}
-	return trim(value), nil
+	v := trim(value)
+	t, whole := readBack("(" + field + ": " + v + ")")
+	got := t.Repo
+	if field == "kind" {
+		got = t.Kind
+	}
+	if !whole || got != v {
+		return "", invalid("Task %s must not hold a dependency edge or another tag", field)
+	}
+	return v, nil
 }
 
 func normalizeLinkURL(url string) (string, error) {
@@ -122,8 +142,9 @@ func NormalizeDate(value, field string) (string, error) {
 	return value, nil
 }
 
-// NormalizeHold checks a hold: a reason on one line without parentheses, a kind
-// from the legacy words if it has one, and a date if it has one.
+// NormalizeHold checks a hold: a reason on one line without parentheses that
+// reads back as itself in its tag, a kind from the legacy words if it has one,
+// and a date if it has one.
 func NormalizeHold(h Hold) (Hold, error) {
 	if strings.ContainsAny(h.Reason, "()"+lineEnds) {
 		return Hold{}, invalid("Task hold reason must be a single line without parentheses")
@@ -131,6 +152,9 @@ func NormalizeHold(h Hold) (Hold, error) {
 	reason := trim(h.Reason)
 	if reason == "" {
 		return Hold{}, invalid("Task hold reason must not be empty")
+	}
+	if t, whole := readBack("(hold: " + reason + ")"); !whole || t.Hold == nil || t.Hold.Reason != reason {
+		return Hold{}, invalid("Task hold reason must not hold a dependency edge or another tag")
 	}
 	out := Hold{Reason: reason}
 	if h.Kind != "" {

@@ -3,6 +3,7 @@ package legacy
 import (
 	"bytes"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -269,6 +270,10 @@ func TestNormalizeTitle(t *testing.T) {
 		"ends in a tag": "work (repo: app)",
 		"ends in a dep": "work blocked-by: other-1",
 		"ends in date":  "work (since 2026-01-01)",
+		"open repo tag": "review (repo: old",
+		"open kind tag": "review (kind: old",
+		"open + repo":   "review (old + repo:",
+		"open edge":     "work parent: other-1 -",
 	} {
 		_, err := NormalizeTitle(title)
 		wantInvalid(t, what, err)
@@ -289,6 +294,17 @@ func TestNormalizeTagValue(t *testing.T) {
 	for _, v := range []string{"a(b", "a)b", "a\nb", "a\u2028b", "a\u2029b"} {
 		_, err := NormalizeTagValue(v, "repo")
 		wantInvalid(t, v, err)
+	}
+	// A value that a re-parse would read as an edge or as another tag.
+	for _, field := range []string{"kind", "repo"} {
+		for _, v := range []string{"blocked-by: b - waiting", "x parent: b - y", "x discovered-from:b - y", "a + repo: b"} {
+			_, err := NormalizeTagValue(v, field)
+			wantInvalid(t, field+" "+v, err)
+		}
+	}
+	// A marker that starts no edge is plain text.
+	if got, err := NormalizeTagValue("after blocked-by: b", "repo"); err != nil || got != "after blocked-by: b" {
+		t.Errorf("NormalizeTagValue = %q, %v", got, err)
 	}
 }
 
@@ -348,11 +364,39 @@ func TestNormalizePriorityDateAndHold(t *testing.T) {
 		"parenthesis":  {Reason: "a (b)"},
 		"two lines":    {Reason: "a\nb"},
 		"line sep.":    {Reason: "a\u2028b"},
+		"edge":         {Reason: "blocked-by: b - waiting"},
+		"other tag":    {Reason: "a + repo: b"},
 		"unknown kind": {Reason: "a", Kind: "later"},
 		"bad date":     {Reason: "a", Until: "tomorrow"},
 	} {
 		_, err := NormalizeHold(h)
 		wantInvalid(t, what, err)
+	}
+}
+
+// What normalization accepts reads back unchanged from the canonical prose,
+// however close each field comes to an edge or a tag.
+func TestNormalizedFieldsReadBack(t *testing.T) {
+	must := func(v string, err error) string {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	title := must(NormalizeTitle("review (repo: old) after parent: other-1 -x"))
+	kind := must(NormalizeTagValue("x parent:y", "kind"))
+	repo := must(NormalizeTagValue("after blocked-by: b", "repo"))
+	hold, err := NormalizeHold(Hold{Reason: "waiting on blocked-by: b -", Kind: "load"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deps := []Dep{{Type: "parent", ID: "up-1"}, {Type: "blocked-by", ID: "other-2", Reason: "why (repo: no)"}}
+	task := &Task{ID: "a", Title: title, State: StateQueued, Kind: kind, Repo: repo, Hold: &hold, Deps: deps}
+	prose := BuildProse(task)
+	got := ExtractTags(prose)
+	if got.Title != title || got.Kind != kind || got.Repo != repo || got.Hold == nil || *got.Hold != hold || !reflect.DeepEqual(got.Deps, deps) {
+		t.Errorf("%q reads back as %+v", prose, got)
 	}
 }
 
