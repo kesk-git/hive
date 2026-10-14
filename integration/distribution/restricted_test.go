@@ -266,7 +266,7 @@ func TestIntegrationTestsPassUnderTheRestrictedSearchPath(t *testing.T) {
 
 // The real Git runs from the directory that holds only it: it starts, by its
 // bare name under the restricted search path, and keeps a repository, which
-// needs none of the other programs of the directory it was linked from.
+// needs none of the other programs of the directory it came from.
 func TestRealGitRunsFromItsOwnDirectory(t *testing.T) {
 	r, root := restricted(t)
 	if got := listed(t, []string{r.Git}, "git"); got != r.Git {

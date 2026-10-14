@@ -8,17 +8,20 @@ import (
 	"unicode/utf8"
 )
 
-// The repository holds no import record, so its root NOTICE is the fixed
-// header and the one sentence that says no record exists yet. It catches a
-// repository without a NOTICE, which the artefact would then ship without.
-func TestRootNoticeSaysNoRecordExistsYet(t *testing.T) {
+// The root NOTICE is UTF-8 text that ends in one line feed, and it says that
+// no import record exists yet exactly while imports/ holds none: once, with no
+// record, and never beside one. It catches a repository without a NOTICE,
+// which the artefact would then ship without, and a sentence left behind by
+// the first record.
+func TestRootNoticeSaysWhetherARecordExists(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join("..", "..", "imports"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	records := 0
 	for _, e := range entries {
 		if e.Name() != "README.md" {
-			t.Skipf("imports/ holds %s; this test covers the tree with no record", e.Name())
+			records++
 		}
 	}
 	notice, err := os.ReadFile(filepath.Join("..", "..", "NOTICE"))
@@ -29,7 +32,11 @@ func TestRootNoticeSaysNoRecordExistsYet(t *testing.T) {
 	if !utf8.ValidString(text) || !strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\n\n") {
 		t.Errorf("NOTICE is not UTF-8 text ending in one line feed")
 	}
-	if strings.Count(text, "No import record exists yet.") != 1 {
-		t.Errorf("NOTICE does not say once that no import record exists yet:\n%s", text)
+	want := 0
+	if records == 0 {
+		want = 1
+	}
+	if got := strings.Count(text, "No import record exists yet."); got != want {
+		t.Errorf("imports/ holds %d records and NOTICE says %d times that no import record exists yet, want %d:\n%s", records, got, want, text)
 	}
 }

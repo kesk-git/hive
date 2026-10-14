@@ -14,52 +14,44 @@ import (
 	"github.com/kesk-git/hive/integration/distribution/proof"
 )
 
-var platforms = []string{"linux", "darwin", "windows"}
-
-// needsLinks skips a fixture whose rules need a symbolic link where the host
-// cannot make one: on Windows the artefact of Windows is the one that
-// matters and the real artefact is checked by its own rules.
-func needsLinks(t *testing.T, goos string) {
+// assembles checks that an assembly of seven executables that agree writes an
+// artefact that satisfies the layout of the platform, with the identity the
+// executables report. The version the executables report is 7.8.9: an
+// assembler that carries a version of its own, or any other constant, names
+// the wrong directory and the wrong manifest.
+func assembles(t *testing.T, goos string) {
 	t.Helper()
-	if goos != "windows" && runtime.GOOS == "windows" {
-		t.Skip("a symbolic-link fixture needs a host that makes one; the Windows artefact is checked by its own rules")
+	dir, want, _, _ := fixture.Artefact(t, goos)
+	if got, wantName := filepath.Base(dir), "hive-7.8.9-"+goos+"-amd64"; got != wantName {
+		t.Errorf("the directory is %s, want %s", got, wantName)
+	}
+	for _, p := range proof.Layout(dir, want) {
+		t.Error(p)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatal(err)
+	}
+	for k, v := range map[string]string{
+		"hive_version": "7.8.9", "contract_version": "1.5", "go_release": "go1.99.9", "os": goos, "arch": "amd64",
+		"source_revision": "0123456789abcdef0123456789abcdef01234567",
+	} {
+		if m[k] != v {
+			t.Errorf("manifest %s is %v, want %s", k, m[k], v)
+		}
 	}
 }
 
-// An assembly of seven executables that agree writes an artefact that
-// satisfies the layout of its platform, with the identity the executables
-// report. The version the executables report is 7.8.9: an assembler that
-// carries a version of its own, or any other constant, names the wrong
-// directory and the wrong manifest.
-func TestAssembleWritesTheArtefactOfEachPlatform(t *testing.T) {
-	for _, goos := range platforms {
-		t.Run(goos, func(t *testing.T) {
-			needsLinks(t, goos)
-			dir, want, _, _ := fixture.Artefact(t, goos)
-			if got, wantName := filepath.Base(dir), "hive-7.8.9-"+goos+"-amd64"; got != wantName {
-				t.Errorf("the directory is %s, want %s", got, wantName)
-			}
-			for _, p := range proof.Layout(dir, want) {
-				t.Error(p)
-			}
-			data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			var m map[string]any
-			if err := json.Unmarshal(data, &m); err != nil {
-				t.Fatal(err)
-			}
-			for k, v := range map[string]string{
-				"hive_version": "7.8.9", "contract_version": "1.5", "go_release": "go1.99.9", "os": goos, "arch": "amd64",
-				"source_revision": "0123456789abcdef0123456789abcdef01234567",
-			} {
-				if m[k] != v {
-					t.Errorf("manifest %s is %v, want %s", k, m[k], v)
-				}
-			}
-		})
-	}
+// The artefact of Windows is assembled with every name ending in .exe and
+// each link a hard link to its executable. Every host makes a hard link, so
+// the case runs wherever the tests do; the artefacts of macOS and Linux, whose
+// links are symbolic, have their case in the file built for those platforms.
+func TestAssembleWritesTheArtefactOfWindows(t *testing.T) {
+	assembles(t, "windows")
 }
 
 // Where a platform without hard links cannot make one, the link is a whole
@@ -158,7 +150,6 @@ func TestAssembleRefusesAMissingExecutableAndAStaleNotice(t *testing.T) {
 // Running the assembly again replaces the directory: what an earlier run or a
 // person left in it is gone.
 func TestAssembleReplacesTheDirectory(t *testing.T) {
-	needsLinks(t, runtime.GOOS)
 	dir, want, root, dist := fixture.Artefact(t, runtime.GOOS)
 	stray := filepath.Join(dir, "bin", "stray")
 	if err := os.WriteFile(stray, []byte("x"), 0o644); err != nil {

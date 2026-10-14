@@ -88,8 +88,25 @@ type Restricted struct {
 	Home            string
 }
 
+// exposeGit places the real Git alone in dir, under its own name: by a
+// symbolic link on macOS and Linux and, on Windows, where a symbolic link
+// needs a right the platform may withhold, by a copy of the file, which needs
+// none. A Git that does not run from there is not helped to: the run that
+// starts it fails and says so.
+func exposeGit(real, dir string) error {
+	alone := filepath.Join(dir, "git"+Suffix())
+	if runtime.GOOS != "windows" {
+		return os.Symlink(real, alone)
+	}
+	data, err := os.ReadFile(real)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(alone, data, 0o755)
+}
+
 // NewRestricted makes the world of an integration run for the artefact in dir,
-// with the fakes built, the real Git linked alone into a directory of its own,
+// with the fakes built, the real Git placed alone in a directory of its own,
 // so that no other program of Git's directory is reachable, and a home created
 // under a temporary directory.
 func NewRestricted(t testing.TB, artefact string) Restricted {
@@ -99,7 +116,7 @@ func NewRestricted(t testing.TB, artefact string) Restricted {
 		t.Fatal(err)
 	}
 	git := t.TempDir()
-	if err := os.Symlink(filepath.Join(gitDir, "git"+Suffix()), filepath.Join(git, "git"+Suffix())); err != nil {
+	if err := exposeGit(filepath.Join(gitDir, "git"+Suffix()), git); err != nil {
 		t.Fatalf("the real Git cannot be exposed alone: %v", err)
 	}
 	r := Restricted{Bin: filepath.Join(artefact, "bin"), Fakes: t.TempDir(), Git: git, Home: t.TempDir()}

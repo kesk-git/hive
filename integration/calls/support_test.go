@@ -128,12 +128,13 @@ func declarations(t testing.TB) map[string]*declare.Package {
 }
 
 // stage checks, once for all tests, that the programs the tests start are the
-// ones the run set up, and gives every executable the command names it lacks
+// ones the run set up, with every executable under each of its command names
 // in the directory of the executables, beside it, as the delivered bin/
-// directory has them; a directory that holds them all is not written to. The
-// seven executables are not built here: they are the ones in that directory,
-// which is dist/ unless the run names another, and a test that cannot find one
-// fails and says so. It returns the directory of the executables.
+// directory has them. In the repository's own dist/ it makes the names that
+// are absent and those that no longer lead to their executable; a directory
+// the run names is only read. The seven executables are not built here: they
+// are the ones in that directory, and a test that cannot find one fails and
+// says so. It returns the directory of the executables.
 func stage(t testing.TB) string {
 	t.Helper()
 	staged.Do(func() {
@@ -160,7 +161,7 @@ func stageAll(t testing.TB) error {
 			return fmt.Errorf("%s is not built: run `make build` first (%s)", d.Executable, exe)
 		}
 		for _, c := range d.Commands {
-			if err := link(exe, filepath.Join(dist, c.Name+suffix())); err != nil {
+			if err := link(exe, filepath.Join(dist, c.Name+suffix()), ownDist()); err != nil {
 				return err
 			}
 			if err := requireFoundIn(c.Name, exe); err != nil {
@@ -180,20 +181,30 @@ func stageAll(t testing.TB) error {
 	return nil
 }
 
-// link gives exe another name when the directory lacks it: the executable
-// itself under its own name, and every other command name a link to it, as the
-// delivered bin/ directory does. A name that is present is never replaced or
-// written: it must be exe, lead to it or, on Windows, be a byte-identical copy
-// of it, otherwise it is an error, so that a file left by an earlier build, or
-// a different program of that name, is never what runs.
-func link(exe, name string) error {
-	if _, err := os.Lstat(name); err == nil {
-		if !isTheExecutable(name, exe) {
-			return fmt.Errorf("%s is present but is not the executable %s or a link to it", name, exe)
-		}
+// link holds exe under another name: the executable itself under its own
+// name, and every other command name a link to it, as the delivered bin/
+// directory does. A name that is exe, leads to it or, on Windows, is a
+// byte-identical copy of it is kept as it is. Any other is made again where
+// write says the directory is the repository's own dist/: a name that is
+// absent, and one that no longer leads to exe, as the hard link of an earlier
+// build does on Windows. Without write nothing is written, and such a name is
+// an error, so that a file left by an earlier build, or a different program of
+// that name, is never what runs.
+func link(exe, name string, write bool) error {
+	_, err := os.Lstat(name)
+	switch {
+	case err == nil && isTheExecutable(name, exe):
 		return nil
-	} else if !errors.Is(err, fs.ErrNotExist) {
+	case err == nil && !write:
+		return fmt.Errorf("%s is present but is not the executable %s or a link to it", name, exe)
+	case err == nil:
+		if err := os.Remove(name); err != nil {
+			return err
+		}
+	case !errors.Is(err, fs.ErrNotExist):
 		return err
+	case !write:
+		return fmt.Errorf("%s is absent: %s, the directory the run names in %s, must hold every command name and is not written to", name, filepath.Dir(name), executablesEnv)
 	}
 	if runtime.GOOS == "windows" {
 		return os.Link(exe, name)

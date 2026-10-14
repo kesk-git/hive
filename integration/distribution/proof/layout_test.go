@@ -3,7 +3,6 @@ package proof_test
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -55,113 +54,68 @@ func file(t *testing.T, path, content string) {
 type breakage struct {
 	name   string
 	expect string
-	// goos limits the case to the platforms whose rules it breaks; empty is all three.
-	goos   []string
 	change func(t *testing.T, dir, goos string)
 }
 
-var unix = []string{"linux", "darwin"}
-
+// breakages are the breaks of any platform's artefact.
 var breakages = []breakage{
-	{"a link that is gone", "lacks hive-admit", unix, func(t *testing.T, dir, goos string) { os.Remove(filepath.Join(dir, "bin", "hive-admit")) }},
-	{"a link that is gone on Windows", "lacks hive-admit.exe", []string{"windows"}, func(t *testing.T, dir, goos string) {
-		os.Remove(filepath.Join(dir, "bin", "hive-admit.exe"))
+	{"a link that is gone", "lacks hive-admit", func(t *testing.T, dir, goos string) {
+		os.Remove(filepath.Join(dir, "bin", "hive-admit"+fixture.Suffix(goos)))
 	}},
-	{"an executable that is gone", "lacks hive-word", unix, func(t *testing.T, dir, goos string) { os.Remove(filepath.Join(dir, "bin", "hive-word")) }},
-	{"a file in bin that is not part of the artefact", "which the artefact does not", nil, func(t *testing.T, dir, goos string) {
+	{"an executable that is gone", "lacks hive-word", func(t *testing.T, dir, goos string) {
+		os.Remove(filepath.Join(dir, "bin", "hive-word"+fixture.Suffix(goos)))
+	}},
+	{"a file in bin that is not part of the artefact", "which the artefact does not", func(t *testing.T, dir, goos string) {
 		file(t, filepath.Join(dir, "bin", "tmux"+fixture.Suffix(goos)), "x")
 	}},
-	{"a file beside bin that is not part of the artefact", "the artefact holds README", nil, func(t *testing.T, dir, goos string) {
+	{"a file beside bin that is not part of the artefact", "the artefact holds README", func(t *testing.T, dir, goos string) {
 		file(t, filepath.Join(dir, "README"), "x")
 	}},
-	{"a link that is absolute", "absolute link", unix, func(t *testing.T, dir, goos string) {
-		replaceLink(t, dir, "hive-admit", func(p string) error { return os.Symlink(filepath.Join(dir, "bin", "hive-pool"), p) })
-	}},
-	{"a link that is dangling", "dangling", unix, func(t *testing.T, dir, goos string) {
-		replaceLink(t, dir, "hive-admit", func(p string) error { return os.Symlink("hive-nowhere", p) })
-	}},
-	{"a link to the executable of another package", "links to", unix, func(t *testing.T, dir, goos string) {
-		replaceLink(t, dir, "hive-admit", func(p string) error { return os.Symlink("hive-word", p) })
-	}},
-	{"a link that reaches its executable through another directory", "links to", unix, func(t *testing.T, dir, goos string) {
-		replaceLink(t, dir, "hive-admit", func(p string) error { return os.Symlink("../bin/hive-pool", p) })
-	}},
-	{"a link that is a copy on macOS and Linux", "not a symbolic link", unix, func(t *testing.T, dir, goos string) {
-		data, _ := os.ReadFile(filepath.Join(dir, "bin", "hive-pool"))
-		replaceLink(t, dir, "hive-admit", func(p string) error { return os.WriteFile(p, data, 0o755) })
-	}},
-	{"an executable without an execute bit", "no execute bit", unix, func(t *testing.T, dir, goos string) {
-		os.Chmod(filepath.Join(dir, "bin", "hive-pool"), 0o644)
-	}},
-	{"a name on Windows without the .exe suffix", "lacks the .exe suffix", []string{"windows"}, func(t *testing.T, dir, goos string) {
-		os.Rename(filepath.Join(dir, "bin", "hive-admit.exe"), filepath.Join(dir, "bin", "hive-admit"))
-	}},
-	{"a link on Windows that is a copy with other bytes", "neither a hard link", []string{"windows"}, func(t *testing.T, dir, goos string) {
-		replaceLink(t, dir, "hive-admit.exe", func(p string) error { return os.WriteFile(p, []byte("other bytes"), 0o755) })
-	}},
-	{"a link on Windows that is a symbolic link", "not a hard link or a copy", []string{"windows"}, func(t *testing.T, dir, goos string) {
-		if runtime.GOOS == "windows" {
-			t.Skip("a symbolic link needs rights a Windows host may not give; the case is shown on the hosts that make one")
-		}
-		replaceLink(t, dir, "hive-admit.exe", func(p string) error { return os.Symlink("hive-pool.exe", p) })
-	}},
-	{"a LICENSE that is not the committed one", "LICENSE of the artefact differs", nil, func(t *testing.T, dir, goos string) {
+	{"a LICENSE that is not the committed one", "LICENSE of the artefact differs", func(t *testing.T, dir, goos string) {
 		file(t, filepath.Join(dir, "LICENSE"), "another licence\n")
 	}},
-	{"a NOTICE that is not the committed one", "NOTICE of the artefact differs", nil, func(t *testing.T, dir, goos string) {
+	{"a NOTICE that is not the committed one", "NOTICE of the artefact differs", func(t *testing.T, dir, goos string) {
 		file(t, filepath.Join(dir, "NOTICE"), "another notice\n")
 	}},
-	{"a LICENSE that is a directory", "LICENSE of the artefact is not a regular file", nil, func(t *testing.T, dir, goos string) {
+	{"a LICENSE that is a directory", "LICENSE of the artefact is not a regular file", func(t *testing.T, dir, goos string) {
 		os.Remove(filepath.Join(dir, "LICENSE"))
 		os.Mkdir(filepath.Join(dir, "LICENSE"), 0o755)
 	}},
-	{"a NOTICE that is a directory", "NOTICE of the artefact is not a regular file", nil, func(t *testing.T, dir, goos string) {
+	{"a NOTICE that is a directory", "NOTICE of the artefact is not a regular file", func(t *testing.T, dir, goos string) {
 		os.Remove(filepath.Join(dir, "NOTICE"))
 		os.Mkdir(filepath.Join(dir, "NOTICE"), 0o755)
 	}},
-	{"a NOTICE that is a link to a file outside the artefact", "NOTICE of the artefact is not a regular file", nil, func(t *testing.T, dir, goos string) {
-		if runtime.GOOS == "windows" {
-			t.Skip("a symbolic link needs rights a Windows host may not give; the case is shown on the hosts that make one")
-		}
-		outside := filepath.Join(t.TempDir(), "NOTICE")
-		data, _ := os.ReadFile(filepath.Join(dir, "NOTICE"))
-		file(t, outside, string(data))
-		os.Remove(filepath.Join(dir, "NOTICE"))
-		if err := os.Symlink(outside, filepath.Join(dir, "NOTICE")); err != nil {
-			t.Fatal(err)
-		}
-	}},
-	{"a manifest that is a directory", "manifest.json of the artefact is not a regular file", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest that is a directory", "manifest.json of the artefact is not a regular file", func(t *testing.T, dir, goos string) {
 		os.Remove(filepath.Join(dir, "manifest.json"))
 		os.Mkdir(filepath.Join(dir, "manifest.json"), 0o755)
 	}},
-	{"a manifest that is gone", "lacks manifest.json", nil, func(t *testing.T, dir, goos string) { os.Remove(filepath.Join(dir, "manifest.json")) }},
-	{"a manifest that is not canonical", "canonical form", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest that is gone", "lacks manifest.json", func(t *testing.T, dir, goos string) { os.Remove(filepath.Join(dir, "manifest.json")) }},
+	{"a manifest that is not canonical", "canonical form", func(t *testing.T, dir, goos string) {
 		p := filepath.Join(dir, "manifest.json")
 		data, _ := os.ReadFile(p)
 		os.WriteFile(p, []byte(strings.Replace(string(data), ",\"os\"", ", \"os\"", 1)), 0o644)
 	}},
-	{"a manifest with a member missing", "lacks go_release", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest with a member missing", "lacks go_release", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) { delete(m, "go_release") })
 	}},
-	{"a manifest with a member it does not define", "which the artefact does not", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest with a member it does not define", "which the artefact does not", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) { m["built_by"] = "someone" })
 	}},
-	{"a manifest that names another version than the directory", "the directory is named", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest that names another version than the directory", "the directory is named", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) { m["hive_version"] = "7.8.8" })
 	}},
-	{"a manifest that names another platform", "names the platform", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest that names another platform", "names the platform", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) { m["os"] = "plan9" })
 	}},
-	{"a manifest with a wrong digest", "the digest", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest with a wrong digest", "the digest", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) {
 			m["files"].([]any)[0].(map[string]any)["digest"] = canon.FileDigest([]byte("other"))
 		})
 	}},
-	{"a manifest with a wrong size", "a size of", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest with a wrong size", "a size of", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) { m["files"].([]any)[0].(map[string]any)["size"] = int64(1) })
 	}},
-	{"a manifest that omits a file", "does not list bin/hive-word", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest that omits a file", "does not list bin/hive-word", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) {
 			var kept []any
 			for _, f := range m["files"].([]any) {
@@ -172,12 +126,12 @@ var breakages = []breakage{
 			m["files"] = kept
 		})
 	}},
-	{"a manifest that lists a file the artefact does not hold", "which the artefact does not hold", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest that lists a file the artefact does not hold", "which the artefact does not hold", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) {
 			m["files"] = append(m["files"].([]any), map[string]any{"path": "zzz", "size": int64(1), "digest": canon.FileDigest([]byte("x"))})
 		})
 	}},
-	{"a manifest that omits a link", "does not list the link bin/hive-admit", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest that omits a link", "does not list the link bin/hive-admit", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) {
 			var kept []any
 			for _, l := range m["links"].([]any) {
@@ -188,7 +142,7 @@ var breakages = []breakage{
 			m["links"] = kept
 		})
 	}},
-	{"a manifest that gives a link another target", "not hive-pool", nil, func(t *testing.T, dir, goos string) {
+	{"a manifest that gives a link another target", "not hive-pool", func(t *testing.T, dir, goos string) {
 		editManifest(t, dir, func(m map[string]any) {
 			for _, l := range m["links"].([]any) {
 				if strings.HasPrefix(l.(map[string]any)["path"].(string), "bin/hive-admit") {
@@ -199,35 +153,39 @@ var breakages = []breakage{
 	}},
 }
 
-// A sound artefact of each platform passes the layout checks by that
-// platform's rules, on any host.
-func TestLayoutPassesASoundArtefact(t *testing.T) {
-	for _, goos := range []string{"linux", "darwin", "windows"} {
-		t.Run(goos, func(t *testing.T) {
-			if goos != "windows" && runtime.GOOS == "windows" {
-				t.Skip("a symbolic-link fixture needs a host that makes one; the Windows artefact is checked by its own rules")
-			}
-			dir, want, _, _ := fixture.Artefact(t, goos)
-			for _, p := range proof.Layout(dir, want) {
-				t.Error(p)
-			}
-		})
+// windowsBreakages are the breaks of the rules of the Windows artefact: every
+// name ends in .exe, and a link is a hard link to its executable or a
+// byte-identical copy of it. Each is made of regular files and directories,
+// which every host makes.
+var windowsBreakages = []breakage{
+	{"a name on Windows without the .exe suffix", "lacks the .exe suffix", func(t *testing.T, dir, goos string) {
+		os.Rename(filepath.Join(dir, "bin", "hive-admit.exe"), filepath.Join(dir, "bin", "hive-admit"))
+	}},
+	{"a link on Windows that is a copy with other bytes", "neither a hard link", func(t *testing.T, dir, goos string) {
+		replaceLink(t, dir, "hive-admit.exe", func(p string) error { return os.WriteFile(p, []byte("other bytes"), 0o755) })
+	}},
+	{"a link on Windows that is not a file", "not a hard link or a copy", func(t *testing.T, dir, goos string) {
+		replaceLink(t, dir, "hive-admit.exe", func(p string) error { return os.Mkdir(p, 0o755) })
+	}},
+}
+
+// passes checks that a sound artefact of the platform passes the layout
+// checks by that platform's rules.
+func passes(t *testing.T, goos string) {
+	t.Helper()
+	dir, want, _, _ := fixture.Artefact(t, goos)
+	for _, p := range proof.Layout(dir, want) {
+		t.Error(p)
 	}
 }
 
-// Each break of the artefact is found, by the rules of the platform it is a
-// break on. Every case changes one thing of a sound artefact and says which.
-func TestLayoutCatchesEachBreak(t *testing.T) {
-	for _, b := range breakages {
-		goses := b.goos
-		if goses == nil {
-			goses = []string{"linux", "darwin", "windows"}
-		}
-		for _, goos := range goses {
-			t.Run(b.name+"/"+goos, func(t *testing.T) {
-				if goos != "windows" && runtime.GOOS == "windows" {
-					t.Skip("a symbolic-link fixture needs a host that makes one; the Windows artefact is checked by its own rules")
-				}
+// catches checks that each break is found by the rules of the platform. Every
+// case changes one thing of a sound artefact and says which.
+func catches(t *testing.T, goos string, lists ...[]breakage) {
+	t.Helper()
+	for _, list := range lists {
+		for _, b := range list {
+			t.Run(b.name, func(t *testing.T) {
 				dir, want, _, _ := fixture.Artefact(t, goos)
 				b.change(t, dir, goos)
 				got := proof.Layout(dir, want)
@@ -240,4 +198,17 @@ func TestLayoutCatchesEachBreak(t *testing.T) {
 			})
 		}
 	}
+}
+
+// A sound artefact of Windows passes the layout checks by the rules of
+// Windows. Its links are hard links, which every host makes, so the case runs
+// wherever the tests do; the artefacts of macOS and Linux, whose links are
+// symbolic, have their cases in the file built for those platforms.
+func TestLayoutPassesASoundWindowsArtefact(t *testing.T) {
+	passes(t, "windows")
+}
+
+// Each break of the Windows artefact is found by the rules of Windows.
+func TestLayoutCatchesEachBreakOfAWindowsArtefact(t *testing.T) {
+	catches(t, "windows", breakages, windowsBreakages)
 }

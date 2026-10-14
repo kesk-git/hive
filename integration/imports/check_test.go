@@ -128,6 +128,42 @@ func TestCheckCatchesEachBreak(t *testing.T) {
 	}
 }
 
+// A file under an upstream/ directory is named by a record that lists it as a
+// portion or as a retained test, as much as by one that lists it as a licence
+// text. It catches a check that reports imported material kept beside the
+// upstream's own texts although its record names it.
+func TestCheckCountsPortionsAndRetainedTestsUnderUpstream(t *testing.T) {
+	tree := validTree(t)
+	const (
+		record  = "imports/example-lib.json"
+		portion = "packages/spawning-pool/internal/example/copy.go"
+		moved   = "packages/spawning-pool/upstream/example-lib/copy.go"
+		kept    = "packages/spawning-pool/upstream/example-lib/copy_test.go"
+	)
+	tree[moved] = tree[portion]
+	delete(tree, portion)
+	tree[kept] = &fstest.MapFile{Data: []byte("package example\n")}
+	data := tree[record].Data
+	data = bytes.Replace(data, []byte(`"hive_path": "`+portion+`"`), []byte(`"hive_path": "`+moved+`"`), 1)
+	data = bytes.Replace(data, []byte(`"retained_tests": [],`),
+		[]byte(`"retained_tests": [{"hive_path": "`+kept+`", "upstream_paths": ["src/copy_test.go"], "disposition": "copied"}],`), 1)
+	tree[record] = &fstest.MapFile{Data: data}
+	if ps := Check(tree); len(ps) != 0 {
+		t.Errorf("problems: %v", ps)
+	}
+
+	// The same two files with no record that names them are reported.
+	tree = validTree(t)
+	tree[moved] = &fstest.MapFile{Data: []byte("package example\n")}
+	tree[kept] = &fstest.MapFile{Data: []byte("package example\n")}
+	got := rules(Check(tree))
+	for _, name := range []string{moved, kept} {
+		if !strings.Contains(got[3], name+": is under an upstream/ directory and no record names it") {
+			t.Errorf("check 3 did not report %s; it reported %q", name, got[3])
+		}
+	}
+}
+
 // notice regenerates a tree's NOTICE from the records named, so that a case
 // that breaks a record breaks only that record.
 func notice(m fstest.MapFS, ids ...string) []byte {

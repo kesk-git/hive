@@ -96,12 +96,19 @@ func walk(fsys fs.FS, fn func(name string)) error {
 }
 
 // checkUpstream is the third check: every file under any upstream/ directory
-// is named by a record as one of its licence or notice texts.
+// is named by a record, as one of its licence or notice texts, as a portion
+// or as a retained test.
 func checkUpstream(fsys fs.FS, records []Record) []Problem {
 	named := map[string]bool{}
 	for _, r := range records {
 		for _, f := range r.Licence.Files {
 			named[f.Path] = true
+		}
+		for _, p := range r.Portions {
+			named[p.HivePath] = true
+		}
+		for _, p := range r.RetainedTests {
+			named[p.HivePath] = true
 		}
 	}
 	var problems []Problem
