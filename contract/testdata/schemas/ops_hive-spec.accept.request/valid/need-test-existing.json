@@ -1,0 +1,24 @@
+{
+  "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+  "revision": 2,
+  "task_id": "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+  "admission": {
+    "schema": "pool.admission",
+    "id": "adm_01hf4k2m8q9r3s5t6v7w0x1yr5",
+    "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+    "record_revision": 3
+  },
+  "need_test": {
+    "outcome": "Counter reset is covered.",
+    "coverage": "existing",
+    "reason": "An accepted specification already proves the reset.",
+    "covering_specification": {
+      "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd5",
+      "revision": 2,
+      "digest": "sha256:3fa405a8301ace34d11cf44a816080b8f0e49a48fbd048b8aef1543a8c58bdb6"
+    }
+  },
+  "open_product_questions": [
+    "q_01hf4k2m8q9r3s5t6v7w0x1ym1"
+  ]
+}

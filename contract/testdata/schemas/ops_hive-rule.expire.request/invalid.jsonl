@@ -1,0 +1,27 @@
+{"name":"request-carries-receipt","base":"minimal.json","edits":[{"op":"add","path":"/receipt","value":{"authority":{"kind":"none"},"body":{},"correlation_id":"corr_01hf4k2m8q9r3s5t6v7w0x1yk0","evidence":[],"home_id":"home_01hf4k2m8q9r3s5t6v7w0x1ya1","kind":"word.hold.released","kind_version":"1.0","receipt_id":"rcpt_01hf4k2m8q9r3s5t6v7w0x1yj9","request_id":"req_01hf4k2m8q9r3s5t6v7w0x1yh8","schema":"hive.receipt","schema_version":"1.0","scope_level":"hive","subject":{"id":"hold_01hf4k2m8q9r3s5t6v7w0x1ys6","record_revision":2,"schema":"pool.hold"},"writer":{"command":"hive-word","implementation_version":"0.1.0","operation":"release","package":"word"},"written_at":"2026-10-12T10:30:00.000Z"}}]}
+{"name":"request-carries-words","base":"minimal.json","edits":[{"op":"add","path":"/words","value":"The expiry was noticed."}]}
+{"name":"request-missing-noticed_at","base":"with-wake.json","edits":[{"op":"remove","path":"/noticed_at"}]}
+{"name":"request-missing-rule_id","base":"with-wake.json","edits":[{"op":"remove","path":"/rule_id"}]}
+{"name":"request-noticed-at-date-only","base":"minimal.json","edits":[{"op":"replace","path":"/noticed_at","value":"2026-10-14"}]}
+{"name":"request-noticed-at-lowercase-z","base":"minimal.json","edits":[{"op":"replace","path":"/noticed_at","value":"2026-10-14T11:45:00.000z"}]}
+{"name":"request-noticed-at-no-millis","base":"minimal.json","edits":[{"op":"replace","path":"/noticed_at","value":"2026-10-14T11:45:00Z"}]}
+{"name":"request-noticed-at-null","base":"minimal.json","edits":[{"op":"replace","path":"/noticed_at","value":null}]}
+{"name":"request-noticed-at-number","base":"minimal.json","edits":[{"op":"replace","path":"/noticed_at","value":1760442300}]}
+{"name":"request-noticed-at-offset","base":"minimal.json","edits":[{"op":"replace","path":"/noticed_at","value":"2026-10-14T11:45:00.000+02:00"}]}
+{"name":"request-rule-id-bad-prefix","base":"minimal.json","edits":[{"op":"replace","path":"/rule_id","value":"task_01hf4k2m8q9r3s5t6v7w0x1ye5"}]}
+{"name":"request-rule-id-not-string","base":"minimal.json","edits":[{"op":"replace","path":"/rule_id","value":7}]}
+{"name":"request-rule-id-short","base":"minimal.json","edits":[{"op":"replace","path":"/rule_id","value":"rule_01hf4k"}]}
+{"name":"request-rule-id-upper","base":"minimal.json","edits":[{"op":"replace","path":"/rule_id","value":"rule_01HF4K2M8Q9R3S5T6V7W0X1YA1"}]}
+{"name":"request-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}
+{"name":"request-wake-digest-bad","base":"with-wake.json","edits":[{"op":"replace","path":"/wake/digest","value":"sha256:ABC"}]}
+{"name":"request-wake-home-bad","base":"with-wake.json","edits":[{"op":"replace","path":"/wake/home_id","value":"task_01hf4k2m8q9r3s5t6v7w0x1ye5"}]}
+{"name":"request-wake-id-empty","base":"with-wake.json","edits":[{"op":"replace","path":"/wake/id","value":""}]}
+{"name":"request-wake-id-not-string","base":"with-wake.json","edits":[{"op":"replace","path":"/wake/id","value":9}]}
+{"name":"request-wake-missing-id","base":"with-wake.json","edits":[{"op":"remove","path":"/wake/id"}]}
+{"name":"request-wake-missing-schema","base":"with-wake.json","edits":[{"op":"remove","path":"/wake/schema"}]}
+{"name":"request-wake-not-object","base":"with-wake.json","edits":[{"op":"replace","path":"/wake","value":"pool.item/task_01hf4k2m8q9r3s5t6v7w0x1ye5"}]}
+{"name":"request-wake-revision-zero","base":"with-wake.json","edits":[{"op":"replace","path":"/wake/record_revision","value":0}]}
+{"name":"request-wake-schema-single-segment","base":"with-wake.json","edits":[{"op":"replace","path":"/wake/schema","value":"pool"}]}
+{"name":"request-wake-schema-uppercase","base":"with-wake.json","edits":[{"op":"replace","path":"/wake/schema","value":"Pool.Item"}]}
+{"name":"request-wake-string","base":"with-wake.json","edits":[{"op":"replace","path":"/wake","value":"wake"}]}
+{"name":"request-wake-unknown","base":"with-wake.json","edits":[{"op":"add","path":"/wake/unlisted","value":"unexpected"}]}

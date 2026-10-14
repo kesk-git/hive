@@ -1,0 +1,11 @@
+{
+  "rule_id": "rule_01hf4k2m8q9r3s5t6v7w0x1yf7",
+  "noticed_at": "2026-10-14T11:45:00.000Z",
+  "wake": {
+    "schema": "shadow.wake",
+    "id": "wake_01hf4k2m8q9r3s5t6v7w0x1yt7",
+    "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+    "record_revision": 2,
+    "digest": "sha256:51391bf0ab33e8272bcfca0d61b5ab242391822f331fe51ac5930b58da8e5b25"
+  }
+}

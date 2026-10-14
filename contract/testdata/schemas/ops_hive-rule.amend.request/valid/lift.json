@@ -1,0 +1,33 @@
+{
+  "rule_id": "rule_01hf4k2m8q9r3s5t6v7w0x1yf6",
+  "kind": "lift",
+  "words": "The lift condition was met.",
+  "receipt": {
+    "schema": "hive.receipt",
+    "schema_version": "1.0",
+    "receipt_id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj9",
+    "kind": "word.hold.released",
+    "kind_version": "1.0",
+    "written_at": "2026-10-12T10:30:00.000Z",
+    "writer": {
+      "package": "word",
+      "command": "hive-word",
+      "operation": "release",
+      "implementation_version": "0.1.0"
+    },
+    "request_id": "req_01hf4k2m8q9r3s5t6v7w0x1yh8",
+    "correlation_id": "corr_01hf4k2m8q9r3s5t6v7w0x1yk0",
+    "scope_level": "hive",
+    "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+    "authority": {
+      "kind": "none"
+    },
+    "evidence": [],
+    "body": {},
+    "subject": {
+      "schema": "pool.hold",
+      "id": "hold_01hf4k2m8q9r3s5t6v7w0x1ys6",
+      "record_revision": 2
+    }
+  }
+}

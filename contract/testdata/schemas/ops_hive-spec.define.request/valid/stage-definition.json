@@ -1,0 +1,18 @@
+{
+  "title": "Example stage definition",
+  "text": "Stage seven of the example plan.",
+  "criteria": [
+    {
+      "criterion_id": "no-loss",
+      "text": "No sample is lost on a restart.",
+      "evidence": "A test restarts between two samples."
+    }
+  ],
+  "product_rules": [
+    {
+      "rule_id": "rule_01hf4k2m8q9r3s5t6v7w0x1yf6",
+      "record_revision": 2
+    }
+  ],
+  "plan_stage": 7
+}

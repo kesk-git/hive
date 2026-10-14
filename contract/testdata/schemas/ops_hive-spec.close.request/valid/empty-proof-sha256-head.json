@@ -1,0 +1,13 @@
+{
+  "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+  "revision": 3,
+  "task_id": "task_01hf4k2m8q9r3s5t6v7w0x1ye6",
+  "generation": 1,
+  "landed_revision": "90eae63487cae2df5b793b07c622680d2df6c9a024891c8a9bd98d08d5bc3d92",
+  "landing": {
+    "schema": "hive.receipt",
+    "id": "rcpt_01hf4k2m8q9r3s5t6v7w0x1yj8"
+  },
+  "proof": [],
+  "resolved_findings": []
+}

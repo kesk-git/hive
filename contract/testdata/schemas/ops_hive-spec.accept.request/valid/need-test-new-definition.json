@@ -1,0 +1,11 @@
+{
+  "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+  "revision": 1,
+  "task_id": "task_01hf4k2m8q9r3s5t6v7w0x1ye6",
+  "need_test": {
+    "outcome": "Sample collection is newly covered.",
+    "coverage": "new-definition",
+    "reason": "No accepted specification covered this outcome before this define step."
+  },
+  "open_product_questions": []
+}

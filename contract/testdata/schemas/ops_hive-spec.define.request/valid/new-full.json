@@ -1,0 +1,59 @@
+{
+  "title": "Example specification",
+  "text": "The example counter resets after its sample is collected.",
+  "criteria": [
+    {
+      "criterion_id": "counter-resets",
+      "text": "The counter resets after its sample is collected.",
+      "evidence": "A test reads the counter twice."
+    },
+    {
+      "criterion_id": "sample-kept",
+      "text": "The collected sample is kept.",
+      "evidence": "A test reads the sample after reset.",
+      "requirements": [
+        {
+          "kind": "doc",
+          "path": "docs/example-notes.md"
+        },
+        {
+          "kind": "report",
+          "url": "https://example.invalid/reports/12"
+        },
+        {
+          "kind": "harvest",
+          "url": "https://example.invalid/harvest/7"
+        },
+        {
+          "kind": "record",
+          "ref": {
+            "schema": "pool.item",
+            "id": "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+            "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+            "record_revision": 2,
+            "digest": "sha256:4a33eacd5fa65f2b2e2871cd131286b53c415b131666d71173bb6e3fe59361b3"
+          }
+        }
+      ]
+    }
+  ],
+  "task_ids": [
+    "task_01hf4k2m8q9r3s5t6v7w0x1ye5",
+    "task_01hf4k2m8q9r3s5t6v7w0x1ye6"
+  ],
+  "touched_subjects": [
+    "subj_01hf4k2m8q9r3s5t6v7w0x1yg7",
+    "subj_01hf4k2m8q9r3s5t6v7w0x1yg8"
+  ],
+  "product_rules": [
+    {
+      "rule_id": "rule_01hf4k2m8q9r3s5t6v7w0x1yf6",
+      "record_revision": 1
+    },
+    {
+      "rule_id": "rule_01hf4k2m8q9r3s5t6v7w0x1yf7",
+      "record_revision": 4
+    }
+  ],
+  "plan_stage": 3
+}

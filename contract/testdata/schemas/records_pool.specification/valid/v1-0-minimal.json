@@ -1,0 +1,50 @@
+{
+  "schema": "pool.specification",
+  "schema_version": "1.0",
+  "record_revision": 1,
+  "specification_id": "spec_01hf4k2m8q9r3s5t6v7w0x1yd4",
+  "scope_level": "hive",
+  "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+  "title": "Example specification",
+  "current_revision": 1,
+  "revisions": [
+    {
+      "revision": 1,
+      "text": "The example counter resets after its sample is collected.",
+      "criteria": [
+        {
+          "criterion_id": "counter-resets",
+          "text": "The counter resets after its sample is collected.",
+          "evidence": "A test reads the counter twice."
+        }
+      ],
+      "digest": "sha256:386706bf1f6ba515d60d6a3e5ab8e610177f518a162849c959431cd8535ec1df",
+      "defined_at": "2026-10-12T09:00:00.000Z",
+      "defined_by": {
+        "kind": "supervisor",
+        "session_id": "sess_01hf4k2m8q9r3s5t6v7w0x1yn2",
+        "session_generation": 1
+      },
+      "authority": {
+        "kind": "word",
+        "ref": {
+          "schema": "pool.note",
+          "id": "note_01hf4k2m8q9r3s5t6v7w0x1yp3",
+          "home_id": "home_01hf4k2m8q9r3s5t6v7w0x1ya1",
+          "record_revision": 1,
+          "digest": "sha256:edb465624291e4053c6c5ea4b7eb320dec773e10a57d26b95dcf0564f8e310f8"
+        }
+      },
+      "request_id": "req_01hf4k2m8q9r3s5t6v7w0x1yh8"
+    }
+  ],
+  "closures": [],
+  "created_at": "2026-10-12T09:00:00.000Z",
+  "updated_at": "2026-10-13T08:15:00.000Z",
+  "writer": {
+    "package": "pool",
+    "command": "hive-spec",
+    "operation": "define",
+    "implementation_version": "0.1.0"
+  }
+}
