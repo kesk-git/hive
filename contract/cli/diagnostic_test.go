@@ -1,12 +1,17 @@
 package cli
 
 import (
+	"errors"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/journal"
+	"github.com/kesk-git/hive/contract/store"
 )
 
 // events reads the events the harness's journal holds, in order.
@@ -101,5 +106,245 @@ func TestUsageRefusalQuotesNothingAndWritesNoEvent(t *testing.T) {
 	}
 	if n := len(h.events(t)); n != 0 {
 		t.Errorf("the journal holds %d events", n)
+	}
+}
+
+// diagnostics are the diagnostic events the harness's journal holds.
+func (h *harness) diagnostics(t testing.TB) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, e := range h.events(t) {
+		if e["kind"] == "dispatch.diagnostic.recorded" {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// A panic answers with a sentence that holds no value; its stack and the type
+// of its value go to the event, and nothing of it to standard error.
+func TestPanicDetailGoesToTheJournalOnly(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	req := request(t, "fail", 3, func(m map[string]any) {
+		m["body"].(map[string]any)["home"].(map[string]any)["name"] = "panic"
+	})
+	code, out, stderr := h.run("hive-fleet", req, "fail", HomeOption, home)
+	resp, err := envelope.AcceptResponse(out, code, id(ids.Request, 3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expect(t, resp, envelope.Failed, "internal")
+	if strings.Contains(resp.Error.Message, "boom") || strings.Contains(stderr, "boom") || strings.Contains(stderr, "goroutine") {
+		t.Errorf("the panic is in the message %q or standard error %q", resp.Error.Message, stderr)
+	}
+	if want := "hive-fleet fail: failed internal " + id(ids.Request, 3) + "\n"; stderr != want {
+		t.Errorf("standard error = %q, want %q", stderr, want)
+	}
+	events := h.diagnostics(t)
+	if len(events) != 1 {
+		t.Fatalf("%d diagnostic events", len(events))
+	}
+	body, _ := events[0]["body"].(map[string]any)
+	if body["panic_type"] != "string" || !strings.Contains(body["stack"].(string), "goroutine") || body["detail"] != nil {
+		t.Errorf("body %v", body)
+	}
+	if line := string(h.journal.lines[events[0]["event_id"].(string)]); strings.Contains(line, "boom") {
+		t.Errorf("the panic's value is in the event: %s", line)
+	}
+}
+
+// A request that could not be read has no request_id, no correlation_id and no
+// scope; its detail is kept under a correlation_id minted for the event, in the
+// hive scope of the home, based on the invocation.
+func TestUnreadRequestKeepsItsDetail(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	missing := filepath.Join(t.TempDir(), "no-such-request.json")
+	code, out, stderr := h.run("hive-fleet", nil, "echo", HomeOption, home, RequestFileOption, missing)
+	resp, err := envelope.DecodeResponse(out)
+	if err != nil || resp.ExitCode() != code {
+		t.Fatalf("exit %d: %v", code, err)
+	}
+	expect(t, resp, envelope.Unavailable, "source_unreadable")
+	if strings.Contains(resp.Error.Message, missing) || strings.Contains(stderr, missing) {
+		t.Errorf("the path is in the message %q or standard error %q", resp.Error.Message, stderr)
+	}
+	if want := "hive-fleet echo: unavailable source_unreadable -\n"; stderr != want {
+		t.Errorf("standard error = %q, want %q", stderr, want)
+	}
+	events := h.diagnostics(t)
+	if len(events) != 1 {
+		t.Fatalf("%d diagnostic events", len(events))
+	}
+	e := events[0]
+	corr, _ := e["correlation_id"].(string)
+	if ids.Check(corr, ids.Correlation) != nil || corr == id(ids.Correlation, 1) {
+		t.Errorf("correlation_id %q", corr)
+	}
+	basis, _ := e["basis"].(map[string]any)
+	ref, _ := basis["ref"].(map[string]any)
+	if basis["kind"] != "observation" || ref["schema"] != "hive.invocation" || ref["id"] != corr {
+		t.Errorf("basis %v", basis)
+	}
+	body, _ := e["body"].(map[string]any)
+	if _, has := body["request_id"]; has || e["causation"] != nil || e["scope_level"] != "hive" || e["home_id"] != homeID {
+		t.Errorf("event %v", e)
+	}
+	if detail, _ := body["detail"].([]any); len(detail) == 0 || !strings.Contains(detail[0].(string), missing) {
+		t.Errorf("detail %v", detail)
+	}
+}
+
+// Where no event can be written the detail is dropped, and the response and
+// its one line of standard error are what they would have been.
+func TestDetailIsDroppedWhereNothingCanReceiveIt(t *testing.T) {
+	req := request(t, "fail", 7, func(m map[string]any) {
+		m["body"].(map[string]any)["home"].(map[string]any)["name"] = "chain"
+	})
+	want := "hive-fleet fail: failed internal " + id(ids.Request, 7) + "\n"
+	for _, c := range []struct {
+		name string
+		edit func(h *harness)
+	}{
+		{"no journal is configured", func(h *harness) { h.exe.Journal = nil }},
+		{"the journal does not open", func(h *harness) {
+			h.exe.Journal = func(string) (store.Journal, error) { return nil, errors.New("the journal is gone") }
+		}},
+		{"the append fails", func(h *harness) { h.journal.fail = errors.New("the journal is full") }},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := newHarness(t)
+			c.edit(h)
+			code, out, stderr := h.run("hive-fleet", req, "fail", HomeOption, newHome(t))
+			resp, err := envelope.AcceptResponse(out, code, id(ids.Request, 7))
+			if err != nil {
+				t.Fatal(err)
+			}
+			expect(t, resp, envelope.Failed, "internal")
+			if code != envelope.Failed.ExitCode() || stderr != want {
+				t.Errorf("exit %d, standard error %q", code, stderr)
+			}
+			if n := len(h.events(t)); n != 0 {
+				t.Errorf("%d events", n)
+			}
+		})
+	}
+
+	// A directory with no home record, or none at all, has no home_id to
+	// write the event under.
+	for name, home := range map[string]string{"no home record": emptyHome(t), "no directory": filepath.Join(t.TempDir(), "absent")} {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t)
+			missing := filepath.Join(t.TempDir(), "no-such-request.json")
+			code, out, stderr := h.run("hive-fleet", nil, "echo", HomeOption, home, RequestFileOption, missing)
+			if resp, err := envelope.DecodeResponse(out); err != nil || resp.ExitCode() != code {
+				t.Fatalf("exit %d: %v", code, err)
+			}
+			if stderr != "hive-fleet echo: unavailable source_unreadable -\n" || len(h.events(t)) != 0 {
+				t.Errorf("standard error %q, %d events", stderr, len(h.events(t)))
+			}
+		})
+	}
+}
+
+// An ok response and a replayed one write no diagnostic event, and a failure
+// whose message says everything writes none either.
+func TestNoEventWithoutDetail(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	put := request(t, "put", 1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "first" })
+	expect(t, h.invoke(t, home, "put", put), envelope.Ok, "")
+	again := h.invoke(t, home, "put", put)
+	expect(t, again, envelope.Ok, "")
+	if !again.Replayed {
+		t.Fatal("not a replay")
+	}
+	refused := request(t, "refuse", 2, nil)
+	expect(t, h.invoke(t, home, "refuse", refused), envelope.Refused, "authority_missing")
+	expect(t, h.invoke(t, home, "fail", request(t, "fail", 3, func(m map[string]any) {
+		m["body"].(map[string]any)["home"].(map[string]any)["name"] = "package code"
+	})), envelope.Unavailable, "dispatch.adapter_down")
+	if n := len(h.diagnostics(t)); n != 0 {
+		t.Errorf("%d diagnostic events", n)
+	}
+}
+
+// The event is one the contract library's journal admits: it resolves the one
+// shared body schema, and reads back from the home.
+func TestDiagnosticEventIsAdmittedByTheJournal(t *testing.T) {
+	h := newHarness(t)
+	h.exe.Journal = func(dir string) (store.Journal, error) {
+		return journal.Open(dir, journal.Options{Package: "dispatch", Clock: h.clk})
+	}
+	home := newHome(t)
+	for n, name := range []string{"chain", "panic"} {
+		req := request(t, "fail", n+1, func(m map[string]any) {
+			m["body"].(map[string]any)["home"].(map[string]any)["name"] = name
+		})
+		expect(t, h.invoke(t, home, "fail", req), envelope.Failed, "internal")
+	}
+	j, err := journal.Open(home, journal.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := j.Reader(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for {
+		e, err := r.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e == nil {
+			break
+		}
+		got = append(got, e.Kind)
+	}
+	if want := []string{"dispatch.diagnostic.recorded", "dispatch.diagnostic.recorded"}; !slices.Equal(got, want) {
+		t.Errorf("the journal holds %v", got)
+	}
+}
+
+// No message and no line of standard error quotes what the caller typed: not
+// the command name, the operation name, an argument or an option.
+func TestMessagesQuoteNothingTyped(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	const typed = "sk-live-0123456789abcdefSECRET"
+	cases := []struct {
+		name    string
+		command string
+		args    []string
+		message string
+		// echoed is true where the response's operation member, which names
+		// the operation an undeclared invocation asked for, carries it.
+		echoed bool
+	}{
+		{"command name", "hive-" + typed, []string{"echo", HomeOption, home}, "does not own the command name it was started under, of 35 bytes", false},
+		{"operation of no form", "hive-fleet", []string{"Fly" + typed, HomeOption, home}, "argument 1, of 33 bytes, is not an operation name", false},
+		{"operation not declared", "hive-fleet", []string{"fly-" + strings.ToLower(typed), HomeOption, home}, "has no operation of the name in argument 1, of 34 bytes", true},
+		{"unexpected argument", "hive-fleet", []string{"echo", HomeOption, home, typed}, "argument 4 is not an option; the request is never an argument", false},
+		{"unknown option", "hive-fleet", []string{"echo", HomeOption, home, "--" + typed, "x"}, "argument 4, of 32 bytes, is not an option this command takes", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			code, out, stderr := h.run(c.command, nil, c.args...)
+			resp, err := envelope.DecodeResponse(out)
+			if err != nil || resp.ExitCode() != code || resp.Error == nil {
+				t.Fatalf("exit %d: %v", code, err)
+			}
+			if !strings.Contains(resp.Error.Message, c.message) {
+				t.Errorf("message %q lacks %q", resp.Error.Message, c.message)
+			}
+			if strings.Contains(strings.ToLower(resp.Error.Message), strings.ToLower(typed)) || !c.echoed && strings.Contains(strings.ToLower(string(out)+stderr), strings.ToLower(typed)) {
+				t.Errorf("the typed text is in the response %s or standard error %q", out, stderr)
+			}
+			if strings.Count(stderr, "\n") != 1 || strings.Contains(stderr, resp.Error.Message) {
+				t.Errorf("standard error %q is not one line without the message", stderr)
+			}
+		})
 	}
 }

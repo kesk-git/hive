@@ -1,0 +1,5 @@
+{
+  "command": "hive-fleet",
+  "operation": "put",
+  "status": "failed"
+}

@@ -22,6 +22,16 @@
 // to end the invocation with a status other than ok, and the receipts a
 // refusal or a hold leaves ride on that Failure.
 //
+// A message is one sentence naming the field and shape that failed, and
+// standard error is one line, <command> <operation>: <status> <code>
+// <request_id>. What a failure holds beyond its message, a lower-layer error
+// chain or a panic's stack and the type of its value, rides on the Failure
+// (Because, Panicked), is never part of the response, and goes to the home's
+// journal as one <package>.diagnostic.recorded event, appended through
+// Executable.Journal after the response is decided and before it is written.
+// A handler gives a Failure a short sentence and the error beneath it, and
+// never puts the error's text in the sentence.
+//
 // An operation with an effect outside Hive commits its intent first, with
 // Call.CommitIntent: the records, receipts and events of the intent are
 // durable, as one transaction, before the effect, and the request has no

@@ -623,8 +623,8 @@ func TestFailedAndUnknown(t *testing.T) {
 			}
 		})
 	}
-	if !strings.Contains(h.stderr.String(), "panic: boom") {
-		t.Error("the panic was not reported on standard error")
+	if strings.Contains(h.stderr.String(), "boom") {
+		t.Error("the panic's value was written to standard error")
 	}
 	same(t, before, tree(t, home))
 	// A response body that breaks the operation's schema is never written.
@@ -863,7 +863,7 @@ func TestTransport(t *testing.T) {
 	}
 	// An option is followed by its value; the name=value spelling is not one.
 	code, out, errs := h.run("hive-fleet", nil, "echo", "--home="+home, "--request-file", reqFile, "--response-file", respFile)
-	if code != 2 || !strings.Contains(errs, "unknown option") {
+	if code != 2 || errs != "hive-fleet echo: usage usage -\n" || !strings.Contains(string(out), "is not an option this command takes") {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errs)
 	}
 	code, out, errs = h.run("hive-fleet", nil, "echo", "--home", home, "--request-file", reqFile, "--response-file", respFile)
@@ -1122,8 +1122,21 @@ func TestRetryThatFailsRecoveryIsUnknown(t *testing.T) {
 			if h.calls["put"] != 1 {
 				t.Errorf("put ran %d times", h.calls["put"])
 			}
-			if !strings.Contains(h.stderr.String(), "crashed here") {
-				t.Error("the cause was not reported on standard error")
+			if strings.Contains(h.stderr.String(), "crashed here") {
+				t.Error("the cause was written to standard error")
+			}
+			diagnostics := 0
+			for _, e := range h.events(t) {
+				if e["kind"] != "dispatch.diagnostic.recorded" {
+					continue
+				}
+				diagnostics++
+				if detail, _ := e["body"].(map[string]any)["detail"].([]any); len(detail) == 0 || !strings.Contains(detail[len(detail)-1].(string), "crashed here") {
+					t.Errorf("detail %v", detail)
+				}
+			}
+			if diagnostics != 1 {
+				t.Errorf("%d diagnostic events", diagnostics)
 			}
 
 			h.exe.Fault = nil
@@ -1135,7 +1148,7 @@ func TestRetryThatFailsRecoveryIsUnknown(t *testing.T) {
 			if _, err := os.Stat(intent); err == nil {
 				t.Error("the intent was left behind")
 			}
-			if len(h.journal.order) != 1 {
+			if len(h.journal.order) != 2 {
 				t.Errorf("events appended: %v", h.journal.order)
 			}
 		})
@@ -1288,8 +1301,8 @@ func TestReplayThatNoLongerFitsIsUnknown(t *testing.T) {
 	}
 	// Lowered again, the same answer; nothing of the handler runs.
 	expectUnknown(t, h.invoke(t, home, "put", req))
-	if !strings.Contains(h.stderr.String(), "recorded response") {
-		t.Error("the cause was not reported on standard error")
+	if strings.Contains(h.stderr.String(), "recorded response") {
+		t.Error("the cause was written to standard error")
 	}
 
 	fleet.Limits.MaxResponseBytes = 4096

@@ -193,7 +193,7 @@ func LooseRequestID(data []byte) (string, error) {
 // sent to. A difference is invalid with code envelope_mismatch.
 func (r *Request) Addressed(command, operation string) error {
 	if r.Command != command || r.Operation != operation {
-		return Common(CodeEnvelopeMismatch, fmt.Sprintf("the request names %s %s; it was sent to %s %s", r.Command, r.Operation, command, operation))
+		return Common(CodeEnvelopeMismatch, fmt.Sprintf("the command and operation the request names are not the ones it was sent to, %s %s", command, operation))
 	}
 	return nil
 }

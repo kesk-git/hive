@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:events:diagnostic.recorded:v1",
+  "title": "Event body: <package>.diagnostic.recorded",
+  "description": "The detail of a failed command that its error message does not carry: the lower-layer error chain, outermost first, or a panic's stack and the Go type of its value. The one body schema shared by the kind every package writes as its own, <package>.diagnostic.recorded. It holds no value and never the text of a request, an argument or an option. The event's basis is the observation of the request that failed (schema hive.request, the request_id), or, when the request could not be read, of the invocation (schema hive.invocation, the event's own correlation_id). See spec/events.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "command",
+    "status",
+    "code"
+  ],
+  "properties": {
+    "command": {
+      "description": "The command that answered.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/command_name"
+    },
+    "operation": {
+      "description": "The operation invoked. Absent when the failure came before one was named.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/operation_name"
+    },
+    "status": {
+      "description": "The status of the response that was written.",
+      "enum": [
+        "failed",
+        "usage",
+        "invalid",
+        "refused",
+        "conflict",
+        "not_found",
+        "too_large",
+        "unavailable",
+        "unknown",
+        "held"
+      ]
+    },
+    "code": {
+      "description": "The code of the response's error.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/error_code"
+    },
+    "request_id": {
+      "description": "The failed request's request_id. Absent when the request could not be read.",
+      "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+    },
+    "detail": {
+      "description": "The lower-layer error chain, outermost first. Each string is clipped to 1,024 bytes.",
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "maxLength": 1024
+      }
+    },
+    "stack": {
+      "description": "The stack of a panic, clipped to 8,192 bytes. Present only for a panic.",
+      "type": "string",
+      "maxLength": 8192
+    },
+    "panic_type": {
+      "description": "The Go type of a panic's value, never the value. Present only for a panic.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    }
+  }
+}

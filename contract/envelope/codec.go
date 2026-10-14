@@ -102,14 +102,14 @@ func decodeDocument(data []byte, name, id, known string) (map[string]any, error)
 	}
 	reg, err := registry()
 	if err != nil {
-		return nil, Common(CodeInternal, err.Error())
+		return nil, Common(CodeInternal, "the embedded schemas do not load").Because(err)
 	}
 	if err := reg.Validate(id, data); err != nil {
 		var ve *schema.ValidationError
 		if errors.As(err, &ve) {
 			return nil, Common(CodeSchemaViolation, "the document breaks "+id+": "+ve.Error())
 		}
-		return nil, Common(CodeInternal, err.Error())
+		return nil, Common(CodeInternal, "the document cannot be checked against "+id).Because(err)
 	}
 	return obj, nil
 }
@@ -156,18 +156,18 @@ func validateTree(tree any, id string) error {
 func ValidateBody(body map[string]any, ref string) error {
 	reg, err := registry()
 	if err != nil {
-		return Common(CodeInternal, err.Error())
+		return Common(CodeInternal, "the embedded schemas do not load").Because(err)
 	}
 	out, err := canon.Encode(body)
 	if err != nil {
-		return Common(CodeInternal, "the body cannot be written: "+err.Error())
+		return Common(CodeInternal, "the body cannot be written").Because(err)
 	}
 	if err := reg.Validate(ref, out); err != nil {
 		var ve *schema.ValidationError
 		if errors.As(err, &ve) {
 			return Common(CodeSchemaViolation, "the body breaks "+ref+": "+ve.Error())
 		}
-		return Common(CodeInternal, err.Error())
+		return Common(CodeInternal, "the body cannot be checked against "+ref).Because(err)
 	}
 	return nil
 }

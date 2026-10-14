@@ -209,6 +209,9 @@ type Failure struct {
 	Status   Status
 	Err      Error
 	Receipts []Receipt
+	// diagnostic is what the Failure holds beyond its message: see
+	// Diagnostic. It is never part of the response.
+	diagnostic *Diagnostic
 }
 
 // Fail makes a Failure of the given status and code with a message for a
