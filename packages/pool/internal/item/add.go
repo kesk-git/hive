@@ -21,6 +21,14 @@ func add(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := checkExpected(c); err != nil {
+		return nil, err
+	}
+	if v, ok := body["schedule"]; ok {
+		if err := checkInstant("schedule", v); err != nil {
+			return nil, err
+		}
+	}
 	id, err := ids.Mint(c.Clock, ids.Task)
 	if err != nil {
 		return nil, internal("an item cannot be given an identity", err)
@@ -77,6 +85,9 @@ func add(c *cli.Call) (*cli.Result, error) {
 	if f := checkParentRule(g, level, false, parents); f != nil {
 		return nil, f
 	}
+	if f := checkTargetBlockers(g, level, rec["deps"].([]any)); f != nil {
+		return nil, f
+	}
 	if level == "hunt" {
 		if f := checkAttach(g, parents[0], ""); f != nil {
 			return nil, f
@@ -101,8 +112,6 @@ func add(c *cli.Call) (*cli.Result, error) {
 	switch {
 	case needs && effective:
 		definition = "accepted"
-	case needs && hasGiven && given == "defining":
-		definition = "defining"
 	case needs:
 		definition = "needed"
 	case hasGiven && given == "accepted":
@@ -175,6 +184,21 @@ func checkParentRule(g *read.Graph, level string, exempt bool, parents []string)
 	default:
 		if len(parents) > 0 {
 			return hierarchy("a decision item has no parent edge")
+		}
+	}
+	return nil
+}
+
+// checkTargetBlockers holds a Target to the rule that its blocked-by edges
+// name the Targets it depends on. An edge to an item that does not exist is
+// refused where edges are added, not here.
+func checkTargetBlockers(g *read.Graph, level string, deps []any) *envelope.Failure {
+	if level != "target" {
+		return nil
+	}
+	for _, e := range read.Edges(map[string]any{"deps": deps}) {
+		if n := g.Items[e.TaskID]; e.Type == read.EdgeBlockedBy && n != nil && n.Level != "target" {
+			return hierarchy("a Target's blocked-by edges name Targets")
 		}
 	}
 	return nil

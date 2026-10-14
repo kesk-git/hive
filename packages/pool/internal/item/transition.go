@@ -13,6 +13,11 @@ func transition(c *cli.Call) (*cli.Result, error) {
 	body := c.Request.Body
 	taskID, _ := body["task_id"].(string)
 	to, _ := body["to"].(string)
+	if at, ok := body["at"].(string); ok {
+		if err := checkInstant("at", at); err != nil {
+			return nil, err
+		}
+	}
 	g, err := loadGraph(c)
 	if err != nil {
 		return nil, err
@@ -24,16 +29,12 @@ func transition(c *cli.Call) (*cli.Result, error) {
 	if err := checkScope(c, n.Data); err != nil {
 		return nil, err
 	}
-	expected, err := expectedRevision(c, "pool.item", taskID, n.Revision)
-	if err != nil {
+	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
 	from := n.State
 	if from == "archived" || from == to {
 		return nil, refuse(codeStateTransition, "the transition is not in the table of states")
-	}
-	if f := guardTransition(c, g, n, to); f != nil {
-		return nil, f
 	}
 
 	now, err := c.Stamp()
@@ -69,8 +70,12 @@ func transition(c *cli.Call) (*cli.Result, error) {
 		next["body"] = appendLine(text, note)
 	}
 
+	if f := guardTransition(c, g.Replace(taskID, next), taskID, to); f != nil {
+		return nil, f
+	}
+
 	b := &builder{c: c}
-	final, ref, err := b.put("item", taskID, next, expected)
+	final, ref, err := b.put("item", taskID, next, n.Revision)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +87,8 @@ func transition(c *cli.Call) (*cli.Result, error) {
 
 // guardTransition applies the guards of the state entered, in the order of the
 // table.
-func guardTransition(c *cli.Call, g *read.Graph, n *read.Node, to string) *envelope.Failure {
+func guardTransition(c *cli.Call, g *read.Graph, id, to string) *envelope.Failure {
+	n := g.Items[id]
 	generationOpen := func() *envelope.Failure {
 		if read.OpenGeneration(n.Data) {
 			return envelope.Fail(envelope.Conflict, codeGenerationOpen, "a generation of the item is open")

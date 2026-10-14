@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/kesk-git/hive/contract/clock"
+	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/packages/pool/internal/store"
 )
 
@@ -46,6 +47,7 @@ func readItems(c *Context) (*Result, error) {
 		return nil, err
 	}
 	res := &Result{}
+	evaluated := false
 	for _, id := range g.Order {
 		n := g.Items[id]
 		if sel.ID != "" && id != sel.ID {
@@ -58,16 +60,18 @@ func readItems(c *Context) (*Result, error) {
 			continue
 		}
 		f := g.Facts(id)
+		evaluated = true
 		if sel.Has(MemberReady) && f.Ready != sel.Ready {
 			continue
 		}
 		res.Records = append(res.Records, Record{ID: id, Data: n.Data, Derived: derivedFacts(id, n, f)})
 	}
 	// The facts of an item read the records above it, so a record that could
-	// not be read makes the read incomplete; one the read is not about does
-	// not make an identity that is absent anything but absent.
+	// not be read makes the read incomplete wherever the facts of an item were
+	// computed, whether or not its facts then kept it; one the read is not
+	// about does not make an identity that is absent anything but absent.
 	for _, o := range omitted {
-		if len(res.Records) > 0 || sel.ID == "" || o.ID == sel.ID {
+		if evaluated || sel.ID == "" || o.ID == sel.ID {
 			res.Omitted = append(res.Omitted, o)
 		}
 	}
@@ -97,8 +101,10 @@ func derivedFacts(id string, n *Node, f Facts) map[string]any {
 func readHolds(c *Context) (*Result, error) {
 	sel := c.Selector
 	res := &Result{}
-	keep := func(l store.Loaded) bool {
-		h := newHold(l)
+	if sel.Has(MemberDueBefore) && !clock.Valid(sel.DueBefore) {
+		return nil, envelope.Common(envelope.CodeSchemaViolation, "due_before is not a calendar instant")
+	}
+	keep := func(h *Hold, l store.Loaded) bool {
 		switch {
 		case sel.Has(MemberTaskID) && h.TaskID != sel.TaskID:
 			return false
@@ -109,8 +115,8 @@ func readHolds(c *Context) (*Result, error) {
 		case sel.Has(MemberActive) && (h.State == "active") != sel.Active:
 			return false
 		case sel.Has(MemberDueBefore):
-			due, err := clock.Parse(sel.DueBefore)
-			if err != nil || h.Until.IsZero() || h.Until.After(due) {
+			due, _ := clock.Parse(sel.DueBefore)
+			if h.Until.IsZero() || h.Until.After(due) {
 				return false
 			}
 		}
@@ -124,8 +130,14 @@ func readHolds(c *Context) (*Result, error) {
 			return nil, err
 		case om != nil:
 			res.Omitted = append(res.Omitted, *om)
-		case keep(*l):
-			res.Records = append(res.Records, Record{ID: l.ID, Data: l.Data})
+		default:
+			h, err := newHold(*l)
+			switch {
+			case err != nil:
+				res.Omitted = append(res.Omitted, Omission{ID: l.ID, Reason: store.ReasonMalformed})
+			case keep(h, *l):
+				res.Records = append(res.Records, Record{ID: l.ID, Data: l.Data})
+			}
 		}
 		return res, nil
 	}
@@ -134,7 +146,11 @@ func readHolds(c *Context) (*Result, error) {
 		return nil, err
 	}
 	for _, l := range all {
-		if keep(l) {
+		h, err := newHold(l)
+		switch {
+		case err != nil:
+			omitted = append(omitted, Omission{ID: l.ID, Reason: store.ReasonMalformed})
+		case keep(h, l):
 			res.Records = append(res.Records, Record{ID: l.ID, Data: l.Data})
 		}
 	}

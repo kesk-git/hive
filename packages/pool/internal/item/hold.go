@@ -14,6 +14,11 @@ import (
 func hold(c *cli.Call) (*cli.Result, error) {
 	body := c.Request.Body
 	taskID, _ := body["task_id"].(string)
+	if until, ok := body["until"]; ok {
+		if err := checkInstant("until", until); err != nil {
+			return nil, err
+		}
+	}
 	l, om, err := poolstore.Load(c.Store, "item", taskID)
 	switch {
 	case errors.Is(err, poolstore.ErrNotFound):
@@ -26,7 +31,7 @@ func hold(c *cli.Call) (*cli.Result, error) {
 	if err := checkScope(c, l.Data); err != nil {
 		return nil, err
 	}
-	if _, err := expectedRevision(c, "pool.item", taskID, l.Revision); err != nil {
+	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
 	kind, _ := body["kind"].(string)
@@ -68,7 +73,7 @@ func release(c *cli.Call) (*cli.Result, error) {
 	if err := checkScope(c, l.Data); err != nil {
 		return nil, err
 	}
-	if _, err := expectedRevision(c, "pool.hold", holdID, l.Revision); err != nil {
+	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
 	switch l.Data["kind"] {

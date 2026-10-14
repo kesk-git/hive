@@ -37,6 +37,61 @@ type home struct {
 	homeID string
 	clk    *clock.Fake
 	exe    *cli.Executable
+	// scope is the scope members requests are made at, the whole home where
+	// nil.
+	scope map[string]any
+}
+
+// as is the home as seen by requests made at the scope.
+func (h *home) as(scope map[string]any) *home {
+	c := *h
+	c.scope = scope
+	return &c
+}
+
+// register writes a record of the home's identity registry, as fleet
+// provisioning would.
+func (h *home) register(dir, id string, rec map[string]any) {
+	h.t.Helper()
+	rec["schema_version"], rec["record_revision"], rec["home_id"], rec["state"] = "1.0", int64(1), h.homeID, "active"
+	rec["created_at"], rec["updated_at"] = "2026-10-11T08:00:00.000Z", "2026-10-11T08:00:00.000Z"
+	rec["slug"], rec["name"] = "registered", "Registered"
+	rec["writer"] = map[string]any{"package": "dispatch", "command": "hive-fleet", "operation": "provision", "implementation_version": "test"}
+	data, err := canon.Encode(rec)
+	if err != nil {
+		h.t.Fatal(err)
+	}
+	path := filepath.Join(h.dir, "dispatch", "registry", dir, id+".json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		h.t.Fatal(err)
+	}
+	if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
+		h.t.Fatal(err)
+	}
+}
+
+// workspace registers a workspace and returns its identity.
+func (h *home) workspace() string {
+	h.t.Helper()
+	id := mint(h.t, ids.Workspace)
+	h.register("workspaces", id, map[string]any{"schema": "hive.workspace", "workspace_id": id, "parent_home_id": mint(h.t, ids.Home)})
+	return id
+}
+
+// project registers a project of the workspace and returns its identity.
+func (h *home) project(workspace string) string {
+	h.t.Helper()
+	id := mint(h.t, ids.Project)
+	h.register("projects", id, map[string]any{"schema": "hive.project", "project_id": id, "workspace_id": workspace, "repository": map[string]any{"kind": "local-only"}})
+	return id
+}
+
+func (h *home) inWorkspace(workspace string) *home {
+	return h.as(map[string]any{"scope_level": "workspace", "workspace_id": workspace})
+}
+
+func (h *home) inProject(workspace, project string) *home {
+	return h.as(map[string]any{"scope_level": "project", "workspace_id": workspace, "project_id": project})
 }
 
 func mint(t testing.TB, p ids.Prefix) string {
@@ -91,6 +146,9 @@ func (h *home) do(operation string, body map[string]any, expected ...rev) *envel
 		"issued_at": "2026-10-14T09:00:00.000Z", "caller": map[string]any{"kind": "test"},
 		"scope_level": "hive", "home_id": h.homeID,
 		"authority": map[string]any{"kind": "none"}, "body": body,
+	}
+	for k, v := range h.scope {
+		req[k] = v
 	}
 	if len(expected) > 0 {
 		list := []any{}
@@ -1137,36 +1195,270 @@ func TestEachReaderRefusesTheMembersThatDoNotApply(t *testing.T) {
 	})
 }
 
-// A request acts only on a record of its own scope: update, transition, hold
-// and release compare the scope level, the workspace and the project with the
-// record's and refuse a difference with scope_mismatch before anything is
-// written.
-func TestARequestOutsideTheRecordsScopeIsRefused(t *testing.T) {
+// A request acts only on records its scope contains: update, transition, hold
+// and release refuse a record outside it with scope_mismatch before anything
+// is written, and a hive request contains every record of its home, a
+// workspace request its workspace and that workspace's projects, a project
+// request only that project.
+func TestARequestActsOnlyOnRecordsItsScopeContains(t *testing.T) {
 	h := newHome(t)
 	id := h.addID(leaf("A project item"))
 	holdID := h.hold(id, "parked")
+	workspace := h.workspace()
+	project := h.project(workspace)
 	scoped := func(kind, id string) {
 		rec := h.stored(kind, id)
-		rec["scope_level"], rec["workspace_id"], rec["project_id"] = "project", mint(t, ids.Workspace), mint(t, ids.Project)
+		rec["scope_level"], rec["workspace_id"], rec["project_id"] = "project", workspace, project
 		h.plant(kind, id, rec)
 	}
 	scoped("item", id)
 	scoped("hold", holdID)
-	for _, tc := range []struct {
-		name string
-		do   func() *envelope.Response
-	}{
-		{"update", func() *envelope.Response {
-			return h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"title": "Elsewhere"}})
-		}},
-		{"transition", func() *envelope.Response { return h.do("transition", map[string]any{"task_id": id, "to": "done"}) }},
-		{"hold", func() *envelope.Response {
-			return h.do("hold", map[string]any{"task_id": id, "kind": "parked", "reason": "Elsewhere."})
-		}},
-		{"release", func() *envelope.Response { return h.do("release", map[string]any{"hold_id": holdID}) }},
+	for name, outside := range map[string]*home{
+		"another project":   h.inProject(workspace, h.project(workspace)),
+		"another workspace": h.inWorkspace(h.workspace()),
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			h.unchanged(func() { refused(t, tc.do(), envelope.Refused, envelope.CodeScopeMismatch) })
+		for _, tc := range []struct {
+			name string
+			do   func(h *home) *envelope.Response
+		}{
+			{"update", func(h *home) *envelope.Response {
+				return h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"title": "Elsewhere"}})
+			}},
+			{"transition", func(h *home) *envelope.Response {
+				return h.do("transition", map[string]any{"task_id": id, "to": "done"})
+			}},
+			{"hold", func(h *home) *envelope.Response {
+				return h.do("hold", map[string]any{"task_id": id, "kind": "parked", "reason": "Elsewhere."})
+			}},
+			{"release", func(h *home) *envelope.Response { return h.do("release", map[string]any{"hold_id": holdID}) }},
+		} {
+			t.Run(name+" "+tc.name, func(t *testing.T) {
+				h.unchanged(func() { refused(t, tc.do(outside), envelope.Refused, envelope.CodeScopeMismatch) })
+			})
+		}
+	}
+	for name, inside := range map[string]*home{"the hive": h, "its workspace": h.inWorkspace(workspace), "its project": h.inProject(workspace, project)} {
+		t.Run(name+" contains it", func(t *testing.T) {
+			h.ok(inside.do("update", map[string]any{"task_id": id, "patch": map[string]any{"title": "Contained by " + name}}))
 		})
+	}
+}
+
+// A write that cascades to a record outside the scope of the request writes
+// nothing: moving a Prey of a project releases the definition hold of a Hunt
+// beneath it, and a Hunt of another project is not the request's to change.
+func TestACascadeOutsideTheScopeOfTheRequestIsRefused(t *testing.T) {
+	h := newHome(t)
+	workspace := h.workspace()
+	project := h.project(workspace)
+	p := h.inProject(workspace, project)
+	needing := target("A Target that needs a specification")
+	needing["specification_required"] = true
+	from := p.add(needing)["task_id"].(string)
+	to := p.addID(target("A Target that needs none"))
+	prey := p.addID(under("prey", "A Prey", from))
+	hunt := p.addID(under("hunt", "A Hunt", prey))
+	holds := h.ok(h.do("read", map[string]any{"kind": "hold", "selector": map[string]any{"task_id": hunt, "active": true}}))["records"].([]any)
+	if len(holds) != 1 {
+		t.Fatalf("the Hunt takes a definition hold: %v", holds)
+	}
+	for _, kind := range []string{"item", "hold"} {
+		id := hunt
+		if kind == "hold" {
+			id = holds[0].(map[string]any)["hold_id"].(string)
+		}
+		rec := h.stored(kind, id)
+		rec["project_id"] = h.project(workspace)
+		h.plant(kind, id, rec)
+	}
+	h.unchanged(func() {
+		refused(t, p.do("update", map[string]any{"task_id": prey, "patch": map[string]any{
+			"remove_deps": []any{map[string]any{"type": "parent", "task_id": from}},
+			"add_deps":    []any{map[string]any{"type": "parent", "task_id": to}}}}), envelope.Refused, envelope.CodeScopeMismatch)
+	})
+}
+
+// An expected revision of any record the request names is compared, whether or
+// not the operation writes that record.
+func TestAStaleExpectationOfARecordThatIsNotWrittenIsAConflict(t *testing.T) {
+	h := newHome(t)
+	tgt := h.addID(target("A Target"))
+	prey := h.addID(under("prey", "A Prey", tgt))
+	h.ok(h.do("update", map[string]any{"task_id": prey, "patch": map[string]any{"title": "Renamed"}}))
+	other := h.addID(leaf("Another item"))
+	h.unchanged(func() {
+		refused(t, h.do("add", under("hunt", "A Hunt", prey), rev{"pool.item", prey, 1}), envelope.Conflict, envelope.CodeRevisionConflict)
+		refused(t, h.do("update", map[string]any{"task_id": other, "patch": map[string]any{"title": "Late"}}, rev{"pool.item", prey, 1}), envelope.Conflict, envelope.CodeRevisionConflict)
+		refused(t, h.do("transition", map[string]any{"task_id": other, "to": "in-flight"}, rev{"pool.item", other, 1}, rev{"pool.item", prey, 1}), envelope.Conflict, envelope.CodeRevisionConflict)
+		refused(t, h.do("hold", map[string]any{"task_id": other, "kind": "parked", "reason": "Late."}, rev{"pool.item", prey, 1}), envelope.Conflict, envelope.CodeRevisionConflict)
+		refused(t, h.do("add", leaf("Named a record that is not there"), rev{"pool.item", mint(t, ids.Task), 1}), envelope.Conflict, envelope.CodeRevisionConflict)
+	})
+	h.ok(h.do("add", under("hunt", "A Hunt", prey), rev{"pool.item", prey, 2}))
+}
+
+// A done item that is reopened straight to in-flight is held to the blockers it
+// has once reopened: its completion marker no longer stands in for them.
+func TestReopeningADoneItemToInFlightIsHeldToItsBlockers(t *testing.T) {
+	h := newHome(t)
+	blocker := h.addID(leaf("The blocker"))
+	h.move(blocker, "done")
+	dependent := leaf("The dependent")
+	dependent["deps"] = []any{map[string]any{"type": "blocked-by", "task_id": blocker}}
+	dep := h.addID(dependent)
+	h.move(dep, "done")
+	h.move(blocker, "queued")
+	h.unchanged(func() {
+		refused(t, h.do("transition", map[string]any{"task_id": dep, "to": "in-flight"}), envelope.Refused, "pool.blocked")
+	})
+	h.move(blocker, "done")
+	if h.move(dep, "in-flight")["state"] != "in-flight" {
+		t.Error("the dependent is dispatched once its blocker has landed")
+	}
+}
+
+// An imported item that becomes a Hunt is attached to the Prey it names as any
+// Hunt is, though its parent edge was set by an earlier update.
+func TestAnImportedItemBecomingAHuntIsHeldToTheAttachmentGuards(t *testing.T) {
+	h := newHome(t)
+	tgt := h.addID(target("A Target"))
+	scheduled := leaf("A scheduled Prey")
+	scheduled["deps"] = []any{map[string]any{"type": "parent", "task_id": tgt}}
+	scheduled["schedule"] = map[string]any{"kind": "gate", "not_before": map[string]any{"at": "2026-11-01T00:00:00.000Z", "zone": "UTC"}}
+	prey := h.addID(scheduled)
+	imported := h.legacyItem("queued")
+	h.ok(h.do("update", map[string]any{"task_id": imported, "patch": map[string]any{"add_deps": []any{map[string]any{"type": "parent", "task_id": prey}}}}))
+	h.unchanged(func() {
+		refused(t, h.do("update", map[string]any{"task_id": imported, "patch": map[string]any{"level": "hunt"}}), envelope.Refused, "pool.hierarchy")
+	})
+	h.ok(h.do("update", map[string]any{"task_id": prey, "patch": map[string]any{"clear_schedule": true}}))
+	h.ok(h.do("update", map[string]any{"task_id": imported, "patch": map[string]any{"level": "hunt"}}))
+}
+
+// A Target is blocked only by Targets: add, a new edge and the conversion of an
+// imported item that already has edges all hold the final record to it.
+func TestATargetsBlockedByEdgesNameTargets(t *testing.T) {
+	h := newHome(t)
+	tgt := h.addID(target("A Target"))
+	other := h.addID(target("Another Target"))
+	prey := h.addID(under("prey", "A Prey", tgt))
+	blockedBy := func(id string) []any { return []any{map[string]any{"type": "blocked-by", "task_id": id}} }
+	t.Run("add", func(t *testing.T) {
+		body := target("Blocked by a Prey")
+		body["deps"] = blockedBy(prey)
+		h.unchanged(func() { refused(t, h.do("add", body), envelope.Refused, "pool.hierarchy") })
+		body["deps"] = blockedBy(other)
+		h.add(body)
+	})
+	t.Run("update", func(t *testing.T) {
+		h.unchanged(func() {
+			refused(t, h.do("update", map[string]any{"task_id": other, "patch": map[string]any{"add_deps": blockedBy(prey)}}), envelope.Refused, "pool.hierarchy")
+		})
+		h.ok(h.do("update", map[string]any{"task_id": other, "patch": map[string]any{"add_deps": blockedBy(tgt)}}))
+	})
+	t.Run("conversion", func(t *testing.T) {
+		imported := h.legacyItem("queued")
+		h.ok(h.do("update", map[string]any{"task_id": imported, "patch": map[string]any{"add_deps": blockedBy(prey)}}))
+		h.unchanged(func() {
+			refused(t, h.do("update", map[string]any{"task_id": imported, "patch": map[string]any{"level": "target"}}), envelope.Refused, "pool.hierarchy")
+		})
+	})
+}
+
+// An item that needs a specification and has none is created needed with its
+// definition hold, whatever definition the request gives.
+func TestAnAddedItemThatNeedsASpecificationIsNeededWithItsHold(t *testing.T) {
+	h := newHome(t)
+	body := target("A Target that needs a specification")
+	body["specification_required"], body["definition"] = true, "defining"
+	added := h.add(body)
+	if added["definition"] != "needed" {
+		t.Errorf("the definition is %v", added["definition"])
+	}
+	held := h.ok(h.do("read", map[string]any{"kind": "hold", "selector": map[string]any{"task_id": added["task_id"], "active": true}}))["records"].([]any)
+	if len(held) != 1 || held[0].(map[string]any)["kind"] != "definition" {
+		t.Errorf("the item takes a definition hold: %v", held)
+	}
+}
+
+// A time that is not a real calendar instant is refused where it enters, and a
+// stored one that cannot be read is omitted and never read as no date.
+func TestImpossibleInstantsAreRefusedAndNeverReadAsAbsent(t *testing.T) {
+	h := newHome(t)
+	id := h.addID(leaf("An item"))
+	impossible := map[string]any{"at": "2026-02-31T00:00:00.000Z", "zone": "UTC"}
+	badDate := map[string]any{"at": "2026-11-01T00:00:00.000Z", "zone": "UTC", "date": "2026-02-31"}
+	gate := func(from map[string]any) map[string]any { return map[string]any{"kind": "gate", "not_before": from} }
+	h.unchanged(func() {
+		for name, resp := range map[string]*envelope.Response{
+			"a hold until":         h.do("hold", map[string]any{"task_id": id, "kind": "future", "reason": "Later.", "until": impossible}),
+			"a hold until date":    h.do("hold", map[string]any{"task_id": id, "kind": "future", "reason": "Later.", "until": badDate}),
+			"a transition time":    h.do("transition", map[string]any{"task_id": id, "to": "done", "at": "2026-13-01T00:00:00.000Z"}),
+			"a schedule on add":    h.do("add", map[string]any{"title": "x", "level": "prey", "schedule": gate(impossible)}),
+			"a schedule on update": h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"schedule": gate(badDate)}}),
+			"a recurrence anchor": h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"schedule": map[string]any{
+				"kind": "recurrence", "recurrence": map[string]any{"interval": "P1D", "anchor": impossible}}}}),
+			"a due_before": h.do("read", map[string]any{"kind": "hold", "selector": map[string]any{"due_before": "2026-02-31T00:00:00.000Z"}}),
+		} {
+			if resp.Status != envelope.Invalid || resp.Error == nil || resp.Error.Code != envelope.CodeSchemaViolation {
+				t.Errorf("%s: status %s, error %+v", name, resp.Status, resp.Error)
+			}
+		}
+	})
+	holdID := h.ok(h.do("hold", map[string]any{"task_id": id, "kind": "future", "reason": "Later.",
+		"until": map[string]any{"at": "2026-12-01T00:00:00.000Z", "zone": "UTC"}}))["hold"].(map[string]any)["hold_id"].(string)
+	rec := h.stored("hold", holdID)
+	rec["until"] = impossible
+	h.plant("hold", holdID, rec)
+	for name, selector := range map[string]map[string]any{"by identity": {"id": holdID}, "by query": {"task_id": id}} {
+		body := h.ok(h.do("read", map[string]any{"kind": "hold", "selector": selector}))
+		if body["projection"].(map[string]any)["complete"] != false || len(body["records"].([]any)) != 0 {
+			t.Errorf("a hold with an unreadable date read %s is %v", name, body)
+		}
+	}
+	h.unchanged(func() {
+		if resp := h.do("transition", map[string]any{"task_id": id, "to": "in-flight"}); resp.Error == nil || resp.Error.Code != envelope.CodeRecordMalformed {
+			t.Errorf("a write that reads a hold it cannot read: status %s, error %+v", resp.Status, resp.Error)
+		}
+	})
+}
+
+// A record is written by the call that last wrote it.
+func TestARewrittenRecordNamesTheCallThatRewroteIt(t *testing.T) {
+	h := newHome(t)
+	id := h.addID(leaf("An item"))
+	operation := func(kind, id string) any { return h.stored(kind, id)["writer"].(map[string]any)["operation"] }
+	if operation("item", id) != "add" {
+		t.Fatalf("the writer of an added item is %v", operation("item", id))
+	}
+	h.move(id, "in-flight")
+	if operation("item", id) != "transition" {
+		t.Errorf("the writer of a transitioned item is %v", operation("item", id))
+	}
+	h.ok(h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"title": "Renamed"}}))
+	if operation("item", id) != "update" {
+		t.Errorf("the writer of an updated item is %v", operation("item", id))
+	}
+	holdID := h.hold(id, "parked")
+	h.ok(h.do("release", map[string]any{"hold_id": holdID}))
+	if operation("hold", holdID) != "release" {
+		t.Errorf("the writer of a released hold is %v", operation("hold", holdID))
+	}
+}
+
+// A read whose facts rest on a record that cannot be read says so, though the
+// readiness filter then keeps no item.
+func TestAReadKeepsTheOmissionsOfFactsItEvaluatedWhenTheFilterKeepsNothing(t *testing.T) {
+	h := newHome(t)
+	blocker := h.addID(leaf("A blocker"))
+	dependent := leaf("A dependent")
+	dependent["deps"] = []any{map[string]any{"type": "blocked-by", "task_id": blocker}}
+	dep := h.addID(dependent)
+	if err := os.WriteFile(filepath.Join(h.dir, "pool", "records", "item", blocker+".json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	body := h.ok(h.do("read", map[string]any{"kind": "item", "selector": map[string]any{"id": dep, "ready": false}}))
+	omitted, _ := body["projection"].(map[string]any)["omitted"].([]any)
+	if len(body["records"].([]any)) != 0 || len(omitted) != 1 || omitted[0].(map[string]any)["id"] != blocker {
+		t.Errorf("the read answers %v", body)
 	}
 }

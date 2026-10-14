@@ -10,9 +10,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
+	"time"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
+	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
 	cstore "github.com/kesk-git/hive/contract/store"
@@ -154,6 +157,7 @@ type builder struct {
 // put adds the record to the transaction, finalized, and returns it with the
 // reference a receipt names it by.
 func (b *builder) put(kind, id string, body map[string]any, expected int64) (map[string]any, *envelope.RecordRef, error) {
+	body["writer"] = writerTree(b.c)
 	final, digest, err := finalize(b.c, kind, id, body, expected)
 	if err != nil {
 		return nil, nil, internal("a record cannot be finalized", err)
@@ -213,8 +217,14 @@ func (b *builder) receiptAs(receiptID, kind string, subject *envelope.RecordRef,
 	return r.ReceiptID, nil
 }
 
-// stage checks the transaction and returns the handler's result.
+// stage checks the transaction and returns the handler's result. No record is
+// staged that lies outside the scope of the request, a cascaded one included.
 func (b *builder) stage(body map[string]any) (*cli.Result, error) {
+	for _, w := range b.tx.Records {
+		if err := checkScope(b.c, w.Body); err != nil {
+			return nil, err
+		}
+	}
 	staged, err := poolstore.Stage(b.c, b.tx)
 	if err != nil {
 		return nil, err
@@ -240,28 +250,80 @@ func loadGraph(c *cli.Call) (*read.Graph, error) {
 	return g, nil
 }
 
-// checkScope refuses a request whose scope level, workspace or project differs
-// from the scope of the record it acts on, before anything is written. The
-// clone is not compared.
+// checkScope refuses a request whose scope does not contain the scope of the
+// record it acts on, before anything is written: a hive-scope request contains
+// every record of its home, a workspace-scope request its workspace and that
+// workspace's projects, a project-scope request only that project. The clone is
+// not compared.
 func checkScope(c *cli.Call, rec map[string]any) error {
 	have, want := scopeOf(rec), c.Request.Scope
-	if have.Level != want.Level || have.WorkspaceID != want.WorkspaceID || have.ProjectID != want.ProjectID {
+	in := have.HomeID == want.HomeID
+	switch want.Level {
+	case envelope.ScopeWorkspace:
+		in = in && have.WorkspaceID == want.WorkspaceID
+	case envelope.ScopeProject:
+		in = in && have.Level == envelope.ScopeProject && have.WorkspaceID == want.WorkspaceID && have.ProjectID == want.ProjectID
+	}
+	if !in {
 		return envelope.Common(envelope.CodeScopeMismatch, "the record is outside the scope of the request")
 	}
 	return nil
 }
 
-// expectedRevision is the revision the request expects of the record: the one
-// it names, which must be the current one, or the current one where the
-// request names none. The comparison is made under the lock before anything is
-// computed, and the transaction compares it again before it writes.
-func expectedRevision(c *cli.Call, schema, id string, current int64) (int64, error) {
+// checkExpected compares every expected revision the request supplies with the
+// record it names, whether or not the operation writes that record. The
+// comparison is made under the lock the operation holds, before anything is
+// computed; the transaction compares the records it writes again before it
+// commits. A record the Pool does not hold is not at the revision named.
+func checkExpected(c *cli.Call) error {
 	for _, e := range c.Request.ExpectedRevisions {
-		if e.Schema == schema && e.ID == id && e.RecordRevision != current {
-			return 0, conflict()
+		kind, ok := strings.CutPrefix(e.Schema, "pool.")
+		if _, known := poolstore.Lookup(kind); !ok || !known {
+			return conflict()
+		}
+		l, om, err := poolstore.Load(c.Store, kind, e.ID)
+		switch {
+		case errors.Is(err, poolstore.ErrNotFound):
+			return conflict()
+		case err != nil:
+			return poolstore.Failure("a record the request expects", err)
+		case om != nil:
+			return envelope.Common(envelope.CodeRecordMalformed, "a record the request expects cannot be read").With("record", om.ID)
+		case l.Revision != e.RecordRevision:
+			return conflict()
 		}
 	}
-	return current, nil
+	return nil
+}
+
+// checkInstant refuses a time member of a body that is not a real calendar
+// instant: a timestamp, or the date a zoned time was written as. Both are
+// written before they are read by the Pool, so an impossible date is refused
+// where it enters.
+func checkInstant(what string, v any) error {
+	switch v := v.(type) {
+	case map[string]any:
+		for _, name := range []string{"at", "not_before", "anchor"} {
+			if x, ok := v[name]; ok {
+				if err := checkInstant(what+"."+name, x); err != nil {
+					return err
+				}
+			}
+		}
+		if d, ok := v["date"].(string); ok {
+			if _, err := time.Parse("2006-01-02", d); err != nil {
+				return envelope.Common(envelope.CodeSchemaViolation, what+".date is not a calendar date")
+			}
+		}
+		if r, ok := v["recurrence"]; ok {
+			return checkInstant(what+".recurrence", r)
+		}
+	case string:
+		if !clock.Valid(v) {
+			return envelope.Common(envelope.CodeSchemaViolation, what+" is not a calendar instant")
+		}
+	}
+	return nil
 }
 
 // imperativeExists reports whether the item has an Imperative record. A record

@@ -82,7 +82,11 @@ func LoadGraph(st *cstore.Store, now time.Time) (*Graph, []Omission, error) {
 		g.Order = append(g.Order, l.ID)
 	}
 	for _, l := range holds {
-		h := newHold(l)
+		h, err := newHold(l)
+		if err != nil {
+			omitted = append(omitted, Omission{ID: l.ID, Reason: store.ReasonMalformed})
+			continue
+		}
 		g.Holds[h.TaskID] = append(g.Holds[h.TaskID], h)
 	}
 	g.index()
@@ -103,17 +107,22 @@ func newNode(l store.Loaded) *Node {
 	return n
 }
 
-func newHold(l store.Loaded) *Hold {
+// newHold reads a hold record. A date it holds that is not a real instant is
+// an error: a hold whose date cannot be read is not read as one with none.
+func newHold(l store.Loaded) (*Hold, error) {
 	h := &Hold{ID: l.ID, Data: l.Data, Revision: l.Revision}
 	h.TaskID, _ = l.Data["task_id"].(string)
 	h.Kind, _ = l.Data["kind"].(string)
 	h.State, _ = l.Data["state"].(string)
 	if until, ok := l.Data["until"].(map[string]any); ok {
 		if at, ok := until["at"].(string); ok {
-			h.Until, _ = clock.Parse(at)
+			var err error
+			if h.Until, err = clock.Parse(at); err != nil {
+				return nil, err
+			}
 		}
 	}
-	return h
+	return h, nil
 }
 
 // Replace returns the graph as it would stand with the item's record

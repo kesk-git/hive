@@ -29,8 +29,7 @@ func update(c *cli.Call) (*cli.Result, error) {
 	if err := checkScope(c, n.Data); err != nil {
 		return nil, err
 	}
-	expected, err := expectedRevision(c, "pool.item", taskID, n.Revision)
-	if err != nil {
+	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
 	if _, set := patch["schedule"]; set && patch["clear_schedule"] == true {
@@ -72,6 +71,9 @@ func update(c *cli.Call) (*cli.Result, error) {
 		delete(next, "schedule")
 	}
 	if v, ok := patch["schedule"]; ok {
+		if err := checkInstant("schedule", v); err != nil {
+			return nil, err
+		}
 		next["schedule"] = copyValue(v)
 	}
 
@@ -127,16 +129,19 @@ func update(c *cli.Call) (*cli.Result, error) {
 		if f := checkParentRule(g, newLevel, newLevel == "" && imported, after); f != nil {
 			return nil, f
 		}
+		if f := checkTargetBlockers(g, newLevel, deps); f != nil {
+			return nil, f
+		}
 	}
 	next2 := g.Replace(taskID, next)
 	if moved {
 		if err := checkMove(c, g, taskID); err != nil {
 			return nil, err
 		}
-		if newLevel == "hunt" {
-			if f := checkAttach(g, after[0], taskID); f != nil {
-				return nil, f
-			}
+	}
+	if newLevel == "hunt" && (moved || newLevel != level) {
+		if f := checkAttach(g, after[0], taskID); f != nil {
+			return nil, f
 		}
 	}
 	if _, scheduled := next["schedule"]; scheduled && next2.Derived(taskID) {
@@ -154,7 +159,7 @@ func update(c *cli.Call) (*cli.Result, error) {
 	}
 
 	b := &builder{c: c}
-	final, _, err := b.put("item", taskID, next, expected)
+	final, _, err := b.put("item", taskID, next, n.Revision)
 	if err != nil {
 		return nil, err
 	}
