@@ -43,9 +43,6 @@ type Handoff struct {
 	Command          string
 	Operation        string
 	OperationVersion string
-	// Authority is the authority the callee relies on. Nil sends the
-	// original request's.
-	Authority *envelope.Authority
 	// ExpectedRevisions are the records the handoff depends on, as the
 	// operation read them.
 	ExpectedRevisions []envelope.ExpectedRevision
@@ -96,9 +93,6 @@ func (c *Call) SendHandoff(h Handoff) (*envelope.Response, error) {
 		ExpectedRevisions: h.ExpectedRevisions,
 		Authority:         c.Request.Authority,
 		Body:              h.Body,
-	}
-	if h.Authority != nil {
-		req.Authority = *h.Authority
 	}
 	data, err := req.Encode()
 	if err != nil {
@@ -156,7 +150,7 @@ func (e *Executable) handleStoreless(call *Call, digest string, fail func(*envel
 	}
 	record, found, err := e.Callee.ReadOutcome(call, req.RequestID)
 	if err != nil {
-		return fail(failureOf(err))
+		return e.sizeHanded(call, fail(failureOf(err)), false)
 	}
 	if found {
 		rec, err := parseOutcome("the callee's recorded outcome", record, req.RequestID)
@@ -176,20 +170,16 @@ func (e *Executable) handleStoreless(call *Call, digest string, fail func(*envel
 			// The callee's own answer, with its status and receipts.
 			resp := fail(f)
 			resp.Replayed = call.handed.Replayed
-			return e.sizeHanded(call, resp, call.handed.Status == envelope.Ok || len(f.Receipts) > 0)
+			return e.sizeHanded(call, resp, false)
 		}
 		if len(f.Receipts) > 0 {
 			return fail(envelope.Common(envelope.CodeInternal, "a command with no store writes no receipt of its own"))
 		}
-		if call.handed != nil && (call.handed.Status == envelope.Ok || len(call.handed.Receipts) > 0) {
-			// The callee holds the request, and the command cannot answer it.
+		if call.calleeMayHold() {
+			// The callee may hold the request, and the command cannot answer it.
 			return e.handedUnknown(call, call.handed.Receipts)
 		}
-		resp := fail(f)
-		if bad := e.preflight(c, resp); bad != nil {
-			return bad
-		}
-		return resp
+		return e.sizeHanded(call, fail(f), false)
 	}
 	switch {
 	case call.handed == nil || call.handed.Status != envelope.Ok || call.handoffs != 1:
@@ -201,7 +191,7 @@ func (e *Executable) handleStoreless(call *Call, digest string, fail func(*envel
 		RequestID: req.RequestID, Command: c.Name, Operation: op.Name, Status: envelope.Ok, Responder: e.responder(c),
 		Receipts: call.handed.Receipts, Body: res.Body, Replayed: call.handed.Replayed,
 	}
-	return e.sizeHanded(call, resp, true)
+	return e.sizeHanded(call, resp, false)
 }
 
 // failureOf is the Failure an error is, or the harness's own failure for any
@@ -262,28 +252,50 @@ func (e *Executable) adapt(call *Call, callee *envelope.Response) (map[string]an
 	return body, nil
 }
 
+// calleeMayHold reports whether the callee may hold the request after the
+// handoff: it answered ok, answered unknown, or left receipts of it.
+func (call *Call) calleeMayHold() bool {
+	h := call.handed
+	return h != nil && (h.Status == envelope.Ok || h.Status == envelope.Unknown || len(h.Receipts) > 0)
+}
+
 // sizeHanded checks that the response can be written whole. A response that
-// cannot is too_large while the callee holds nothing of the request, and
-// otherwise outcome_unknown, which fits by the floor: the callee's record is
-// durable and too_large would promise that nothing changed.
-func (e *Executable) sizeHanded(call *Call, resp *envelope.Response, durable bool) *envelope.Response {
+// cannot is too_large only while nothing of the request can be durable: the
+// callee's recorded outcome, an ok, an unknown, or any receipts make it
+// outcome_unknown instead, with the receipts where they fit, since too_large
+// would promise that nothing changed. The answer says the transaction is
+// complete only for an ok or a recorded outcome.
+func (e *Executable) sizeHanded(call *Call, resp *envelope.Response, recorded bool) *envelope.Response {
 	bad := e.preflight(call.Command, resp)
+	complete := recorded || resp.Status == envelope.Ok
 	switch {
 	case bad == nil:
 		return resp
-	case !durable:
-		return bad
+	case complete:
+		return e.unknownHanded(call, resp.Receipts, oversizeReplayMessage)
+	case resp.Status == envelope.Unknown || len(resp.Receipts) > 0:
+		return e.unknownHanded(call, resp.Receipts, handoffUnknownMessage)
 	}
-	return e.instead(resp, envelope.Common(envelope.CodeOutcomeUnknown, oversizeReplayMessage))
+	return bad
 }
 
-// handedUnknown is the answer of a request the callee holds and the command
-// cannot answer: unknown with the callee's receipts where they fit, and
-// retried by sending the same request again, which replays it.
+// handedUnknown is the answer of a request the callee may hold and the
+// command cannot answer: unknown with the callee's receipts where they fit,
+// retried by sending the same request again, which replays or reads it.
 func (e *Executable) handedUnknown(call *Call, receipts []envelope.Receipt) *envelope.Response {
+	message := handedMessage
+	if call.handed != nil && call.handed.Status == envelope.Unknown {
+		message = handoffUnknownMessage
+	}
+	return e.unknownHanded(call, receipts, message)
+}
+
+// unknownHanded is the unknown answer with the message and the receipts where
+// they fit, and without them, which fits by the floor, where they do not.
+func (e *Executable) unknownHanded(call *Call, receipts []envelope.Receipt, message string) *envelope.Response {
 	c, op, id := call.Command, call.Operation, call.Request.RequestID
-	if resp := e.unknownWith(c, op, id, handedMessage, receipts); e.preflight(c, resp) == nil {
+	if resp := e.unknownWith(c, op, id, message, receipts); e.preflight(c, resp) == nil {
 		return resp
 	}
-	return e.unknownAnswer(c, op.Name, id, handedMessage)
+	return e.unknownAnswer(c, op.Name, id, message)
 }

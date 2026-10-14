@@ -394,6 +394,55 @@ func TestACalleeThatDoesNotAnswerLeavesTheRequestUnknown(t *testing.T) {
 	}
 }
 
+// An answer that may follow a durable change is never too_large, which would
+// promise that nothing changed: a callee's unknown, with or without receipts,
+// and an unknown read of the callee's recorded outcome, oversized, are
+// outcome_unknown, with the receipts where they fit, and none says the
+// transaction is complete.
+func TestAnOversizedUnknownAnswerIsNeverTooLarge(t *testing.T) {
+	h := newHarness(t)
+	home := newHome(t)
+	before := layout(t, home)
+	wide := strings.Repeat("x", 2000)
+	unknown := func(withReceipt bool) func([]byte) ([]byte, int, error) {
+		return func(r []byte) ([]byte, int, error) {
+			return calleeAnswer(r, func(resp *envelope.Response, req *envelope.Request) {
+				if withReceipt {
+					resp.Receipts = []envelope.Receipt{{ReceiptID: id(ids.Receipt, 1), Kind: "dispatch.thing.intended", KindVersion: "1.0", WrittenAt: "2026-10-11T08:00:00.000Z",
+						Writer:    envelope.Writer{Package: "dispatch", Command: "hive-fleet", Operation: "put", ImplementationVersion: "0.1.0-test"},
+						RequestID: req.RequestID, CorrelationID: req.CorrelationID, Scope: req.Scope, Authority: req.Authority,
+						Evidence: []envelope.Evidence{}, Body: map[string]any{}}}
+				}
+				f := envelope.Common(envelope.CodeOutcomeUnknown, wide)
+				resp.Status, resp.Body, resp.Error = f.Status, nil, &f.Err
+			})
+		}
+	}
+	cases := []struct {
+		name     string
+		adapter  *scripted
+		receipts int
+		handoffs int
+	}{
+		{"a callee unknown with no receipts", &scripted{reply: unknown(false)}, 0, 1},
+		{"a callee unknown with receipts", &scripted{reply: unknown(true)}, 1, 1},
+		{"an unknown read of the recorded outcome", &scripted{readErr: envelope.Common(envelope.CodeOutcomeUnknown, wide)}, 0, 0},
+	}
+	for i, tc := range cases {
+		w := newWordy(t, h, tc.adapter)
+		w.exe.Commands[0].Limits = envelope.Limits{MaxResponseBytes: 2048}
+		resp := w.send(t, home, "say", sayRequest(t, "say", i+1, "first"))
+		expect(t, resp, envelope.Unknown, "outcome_unknown")
+		if len(resp.Receipts) != tc.receipts || resp.Replayed || resp.Error.Message == oversizeReplayMessage {
+			t.Errorf("%s: %+v", tc.name, resp)
+		}
+		if len(tc.adapter.sent) != tc.handoffs {
+			t.Errorf("%s: %d handoffs", tc.name, len(tc.adapter.sent))
+		}
+		same(t, before, layout(t, home))
+	}
+}
+
 // The read is after the request, the home, the scope and the operation are
 // checked: a request refused there reads nothing of the callee and runs
 // nothing.
