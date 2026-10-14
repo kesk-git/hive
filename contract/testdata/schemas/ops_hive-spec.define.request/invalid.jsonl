@@ -48,7 +48,7 @@
 {"name":"request-product-rule-short-id","base":"new-full.json","edits":[{"op":"replace","path":"/product_rules/0/rule_id","value":"rule_01hf"}]}
 {"name":"request-product-rule-unknown","base":"new-full.json","edits":[{"op":"add","path":"/product_rules/0/unlisted","value":"unexpected"}]}
 {"name":"request-product-rules-not-array","base":"new-full.json","edits":[{"op":"replace","path":"/product_rules","value":{"record_revision":1,"rule_id":"rule_01hf4k2m8q9r3s5t6v7w0x1yf6"}}]}
-{"name":"request-requirements-not-array","base":"new-full.json","edits":[{"op":"replace","path":"/criteria/1","value":{"kind":"doc"}}]}
+{"name":"request-requirements-not-array","base":"new-full.json","edits":[{"op":"replace","path":"/criteria/1/requirements","value":{"kind":"doc"}}]}
 {"name":"request-specification-id-bad-prefix","base":"revise-existing.json","edits":[{"op":"replace","path":"/specification_id","value":"task_01hf4k2m8q9r3s5t6v7w0x1ye5"}]}
 {"name":"request-specification-id-not-string","base":"revise-existing.json","edits":[{"op":"replace","path":"/specification_id","value":7}]}
 {"name":"request-specification-id-short","base":"revise-existing.json","edits":[{"op":"replace","path":"/specification_id","value":"spec_01hf4k"}]}

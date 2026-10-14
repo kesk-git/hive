@@ -273,7 +273,7 @@
 {"name":"revision-request-id-not-string","base":"v1-0-minimal.json","edits":[{"op":"replace","path":"/revisions/0/request_id","value":7}]}
 {"name":"revision-request-id-short","base":"v1-0-minimal.json","edits":[{"op":"replace","path":"/revisions/0/request_id","value":"req_01hf4k"}]}
 {"name":"revision-request-id-upper","base":"v1-0-minimal.json","edits":[{"op":"replace","path":"/revisions/0/request_id","value":"req_01HF4K2M8Q9R3S5T6V7W0X1YA1"}]}
-{"name":"revision-requirements-not-array","base":"v1-0-revised-and-invalidated.json","edits":[{"op":"replace","path":"/revisions/0/criteria/1","value":{"kind":"doc"}}]}
+{"name":"revision-requirements-not-array","base":"v1-0-revised-and-invalidated.json","edits":[{"op":"replace","path":"/revisions/0/criteria/1/requirements","value":{"kind":"doc"}}]}
 {"name":"revision-subject-dotted-name","base":"v1-2-touched-subjects-and-evidence.json","edits":[{"op":"replace","path":"/revisions/0/touched_subjects/0","value":"example.subject"}]}
 {"name":"revision-subject-not-string","base":"v1-2-touched-subjects-and-evidence.json","edits":[{"op":"replace","path":"/revisions/0/touched_subjects/0","value":5}]}
 {"name":"revision-subject-short","base":"v1-2-touched-subjects-and-evidence.json","edits":[{"op":"replace","path":"/revisions/0/touched_subjects/0","value":"subj_01hf4k"}]}
