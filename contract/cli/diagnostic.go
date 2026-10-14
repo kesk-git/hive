@@ -38,7 +38,7 @@ type valueChecker interface{ ChecksValues() bool }
 // included, changes nothing: the detail is dropped whole, and the response, its
 // status, its exit code and standard error stand.
 func (e *Executable) diagnose(dir string, req *envelope.Request, resp *envelope.Response) {
-	if e.Journal == nil || dir == "" || resp.Status == envelope.Ok || resp.Error == nil || resp.Replayed || resp.Diagnostic.Empty() {
+	if e.Journal == nil || dir == "" || resp.Status == envelope.Ok || resp.Error == nil || resp.Replayed || resp.Diagnostic.Empty() || resp.Diagnostic.Shaped {
 		return
 	}
 	home, err := store.CheckHome(dir)

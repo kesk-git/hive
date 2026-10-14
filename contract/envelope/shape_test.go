@@ -1,6 +1,8 @@
 package envelope
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -85,4 +87,36 @@ func TestValidateBodyKeepsWhatIsNotAShape(t *testing.T) {
 	body = bodyNamed("A home")
 	body["home"].(map[string]any)["role"] = "nest"
 	failure(t, ValidateBody(body, provisionRequest), Invalid, CodeSchemaViolation)
+}
+
+// A diagnostic notes that a string of its chain or its stack held a listed
+// shape whole, before the clip cut it into a fragment that is none.
+func TestDiagnosticNotesAShapeBeforeItClips(t *testing.T) {
+	text := shaped["github.oauth-access"]
+	pad := strings.Repeat("x", MaxDetailBytes-20) + " "
+	long := errors.New(pad + text)
+	d := DiagnosticOf(long)
+	if !d.Shaped || len(d.Chain[0]) != MaxDetailBytes || strings.Contains(d.Chain[0], text) {
+		t.Errorf("shaped %v, chain of %d bytes", d.Shaped, len(d.Chain[0]))
+	}
+	if DiagnosticOf(errors.New(pad + "gho_ is the prefix")).Shaped {
+		t.Error("a prefix mention is shaped")
+	}
+	wrapped := fmt.Errorf("outer: %w", long)
+	if !DiagnosticOf(wrapped).Shaped {
+		t.Error("a wrapped chain is not shaped")
+	}
+	f := Common(CodeInternal, "x").Because(long)
+	if !f.Diagnostic().Shaped || !DiagnosticOf(f).Shaped || !Common(CodeInternal, "y").Carry(f).Diagnostic().Shaped {
+		t.Error("the note is not carried with the diagnostic")
+	}
+	if !Common(CodeInternal, "x").Panicked([]byte(strings.Repeat("y", MaxStackBytes-10) + " " + text)).Diagnostic().Shaped {
+		t.Error("a stack is not checked whole")
+	}
+	if Common(CodeInternal, "x").Panicked([]byte("goroutine 1")).Diagnostic().Shaped {
+		t.Error("an ordinary stack is shaped")
+	}
+	if !Common(CodeInternal, "has "+text).Detail().Shaped {
+		t.Error("a message kept as detail is not checked")
+	}
 }
