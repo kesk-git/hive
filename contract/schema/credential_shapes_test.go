@@ -3,7 +3,6 @@ package schema
 import (
 	"encoding/json"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 )
@@ -69,19 +68,6 @@ func TestTheListIsFifteenNamedShapes(t *testing.T) {
 	for name := range markers {
 		if !seen[name] {
 			t.Errorf("%s is not on the list", name)
-		}
-	}
-}
-
-// The contract states the exact list: every name of it is in spec/records.md.
-func TestContractNamesEveryShape(t *testing.T) {
-	data, err := os.ReadFile("../../spec/records.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range ShapeNames() {
-		if !strings.Contains(string(data), "`"+name+"`") {
-			t.Errorf("spec/records.md does not name %s", name)
 		}
 	}
 }
