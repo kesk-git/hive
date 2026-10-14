@@ -30,7 +30,9 @@ const persistentSupervisorKind = "secondmate"
 
 // IsPersistentSupervisor reports whether the entry is a persistent supervisor,
 // which an import excludes.
-func IsPersistentSupervisor(t *Task) bool { return t.Kind == persistentSupervisorKind }
+func IsPersistentSupervisor(t *Task) bool {
+	return t.Kind == persistentSupervisorKind || LeadingKind(t.Title) == persistentSupervisorKind
+}
 
 const exclusionReason = "a persistent supervisor entry is excluded: a persistent Fleet is never an ordinary task, and the export emits its lines verbatim"
 
@@ -110,13 +112,13 @@ func report(src []byte, digest string, b *Backlog) map[string]any {
 				"legacy_id": t.ID, "section": semanticLine(s.HeaderLine), "state": stateWord(s.State), "disposition": "item",
 			}
 			switch {
+			case IsPersistentSupervisor(t):
+				row["disposition"] = "excluded"
+				row["reason"] = exclusionReason
 			case seen[t.ID]:
 				row["disposition"] = "duplicate"
 				row["reason"] = "a later entry with an identity already seen; it creates no item"
 				warn("entry %q repeats an identity already seen; the later entry is kept in the migration and creates no item", t.ID)
-			case IsPersistentSupervisor(t):
-				row["disposition"] = "excluded"
-				row["reason"] = exclusionReason
 			}
 			seen[t.ID] = true
 			entries = append(entries, row)

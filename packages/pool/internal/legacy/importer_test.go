@@ -379,6 +379,24 @@ func TestDryRunReportsDuplicatesAndDanglingEdges(t *testing.T) {
 	}
 }
 
+// A PERSISTENT SECONDMATE entry is excluded by its leading words whatever kind
+// tag it carries, and a duplicate identity does not make an item of it.
+func TestDryRunExcludesAPersistentSupervisorWhateverItsKindTag(t *testing.T) {
+	h := newHome(t)
+	text := "# Backlog\n\n## Queued\n- [ ] boss-a1 - PERSISTENT SECONDMATE owns the project (kind: scout)\n- [ ] boss-a1 - PERSISTENT SECONDMATE owns the project again (kind: scout)\n- [ ] plain-b2 - SCOUT looks around\n\n## Done\n"
+	path, data, when := sourceBytes(t, []byte(text))
+	report := h.dryRun(path, data, when)
+	list := report["entries"].([]any)
+	if len(list) != 3 {
+		t.Fatalf("the report lists %v", list)
+	}
+	for i, wantDisposition := range []string{"excluded", "excluded", "item"} {
+		if got := list[i].(map[string]any)["disposition"]; got != wantDisposition {
+			t.Errorf("entry %d is %v; want %s", i, got, wantDisposition)
+		}
+	}
+}
+
 // expected_digest makes the caller import what it inspected.
 func TestExpectedDigest(t *testing.T) {
 	h := newHome(t)

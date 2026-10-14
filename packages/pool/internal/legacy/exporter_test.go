@@ -184,7 +184,7 @@ func TestExportPlacesEachItemInTheSectionOfItsState(t *testing.T) {
 	}
 	t.Run("the legacy words come from the legacy member", func(t *testing.T) {
 		a, _ := e.task(t, "queued-a1")
-		if a.Repo != "app" || a.Kind != "ship" || a.Priority == nil || *a.Priority != 2 || a.Body != "Body line one.\n\nBody line after a blank." || a.Created != "2026-10-02" {
+		if a.Repo != "app" || a.Kind != "SHIP" || a.Priority == nil || *a.Priority != 2 || a.Body != "Body line one.\n\nBody line after a blank." || a.Created != "2026-10-02" {
 			t.Errorf("%+v", a)
 		}
 		b, _ := e.task(t, "flying-b2")
@@ -256,6 +256,10 @@ func TestExportSelector(t *testing.T) {
 	if list := e.body["items"].([]any); len(list) != 1 || list[0].(map[string]any)["legacy_id"] != "sel-b2" {
 		t.Errorf("%v", list)
 	}
+	e = h.export(map[string]any{"zone": "UTC", "selector": map[string]any{"states": []any{}}})
+	if list := e.body["items"].([]any); len(list) != 0 {
+		t.Errorf("an empty state set matches %v", list)
+	}
 	e = h.export(map[string]any{"zone": "UTC", "selector": map[string]any{"task_id": a}})
 	if list := e.body["items"].([]any); len(list) != 1 || list[0].(map[string]any)["task_id"] != a {
 		t.Errorf("%v", list)
@@ -271,5 +275,57 @@ func TestExportOfAnItemThatWasNeverImported(t *testing.T) {
 	e := h.export(map[string]any{"zone": "UTC"})
 	if task, state := e.task(t, id); state != legacy.StateQueued || task.Title != "a native item" {
 		t.Errorf("%+v", task)
+	}
+}
+
+// A hold is written when it is in force: an expired dated hold is not written
+// and does not hide a hold that is, a word hold stays in force past its date,
+// the date follows the zone of the request, and a reason the legacy form
+// cannot read back as itself is refused.
+func TestExportHoldsInForce(t *testing.T) {
+	h := newHome(t)
+	past := map[string]any{"at": "2026-10-01T00:00:00.000Z", "zone": "UTC", "date": "2026-10-01"}
+	later := h.leaf("later-a1", "hidden behind an expired hold", "queued")
+	h.plantHold(later, "future", "an expired wait", "active", past)
+	h.plantHold(later, "parked", "waiting for the slot", "active", nil)
+	expired := h.leaf("expired-b2", "only an expired hold", "queued")
+	h.plantHold(expired, "future", "an expired wait", "active", past)
+	word := h.leaf("word-c3", "a word hold past its date", "queued")
+	h.plantHold(word, "word", "awaiting the word", "active", past)
+	dated := h.leaf("dated-d4", "a hold with a timestamp and a date", "queued")
+	h.plantHold(dated, "future", "until november", "active", map[string]any{"at": "2026-11-01T00:00:00.000Z", "zone": "UTC", "date": "2026-11-01"})
+
+	e := h.export(map[string]any{"zone": "America/New_York"})
+	if task, _ := e.task(t, "later-a1"); task.Hold == nil || task.Hold.Reason != "waiting for the slot" {
+		t.Errorf("%+v", task.Hold)
+	}
+	if task, _ := e.task(t, "expired-b2"); task.Hold != nil {
+		t.Errorf("an expired hold is written: %+v", task.Hold)
+	}
+	if task, _ := e.task(t, "word-c3"); task.Hold == nil || task.Hold.Kind != "captain" {
+		t.Errorf("%+v", task.Hold)
+	}
+	if task, _ := e.task(t, "dated-d4"); task.Hold == nil || task.Hold.Until != "2026-10-31" {
+		t.Errorf("the date does not follow the zone: %+v", task.Hold)
+	}
+
+	marker := h.leaf("marker-e5", "a reason that names an edge", "queued")
+	h.plantHold(marker, "parked", "waiting blocked-by: gate-a1 - approval", "active", nil)
+	resp := h.do("export-legacy", map[string]any{"zone": "UTC", "selector": map[string]any{"task_id": marker}})
+	refused(t, resp, envelope.Invalid, "pool.legacy_malformed")
+}
+
+// A link is not taken for one the prose holds because its URL is the start of
+// another.
+func TestExportKeepsALinkWhoseURLPrefixesAnotherInTheBody(t *testing.T) {
+	h := newHome(t)
+	h.leaf("link-a1", "ship the gauge", "done", completed("2026-10-04T00:00:00.000Z"), func(rec map[string]any) {
+		rec["body"] = "Follows https://github.com/acme/app/pull/1234 first."
+		rec["links"] = []any{map[string]any{"kind": "harvest", "url": "https://github.com/acme/app/pull/123"}}
+	})
+	e := h.export(map[string]any{"zone": "UTC"})
+	task, _ := e.task(t, "link-a1")
+	if len(task.Links) != 1 || task.Links[0].URL != "https://github.com/acme/app/pull/123" {
+		t.Errorf("%+v", task.Links)
 	}
 }

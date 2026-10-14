@@ -124,8 +124,9 @@ func selection(c *cli.Call, g *read.Graph) ([]string, error) {
 	sel, _ := c.Request.Body["selector"].(map[string]any)
 	taskID, _ := sel["task_id"].(string)
 	projectID, _ := sel["project_id"].(string)
+	rawStates, wantStates := sel["states"].([]any)
 	var states []string
-	for _, v := range asList(sel["states"]) {
+	for _, v := range rawStates {
 		s, _ := v.(string)
 		states = append(states, s)
 	}
@@ -141,7 +142,7 @@ func selection(c *cli.Call, g *read.Graph) ([]string, error) {
 			continue
 		case projectID != "" && n.Data["project_id"] != projectID:
 			continue
-		case states != nil && !slices.Contains(states, n.State):
+		case wantStates && !slices.Contains(states, n.State):
 			continue
 		case wantReady && g.Facts(id).Ready != ready:
 			continue
@@ -239,10 +240,6 @@ func (r *renderer) task(id string) (*Task, error) {
 		if t.Kind, err = NormalizeTagValue(kind, "kind"); err != nil {
 			return nil, malformed(err)
 		}
-		// The kind a leading word already implies is not written twice.
-		if lead := LeadingKind(t.Title); strings.EqualFold(lead, t.Kind) {
-			t.Kind = lead
-		}
 	} else {
 		t.Kind = LeadingKind(t.Title)
 	}
@@ -323,7 +320,7 @@ func (r *renderer) links(title, body string, data map[string]any) (string, []ite
 			continue
 		}
 		out = append(out, link)
-		if strings.Contains(body, link.URL) {
+		if slices.ContainsFunc(item.DeriveLinks(body), func(l item.Link) bool { return l.URL == link.URL }) {
 			continue
 		}
 		var err error
@@ -334,28 +331,32 @@ func (r *renderer) links(title, body string, data map[string]any) (string, []ite
 	return title, out, nil
 }
 
-// hold is the hold tags of the item's first active hold that has a legacy
+// hold is the hold tags of the item's first hold in force that has a legacy
 // word, or nil. The legacy form carries one hold to an entry; a hold released
 // is never written back.
 func (r *renderer) hold(id string) (*Hold, error) {
 	for _, h := range r.g.Holds[id] {
 		word, ok := holdWords[h.Kind]
-		if h.State != "active" || !ok {
+		if !r.g.InForce(h) || !ok {
 			continue
 		}
 		reason, _ := h.Data["reason"].(string)
 		out := Hold{Reason: legacyReason(reason), Kind: word}
 		if until, ok := h.Data["until"].(map[string]any); ok {
-			if date, _ := until["date"].(string); date != "" {
-				out.Until = date
-			} else {
+			if _, timed := until["at"]; timed {
 				var err error
 				if out.Until, err = r.date(until["at"]); err != nil {
 					return nil, err
 				}
+			} else if date, _ := until["date"].(string); date != "" {
+				out.Until = date
 			}
 		}
-		return &out, nil
+		norm, err := NormalizeHold(out)
+		if err != nil {
+			return nil, err
+		}
+		return &norm, nil
 	}
 	return nil, nil
 }
