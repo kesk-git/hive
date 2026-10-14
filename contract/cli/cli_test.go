@@ -715,7 +715,8 @@ func TestTooLarge(t *testing.T) {
 	if *resp.Error.ActualBytes != 10000 {
 		t.Errorf("%+v", resp.Error)
 	}
-	// Handle checks the size too, for a request a convenience form built.
+	// Handle checks the size too: the request document is the only form,
+	// and a test may hand it to Handle directly, past Main's read.
 	outc, err := h.exe.Handle(Invocation{Command: h.exe.command("hive-fleet"), Operation: "echo", Home: home, Request: over})
 	if err != nil {
 		t.Fatal(err)
@@ -1141,11 +1142,12 @@ func TestRetryThatFailsRecoveryIsUnknown(t *testing.T) {
 	}
 }
 
-// Handle, which a convenience form calls without Check, holds the floor
-// itself: a command whose response limit admits a small success response but
-// not the outcome_unknown answer is refused before anything is written, and
-// an interrupted commit under it is never answered too_large. At the floor
-// exactly, an interrupted commit is answered unknown.
+// Handle, which a test may hand the request document, the only form,
+// directly and without Main's Check, holds the floor itself: a command whose
+// response limit admits a small success response but not the outcome_unknown
+// answer is refused before anything is written, and an interrupted commit
+// under it is never answered too_large. At the floor exactly, an interrupted
+// commit is answered unknown.
 func TestHandleHoldsTheFloor(t *testing.T) {
 	h := newHarness(t)
 	fleet := h.exe.command("hive-fleet")
