@@ -400,53 +400,6 @@
           "$ref": "urn:hive:schema:common:v1#/$defs/receipt_id"
         }
       }
-    },
-    "need_test": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "outcome",
-        "coverage",
-        "reason"
-      ],
-      "properties": {
-        "outcome": {
-          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
-        },
-        "coverage": {
-          "enum": [
-            "existing",
-            "new-definition"
-          ]
-        },
-        "reason": {
-          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
-        },
-        "covering_specification": {
-          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/criteria_ref"
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "coverage": {
-                "const": "existing"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "covering_specification"
-            ]
-          },
-          "else": {
-            "properties": {
-              "covering_specification": false
-            }
-          }
-        }
-      ]
     }
   }
 }

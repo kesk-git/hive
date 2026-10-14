@@ -620,6 +620,9 @@
             "public-safe-prompt"
           ]
         },
+        "rendered_at": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+        },
         "delivered_at": {
           "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
         },
