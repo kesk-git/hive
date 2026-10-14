@@ -252,8 +252,9 @@ func legacyMember(data map[string]any, key string) string {
 
 // renderer reads items out of a graph into the legacy form.
 type renderer struct {
-	g   *read.Graph
-	loc *time.Location
+	g      *read.Graph
+	loc    *time.Location
+	owners map[string][]string
 }
 
 // identity is the identifier an item is written under: its legacy one, and for
@@ -265,6 +266,29 @@ func (r *renderer) identity(taskID string) string {
 		}
 	}
 	return taskID
+}
+
+// name is the identifier an item is written under, refused when another item
+// of the Pool is written under it too: a file that held it twice would be
+// read back as one item.
+func (r *renderer) name(taskID string) (string, error) {
+	id := r.identity(taskID)
+	if len(r.ownersOf(id)) > 1 {
+		return "", envelope.Fail(envelope.Invalid, codeLegacyMalformed, "the legacy identifier "+id+" stands for more than one item").With("task_id", taskID).With("legacy_id", id)
+	}
+	return id, nil
+}
+
+// ownersOf is the items written under the identifier.
+func (r *renderer) ownersOf(id string) []string {
+	if r.owners == nil {
+		r.owners = map[string][]string{}
+		for _, taskID := range r.g.Order {
+			name := r.identity(taskID)
+			r.owners[name] = append(r.owners[name], taskID)
+		}
+	}
+	return r.owners[id]
 }
 
 // section is the state of the section an item stands in. An item that has
@@ -291,8 +315,11 @@ func (r *renderer) task(id string) (*Task, error) {
 	malformed := func(err error) error {
 		return envelope.Fail(envelope.Invalid, codeLegacyMalformed, "an item cannot be written in the legacy form").With("task_id", id).Because(err)
 	}
-	t := &Task{ID: r.identity(id), State: r.section(id)}
 	var err error
+	t := &Task{State: r.section(id)}
+	if t.ID, err = r.name(id); err != nil {
+		return nil, err
+	}
 	title, _ := data["title"].(string)
 	if t.Title, err = NormalizeTitle(title); err != nil {
 		return nil, malformed(err)
@@ -329,7 +356,11 @@ func (r *renderer) task(id string) (*Task, error) {
 		return nil, malformed(err)
 	}
 	for _, e := range read.Edges(data) {
-		d, err := NormalizeDep(t.ID, Dep{Type: e.Type, ID: r.identity(e.TaskID), Reason: e.Reason})
+		to, err := r.name(e.TaskID)
+		if err != nil {
+			return nil, err
+		}
+		d, err := NormalizeDep(t.ID, Dep{Type: e.Type, ID: to, Reason: e.Reason})
 		if err != nil {
 			return nil, malformed(err)
 		}
@@ -348,9 +379,8 @@ func (r *renderer) task(id string) (*Task, error) {
 		if id, reason, found := strings.Cut(value, " - "); found {
 			dep.ID, dep.Reason = id, reason
 		}
-		if dep.ID == t.ID {
-			// An edge to itself cannot be written, and blocks nothing.
-			continue
+		if len(r.ownersOf(dep.ID)) > 0 {
+			return nil, envelope.Fail(envelope.Invalid, codeLegacyMalformed, "the legacy identifier "+dep.ID+" names an item the edge was not made to").With("task_id", id).With("legacy_id", dep.ID)
 		}
 		d, err := NormalizeDep(t.ID, dep)
 		if err != nil {
@@ -539,24 +569,17 @@ func exportMigration(c *cli.Call, st *cstore.Store, g *read.Graph, loc *time.Loc
 			continue
 		}
 		present := r.section(e.TaskID)
+		inPlace := layout.Sections[secOf[i]].State == present
+		if inPlace && unmodified(g, e.TaskID, e) {
+			verbatim[i] = true
+			continue
+		}
 		t, err := r.task(e.TaskID)
 		if err != nil {
 			return nil, err
 		}
-		// An entry that gave no date was created at the time of the import,
-		// which is the migration's fact and no date the file wrote.
-		if original := originalTask(layout.Sections[secOf[i]], e); original != nil && original.Created == "" &&
-			g.Items[e.TaskID].Data["created_at"] == m.Data["imported_at"] {
-			t.Created = ""
-		}
-		inPlace := layout.Sections[secOf[i]].State == present
-		switch {
-		case inPlace && unmodified(g, e.TaskID, e):
-			verbatim[i] = true
-		case inPlace:
-			canonical[i] = RenderTaskLines(t)
-		default:
-			canonical[i] = RenderTaskLines(t)
+		canonical[i] = RenderTaskLines(t)
+		if !inPlace {
 			moved = append(moved, movedEntry{entry: i, state: present})
 		}
 	}
@@ -639,18 +662,4 @@ func exportMigration(c *cli.Call, st *cstore.Store, g *read.Graph, loc *time.Loc
 		"text": text, "digest": canon.FileDigest([]byte(text)), "bytes": int64(len(text)),
 		"exact": text == m.SourceText, "items": listed,
 	}}, nil
-}
-
-// originalTask is the task the entry's exact lines say, read again under the
-// header of the section it stands in, or nil if they say none.
-func originalTask(sec LayoutSection, e MigrationEntry) *Task {
-	b, err := Parse([]byte(sec.Header + "\n" + strings.Join(e.Lines, "\n")))
-	if err != nil || len(b.Sections) != 1 {
-		return nil
-	}
-	tasks := b.Tasks()
-	if len(tasks) == 0 {
-		return nil
-	}
-	return tasks[0]
 }

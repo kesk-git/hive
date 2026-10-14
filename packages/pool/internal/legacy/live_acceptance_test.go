@@ -643,7 +643,7 @@ func TestExportFromAMigrationRendersAModifiedItemInTheSectionOfItsState(t *testi
 	}
 	// The item that stays is rendered where it stands, with its new priority;
 	// every line of an item that was not modified is still there.
-	if !strings.Contains(text, "- [ ] key-cleanup - port the post-upload key pruning to the release workflow. Keep the newest 2, never touch the signing keys. (repo: monorepo) (priority: 3)\n") {
+	if !strings.Contains(text, "- [ ] key-cleanup - port the post-upload key pruning to the release workflow. Keep the newest 2, never touch the signing keys. (repo: monorepo) (priority: 3) (since ") {
 		t.Errorf("key-cleanup is not rendered with its priority in place:\n%s", text)
 	}
 	for _, line := range strings.Split(string(im.data), "\n") {
@@ -676,6 +676,49 @@ func TestExportFromAMigrationRendersAModifiedItemInTheSectionOfItsState(t *testi
 	}
 	if got := im2.items["key-cleanup"]["priority"]; got != int64(3) {
 		t.Errorf("key-cleanup imports again with priority %v", got)
+	}
+}
+
+// An entry whose title ends in an unfinished tag cannot be rendered
+// canonically, but is emitted from its exact lines for as long as it is
+// unmodified.
+func TestExportFromAMigrationEmitsAnUnmodifiedEntryThatCannotBeRenderedCanonically(t *testing.T) {
+	h := newHome(t)
+	text := "# Backlog\n\n## Queued\n- [ ] open-a1 - fix (repo:\n- [ ] open-b2 - fine\n\n## Done\n"
+	path, data, when := sourceBytes(t, []byte(text))
+	im := h.importPath(path, data, when, "UTC")
+	out := h.exportMigration(im.migration["migration_id"].(string), nil)
+	if out["exact"] != true || out["text"] != text {
+		t.Errorf("the export of an unmodified import is not its source (exact %v):\n%s", out["exact"], out["text"])
+	}
+}
+
+// One legacy identifier that two imports gave to two items is never written
+// for a rendered item: the export is refused naming it, rather than a file
+// that would read back as one item.
+func TestExportFromAMigrationRefusesALegacyIdentifierOfTwoItems(t *testing.T) {
+	h := newHome(t)
+	pathA, dataA, whenA := sourceBytes(t, []byte("# Backlog\n\n## Queued\n- [ ] dup-a1 - first\n\n## Done\n"))
+	imA := h.importPath(pathA, dataA, whenA, "UTC")
+	pathB, dataB, whenB := sourceBytes(t, []byte("# Backlog\n\n## Queued\n- [ ] dup-a1 - second\n\n## Done\n"))
+	h.importPath(pathB, dataB, whenB, "UTC")
+	id := imA.migration["migration_id"].(string)
+	if out := h.exportMigration(id, nil); out["exact"] != true {
+		t.Fatalf("the export of an unmodified import is not exact: %v", out)
+	}
+	ok(t, h.do("update", map[string]any{"task_id": imA.taskID("dup-a1"), "patch": map[string]any{"priority": int64(3)}}))
+	for name, extra := range map[string]map[string]any{"from the migration": nil, "with normalize": {"normalize": true}} {
+		t.Run(name, func(t *testing.T) {
+			body := map[string]any{"migration_id": id, "zone": "UTC"}
+			for k, v := range extra {
+				body[k] = v
+			}
+			resp := h.do("export-legacy", body)
+			refused(t, resp, envelope.Invalid, "pool.legacy_malformed")
+			if resp.Error.Detail["legacy_id"] != "dup-a1" {
+				t.Errorf("the refusal names %v", resp.Error.Detail)
+			}
+		})
 	}
 }
 

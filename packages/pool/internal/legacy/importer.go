@@ -368,7 +368,8 @@ var holdKinds = map[string]string{
 const maxTitle = 200
 
 // importable refuses an entry the Pool cannot make an item of, naming its
-// line and field: a title the item cannot keep and a future hold with no date.
+// line and field: a title the item cannot keep, a hold with no reason, a future
+// hold with no date, and an edge from an entry to itself.
 func importable(w walked) error {
 	seen := map[string]bool{}
 	for _, e := range w.Entries {
@@ -379,8 +380,18 @@ func importable(w walked) error {
 		if n := utf8.RuneCountInString(t.Title); n == 0 || n > maxTitle {
 			return unrepresentable(e.FirstLine, "title", "an item's title is 1 to "+strconv.Itoa(maxTitle)+" characters, and this one is "+strconv.Itoa(n))
 		}
-		if h := t.Hold; h != nil && strings.TrimSpace(h.Reason) != "" && holdKinds[h.Kind] == "future" && h.Until == "" {
-			return unrepresentable(e.FirstLine, "hold-until", "a future hold needs the date it is held until, and this one has none")
+		if h := t.Hold; h != nil {
+			if strings.TrimSpace(h.Reason) == "" {
+				return unrepresentable(e.FirstLine, "hold", "a hold needs the reason it is held for, and this one has none")
+			}
+			if holdKinds[h.Kind] == "future" && h.Until == "" {
+				return unrepresentable(e.FirstLine, "hold-until", "a future hold needs the date it is held until, and this one has none")
+			}
+		}
+		for _, d := range t.Deps {
+			if d.ID == t.ID {
+				return unrepresentable(e.FirstLine, "dependency", "an entry cannot depend on itself")
+			}
 		}
 	}
 	return nil
@@ -563,7 +574,7 @@ func (im *importer) itemRecord(e walkedEntry, taskID string) (map[string]any, []
 	deps := []any{}
 	for _, d := range t.Deps {
 		to, held := im.taskOf[d.ID]
-		if !held || d.ID == t.ID {
+		if !held {
 			value := d.ID
 			if d.Reason != "" {
 				value += " - " + d.Reason
@@ -598,16 +609,9 @@ func (im *importer) itemRecord(e walkedEntry, taskID string) (map[string]any, []
 	return rec, warns
 }
 
-// holdRecord is the hold an entry's hold tags become, or nil for an entry
-// whose tags give no reason. The date is kept as the instant it starts at in
-// the zone, the zone and the date as written.
+// holdRecord is the hold an entry's hold tags become. The date is kept as the
+// instant it starts at in the zone, the zone and the date as written.
 func (im *importer) holdRecord(taskID, holdID string, h *Hold) (map[string]any, []string) {
-	if h == nil || strings.TrimSpace(h.Reason) == "" {
-		if h != nil {
-			return nil, []string{"the hold tag has no reason; no hold is made of it"}
-		}
-		return nil, nil
-	}
 	var warns []string
 	rec := map[string]any{
 		"schema": "pool.hold", "schema_version": "1.0", "record_revision": int64(1),
@@ -688,10 +692,6 @@ func writeImport(c *cli.Call, src []byte, digest, path, zone string, loc *time.L
 		}
 		hold, warns := im.holdRecord(made[i].TaskID, holdIDs[i], e.Task.Hold)
 		made[i].Warnings = append(made[i].Warnings, warns...)
-		if hold == nil {
-			holdIDs[i] = ""
-			continue
-		}
 		made[i].HoldID = holdIDs[i]
 		holdScope := scope
 		holdScope.CloneID = ""

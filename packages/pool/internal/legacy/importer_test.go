@@ -428,6 +428,14 @@ func TestDryRunRefusesAnIdentifierTooLongToReport(t *testing.T) {
 	newHome(t).unrepresentable("# Backlog\n\n## Queued\n- [ ] short-a1 - fine\n- [ ] "+strings.Repeat("a", 201)+" - too long\n\n## Done\n", 5, "legacy_id")
 }
 
+// An entry whose hold tags give no reason is refused whole, naming its line and
+// the hold, as an entry that depends on itself is: neither is imported with
+// the hold or the edge dropped.
+func TestDryRunRefusesAHoldWithNoReasonAndAnEntryThatDependsOnItself(t *testing.T) {
+	newHome(t).unrepresentable("# Backlog\n\n## Queued\n- [ ] hold-a1 - fine\n- [ ] hold-b2 - work (hold: ) (hold-kind: parked)\n\n## Done\n", 5, "hold")
+	newHome(t).unrepresentable("# Backlog\n\n## Queued\n- [ ] fine-a1 - fine\n- [ ] self-b2 - waits blocked-by: self-b2\n\n## Done\n", 5, "dependency")
+}
+
 // A section header that is not UTF-8 is refused, naming its line.
 func TestDryRunRefusesASectionHeaderThatIsNotUTF8(t *testing.T) {
 	newHome(t).unrepresentable("# Backlog\n\n## Queued\n\n## Done\xff\n- [x] enc-a1 - closed (done 2026-10-01)\n", 5, "section")
