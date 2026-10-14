@@ -1,0 +1,42 @@
+{
+  "schema": "pool.note",
+  "schema_version": "1.0",
+  "record_revision": 9007199254740991,
+  "note_id": "note_01000000000000000000000000",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "scope_level": "hive",
+  "text": "Example fact.",
+  "provenance": {
+    "incident": {
+      "schema": "pool.item",
+      "id": "item_01j9xk3m2nq4r5s6t7v8w9xyzp",
+      "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+      "record_revision": 3,
+      "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab"
+    },
+    "observer": {
+      "kind": "test"
+    },
+    "independence": "independent",
+    "derived_from": [],
+    "evidence": [
+      {
+        "schema": "pool.item",
+        "id": "item_01j9xk3m2nq4r5s6t7v8w9xyzp",
+        "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+        "record_revision": 3,
+        "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab"
+      }
+    ]
+  },
+  "origin": "stow",
+  "state": "pending",
+  "created_at": "2026-10-11T08:00:00.000Z",
+  "updated_at": "2026-10-11T08:00:00.000Z",
+  "writer": {
+    "package": "dispatch",
+    "command": "hive-dispatch",
+    "operation": "create-home",
+    "implementation_version": "0.1.0"
+  }
+}

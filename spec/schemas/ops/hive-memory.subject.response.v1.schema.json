@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.subject.response:v1",
+  "title": "hive-memory subject: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "subject"
+  ],
+  "properties": {
+    "subject": {
+      "$ref": "urn:hive:schema:records:pool.subject:v1"
+    }
+  }
+}

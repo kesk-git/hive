@@ -1,0 +1,16 @@
+{"name":"folded-fact-bad-subject","base":"folded-fact.json","edits":[{"op":"replace","path":"/facts/0/subject_id","value":"not-an-id"}]}
+{"name":"folded-fact-undrained","base":"folded-fact.json","edits":[{"op":"replace","path":"/remaining","value":1}]}
+{"name":"minimal-missing-facts","base":"minimal.json","edits":[{"op":"remove","path":"/facts"}]}
+{"name":"minimal-missing-items","base":"minimal.json","edits":[{"op":"remove","path":"/items"}]}
+{"name":"minimal-missing-notes","base":"minimal.json","edits":[{"op":"remove","path":"/notes"}]}
+{"name":"minimal-missing-queue-revision-after","base":"minimal.json","edits":[{"op":"remove","path":"/queue_revision_after"}]}
+{"name":"minimal-missing-queue-revision-before","base":"minimal.json","edits":[{"op":"remove","path":"/queue_revision_before"}]}
+{"name":"minimal-missing-remaining","base":"minimal.json","edits":[{"op":"remove","path":"/remaining"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}
+{"name":"routed-note-missing-facts","base":"routed-note.json","edits":[{"op":"remove","path":"/facts"}]}
+{"name":"routed-note-missing-items","base":"routed-note.json","edits":[{"op":"remove","path":"/items"}]}
+{"name":"routed-note-missing-notes","base":"routed-note.json","edits":[{"op":"remove","path":"/notes"}]}
+{"name":"routed-note-missing-queue-revision-after","base":"routed-note.json","edits":[{"op":"remove","path":"/queue_revision_after"}]}
+{"name":"routed-note-missing-queue-revision-before","base":"routed-note.json","edits":[{"op":"remove","path":"/queue_revision_before"}]}
+{"name":"routed-note-missing-remaining","base":"routed-note.json","edits":[{"op":"remove","path":"/remaining"}]}
+{"name":"routed-note-unknown","base":"routed-note.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

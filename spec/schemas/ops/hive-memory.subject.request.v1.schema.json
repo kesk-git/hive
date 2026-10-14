@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.subject.request:v1",
+  "title": "hive-memory subject: request body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "subject_id",
+    "loads_at",
+    "intake"
+  ],
+  "properties": {
+    "subject_id": {
+      "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/subject_id"
+    },
+    "loads_at": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/step"
+      }
+    },
+    "intake": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+    }
+  }
+}

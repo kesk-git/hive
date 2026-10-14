@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:ops:hive-memory.enqueue.response:v1",
+  "title": "hive-memory enqueue: response body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "notes",
+    "queue"
+  ],
+  "properties": {
+    "notes": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:hive:schema:records:pool.note:v1"
+      },
+      "minItems": 1
+    },
+    "queue": {
+      "$ref": "urn:hive:schema:records:pool.maintenance-queue:v1"
+    }
+  }
+}

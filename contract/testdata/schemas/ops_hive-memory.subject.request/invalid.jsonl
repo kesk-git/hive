@@ -1,0 +1,4 @@
+{"name":"minimal-missing-intake","base":"minimal.json","edits":[{"op":"remove","path":"/intake"}]}
+{"name":"minimal-missing-loads-at","base":"minimal.json","edits":[{"op":"remove","path":"/loads_at"}]}
+{"name":"minimal-missing-subject-id","base":"minimal.json","edits":[{"op":"remove","path":"/subject_id"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

@@ -1,0 +1,16 @@
+{
+  "queue_revision_before": 9007199254740991,
+  "queue_revision_after": 9007199254740991,
+  "notes": [
+    "note_01000000000000000000000000"
+  ],
+  "facts": [
+    {
+      "note_id": "note_01000000000000000000000000",
+      "subject_id": "subj_01000000000000000000000000",
+      "fact_id": "example-mechanics"
+    }
+  ],
+  "items": [],
+  "remaining": 0
+}

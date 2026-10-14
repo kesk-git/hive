@@ -1,0 +1,3 @@
+{"name":"minimal-missing-notes","base":"minimal.json","edits":[{"op":"remove","path":"/notes"}]}
+{"name":"minimal-missing-queue","base":"minimal.json","edits":[{"op":"remove","path":"/queue"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}

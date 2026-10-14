@@ -1,0 +1,16 @@
+{
+  "queue_revision_before": 9007199254740991,
+  "queue_revision_after": 9007199254740991,
+  "notes": [
+    "note_01000000000000000000000000"
+  ],
+  "facts": [],
+  "items": [
+    {
+      "note_id": "note_01000000000000000000000000",
+      "task_id": "task_01000000000000000000000000",
+      "reason": "over-budget"
+    }
+  ],
+  "remaining": 0
+}

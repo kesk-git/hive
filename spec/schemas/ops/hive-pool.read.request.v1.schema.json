@@ -26,6 +26,8 @@
         "request-outcome",
         "subject",
         "budget",
+        "note",
+        "maintenance-queue",
         "miss"
       ]
     },

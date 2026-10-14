@@ -26,7 +26,7 @@ var commands = []struct {
 	{"hive-imperative", []string{"create", "revise", "render", "deliver"}},
 	{"hive-spec", []string{"define", "accept", "close"}},
 	{"hive-rule", []string{"record", "amend", "expire", "resolve"}},
-	{"hive-memory", []string{"render", "check", "propagate", "budget", "miss"}},
+	{"hive-memory", []string{"render", "check", "propagate", "budget", "miss", "subject", "enqueue", "fold"}},
 }
 
 // Executable is the hive-pool executable. Started under any of its command names

@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.note:v1",
+  "title": "Maintenance note",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "note_id",
+    "home_id",
+    "scope_level",
+    "text",
+    "provenance",
+    "origin",
+    "state",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.note"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "note_id": {
+      "type": "string",
+      "pattern": "^note_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "text": {
+      "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+    },
+    "subject_id": {
+      "type": "string",
+      "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "fact_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
+    },
+    "provenance": {
+      "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/provenance"
+    },
+    "origin": {
+      "enum": [
+        "stow",
+        "swarm-report",
+        "lictor-report"
+      ]
+    },
+    "state": {
+      "enum": [
+        "pending",
+        "folded",
+        "routed"
+      ]
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fold"
+      ],
+      "properties": {
+        "fold": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "fact_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
+        },
+        "task_id": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/task_id"
+        }
+      }
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "pending"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "disposition": false
+        }
+      },
+      "else": {
+        "required": [
+          "disposition"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "folded"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "subject_id",
+          "fact_id"
+        ],
+        "properties": {
+          "disposition": {
+            "required": [
+              "fact_id"
+            ],
+            "properties": {
+              "task_id": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "routed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "disposition": {
+            "required": [
+              "task_id"
+            ],
+            "properties": {
+              "fact_id": false
+            }
+          }
+        }
+      }
+    }
+  ]
+}
