@@ -48,8 +48,11 @@ func newWordy(t testing.TB, h *harness, adapter Callee) *wordy {
 		// An identity made anew by each run, as a handler that mints one is.
 		w.minted++
 		operation, callee := "put", fmt.Sprintf("said-%d", w.minted)
-		if strings.HasPrefix(name, "refuse") {
+		switch {
+		case strings.HasPrefix(name, "refuse"):
 			operation, callee = "refuse", "record it"
+		case name == "unreconciled":
+			callee = name
 		}
 		command := "hive-fleet"
 		switch c.Operation.Name {
@@ -70,7 +73,14 @@ func newWordy(t testing.TB, h *harness, adapter Callee) *wordy {
 		}
 		return &Result{Body: body}, nil
 	}
+	// adapt answers an outcome the callee wrote as unreconciled as held, as
+	// word adapts an answer the Pool could not reconcile.
 	adapt := func(c *Call, callee *envelope.Response) (map[string]any, error) {
+		if callee.Body["wrote"] == "unreconciled" {
+			f := envelope.Fail(envelope.Held, "word.question_changed", "the question changed before the answer reached it")
+			f.Err.Hold = &envelope.RecordRef{Schema: "word.question", ID: id(ids.Question, 1)}
+			return nil, f
+		}
 		return map[string]any{"adapted": true, "callee": callee.Body}, nil
 	}
 	op := func(name string) *Operation { return &Operation{OperationDecl: decl(name), Handle: say, Adapt: adapt} }
@@ -226,6 +236,41 @@ func TestARecordedOutcomeIsReplayedBeforeAnythingElse(t *testing.T) {
 		if len(adapter.sent) != sent || len(adapter.reads) != reads+1 {
 			t.Errorf("%s: %d handoffs after the replay, %d reads", tc.name, len(adapter.sent)-sent, len(adapter.reads)-reads)
 		}
+	}
+	absent(t, filepath.Join(home, "word"))
+}
+
+// An operation may adapt the callee's ok outcome to a hold in place of a body:
+// the hold is answered with the callee's receipts, and its retry is the same
+// hold, replayed from the callee's recorded outcome.
+func TestAnOutcomeAdaptedToAHoldKeepsTheCalleesReceipts(t *testing.T) {
+	h := newHarness(t)
+	h.exe.Handoffs = []string{"word"}
+	adapter := &inProcess{exe: h.exe}
+	w := newWordy(t, h, adapter)
+	home := newHome(t)
+	req := sayRequest(t, "say", 1, "unreconciled")
+
+	first := w.send(t, home, "say", req)
+	expect(t, first, envelope.Held, "word.question_changed")
+	if first.Replayed || first.Body != nil || first.Error.Hold == nil || first.Error.Hold.Schema != "word.question" {
+		t.Errorf("%+v", first)
+	}
+	if len(first.Receipts) != 1 || first.Receipts[0].Writer.Package != "dispatch" {
+		t.Fatalf("the callee's receipt is not carried in full: %+v", first.Receipts)
+	}
+	runs, sent := w.runs["say"], len(adapter.sent)
+
+	again := w.send(t, home, "say", req)
+	expect(t, again, envelope.Held, "word.question_changed")
+	if !again.Replayed || again.Error.Hold == nil || again.Error.Hold.ID != first.Error.Hold.ID {
+		t.Errorf("%+v", again)
+	}
+	if len(again.Receipts) != 1 || again.Receipts[0].ReceiptID != first.Receipts[0].ReceiptID {
+		t.Errorf("receipts %+v, want %+v", again.Receipts, first.Receipts)
+	}
+	if w.runs["say"] != runs || len(adapter.sent) != sent {
+		t.Errorf("the replay ran the handler %d times and sent %d handoffs", w.runs["say"]-runs, len(adapter.sent)-sent)
 	}
 	absent(t, filepath.Join(home, "word"))
 }

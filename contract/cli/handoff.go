@@ -175,6 +175,9 @@ func (e *Executable) handleStoreless(call *Call, digest string, fail func(*envel
 		if len(f.Receipts) > 0 {
 			return fail(envelope.Common(envelope.CodeInternal, "a command with no store writes no receipt of its own"))
 		}
+		if call.handed != nil && call.handed.Status == envelope.Ok && adaptedFailure(f) {
+			return e.handedAdapted(call, f, call.handed, call.handed.Replayed, fail)
+		}
 		if call.calleeMayHold() {
 			// The callee may hold the request, and the command cannot answer it.
 			return e.handedUnknown(call, call.handed.Receipts)
@@ -204,9 +207,9 @@ func failureOf(err error) *envelope.Failure {
 }
 
 // replayHanded answers a request from the callee's recorded outcome of it: an
-// ok response adapted to the operation's own body, and any other status as the
-// callee recorded it, with its receipts, all as a replay of this command's
-// operation.
+// ok response adapted to the operation's own response, and any other status
+// as the callee recorded it, with its receipts, all as a replay of this
+// command's operation.
 func (e *Executable) replayHanded(call *Call, callee *envelope.Response, fail func(*envelope.Failure) *envelope.Response) *envelope.Response {
 	c, op, req := call.Command, call.Operation, call.Request
 	if callee.Status != envelope.Ok {
@@ -215,6 +218,9 @@ func (e *Executable) replayHanded(call *Call, callee *envelope.Response, fail fu
 		return e.sizeHanded(call, resp, true)
 	}
 	body, err := e.adapt(call, callee)
+	if f := envelope.AsFailure(err); adaptedFailure(f) {
+		return e.handedAdapted(call, f, callee, true, fail)
+	}
 	if err != nil {
 		return e.handedUnknown(call, callee.Receipts)
 	}
@@ -222,6 +228,24 @@ func (e *Executable) replayHanded(call *Call, callee *envelope.Response, fail fu
 		RequestID: req.RequestID, Command: c.Name, Operation: op.Name, Status: envelope.Ok, Responder: e.responder(c),
 		Receipts: callee.Receipts, Body: body, Replayed: true,
 	}
+	return e.sizeHanded(call, resp, true)
+}
+
+// adaptedFailure reports whether f is an answer an operation adapts its
+// callee's ok outcome to in place of a body: a refusal or a hold, the statuses
+// that leave a record, with no receipt of its own.
+func adaptedFailure(f *envelope.Failure) bool {
+	return f != nil && len(f.Receipts) == 0 && (f.Status == envelope.Refused || f.Status == envelope.Held)
+}
+
+// handedAdapted is the answer the operation adapted the callee's ok outcome
+// to in place of a body, with the callee's receipts: the callee's transaction
+// is complete, so it is never too_large.
+func (e *Executable) handedAdapted(call *Call, f *envelope.Failure, callee *envelope.Response, replayed bool, fail func(*envelope.Failure) *envelope.Response) *envelope.Response {
+	adapted := *f
+	adapted.Receipts = callee.Receipts
+	resp := fail(&adapted)
+	resp.Replayed = replayed
 	return e.sizeHanded(call, resp, true)
 }
 
