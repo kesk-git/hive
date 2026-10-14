@@ -1,12 +1,12 @@
 // Package entry describes the pool executable: the commands it owns, as the
 // package's declaration lists them, each answering capabilities and refusing
-// every operation, since no operation beyond capabilities is built yet.
+// every operation that is not built. An operation is built by registering it
+// (register.go), and hive-pool read is built once a kind has a reader.
 package entry
 
 import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
-	"github.com/kesk-git/hive/contract/journal"
 )
 
 // Version is the implementation version of the executable.
@@ -29,26 +29,12 @@ var commands = []struct {
 	{"hive-memory", []string{"render", "check", "propagate", "budget", "miss", "subject", "enqueue", "fold"}},
 }
 
-// Executable is the hive-pool executable. Started under any of its command names
-// it acts as that command; the contract library's harness answers
-// capabilities and --version and refuses a name the executable does not own.
-func Executable() *cli.Executable {
-	e := &cli.Executable{
-		Package:   "pool",
-		Name:      "hive-pool",
-		Version:   Version,
-		Storeless: false,
-		Journal:   journal.Opener("pool"),
-	}
-	for _, c := range commands {
-		cmd := &cli.Command{Name: c.name}
-		for _, name := range c.operations {
-			cmd.Operations = append(cmd.Operations, unsupported(name))
-		}
-		e.Commands = append(e.Commands, cmd)
-	}
-	return e
-}
+// Executable is the hive-pool executable of the default registry: the
+// operations built so far, and every other declared operation refused. Started
+// under any of its command names it acts as that command; the contract
+// library's harness answers capabilities and --version and refuses a name the
+// executable does not own.
+func Executable() *cli.Executable { return Default.Executable() }
 
 // unsupported declares an operation the design names and the build has not
 // reached: calling it is refused with unsupported_operation.
