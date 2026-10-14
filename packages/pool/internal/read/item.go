@@ -18,8 +18,9 @@ import (
 var ItemMembers = []string{MemberID, MemberProjectID, MemberStates, MemberReady, MemberLimit}
 
 // HoldMembers are the selector members of a read of kind hold: the identity,
-// the item held, the states, the active predicate, the due time and the limit.
-var HoldMembers = []string{MemberID, MemberTaskID, MemberStates, MemberActive, MemberDueBefore, MemberLimit}
+// the item held, the project, the states, the active predicate, the due time
+// and the limit. A hold record carries the project of its item, as an item does.
+var HoldMembers = []string{MemberID, MemberTaskID, MemberProjectID, MemberStates, MemberActive, MemberDueBefore, MemberLimit}
 
 // RegisterItemReaders registers the readers of the kinds item and hold.
 func RegisterItemReaders(r *Registry) {
@@ -100,6 +101,8 @@ func readHolds(c *Context) (*Result, error) {
 		h := newHold(l)
 		switch {
 		case sel.Has(MemberTaskID) && h.TaskID != sel.TaskID:
+			return false
+		case sel.Has(MemberProjectID) && l.Data["project_id"] != sel.ProjectID:
 			return false
 		case sel.Has(MemberStates) && !slices.Contains(sel.States, h.State):
 			return false

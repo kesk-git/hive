@@ -1099,7 +1099,7 @@ func TestEachReaderRefusesTheMembersThatDoNotApply(t *testing.T) {
 		{"hold by identity", "hold", map[string]any{"id": holdID}, true},
 		{"hold by query", "hold", map[string]any{"task_id": id, "states": []any{"active"}, "active": true, "due_before": "2026-10-14T11:00:00.000Z", "limit": int64(5)}, true},
 		{"hold with ready", "hold", map[string]any{"ready": true}, false},
-		{"hold with project_id", "hold", map[string]any{"project_id": mint(t, ids.Project)}, false},
+		{"hold with project_id", "hold", map[string]any{"project_id": mint(t, ids.Project)}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			resp := h.do("read", map[string]any{"kind": tc.kind, "selector": tc.selector})
@@ -1112,6 +1112,19 @@ func TestEachReaderRefusesTheMembersThatDoNotApply(t *testing.T) {
 			refused(t, resp, envelope.Invalid, envelope.CodeSchemaViolation)
 		})
 	}
+	t.Run("holds are selected by the project they carry", func(t *testing.T) {
+		project := mint(t, ids.Project)
+		rec := h.stored("hold", holdID)
+		rec["scope_level"], rec["workspace_id"], rec["project_id"] = "project", mint(t, ids.Workspace), project
+		h.plant("hold", holdID, rec)
+		got := func(p string) int {
+			body := h.ok(h.do("read", map[string]any{"kind": "hold", "selector": map[string]any{"project_id": p}}))
+			return len(body["records"].([]any))
+		}
+		if got(project) != 1 || got(mint(t, ids.Project)) != 0 {
+			t.Error("a hold is selected by its project and by no other")
+		}
+	})
 	t.Run("an identity that is not there is not_found and a query that matches nothing is empty", func(t *testing.T) {
 		refused(t, h.do("read", map[string]any{"kind": "item", "selector": map[string]any{"id": mint(t, ids.Task)}}), envelope.NotFound, envelope.CodeNotFound)
 		body := h.ok(h.do("read", map[string]any{"kind": "item", "selector": map[string]any{"states": []any{"archived"}}}))
