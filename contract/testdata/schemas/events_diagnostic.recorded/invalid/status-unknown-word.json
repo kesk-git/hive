@@ -1,6 +1,0 @@
-{
-  "command": "hive-fleet",
-  "operation": "put",
-  "status": "broken",
-  "code": "internal"
-}

@@ -10,13 +10,19 @@ import (
 )
 
 // fixtureRoot is where spec/layout.md keeps the fixtures of the schemas:
-// contract/testdata/schemas/<name>/valid/ and .../invalid/.
+// contract/testdata/schemas/<name>/.
 const fixtureRoot = "../testdata/schemas"
 
 // TestFixturesProveTheCommittedSchemas runs every example under fixtureRoot
 // through the embedded registry. It is the one walker for every schema's
 // fixtures: a lane that adds examples for another schema adds files and
-// nothing here.
+// table rows and nothing here.
+//
+// The walk starts from the registry, not from the directories: every
+// committed schema needs fixtures unless the table of "Schema fixture
+// obligations" in spec/test-targets.md defers it, and a deferred schema must
+// have no fixture directory, so the deferral is removed in the change that
+// brings its fixtures.
 //
 // Each directory <name> directly under fixtureRoot names the schema whose
 // $id is urn:hive:schema:<name>:v1, where a schema under a subdirectory of
@@ -25,38 +31,36 @@ const fixtureRoot = "../testdata/schemas"
 // naming no schema fails.
 //
 // The schema common holds only definitions and no keyword of its own at its
-// root, so its examples name the definition they test: a file under common/
-// is called <definition>.<label>.json (home_id.ok.json) and is checked
-// against urn:hive:schema:common:v1#/$defs/<definition>. A file under
+// root, so its examples name the definition they test: a case under common/
+// is called <definition>.<label> (home_id.ok.json, open_object.array) and is
+// checked against urn:hive:schema:common:v1#/$defs/<definition>. A case under
 // common/ that names no definition, or a definition the schema lacks, fails.
 //
-// Under each schema directory only the folders valid/ and invalid/ may
-// appear, and each must hold at least one example: a stray file or folder
-// beside them fails, and so does a folder with no example. Every example is
-// a .json file; a file with another suffix, or a folder inside valid/ or
-// invalid/, fails. A file under valid/ must be accepted by its schema. A
-// file under invalid/ must be refused, which means Validate returns a
-// *ValidationError or a *SyntaxError; any other error, such as an unknown
-// schema, is a failure of the test, not a refusal. A failing file is
-// reported by its path with the violations the validator found.
+// Under each schema directory only valid/, invalid.jsonl and invalid/ may
+// appear. The schema needs at least one accepted example, a file of valid/,
+// and at least one refused example, a row of invalid.jsonl or a file of
+// invalid/. A stray file or folder beside them fails. Every example file is a
+// .json file; a file with another suffix, or a folder inside valid/ or
+// invalid/, fails. A file under valid/ must be accepted by its schema.
+//
+// A row of invalid.jsonl names a file of valid/ and edits it; see
+// fixture_table_test.go. The document the edits build must decode and be
+// refused by the schema with a *ValidationError; a row whose base cannot be
+// used, whose edits cannot be applied or whose document the decoder refuses
+// is a mistake in the fixture, not a refusal by the schema. A file under
+// invalid/ keeps a document as written, for what no edit can say: it must be
+// refused, which means Validate returns a *ValidationError or a
+// *SyntaxError; any other error, such as an unknown schema, is a failure of
+// the test, not a refusal. A row and a file of one name fail. A failing case
+// is reported by its path, or by the table, line and name of its row, with
+// the violations the validator found.
 func TestFixturesProveTheCommittedSchemas(t *testing.T) {
 	r, err := Embedded()
 	if err != nil {
 		t.Fatal(err)
 	}
-	names, problems := fixtureDirs(fixtureRoot)
-	for _, p := range problems {
+	for _, p := range checkFixtureTree(r, fixtureRoot, r.IDs(), readFixtureDeferrals(t)) {
 		t.Error(p)
-	}
-	if len(names) == 0 {
-		t.Fatalf("%s holds no schema directory", fixtureRoot)
-	}
-	for _, name := range names {
-		t.Run(name, func(t *testing.T) {
-			for _, p := range checkFixtureDir(r, fixtureRoot, name) {
-				t.Error(p)
-			}
-		})
 	}
 }
 
@@ -158,6 +162,41 @@ func TestFixtureWalkerRefusesAMistakenTree(t *testing.T) {
 	}
 }
 
+// fixtureDeferral is a schema whose fixtures are not yet owed, and the stage
+// that owes them.
+type fixtureDeferral struct {
+	ID    string
+	Stage int
+}
+
+// checkFixtureTree checks the whole tree of fixtures under root against r and
+// reports every problem, each starting with the path concerned. ids are the
+// schemas the tree must cover, except those named by deferred, which must have
+// no directory.
+func checkFixtureTree(r *Registry, root string, ids []string, deferred []fixtureDeferral) (problems []string) {
+	required, deferredDirs, problems := checkFixtureObligations(ids, deferred, root)
+	names, found := fixtureDirs(root)
+	problems = append(problems, found...)
+	have := map[string]bool{}
+	for _, name := range names {
+		have[name] = true
+		if d, ok := deferredDirs[name]; ok {
+			problems = append(problems, fmt.Sprintf("%s: the schema is deferred to stage %d by test-targets.md and has fixtures; remove its row there", filepath.Join(root, name), d.Stage))
+			continue
+		}
+		problems = append(problems, checkFixtureDir(r, root, name)...)
+	}
+	for _, name := range required {
+		if !have[name] {
+			dir := filepath.Join(root, name)
+			problems = append(problems,
+				dir+": no accepted example under valid/; the schema has no fixture directory",
+				dir+": no refused example in invalid.jsonl or under invalid/; the schema has no fixture directory")
+		}
+	}
+	return problems
+}
+
 // fixtureDirs lists the schema directories under root, sorted, and reports
 // anything else found there.
 func fixtureDirs(root string) (names, problems []string) {
@@ -193,23 +232,40 @@ func checkFixtureDir(r *Registry, root, name string) (problems []string) {
 		return []string{err.Error()}
 	}
 	var valid, invalid []string
+	var table string
 	for _, e := range entries {
 		switch {
 		case e.IsDir() && e.Name() == "valid":
 			valid = examplesIn(filepath.Join(dir, "valid"), &problems)
 		case e.IsDir() && e.Name() == "invalid":
 			invalid = examplesIn(filepath.Join(dir, "invalid"), &problems)
+		case !e.IsDir() && e.Name() == "invalid.jsonl":
+			table = filepath.Join(dir, "invalid.jsonl")
 		default:
-			problems = append(problems, fmt.Sprintf("%s: a stray entry; only valid/ and invalid/ belong here", filepath.Join(dir, e.Name())))
+			problems = append(problems, fmt.Sprintf("%s: a stray entry; only valid/, invalid.jsonl and invalid/ belong here", filepath.Join(dir, e.Name())))
+		}
+	}
+	var rows []fixtureRow
+	if table != "" {
+		data, err := os.ReadFile(table)
+		if err != nil {
+			problems = append(problems, err.Error())
+		}
+		var faults []string
+		rows, faults = parseFixtureTable(data)
+		for _, f := range faults {
+			problems = append(problems, table+": "+f)
 		}
 	}
 	if len(valid) == 0 {
 		problems = append(problems, dir+": no accepted example under valid/")
 	}
-	if len(invalid) == 0 {
-		problems = append(problems, dir+": no refused example under invalid/")
+	if len(invalid)+len(rows) == 0 {
+		problems = append(problems, dir+": no refused example in invalid.jsonl or under invalid/")
 	}
+	accepted := map[string]bool{}
 	for _, p := range valid {
+		accepted[filepath.Base(p)] = true
 		ref, ok := refFor(name, id, p, &problems)
 		if !ok {
 			continue
@@ -228,7 +284,9 @@ func checkFixtureDir(r *Registry, root, name string) (problems []string) {
 			problems = append(problems, fmt.Sprintf("%s: was refused by %s:\n%s", p, ref, describe(err)))
 		}
 	}
+	files := map[string]bool{}
 	for _, p := range invalid {
+		files[strings.TrimSuffix(filepath.Base(p), ".json")] = true
 		ref, ok := refFor(name, id, p, &problems)
 		if !ok {
 			continue
@@ -249,6 +307,68 @@ func checkFixtureDir(r *Registry, root, name string) (problems []string) {
 		default:
 			problems = append(problems, fmt.Sprintf("%s: could not be checked against %s: %v", p, ref, err))
 		}
+	}
+	for _, row := range rows {
+		problems = append(problems, checkFixtureRow(r, dir, name, id, table, row, accepted, files)...)
+	}
+	return problems
+}
+
+// checkFixtureRow builds the case of one row and reports every problem with
+// it.
+func checkFixtureRow(r *Registry, dir, name, id, table string, row fixtureRow, accepted, files map[string]bool) (problems []string) {
+	at := fmt.Sprintf("%s:%d:%s", table, row.Line, row.Name)
+	fail := func(format string, args ...any) {
+		problems = append(problems, at+": "+fmt.Sprintf(format, args...))
+	}
+	if files[row.Name] {
+		fail("a row of this name and the file invalid/%s.json both hold a case", row.Name)
+		return problems
+	}
+	ref, ok := refFor(name, id, row.Name+".json", &problems)
+	if !ok {
+		problems[len(problems)-1] = at + ": " + strings.TrimPrefix(problems[len(problems)-1], row.Name+".json: ")
+		return problems
+	}
+	if !accepted[row.Base] {
+		fail("the base %s names no file under valid/", row.Base)
+		return problems
+	}
+	baseRef, ok := refFor(name, id, row.Base, &problems)
+	if !ok {
+		problems[len(problems)-1] = at + ": the base " + strings.TrimPrefix(problems[len(problems)-1], row.Base+": ")
+		return problems
+	}
+	if baseRef != ref {
+		fail("the base %s is an example of a different definition than the row, %s", row.Base, ref)
+		return problems
+	}
+	base, err := os.ReadFile(filepath.Join(dir, "valid", row.Base))
+	if err != nil {
+		fail("%v", err)
+		return problems
+	}
+	if err := r.Validate(ref, base); err != nil {
+		fail("the base %s is not accepted by %s", row.Base, ref)
+		return problems
+	}
+	doc, err := constructFixture(base, row)
+	if err != nil {
+		fail("the case cannot be built: %v", err)
+		return problems
+	}
+	err = r.Validate(ref, doc)
+	var ve *ValidationError
+	var se *SyntaxError
+	switch {
+	case err == nil:
+		fail("was accepted by %s", ref)
+	case errors.As(err, &se):
+		fail("the decoder refused the case the edits built, so it does not prove %s: %v", ref, err)
+	case errors.As(err, &ve):
+		// Refused by the schema, as it must be.
+	default:
+		fail("could not be checked against %s: %v", ref, err)
 	}
 	return problems
 }
