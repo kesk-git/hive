@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -188,6 +189,9 @@ type harness struct {
 	journal *fakeJournal
 	// calls counts the handler runs of each operation.
 	calls map[string]int
+	// durable are the receipts the operations recap and echo return as already
+	// durable, when set.
+	durable []envelope.Receipt
 	// stderr gathers the diagnostics of every run.
 	stderr bytes.Buffer
 }
@@ -213,6 +217,10 @@ func newHarness(t testing.TB) *harness {
 			if c.Store != nil {
 				return nil, errors.New("a read-only operation was given the store")
 			}
+			if h.durable != nil {
+				// A read-only operation returns no receipt as already durable.
+				return &Result{Body: map[string]any{}, Durable: h.durable}, nil
+			}
 			unknown := make([]any, 0, len(c.Home.Unknown))
 			for _, u := range c.Home.Unknown {
 				unknown = append(unknown, u)
@@ -226,6 +234,11 @@ func newHarness(t testing.TB) *harness {
 			if label == "huge" {
 				return &Result{Body: map[string]any{"filler": strings.Repeat("x", 4096)}}, nil
 			}
+			// "recap" writes nothing and returns the receipts the test set as
+			// already durable; any other name returns them after its own.
+			if label == "recap" {
+				return &Result{Body: map[string]any{"wrote": ""}, Durable: h.durable}, nil
+			}
 			// The name is the record's name, and after @ the revision the
 			// write expects.
 			name, rev, _ := strings.Cut(label, "@")
@@ -238,10 +251,16 @@ func newHarness(t testing.TB) *harness {
 			if err != nil {
 				return nil, err
 			}
+			// "clash" names its own receipt as already durable too.
+			var clash []envelope.Receipt
+			if label == "clash" {
+				clash = []envelope.Receipt{rc}
+			}
 			return &Result{
 				Body:     map[string]any{"wrote": name},
 				Records:  []store.RecordWrite{{Path: store.RecordPath("dispatch", "thing", name), Content: []byte(`{"schema":"dispatch.thing","schema_version":"1.0","name":"` + name + `"}`), Expected: expected}},
 				Receipts: []envelope.Receipt{rc},
+				Durable:  append(slices.Clone(h.durable), clash...),
 				Events:   []store.Event{{ID: id(ids.Event, h.calls["put"]), Content: []byte(`{"schema":"dispatch.thing.put"}`)}},
 			}, nil
 		})},
