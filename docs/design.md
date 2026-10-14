@@ -1335,7 +1335,7 @@ These decisions resolve the workflow inventory's conflicts as part of this desig
 | Platform-bound inheritance | The inherited supervisor is shell scripts over tmux, assumes a POSIX userland and runs on Windows only under WSL2. Hive inherits none of that: it runs natively on macOS, Windows and Linux and never through WSL2 or another compatibility layer, as [Platforms](#platforms-native-on-macos-windows-and-linux) states, and the inherited macOS utilities, notifiers and launch agents are not carried over. |
 | External contracts and old defects | Track consumer versions and source-date/digest drift at the plugin boundary, and prove that configured checks actually run. Reproduce archived-answer lookup or other reported defects against the current dependency before adding a workaround. Historical issue age proves neither that a defect remains nor that it was fixed. |
 
-A finalizer is a definition's named choice, never the default. The approved Tooling ruling, as amended, selects the native replacements and five-dependency target; it does not authorize deployment, account changes, destructive cleanup or Assimilation of this Harvest. That last action still needs the Hive Mind's merge word after validation.
+A finalizer is a definition's named choice, never the default. The tooling strategy selects the native replacements and five-dependency target; it does not authorize deployment, account changes, destructive cleanup or Assimilation of this Harvest. That last action still needs the Hive Mind's merge word after validation.
 
 ## Implementation evidence still required
 
