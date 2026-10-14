@@ -1,18 +1,20 @@
 // Package entry describes the word executable: the commands it owns, as the
-// package's declaration lists them, each answering capabilities and refusing
-// every operation, since no operation beyond capabilities is built yet.
+// package's declaration lists them. The operations that persist through one
+// handoff to the Pool are built; the others are declared and refused as
+// unsupported until they are.
 package entry
 
 import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/journal"
+	"github.com/kesk-git/hive/packages/word/internal/intake"
 )
 
 // Version is the implementation version of the executable.
 const Version = "0.1.0"
 
-// notBuilt is the reason every operation is declared unsupported.
+// notBuilt is the reason an operation not built yet is declared unsupported.
 const notBuilt = "the operation is declared and not built yet"
 
 // commands are the command names of the package with the operations its
@@ -24,29 +26,32 @@ var commands = []struct {
 	{"hive-word", []string{"hold", "revise", "answer", "release", "complete", "close", "verify"}},
 }
 
-// ExecutableWith is the hive-word executable reaching the Pool through the
-// callee given.
-func ExecutableWith(callee cli.Callee) *cli.Executable {
-	e := Executable()
-	e.Callee = callee
-	return e
-}
-
 // Executable is the hive-word executable. Started under any of its command names
 // it acts as that command; the contract library's harness answers
 // capabilities and --version and refuses a name the executable does not own.
-func Executable() *cli.Executable {
+// It has no way to the Pool yet: the call to hive-pool is built apart, and
+// until it is every read of the Pool is unavailable and nothing is sent.
+func Executable() *cli.Executable { return ExecutableWith(intake.Unwired()) }
+
+// ExecutableWith is the hive-word executable reaching the Pool through the
+// callee given, behind the check of who brings each request.
+func ExecutableWith(callee cli.Callee) *cli.Executable {
 	e := &cli.Executable{
 		Package:   "word",
 		Name:      "hive-word",
 		Version:   Version,
 		Storeless: true,
 		Journal:   journal.Opener("word"),
+		Callee:    intake.Guard(callee),
 	}
 	for _, c := range commands {
 		cmd := &cli.Command{Name: c.name}
 		for _, name := range c.operations {
-			cmd.Operations = append(cmd.Operations, unsupported(name))
+			op := intake.Operation(name)
+			if op == nil {
+				op = unsupported(name)
+			}
+			cmd.Operations = append(cmd.Operations, op)
 		}
 		e.Commands = append(e.Commands, cmd)
 	}

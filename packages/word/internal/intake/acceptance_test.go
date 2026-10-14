@@ -52,17 +52,20 @@ func mint(t testing.TB, p ids.Prefix) string {
 
 func newRig(t testing.TB) *rig {
 	t.Helper()
-	r := &rig{t: t, home: t.TempDir(), pool: &poolfake.Pool{}, homeID: mint(t, ids.Home), workspaceID: mint(t, ids.Workspace)}
+	r := &rig{t: t, home: filepath.Join(t.TempDir(), "home"), pool: &poolfake.Pool{}, homeID: mint(t, ids.Home), workspaceID: mint(t, ids.Workspace)}
+	if err := os.Mkdir(r.home, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	r.exe = entry.ExecutableWith(r.pool)
 	stamp := "2026-10-11T08:00:00.000Z"
 	writer := map[string]any{"package": "dispatch", "command": "hive-fleet", "operation": "provision", "implementation_version": "test"}
 	r.write("home.json", map[string]any{
-		"schema": "hive.home", "schema_version": "1.0", "record_revision": 1,
+		"schema": "hive.home", "schema_version": "1.0", "record_revision": int64(1),
 		"home_id": r.homeID, "role": "hive", "name": "A test home", "parent": map[string]any{"kind": "none"},
 		"created_at": stamp, "updated_at": stamp, "writer": writer,
 	})
 	r.write("dispatch/registry/workspaces/"+r.workspaceID+".json", map[string]any{
-		"schema": "hive.workspace", "schema_version": "1.0", "record_revision": 1,
+		"schema": "hive.workspace", "schema_version": "1.0", "record_revision": int64(1),
 		"workspace_id": r.workspaceID, "slug": "one", "name": "One", "home_id": r.homeID, "parent_home_id": mint(t, ids.Home), "state": "active",
 		"created_at": stamp, "updated_at": stamp, "writer": writer,
 	})

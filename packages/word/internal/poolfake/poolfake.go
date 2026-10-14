@@ -55,6 +55,9 @@ type Pool struct {
 	// Hide makes a read find nothing, as the read of a request that looked
 	// before another reached the Pool.
 	Hide bool
+	// ReadErr, when set, is the Pool giving no answer to a read, and SendErr
+	// the Pool giving none to a request.
+	ReadErr, SendErr error
 
 	outcomes map[string]recorded
 }
@@ -71,6 +74,9 @@ func (p *Pool) ReadOutcome(c *cli.Call, requestID string) ([]byte, bool, error) 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.Reads = append(p.Reads, requestID)
+	if p.ReadErr != nil {
+		return nil, false, p.ReadErr
+	}
 	rec, ok := p.outcomes[requestID]
 	if !ok || p.Hide {
 		return nil, false, nil
@@ -91,6 +97,9 @@ func (p *Pool) Send(c *cli.Call, request []byte) ([]byte, int, error) {
 		return nil, 0, err
 	}
 	p.Sent = append(p.Sent, req)
+	if p.SendErr != nil {
+		return nil, 0, p.SendErr
+	}
 	answer := func(r *envelope.Response) ([]byte, int, error) {
 		r.RequestID, r.Command, r.Operation = req.RequestID, req.Command, req.Operation
 		r.Responder = envelope.Responder{Package: "pool", Command: "hive-pool", ImplementationVersion: "0.1.0-fake", ContractVersion: envelope.ContractVersion}
@@ -138,7 +147,7 @@ func (p *Pool) Send(c *cli.Call, request []byte) ([]byte, int, error) {
 	if err := envelope.ValidateBody(body, fmt.Sprintf(responseSchema, req.Operation)); err != nil {
 		return nil, 0, err
 	}
-	receipt, err := receipt(c, req, op.Receipt)
+	receipt, err := Receipt(req, op.Receipt)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -161,8 +170,8 @@ func (p *Pool) Count() int {
 	return len(p.Sent)
 }
 
-// receipt is the one receipt the fake writes for the request.
-func receipt(c *cli.Call, req *envelope.Request, kind string) (envelope.Receipt, error) {
+// Receipt is a receipt of the kind that the Pool writes for the request.
+func Receipt(req *envelope.Request, kind string) (envelope.Receipt, error) {
 	id, err := ids.Mint(clock.System{}, ids.Receipt)
 	if err != nil {
 		return envelope.Receipt{}, err
