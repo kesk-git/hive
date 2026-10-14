@@ -683,3 +683,26 @@ func TestALaterDefersAndALaterAnswerEndsTheDeferral(t *testing.T) {
 		t.Errorf("answers %v", all)
 	}
 }
+
+// The duplicate of a superseding answer returns every receipt the first
+// request wrote, the acceptance and the supersession.
+func TestTheDuplicateOfASupersedingAnswerReturnsBothReceipts(t *testing.T) {
+	h := newHome(t)
+	r := h.fresh()
+	h.ok(h.operator(r.question, keep))
+	source := submission(h.item(), mint(t, ids.Review), h.event())
+	firstResp := h.answer(r.question, source, map[string]any{"supersedes": int64(1), "text": "Instead."})
+	h.ok(firstResp)
+	sameKinds(t, firstResp, "pool.answer.accepted", "pool.answer.superseded")
+	var again *envelope.Response
+	h.unchanged(func() { again = h.answer(r.question, source, map[string]any{"supersedes": int64(1), "text": "Again."}) })
+	if body := h.ok(again); body["duplicate"] != true || body["answer_sequence"] != int64(2) {
+		t.Errorf("response %v", body)
+	}
+	sameKinds(t, again, "pool.answer.accepted", "pool.answer.superseded")
+	for i := range firstResp.Receipts {
+		if again.Receipts[i].ReceiptID != firstResp.Receipts[i].ReceiptID {
+			t.Errorf("receipt %d is %s, want %s", i, again.Receipts[i].ReceiptID, firstResp.Receipts[i].ReceiptID)
+		}
+	}
+}

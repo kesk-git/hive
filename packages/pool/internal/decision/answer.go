@@ -1,10 +1,16 @@
 package decision
 
 import (
+	"errors"
+	"io/fs"
+
+	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	cstore "github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/pool/internal/entry"
+	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
 )
 
 // The operation answer-question of hive-pool, the third of the six the Mind's
@@ -87,7 +93,7 @@ func answerQuestion(c *cli.Call) (*cli.Result, error) {
 	// answer's, and nothing is written.
 	source := asMap(body["source"])
 	if first := answerWithSource(q, source); first != nil {
-		return duplicate(first, l.Data, rl.Data, hold.Data)
+		return duplicate(c, first, l.Data, rl.Data, hold.Data)
 	}
 
 	optionID, _ := body["option_id"].(string)
@@ -181,12 +187,48 @@ func answerQuestion(c *cli.Call) (*cli.Result, error) {
 
 // duplicate is the result for an answer whose source is already recorded for
 // the question: the first answer's sequence and disposition, the records as
-// they stand, and nothing written.
-func duplicate(first *Answer, question, round, hold map[string]any) (*cli.Result, error) {
-	return &cli.Result{Body: map[string]any{
-		"question": question, "round": round, "hold": hold,
-		"answer_sequence": first.Sequence, "disposition": first.Disposition, "duplicate": true,
-	}}, nil
+// they stand, and the receipts recorded with the first answer, returned and not
+// written again. Nothing is written.
+func duplicate(c *cli.Call, first *Answer, question, round, hold map[string]any) (*cli.Result, error) {
+	receipts, err := recordedReceipts(c, first.RequestID)
+	if err != nil {
+		return nil, err
+	}
+	return &cli.Result{
+		Body: map[string]any{
+			"question": question, "round": round, "hold": hold,
+			"answer_sequence": first.Sequence, "disposition": first.Disposition, "duplicate": true,
+		},
+		Durable: receipts,
+	}, nil
+}
+
+// recordedReceipts are the receipts the Pool returned for the request that
+// recorded an answer, as its recorded outcome holds them.
+func recordedReceipts(c *cli.Call, requestID string) ([]envelope.Receipt, error) {
+	rel := cstore.OutcomePath(poolstore.Package, requestID)
+	data, err := c.Store.Read(rel)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, malformed("recorded outcome of the first answer")
+		}
+		return nil, poolstore.Failure("the recorded outcome of the first answer", err)
+	}
+	v, err := canon.Parse(data)
+	if err != nil {
+		return nil, malformed("recorded outcome of the first answer").Because(err)
+	}
+	outcome, _ := v.(map[string]any)
+	tree, _ := outcome["response"].(map[string]any)
+	encoded, err := canon.Encode(tree)
+	if err != nil {
+		return nil, malformed("recorded outcome of the first answer").Because(err)
+	}
+	resp, err := envelope.DecodeResponse(append(encoded, '\n'))
+	if err != nil || resp.RequestID != requestID {
+		return nil, malformed("recorded outcome of the first answer").Because(err)
+	}
+	return resp.Receipts, nil
 }
 
 // intOf is the whole number a member holds, or 0 where it holds none.
