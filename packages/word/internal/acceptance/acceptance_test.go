@@ -207,8 +207,8 @@ func TestEveryCommandNameAnswersCapabilities(t *testing.T) {
 }
 
 // Every command name refuses an operation it does not declare as usage, exit
-// 2, and every operation it does declare as refused, exit 4, with
-// unsupported_operation: nothing but capabilities is built.
+// 2, and every operation it declares and has not built as refused, exit 4,
+// with unsupported_operation.
 func TestEveryCommandNameRefusesEverythingElse(t *testing.T) {
 	p := declaration(t)
 	dir := delivered(t, p)
