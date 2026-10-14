@@ -17,6 +17,7 @@ const obligationsHeading = "### Schema fixture obligations"
 var (
 	obligationRow   = regexp.MustCompile("^\\| `([^`|]+)` \\| ([^|]+) \\|$")
 	obligationStage = regexp.MustCompile(`^stage ([0-9]+)$`)
+	fixtureMajor    = regexp.MustCompile(`^[1-9][0-9]*$`)
 )
 
 // parseFixtureDeferrals reads the table of the obligations section of
@@ -91,11 +92,47 @@ func fixtureDirFor(id string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	rest, ok = strings.CutSuffix(rest, ":v1")
-	if !ok || rest == "" {
+	i := strings.LastIndex(rest, ":v")
+	if i <= 0 || !fixtureMajor.MatchString(rest[i+2:]) {
 		return "", false
 	}
-	return strings.ReplaceAll(rest, ":", "_"), true
+	name, major := rest[:i], rest[i+2:]
+	if canonical, err := idForPath(strings.ReplaceAll(name, ":", "/") + ".v" + major + ".schema.json"); err != nil || canonical != id {
+		return "", false
+	}
+	dir := strings.ReplaceAll(name, ":", "_")
+	if major != "1" {
+		dir += "_v" + major
+	}
+	return dir, true
+}
+
+func TestFixtureDirectoriesKeepTheirSchemaMajor(t *testing.T) {
+	for _, c := range []struct{ id, dir string }{
+		{"urn:hive:schema:request:v1", "request"},
+		{"urn:hive:schema:records:pool.rule:v2", "records_pool.rule_v2"},
+		{"urn:hive:schema:ops:hive-memory.fold.response:v12", "ops_hive-memory.fold.response_v12"},
+		{"urn:hive:schema:common:v2", "common_v2"},
+		{"urn:hive:schema:records:views:v1", "records_views"},
+	} {
+		got, ok := fixtureDirFor(c.id)
+		if !ok || got != c.dir {
+			t.Errorf("fixtureDirFor(%q) = %q, %v; want %q, true", c.id, got, ok, c.dir)
+		}
+		if got := schemaIDFor(c.dir); got != c.id {
+			t.Errorf("schemaIDFor(%q) = %q, want %q", c.dir, got, c.id)
+		}
+	}
+	for _, id := range []string{"elsewhere:request:v2", "urn:hive:schema:request", "urn:hive:schema:request:v0", "urn:hive:schema:request:v02", "urn:hive:schema:request:v2#/$defs/value"} {
+		if dir, ok := fixtureDirFor(id); ok {
+			t.Errorf("malformed schema id %q mapped to %q", id, dir)
+		}
+	}
+	for _, dir := range []string{"request_v1", "request_v0", "request_v02", "request_", "_v2", "request/v2"} {
+		if id := schemaIDFor(dir); id != "" {
+			t.Errorf("noncanonical directory %q mapped to %q", dir, id)
+		}
+	}
 }
 
 // checkFixtureObligations reports what is wrong with deferred itself, and

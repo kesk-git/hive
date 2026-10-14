@@ -1,0 +1,33 @@
+{
+  "schema": "pool.rule",
+  "schema_version": "2.0",
+  "record_revision": 9007199254740991,
+  "rule_id": "rule_01000000000000000000000000",
+  "scope_level": "hive",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "subject": "example.subject",
+  "words": "Example fact.",
+  "origin": {
+    "kind": "ruling"
+  },
+  "applies": [],
+  "status": "in-force",
+  "effective_at": "2026-10-11T08:00:00.000Z",
+  "authority": {
+    "kind": "none"
+  },
+  "amendments": [],
+  "created_at": "2026-10-11T08:00:00.000Z",
+  "updated_at": "2026-10-11T08:00:00.000Z",
+  "writer": {
+    "package": "dispatch",
+    "command": "hive-dispatch",
+    "operation": "create-home",
+    "implementation_version": "0.1.0"
+  },
+  "kind": "product",
+  "governs": {
+    "stage": 2
+  },
+  "specifications": []
+}

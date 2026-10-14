@@ -23,7 +23,9 @@
         "migration",
         "question",
         "decision-round",
-        "request-outcome"
+        "request-outcome",
+        "subject",
+        "budget"
       ]
     },
     "selector": {

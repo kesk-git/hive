@@ -10,7 +10,7 @@
   ],
   "properties": {
     "role": {
-      "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/role"
+      "$ref": "urn:hive:schema:records:pool.rule:v2#/$defs/role"
     },
     "at": {
       "description": "The instant to resolve for. Absent means the command's clock. A test gives it.",

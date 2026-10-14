@@ -26,7 +26,8 @@
     },
     "schema_version": {
       "enum": [
-        "1.0"
+        "1.0",
+        "1.1"
       ]
     },
     "record_revision": {
@@ -163,7 +164,7 @@
           }
         },
         "digest": {
-          "description": "The digest of the canonical form of the text and criteria.",
+          "description": "Digest of canonical text, criteria, product_rules and plan_stage when present; absent optional members keep their historical digest input.",
           "$ref": "urn:hive:schema:common:v1#/$defs/digest"
         },
         "defined_at": {
@@ -177,6 +178,30 @@
         },
         "request_id": {
           "$ref": "urn:hive:schema:common:v1#/$defs/request_id"
+        },
+        "product_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rule_id",
+              "record_revision"
+            ],
+            "properties": {
+              "rule_id": {
+                "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+              },
+              "record_revision": {
+                "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+              }
+            }
+          }
+        },
+        "plan_stage": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
         }
       }
     },

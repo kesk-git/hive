@@ -1,0 +1,15 @@
+{"name":"minimal-bad-schema-version","base":"minimal.json","edits":[{"op":"replace","path":"/schema_version","value":"not-allowed"}]}
+{"name":"minimal-missing-budget-id","base":"minimal.json","edits":[{"op":"remove","path":"/budget_id"}]}
+{"name":"minimal-missing-changes","base":"minimal.json","edits":[{"op":"remove","path":"/changes"}]}
+{"name":"minimal-missing-created-at","base":"minimal.json","edits":[{"op":"remove","path":"/created_at"}]}
+{"name":"minimal-missing-defaults","base":"minimal.json","edits":[{"op":"remove","path":"/defaults"}]}
+{"name":"minimal-missing-home-id","base":"minimal.json","edits":[{"op":"remove","path":"/home_id"}]}
+{"name":"minimal-missing-projections","base":"minimal.json","edits":[{"op":"remove","path":"/projections"}]}
+{"name":"minimal-missing-record-revision","base":"minimal.json","edits":[{"op":"remove","path":"/record_revision"}]}
+{"name":"minimal-missing-schema","base":"minimal.json","edits":[{"op":"remove","path":"/schema"}]}
+{"name":"minimal-missing-schema-version","base":"minimal.json","edits":[{"op":"remove","path":"/schema_version"}]}
+{"name":"minimal-missing-updated-at","base":"minimal.json","edits":[{"op":"remove","path":"/updated_at"}]}
+{"name":"minimal-missing-writer","base":"minimal.json","edits":[{"op":"remove","path":"/writer"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}
+{"name":"subject-budget-nonpositive","base":"subject-budget.json","edits":[{"op":"replace","path":"/projections/0/max_bytes","value":0}]}
+{"name":"subject-budget-seed-default","base":"subject-budget.json","edits":[{"op":"replace","path":"/defaults/subject","value":99999}]}

@@ -1,0 +1,48 @@
+{
+  "subject": "example.subject",
+  "words": "Example fact.",
+  "origin": {
+    "kind": "ruling"
+  },
+  "applies": [],
+  "kind": "operating",
+  "tier": "always",
+  "filed_under": "subj_01000000000000000000000000",
+  "rule_line": "Example fact.",
+  "create_subject": {
+    "subject_id": "subj_01000000000000000000000000",
+    "key": "class.3",
+    "loads_at": [
+      "dispatch"
+    ]
+  },
+  "facts": [
+    {
+      "fact_id": "example-mechanics",
+      "text": "The example counter resets after its sample is collected.",
+      "provenance": {
+        "incident": {
+          "schema": "pool.item",
+          "id": "item_01j9xk3m2nq4r5s6t7v8w9xyzp",
+          "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+          "record_revision": 3,
+          "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab"
+        },
+        "observer": {
+          "kind": "test"
+        },
+        "independence": "independent",
+        "derived_from": [],
+        "evidence": [
+          {
+            "schema": "pool.item",
+            "id": "item_01j9xk3m2nq4r5s6t7v8w9xyzp",
+            "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+            "record_revision": 3,
+            "digest": "sha256:3f786850e387550fdab836ed7e6dc881de23001bc0ffee0000000000000000ab"
+          }
+        ]
+      }
+    }
+  ]
+}

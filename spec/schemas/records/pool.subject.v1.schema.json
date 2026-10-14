@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hive:schema:records:pool.subject:v1",
+  "title": "Memory subject",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "record_revision",
+    "subject_id",
+    "home_id",
+    "scope_level",
+    "key",
+    "loads_at",
+    "facts",
+    "created_at",
+    "updated_at",
+    "writer"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pool.subject"
+    },
+    "schema_version": {
+      "enum": [
+        "1.0"
+      ]
+    },
+    "record_revision": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+    },
+    "subject_id": {
+      "type": "string",
+      "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "home_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/home_id"
+    },
+    "scope_level": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_level"
+    },
+    "workspace_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/workspace_id"
+    },
+    "project_id": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/project_id"
+    },
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
+    },
+    "loads_at": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "dispatch",
+          "gate",
+          "define",
+          "stow",
+          "project"
+        ]
+      },
+      "minItems": 1
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fact_id",
+          "text",
+          "provenance"
+        ],
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
+          },
+          "text": {
+            "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+          },
+          "provenance": {
+            "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/provenance"
+          }
+        }
+      }
+    },
+    "created_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
+    },
+    "writer": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/writer"
+    },
+    "unknown": {
+      "$ref": "urn:hive:schema:common:v1#/$defs/open_object"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "urn:hive:schema:common:v1#/$defs/scope_rules"
+    }
+  ],
+  "$defs": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
+    },
+    "step": {
+      "enum": [
+        "dispatch",
+        "gate",
+        "define",
+        "stow",
+        "project"
+      ]
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fact_id",
+        "text",
+        "provenance"
+      ],
+      "properties": {
+        "fact_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}(\\.[a-z0-9][a-z0-9-]{0,62}){0,3}$"
+        },
+        "text": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/text"
+        },
+        "provenance": {
+          "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/provenance"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incident",
+        "observer",
+        "independence",
+        "derived_from",
+        "evidence"
+      ],
+      "properties": {
+        "incident": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+        },
+        "observer": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/caller"
+        },
+        "independence": {
+          "enum": [
+            "independent",
+            "derived",
+            "unknown"
+          ]
+        },
+        "derived_from": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:hive:schema:common:v1#/$defs/record_ref"
+          },
+          "minItems": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "independence": {
+                "const": "independent"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "derived_from": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "independence": {
+                "const": "derived"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "derived_from": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "subject_id": {
+      "type": "string",
+      "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+    },
+    "rule_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "record_revision"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/rule_id"
+        },
+        "record_revision": {
+          "$ref": "urn:hive:schema:common:v1#/$defs/record_revision"
+        }
+      }
+    }
+  }
+}

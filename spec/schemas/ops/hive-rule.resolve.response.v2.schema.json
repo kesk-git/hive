@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:hive:schema:ops:hive-rule.resolve.response:v1",
+  "$id": "urn:hive:schema:ops:hive-rule.resolve.response:v2",
   "title": "hive-rule resolve: response body",
   "description": "The effective rules with their rendered lines, the conflicts found, what was excluded and why, and the resolved-rule digest, present only when there is no conflict. A caller whose action depends on a conflicted subject holds that action.",
   "type": "object",
@@ -17,19 +17,19 @@
       "$ref": "urn:hive:schema:common:v1#/$defs/timestamp"
     },
     "role": {
-      "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/role"
+      "$ref": "urn:hive:schema:records:pool.rule:v2#/$defs/role"
     },
     "rules": {
       "description": "In the order they apply: by scope from widest to narrowest, then by effective time.",
       "type": "array",
       "items": {
-        "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/resolved_rule"
+        "$ref": "urn:hive:schema:records:pool.rule:v2#/$defs/resolved_rule"
       }
     },
     "conflicts": {
       "type": "array",
       "items": {
-        "$ref": "urn:hive:schema:records:pool.rule:v1#/$defs/conflict"
+        "$ref": "urn:hive:schema:records:pool.rule:v2#/$defs/conflict"
       }
     },
     "excluded": {

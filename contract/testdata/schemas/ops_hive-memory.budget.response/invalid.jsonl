@@ -1,0 +1,2 @@
+{"name":"minimal-missing-budget","base":"minimal.json","edits":[{"op":"remove","path":"/budget"}]}
+{"name":"minimal-unknown","base":"minimal.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}
