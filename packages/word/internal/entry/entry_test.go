@@ -84,14 +84,18 @@ func TestTheExecutableAgreesWithTheDeclaration(t *testing.T) {
 	}
 }
 
-// built are the operations that persist through one handoff to the Pool; the
-// others are declared and not built yet.
-var built = []string{"hold", "revise", "answer", "release", "complete", "close"}
+// built are the operations that persist through one handoff to the Pool, and
+// readOnly the operations that read it; any other is declared and not built
+// yet.
+var (
+	built    = []string{"hold", "revise", "answer", "release", "complete", "close"}
+	readOnly = []string{"verify"}
+)
 
 // Every command name, as the executable is started under it, answers
 // capabilities for that command and no other. The six handoffs are supported
 // mutating operations that call hive-pool and write no receipt of their own;
-// the rest are unsupported.
+// verify is supported, read-only and calls hive-pool; the rest are unsupported.
 func TestEachNameAnswersCapabilities(t *testing.T) {
 	for _, c := range Executable().Commands {
 		out, exit := invoke(t, "/some/bin/"+c.Name, nil, "capabilities")
@@ -112,6 +116,12 @@ func TestEachNameAnswersCapabilities(t *testing.T) {
 		for _, op := range caps.Operations {
 			if slices.Contains(built, op.Name) {
 				if op.State != envelope.Supported || !op.Mutates || !slices.Equal(op.Calls, []string{"hive-pool"}) || len(op.ReceiptKinds) != 0 || len(op.Executes) != 0 {
+					t.Errorf("%s %s: state %s, mutates %v, calls %v, receipts %v", c.Name, op.Name, op.State, op.Mutates, op.Calls, op.ReceiptKinds)
+				}
+				continue
+			}
+			if slices.Contains(readOnly, op.Name) {
+				if op.State != envelope.Supported || op.Mutates || !slices.Equal(op.Calls, []string{"hive-pool"}) || len(op.ReceiptKinds) != 0 || len(op.Executes) != 0 {
 					t.Errorf("%s %s: state %s, mutates %v, calls %v, receipts %v", c.Name, op.Name, op.State, op.Mutates, op.Calls, op.ReceiptKinds)
 				}
 				continue
@@ -170,7 +180,7 @@ func TestAnUnknownOperationExitsTwo(t *testing.T) {
 func TestADeclaredOperationIsRefusedAndWritesNothing(t *testing.T) {
 	for _, c := range Executable().Commands {
 		for _, op := range c.Operations {
-			if slices.Contains(built, op.Name) {
+			if slices.Contains(built, op.Name) || slices.Contains(readOnly, op.Name) {
 				continue
 			}
 			home := t.TempDir()
