@@ -74,7 +74,6 @@ func (c *Call) SendHandoff(h Handoff) (*envelope.Response, error) {
 	case c.handoffs > 0:
 		return nil, fmt.Errorf("cli: a request is handed off exactly once")
 	}
-	c.handoffs++
 	issued, err := c.Stamp()
 	if err != nil {
 		return nil, err
@@ -101,6 +100,7 @@ func (c *Call) SendHandoff(h Handoff) (*envelope.Response, error) {
 	unknown := func(why error) error {
 		return envelope.Common(envelope.CodeOutcomeUnknown, handoffUnknownMessage).Because(why)
 	}
+	c.handoffs++
 	output, exit, err := callee.Send(c, data)
 	if err != nil {
 		return nil, unknown(err)
@@ -164,6 +164,9 @@ func (e *Executable) handleStoreless(call *Call, digest string, fail func(*envel
 	}
 
 	res, err := e.run(call)
+	if err == nil && (call.handed == nil || call.handed.Status != envelope.Ok || len(res.Records)+len(res.Receipts)+len(res.Events) > 0) {
+		err = envelope.Common(envelope.CodeInternal, "a mutating operation of a command with no store ends ok by handing off, exactly once")
+	}
 	if err != nil {
 		f := failureOf(err)
 		if f == call.handedFailure && f != nil {
@@ -172,23 +175,19 @@ func (e *Executable) handleStoreless(call *Call, digest string, fail func(*envel
 			resp.Replayed = call.handed.Replayed
 			return e.sizeHanded(call, resp, false)
 		}
-		if len(f.Receipts) > 0 {
-			return fail(envelope.Common(envelope.CodeInternal, "a command with no store writes no receipt of its own"))
-		}
 		if call.handed != nil && call.handed.Status == envelope.Ok && adaptedFailure(f) {
 			return e.handedAdapted(call, f, call.handed, call.handed.Replayed, fail)
 		}
 		if call.calleeMayHold() {
 			// The callee may hold the request, and the command cannot answer it.
-			return e.handedUnknown(call, call.handed.Receipts)
+			resp := e.handedUnknown(call, call.handed)
+			resp.Diagnostic = f.Detail()
+			return resp
+		}
+		if len(f.Receipts) > 0 {
+			return fail(envelope.Common(envelope.CodeInternal, "a command with no store writes no receipt of its own"))
 		}
 		return e.sizeHanded(call, fail(f), false)
-	}
-	switch {
-	case call.handed == nil || call.handed.Status != envelope.Ok || call.handoffs != 1:
-		return fail(envelope.Common(envelope.CodeInternal, "a mutating operation of a command with no store ends ok by handing off, exactly once"))
-	case len(res.Records)+len(res.Receipts)+len(res.Events) > 0:
-		return e.handedUnknown(call, call.handed.Receipts)
 	}
 	resp := &envelope.Response{
 		RequestID: req.RequestID, Command: c.Name, Operation: op.Name, Status: envelope.Ok, Responder: e.responder(c),
@@ -222,7 +221,7 @@ func (e *Executable) replayHanded(call *Call, callee *envelope.Response, fail fu
 		return e.handedAdapted(call, f, callee, true, fail)
 	}
 	if err != nil {
-		return e.handedUnknown(call, callee.Receipts)
+		return e.handedUnknown(call, callee)
 	}
 	resp := &envelope.Response{
 		RequestID: req.RequestID, Command: c.Name, Operation: op.Name, Status: envelope.Ok, Responder: e.responder(c),
@@ -232,10 +231,10 @@ func (e *Executable) replayHanded(call *Call, callee *envelope.Response, fail fu
 }
 
 // adaptedFailure reports whether f is an answer an operation adapts its
-// callee's ok outcome to in place of a body: a refusal or a hold, the statuses
-// that leave a record, with no receipt of its own.
+// callee's ok outcome to in place of a body: a hold, with no receipt of its
+// own.
 func adaptedFailure(f *envelope.Failure) bool {
-	return f != nil && len(f.Receipts) == 0 && (f.Status == envelope.Refused || f.Status == envelope.Held)
+	return f != nil && len(f.Receipts) == 0 && f.Status == envelope.Held
 }
 
 // handedAdapted is the answer the operation adapted the callee's ok outcome
@@ -276,19 +275,21 @@ func (e *Executable) adapt(call *Call, callee *envelope.Response) (map[string]an
 	return body, nil
 }
 
-// calleeMayHold reports whether the callee may hold the request after the
-// handoff: it answered ok, answered unknown, or left receipts of it.
+// calleeMayHold reports whether the callee may hold the request once the
+// handoff is sent: it gave no accepted answer, answered ok, answered unknown,
+// or left receipts of it.
 func (call *Call) calleeMayHold() bool {
 	h := call.handed
-	return h != nil && (h.Status == envelope.Ok || h.Status == envelope.Unknown || len(h.Receipts) > 0)
+	return call.handoffs > 0 && (h == nil || h.Status == envelope.Ok || h.Status == envelope.Unknown || len(h.Receipts) > 0)
 }
 
 // sizeHanded checks that the response can be written whole. A response that
 // cannot is too_large only while nothing of the request can be durable: the
-// callee's recorded outcome, an ok, an unknown, or any receipts make it
-// outcome_unknown instead, with the receipts where they fit, since too_large
-// would promise that nothing changed. The answer says the transaction is
-// complete only for an ok or a recorded outcome.
+// callee's recorded outcome, an ok, an unknown, any receipts or a callee that
+// may hold the request make it outcome_unknown instead, with the receipts
+// where they fit, since too_large would promise that nothing changed. The
+// answer says the transaction is complete only for an ok or a recorded
+// outcome.
 func (e *Executable) sizeHanded(call *Call, resp *envelope.Response, recorded bool) *envelope.Response {
 	bad := e.preflight(call.Command, resp)
 	complete := recorded || resp.Status == envelope.Ok
@@ -297,21 +298,25 @@ func (e *Executable) sizeHanded(call *Call, resp *envelope.Response, recorded bo
 		return resp
 	case complete:
 		return e.unknownHanded(call, resp.Receipts, oversizeReplayMessage)
-	case resp.Status == envelope.Unknown || len(resp.Receipts) > 0:
+	case resp.Status == envelope.Unknown || len(resp.Receipts) > 0 || call.calleeMayHold():
 		return e.unknownHanded(call, resp.Receipts, handoffUnknownMessage)
 	}
 	return bad
 }
 
 // handedUnknown is the answer of a request the callee may hold and the
-// command cannot answer: unknown with the callee's receipts where they fit,
-// retried by sending the same request again, which replays or reads it.
-func (e *Executable) handedUnknown(call *Call, receipts []envelope.Receipt) *envelope.Response {
+// command cannot answer, after the callee's answer: unknown with its receipts
+// where they fit, retried by sending the same request again, which replays or
+// reads it. No accepted answer, or an unknown one, is the handoff's unknown.
+func (e *Executable) handedUnknown(call *Call, callee *envelope.Response) *envelope.Response {
+	if callee == nil {
+		return e.unknownHanded(call, nil, handoffUnknownMessage)
+	}
 	message := handedMessage
-	if call.handed != nil && call.handed.Status == envelope.Unknown {
+	if callee.Status == envelope.Unknown {
 		message = handoffUnknownMessage
 	}
-	return e.unknownHanded(call, receipts, message)
+	return e.unknownHanded(call, callee.Receipts, message)
 }
 
 // unknownHanded is the unknown answer with the message and the receipts where

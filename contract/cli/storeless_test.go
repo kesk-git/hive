@@ -51,7 +51,7 @@ func newWordy(t testing.TB, h *harness, adapter Callee) *wordy {
 		switch {
 		case strings.HasPrefix(name, "refuse"):
 			operation, callee = "refuse", "record it"
-		case name == "unreconciled":
+		case name == "unreconciled" || name == "denied":
 			callee = name
 		}
 		command := "hive-fleet"
@@ -74,12 +74,16 @@ func newWordy(t testing.TB, h *harness, adapter Callee) *wordy {
 		return &Result{Body: body}, nil
 	}
 	// adapt answers an outcome the callee wrote as unreconciled as held, as
-	// word adapts an answer the Pool could not reconcile.
+	// word adapts an answer the Pool could not reconcile, and one it wrote as
+	// denied as refused, which no operation may.
 	adapt := func(c *Call, callee *envelope.Response) (map[string]any, error) {
-		if callee.Body["wrote"] == "unreconciled" {
+		switch callee.Body["wrote"] {
+		case "unreconciled":
 			f := envelope.Fail(envelope.Held, "word.question_changed", "the question changed before the answer reached it")
 			f.Err.Hold = &envelope.RecordRef{Schema: "word.question", ID: id(ids.Question, 1)}
 			return nil, f
+		case "denied":
+			return nil, envelope.Common(envelope.CodeAuthorityMissing, "no word was given")
 		}
 		return map[string]any{"adapted": true, "callee": callee.Body}, nil
 	}
@@ -242,35 +246,46 @@ func TestARecordedOutcomeIsReplayedBeforeAnythingElse(t *testing.T) {
 
 // An operation may adapt the callee's ok outcome to a hold in place of a body:
 // the hold is answered with the callee's receipts, and its retry is the same
-// hold, replayed from the callee's recorded outcome.
+// hold, replayed from the callee's recorded outcome. An adaptation to any
+// other status would promise that nothing changed, and leaves the request
+// unknown with the callee's receipts.
 func TestAnOutcomeAdaptedToAHoldKeepsTheCalleesReceipts(t *testing.T) {
 	h := newHarness(t)
 	h.exe.Handoffs = []string{"word"}
 	adapter := &inProcess{exe: h.exe}
 	w := newWordy(t, h, adapter)
 	home := newHome(t)
-	req := sayRequest(t, "say", 1, "unreconciled")
 
-	first := w.send(t, home, "say", req)
-	expect(t, first, envelope.Held, "word.question_changed")
-	if first.Replayed || first.Body != nil || first.Error.Hold == nil || first.Error.Hold.Schema != "word.question" {
-		t.Errorf("%+v", first)
-	}
-	if len(first.Receipts) != 1 || first.Receipts[0].Writer.Package != "dispatch" {
-		t.Fatalf("the callee's receipt is not carried in full: %+v", first.Receipts)
-	}
-	runs, sent := w.runs["say"], len(adapter.sent)
+	for i, tc := range []struct {
+		name   string
+		status envelope.Status
+		code   string
+	}{{"unreconciled", envelope.Held, "word.question_changed"}, {"denied", envelope.Unknown, "outcome_unknown"}} {
+		req := sayRequest(t, "say", i+1, tc.name)
+		first := w.send(t, home, "say", req)
+		expect(t, first, tc.status, tc.code)
+		if first.Replayed || first.Body != nil {
+			t.Errorf("%s: %+v", tc.name, first)
+		}
+		if tc.status == envelope.Held && (first.Error.Hold == nil || first.Error.Hold.Schema != "word.question") {
+			t.Errorf("%s: the hold is lost: %+v", tc.name, first.Error)
+		}
+		if len(first.Receipts) != 1 || first.Receipts[0].Writer.Package != "dispatch" {
+			t.Fatalf("%s: the callee's receipt is not carried in full: %+v", tc.name, first.Receipts)
+		}
+		runs, sent := w.runs["say"], len(adapter.sent)
 
-	again := w.send(t, home, "say", req)
-	expect(t, again, envelope.Held, "word.question_changed")
-	if !again.Replayed || again.Error.Hold == nil || again.Error.Hold.ID != first.Error.Hold.ID {
-		t.Errorf("%+v", again)
-	}
-	if len(again.Receipts) != 1 || again.Receipts[0].ReceiptID != first.Receipts[0].ReceiptID {
-		t.Errorf("receipts %+v, want %+v", again.Receipts, first.Receipts)
-	}
-	if w.runs["say"] != runs || len(adapter.sent) != sent {
-		t.Errorf("the replay ran the handler %d times and sent %d handoffs", w.runs["say"]-runs, len(adapter.sent)-sent)
+		again := w.send(t, home, "say", req)
+		expect(t, again, tc.status, tc.code)
+		if tc.status == envelope.Held && (!again.Replayed || again.Error.Hold == nil || again.Error.Hold.ID != first.Error.Hold.ID) {
+			t.Errorf("%s: %+v", tc.name, again)
+		}
+		if len(again.Receipts) != 1 || again.Receipts[0].ReceiptID != first.Receipts[0].ReceiptID {
+			t.Errorf("%s: receipts %+v, want %+v", tc.name, again.Receipts, first.Receipts)
+		}
+		if w.runs["say"] != runs || len(adapter.sent) != sent {
+			t.Errorf("%s: the replay ran the handler %d times and sent %d handoffs", tc.name, w.runs["say"]-runs, len(adapter.sent)-sent)
+		}
 	}
 	absent(t, filepath.Join(home, "word"))
 }
@@ -401,6 +416,7 @@ func TestACalleeThatDoesNotAnswerLeavesTheRequestUnknown(t *testing.T) {
 		receipts int
 	}{
 		{"no response", func([]byte) ([]byte, int, error) { return nil, 0, errors.New("the callee did not start") }, 0},
+		{"a callee that stops after the request is sent", func([]byte) ([]byte, int, error) { panic("the callee stopped") }, 0},
 		{"empty output", func([]byte) ([]byte, int, error) { return nil, 0, nil }, 0},
 		{"output that is not a response", func([]byte) ([]byte, int, error) { return []byte("{}\n"), 0, nil }, 0},
 		{"a status that disagrees with the exit code", func(r []byte) ([]byte, int, error) {

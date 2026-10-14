@@ -112,11 +112,11 @@ type Operation struct {
 	Handle func(*Call) (*Result, error)
 	// Adapt gives the operation's own response body from the response of its
 	// callee: the ok response recorded for the request, when a command with
-	// no store replays it, and the one a handoff returns. It returns a
-	// *envelope.Failure of status refused or held for an outcome the
-	// operation answers with that status in place of a body, which the
-	// harness gives with the callee's receipts. A supported mutating
-	// operation of a storeless executable has it; no other does.
+	// no store replays it, and the one a handoff returns. It returns a held
+	// *envelope.Failure for an outcome the operation answers as held in place
+	// of a body, which the harness gives with the callee's receipts; any
+	// other error leaves the request unknown. A supported mutating operation
+	// of a storeless executable has it; no other does.
 	Adapt func(c *Call, callee *envelope.Response) (map[string]any, error)
 }
 
