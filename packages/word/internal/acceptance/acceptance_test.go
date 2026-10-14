@@ -161,8 +161,9 @@ func request(t testing.TB, command, operation string) []byte {
 }
 
 // notBuilt are the operations declared and not built yet; the others are
-// proved by the tests of the intake.
-var notBuilt = []string{"verify"}
+// proved by the tests of the intake. Every operation the declaration lists is
+// built now.
+var notBuilt []string
 
 // Every command name of the package answers capabilities: exit 0, one
 // complete response with a null request_id, whose body declares the

@@ -1,7 +1,7 @@
 // Package entry describes the word executable: the commands it owns, as the
 // package's declaration lists them. The operations that persist through one
-// handoff to the Pool are built; the others are declared and refused as
-// unsupported until they are.
+// handoff to the Pool are built, and so is verify, which reads the Pool; an
+// operation declared and not built is refused as unsupported until it is.
 package entry
 
 import (
@@ -35,6 +35,8 @@ func Executable() *cli.Executable { return ExecutableWith(intake.Pool{}) }
 // ExecutableWith is the hive-word executable reaching the Pool through the
 // callee given, behind the check of who brings each request.
 func ExecutableWith(callee cli.Callee) *cli.Executable {
+	// verify reads the Pool through the callee, which the guards below hide.
+	reader, _ := callee.(intake.Reader)
 	e := &cli.Executable{
 		Package:   "word",
 		Name:      "hive-word",
@@ -46,8 +48,11 @@ func ExecutableWith(callee cli.Callee) *cli.Executable {
 		cmd := &cli.Command{Name: c.name}
 		for _, name := range c.operations {
 			op := intake.Operation(name)
-			if name == intake.Answer {
+			switch name {
+			case intake.Answer:
 				op = intake.AnswerOperation()
+			case intake.Verify:
+				op = intake.VerifyOperation(reader)
 			}
 			if op == nil {
 				op = unsupported(name)
