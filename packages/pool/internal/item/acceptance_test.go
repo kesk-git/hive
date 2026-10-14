@@ -171,14 +171,28 @@ func same(a, b map[string]string) bool {
 	return true
 }
 
-// unchanged runs f and fails if it changed anything under pool/.
+// unchanged runs f and fails if it changed anything under pool/. A request
+// that answers ok leaves the replay record of its outcome in pool/requests, as
+// every request does; a no-op is held to changing nothing else.
 func (h *home) unchanged(f func()) {
 	h.t.Helper()
-	before := h.files("pool")
+	before := h.records()
 	f()
-	if after := h.files("pool"); !same(before, after) {
+	if after := h.records(); !same(before, after) {
 		h.t.Errorf("the Pool changed: before %v, after %v", sortedKeys(before), sortedKeys(after))
 	}
+}
+
+// records is every file under pool/ but the replay records of requests.
+func (h *home) records() map[string]string {
+	h.t.Helper()
+	out := h.files("pool")
+	for k := range out {
+		if strings.HasPrefix(k, "pool/requests/") {
+			delete(out, k)
+		}
+	}
+	return out
 }
 
 func sortedKeys(m map[string]string) []string {
@@ -429,11 +443,10 @@ func TestEveryTransitionOfTheStateTable(t *testing.T) {
 		}},
 		{"a blocker archived without having been done", envelope.Refused, "pool.blocked", func(h *home) (string, string) {
 			blocker := h.addID(leaf("Blocker"))
+			h.move(blocker, "archived")
 			item := leaf("Blocked")
 			item["deps"] = []any{map[string]any{"type": "blocked-by", "task_id": blocker}}
-			id := h.addID(item)
-			h.move(blocker, "archived")
-			return id, "in-flight"
+			return h.addID(item), "in-flight"
 		}},
 		{"a required specification has none accepted", envelope.Refused, "pool.specification_unaccepted", func(h *home) (string, string) {
 			id := h.addID(leaf("Needs a specification"))
@@ -889,6 +902,30 @@ func TestAddAndUpdateHoldTheHierarchy(t *testing.T) {
 			"remove_deps": []any{map[string]any{"type": "parent", "task_id": otherPrey}},
 			"add_deps":    []any{map[string]any{"type": "parent", "task_id": prey}}}}), envelope.Refused, "pool.hierarchy")
 		refused(t, h.do("update", map[string]any{"task_id": followUp, "patch": map[string]any{"level": "hunt"}}), envelope.Refused, "pool.hierarchy")
+	})
+	t.Run("a Prey moved under an accepted Target loses its definition hold and keeps its definition", func(t *testing.T) {
+		accepted := h.addID(target("An accepted Target"))
+		rec := h.stored("item", accepted)
+		rec["specification_required"], rec["definition"] = true, "accepted"
+		rec["specification"] = map[string]any{"specification_id": mint(t, ids.Spec), "revision": int64(1), "digest": "sha256:" + strings.Repeat("b", 64)}
+		h.plant("item", accepted, rec)
+		needing := leaf("A Prey that needs a specification")
+		needing["specification_required"] = true
+		prey := h.add(needing)
+		active := func() []any {
+			return h.ok(h.do("read", map[string]any{"kind": "hold", "selector": map[string]any{"task_id": prey["task_id"], "active": true}}))["records"].([]any)
+		}
+		if len(active()) != 1 {
+			t.Fatalf("the Prey takes a definition hold: %v", active())
+		}
+		h.ok(h.do("update", map[string]any{"task_id": prey["task_id"], "patch": map[string]any{
+			"add_deps": []any{map[string]any{"type": "parent", "task_id": accepted}}}}))
+		if len(active()) != 0 {
+			t.Errorf("the hold stands after the move: %v", active())
+		}
+		if moved, _ := h.item(prey["task_id"].(string)); moved["definition"] != "needed" {
+			t.Errorf("the move changed the definition state to %v", moved["definition"])
+		}
 	})
 	t.Run("a Prey added beneath a Target takes the definition from it", func(t *testing.T) {
 		needing := target("A Target that needs a specification")
