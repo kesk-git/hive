@@ -1,3 +1,4 @@
+{"name":"minimal-always-class-audience","base":"minimal.json","edits":[{"op":"replace","path":"/audience","value":"class-0"}]}
 {"name":"minimal-bad-audience","base":"minimal.json","edits":[{"op":"replace","path":"/audience","value":"not-allowed"}]}
 {"name":"minimal-bad-tier","base":"minimal.json","edits":[{"op":"replace","path":"/tier","value":"not-allowed"}]}
 {"name":"minimal-missing-audience","base":"minimal.json","edits":[{"op":"remove","path":"/audience"}]}

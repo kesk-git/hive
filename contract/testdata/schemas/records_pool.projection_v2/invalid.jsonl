@@ -18,6 +18,7 @@
 {"name":"class-subject-missing-updated-at","base":"class-subject.json","edits":[{"op":"remove","path":"/updated_at"}]}
 {"name":"class-subject-missing-writer","base":"class-subject.json","edits":[{"op":"remove","path":"/writer"}]}
 {"name":"class-subject-unknown","base":"class-subject.json","edits":[{"op":"add","path":"/unlisted","value":"unexpected"}]}
+{"name":"minimal-always-class-audience","base":"minimal.json","edits":[{"op":"replace","path":"/audience","value":"class-0"}]}
 {"name":"minimal-bad-audience","base":"minimal.json","edits":[{"op":"replace","path":"/audience","value":"not-allowed"}]}
 {"name":"minimal-bad-schema-version","base":"minimal.json","edits":[{"op":"replace","path":"/schema_version","value":"not-allowed"}]}
 {"name":"minimal-bad-tier","base":"minimal.json","edits":[{"op":"replace","path":"/tier","value":"not-allowed"}]}

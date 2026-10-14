@@ -35,21 +35,7 @@
             "$ref": "urn:hive:schema:records:pool.item:v1#/$defs/projection_id"
           },
           "audience": {
-            "enum": [
-              "hive",
-              "fleet",
-              "class-0",
-              "class-1",
-              "class-2",
-              "class-3",
-              "class-4",
-              "class-5",
-              "class-6",
-              "class-7",
-              "reviewer",
-              "fixer",
-              "validation"
-            ]
+            "$ref": "urn:hive:schema:records:pool.rule:v2#/$defs/role"
           },
           "state": {
             "enum": [
@@ -99,8 +85,7 @@
             }
           },
           "max_bytes": {
-            "type": "integer",
-            "minimum": 1
+            "$ref": "urn:hive:schema:records:pool.budget:v1#/properties/projections/items/properties/max_bytes"
           }
         }
       }
@@ -121,8 +106,7 @@
         ],
         "properties": {
           "subject_id": {
-            "type": "string",
-            "pattern": "^subj_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+            "$ref": "urn:hive:schema:records:pool.subject:v1#/$defs/subject_id"
           },
           "independent_misses": {
             "type": "integer",
@@ -131,8 +115,7 @@
           "misses": {
             "type": "array",
             "items": {
-              "type": "string",
-              "pattern": "^miss_[0-7][0-9a-hjkmnp-tv-z]{25}$"
+              "$ref": "urn:hive:schema:records:pool.miss:v1#/properties/miss_id"
             }
           },
           "decision_due": {
