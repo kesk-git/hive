@@ -113,6 +113,36 @@ func (j *Journal) checkEvent(obj map[string]any, data []byte, segment string) er
 	return nil
 }
 
+// checkValues is the journal's no-value check: the fixed list of credential
+// shapes of the schema package applied to every string of the event, values
+// and member names, outside its body against the event schema and inside it
+// against the body schema its kind registers, or with none declared where the
+// kind registers none. A match is a *schema.ShapeError that names the field
+// within the event, the body's as /body/..., and the shape, never the text.
+func (j *Journal) checkValues(obj map[string]any) error {
+	rest := make(map[string]any, len(obj))
+	for k, v := range obj {
+		if k != "body" {
+			rest[k] = v
+		}
+	}
+	if err := j.reg.CheckShapes(eventSchema, rest); err != nil {
+		return err
+	}
+	kind, _ := obj["kind"].(string)
+	kindVersion, _ := obj["kind_version"].(string)
+	major, _, _ := strings.Cut(kindVersion, ".")
+	err := j.reg.CheckShapes(j.bodySchema(kind, major), obj["body"])
+	if errors.Is(err, schema.ErrUnknownSchema) {
+		err = schema.CheckShapes(obj["body"])
+	}
+	var se *schema.ShapeError
+	if errors.As(err, &se) {
+		return se.Under("/body")
+	}
+	return err
+}
+
 // checkRepairEvent checks what makes a repair event the journal's own: the one
 // version of its kind this build knows, and a basis that is the journal's
 // record of the segment the line is in, which its body names too.

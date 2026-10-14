@@ -9,6 +9,31 @@ Owner: the contract library. Proved by `test-contract`.
 - Every record is one **JSON** document in **UTF-8**, with no byte-order mark, ending in a single line feed. Hive writes the same bytes on macOS, Windows and Linux: no carriage return is ever added before a line feed, and nothing translates line endings in either direction.
 - A record is one file. A journal is a file of records, one per line.
 - **Text is kept exactly as written.** Nothing normalizes Unicode, trims, reflows or re-escapes a string that came from the Hive Mind, a worker, a vendor or a forge. A writer that cannot keep a string whole refuses the write. A writer likewise refuses whole, `invalid` with `secret_shape_recognized` and nothing written, a body holding a string of a credential shape on the fixed list the contract library's schema package keeps, as the design's [Secrets](../docs/design.md#secrets-hive-keeps-none) section requires; the refusal names the field and the shape, never the text, and what the list does not recognize is kept exactly. No body holds a value of the secret type, which has no encoding: its JSON and text encodings fail with an error.
+- **The fixed list of credential shapes.** The contract library's schema package keeps the list, fifteen shapes, each named, and it changes only as a contract change, which changes no schema. A shape is a string that is unmistakable by construction. Matching is case-sensitive ASCII, within one string and never across fields, on the string value after ordinary JSON parsing, so the spelling of an escape does not change a match; nothing further is decoded. Member names inside a body are checked as values are. The lengths below include the prefix.
+
+  | Name | Shape | Length | Boundary |
+  | --- | --- | --- | --- |
+  | `github.pat-classic` | `ghp_`, then exactly 36 characters from `[A-Za-z0-9]` | 40 | T |
+  | `github.oauth-access` | `gho_`, then exactly 36 characters from `[A-Za-z0-9]` | 40 | T |
+  | `github.app-user-access` | `ghu_`, then exactly 36 characters from `[A-Za-z0-9]` | 40 | T |
+  | `github.app-installation-opaque` | `ghs_`, then exactly 36 or exactly 255 characters from `[A-Za-z0-9]` | 40 or 259, and no other | T |
+  | `github.app-refresh-scanner40` | `ghr_`, then exactly 36 characters from `[A-Za-z0-9]` | 40 | T |
+  | `github.pat-fine-grained` | `github_pat_`, then exactly 82 characters from `[A-Za-z0-9_]` | 93 | T |
+  | `private-key.pkcs8` | `-----BEGIN PRIVATE KEY-----` | the marker | L |
+  | `private-key.pkcs8-encrypted` | `-----BEGIN ENCRYPTED PRIVATE KEY-----` | the marker | L |
+  | `private-key.rsa` | `-----BEGIN RSA PRIVATE KEY-----` | the marker | L |
+  | `private-key.dsa` | `-----BEGIN DSA PRIVATE KEY-----` | the marker | L |
+  | `private-key.ec` | `-----BEGIN EC PRIVATE KEY-----` | the marker | L |
+  | `private-key.sm2` | `-----BEGIN SM2 PRIVATE KEY-----` | the marker | L |
+  | `private-key.openssh` | `-----BEGIN OPENSSH PRIVATE KEY-----` | the marker | L |
+  | `private-key.openpgp` | `-----BEGIN PGP PRIVATE KEY BLOCK-----` | the marker | L |
+  | `private-key.pgp2-secret` | `-----BEGIN PGP SECRET KEY BLOCK-----` | the marker | L |
+
+  **Boundary T**, a whole ASCII token run: the candidate is preceded by the start of its string or a character outside `[A-Za-z0-9_.-]` and followed by the end of its string or a character outside that set, so a period, hyphen or underscore beside an otherwise matching token prevents a match, and no fixed-length slice is taken from a longer run. **Boundary L**, an exact opening armour line: the marker occupies a whole decoded line, from the start of the string or just after a line feed, to the end of the string, a line feed, or a carriage return followed by a line feed; no indentation, trailing space, extra hyphen or inline prose matches, and the opening line alone suffices.
+
+  A match is refused whole as above. When the match is a member name, or a string beneath a declared field that is not itself a declared field, such as an element of an array of strings or a value in a designated open member, the refusal names the nearest declared field that contains it, or the body root, and never the matching text or an arbitrary member name. A body that holds a shape is refused for it whatever else is wrong with it. Not covered, by design: Anthropic and OpenAI API keys and GitHub's variable-length installation tokens, which publish no exact length; there is no entropy, heuristic, prefix-only or field-name detection, no redaction or rewriting, and no validity or network check. The list is a floor, and what it does not recognize is kept exactly.
+
+  **In force** from contract version 1.31, which is when the list enters the schema package. The owner's validation of a body applies it before the first write, the journal applies it to every event before any append or repair write and says so through `ChecksValues`, and a failure's diagnostic event is written, as [events.md](events.md#diagnostic-events) states.
 - **Numbers are whole.** A record holds no fractional or exponent number and no number outside ±9,007,199,254,740,991. A value that is not whole is written as a string in a form its schema states.
 - **Times** are RFC 3339 in UTC with millisecond precision and a literal `Z`: `2026-10-11T08:00:00.000Z`. A wall-clock time in a declared zone is two fields, the UTC instant and the zone's name.
 - **Digests** are SHA-256, written `sha256:` and 64 lowercase hexadecimal digits. The digest of a file is the digest of its bytes. The digest of a record is the digest of its canonical form. A digest that binds a part of a file, which a later write may extend, says which part and is defined where it is used, as the [events digest](review.md#the-events-digest) of a review round is.

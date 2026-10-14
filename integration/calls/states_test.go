@@ -2,6 +2,9 @@ package calls
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/declare"
@@ -124,8 +127,66 @@ func TestDeclaredCallsExitStatesRepeatAndSize(t *testing.T) {
 				}
 			})
 
-			sameSnapshot(t, "the exit states", before, snapshot(t, home))
+			sameButOneDiagnostic(t, "the exit states", before, snapshot(t, home), home, callee)
 		})
+	}
+}
+
+// sameButOneDiagnostic fails the test unless the home is as it was but for the
+// one diagnostic event the invalid subtest's request makes. That request is
+// bytes that are no request, so no request_id and no correlation_id can be
+// read: spec/events.md (Diagnostic events) keeps the lower-layer detail of the
+// failure in the home's journal as one event of the answering package, with a
+// correlation_id minted for it, the hive scope of the home and the invocation
+// as its basis. Every other change, a second event, an event of another kind
+// and any file outside the journal included, fails as sameSnapshot does.
+func sameButOneDiagnostic(t testing.TB, what string, before, after map[string]string, home string, callee *declare.Package) {
+	t.Helper()
+	rest := func(m map[string]string) map[string]string {
+		out := map[string]string{}
+		for k, v := range m {
+			if !strings.HasPrefix(k, "journal/") {
+				out[k] = v
+			}
+		}
+		return out
+	}
+	sameSnapshot(t, what, rest(before), rest(after))
+	for k := range before {
+		if strings.HasPrefix(k, "journal/") {
+			t.Fatalf("%s found the journal holding %s before it began", what, k)
+		}
+	}
+	var lines [][]byte
+	for k := range after {
+		if !strings.HasPrefix(k, "journal/") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(home, filepath.FromSlash(k)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, l := range bytes.Split(bytes.TrimSuffix(data, []byte("\n")), []byte("\n")) {
+			lines = append(lines, l)
+		}
+	}
+	if len(lines) != 1 {
+		t.Fatalf("%s left %d events in the journal, want exactly the one diagnostic of the invalid request", what, len(lines))
+	}
+	event := parseObject(t, lines[0])
+	source, _ := event["source"].(map[string]any)
+	body, _ := event["body"].(map[string]any)
+	basis, _ := event["basis"].(map[string]any)
+	ref, _ := basis["ref"].(map[string]any)
+	corr, _ := event["correlation_id"].(string)
+	if event["kind"] != callee.Name+".diagnostic.recorded" || source["package"] != callee.Name {
+		t.Errorf("%s: the event is %v of %v, want %s.diagnostic.recorded", what, event["kind"], source, callee.Name)
+	}
+	if body["status"] != "invalid" || body["code"] != "malformed_request" || body["request_id"] != nil || event["causation"] != nil {
+		t.Errorf("%s: the event's body is %v, causation %v; want invalid malformed_request with no request", what, body, event["causation"])
+	}
+	if corr == "" || basis["kind"] != "observation" || ref["schema"] != "hive.invocation" || ref["id"] != corr || event["home_id"] != testHome || event["scope_level"] != "hive" {
+		t.Errorf("%s: the event is not the invocation's, observed, in the hive scope of the home: %v", what, event)
 	}
 }
 

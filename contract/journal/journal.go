@@ -176,11 +176,12 @@ func (j *Journal) path(name string) (string, error) {
 func (j *Journal) Package() string { return j.pkg }
 
 // ChecksValues says whether the journal's own validation of an event applies
-// the no-value check of the design's Secrets section to its body. It does not
-// yet: the fixed list of credential shapes enters the schema package with the
-// first writer of stage 2, and with it this returns true. A writer of free text
+// the no-value check of the design's Secrets section to its body. It does: the
+// fixed list of credential shapes of the schema package is applied to every
+// event, in its values and its member names, before the journal's lock is
+// taken or any line, repair line included, is written. A writer of free text
 // appends it only through a journal that says so.
-func (j *Journal) ChecksValues() bool { return false }
+func (j *Journal) ChecksValues() bool { return true }
 
 // Opener is the function that opens the journal of a home for the package pkg,
 // as an executable's Journal configures it.

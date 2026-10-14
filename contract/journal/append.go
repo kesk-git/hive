@@ -31,7 +31,10 @@ type line struct {
 // line with its line feed in one write, flushed before the next, and the
 // directories that hold the segments before it returns. It looks for no
 // earlier line of the event: an event is new until recovery says otherwise.
-// An event that fails its checks is refused before anything is written.
+// An event that fails its checks is refused before anything is written, the
+// no-value check first: an event with a string of a listed credential shape,
+// in a value or a member name, is refused whole with an error wrapping a
+// *schema.ShapeError that names the field and the shape and never the text.
 func (j *Journal) Append(events []store.Event) error { return j.append(events, false) }
 
 // Recover appends events as recovery rolling an intent forward: as Append
@@ -173,6 +176,9 @@ func (j *Journal) prepare(e store.Event, homeID string) (map[string]any, error) 
 	if !ok {
 		return nil, fmt.Errorf("%w: %s: an event is a JSON object", ErrEvent, e.ID)
 	}
+	if err := j.checkValues(obj); err != nil {
+		return nil, fmt.Errorf("%w: %s: %w", ErrEvent, e.ID, err)
+	}
 	if obj["event_id"] != e.ID {
 		return nil, fmt.Errorf("%w: %s: the content carries another event_id", ErrEvent, e.ID)
 	}
@@ -226,6 +232,9 @@ func (j *Journal) repairLine(st *state, stamp, homeID, correlation string) (*lin
 	}
 	data, err := canon.Encode(obj)
 	if err != nil {
+		return nil, fmt.Errorf("journal: repair event: %w", err)
+	}
+	if err := j.checkValues(obj); err != nil {
 		return nil, fmt.Errorf("journal: repair event: %w", err)
 	}
 	if err := j.checkEvent(obj, data, st.cur.name); err != nil {

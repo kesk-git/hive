@@ -28,8 +28,11 @@ type valueChecker interface{ ChecksValues() bool }
 // invocation that holds some beyond its message: a lower-layer error chain or a
 // panic (spec/commands.md, Invocation). req is the request where it was read.
 //
-// No free text is kept before the no-value check is in force: the event is
-// appended only through a journal that says its validation applies that check.
+// The event is appended only through a journal that says its validation
+// applies the no-value check, and a diagnostic with a string of a listed
+// credential shape in its chain or stack, whole before it was clipped, is
+// dropped before the append, since the clip can cut a credential into a
+// fragment that no longer matches.
 // Nothing is written for an ok response, a replayed one or a failure whose
 // message says everything, and nothing where the executable gives no journal,
 // dir is not a directory whose home record reads, the journal does not open or
@@ -38,7 +41,7 @@ type valueChecker interface{ ChecksValues() bool }
 // included, changes nothing: the detail is dropped whole, and the response, its
 // status, its exit code and standard error stand.
 func (e *Executable) diagnose(dir string, req *envelope.Request, resp *envelope.Response) {
-	if e.Journal == nil || dir == "" || resp.Status == envelope.Ok || resp.Error == nil || resp.Replayed || resp.Diagnostic.Empty() {
+	if e.Journal == nil || dir == "" || resp.Status == envelope.Ok || resp.Error == nil || resp.Replayed || resp.Diagnostic.Empty() || resp.Diagnostic.Shaped {
 		return
 	}
 	home, err := store.CheckHome(dir)
