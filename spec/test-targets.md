@@ -37,10 +37,6 @@ Every committed schema requires at least one accepted example and one refused ex
 | `ops/hive-memory.propagate.response.v1.schema.json` | stage 2 |
 | `ops/hive-memory.render.request.v1.schema.json` | stage 2 |
 | `ops/hive-memory.render.response.v1.schema.json` | stage 2 |
-| `ops/hive-pool.export-legacy.request.v1.schema.json` | stage 2 |
-| `ops/hive-pool.export-legacy.response.v1.schema.json` | stage 2 |
-| `ops/hive-pool.import-legacy.request.v1.schema.json` | stage 2 |
-| `ops/hive-pool.import-legacy.response.v1.schema.json` | stage 2 |
 | `ops/hive-rule.amend.request.v1.schema.json` | stage 2 |
 | `ops/hive-rule.amend.response.v1.schema.json` | stage 2 |
 | `ops/hive-rule.expire.request.v1.schema.json` | stage 2 |
@@ -55,7 +51,6 @@ Every committed schema requires at least one accepted example and one refused ex
 | `ops/hive-spec.close.response.v1.schema.json` | stage 2 |
 | `ops/hive-spec.define.request.v1.schema.json` | stage 2 |
 | `ops/hive-spec.define.response.v1.schema.json` | stage 2 |
-| `records/pool.migration.v1.schema.json` | stage 2 |
 | `records/pool.projection.v1.schema.json` | stage 2 |
 | `records/pool.rule.v1.schema.json` | stage 2 |
 | `records/pool.specification.v1.schema.json` | stage 2 |
