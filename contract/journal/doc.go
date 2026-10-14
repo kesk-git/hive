@@ -42,8 +42,14 @@
 // journal resolves it for the subject and fact diagnostic.recorded whichever
 // package the kind names, and the body schema of any other kind by its exact
 // name. The journal says, through ChecksValues, whether its own validation
-// applies the no-value check to a body; it does not yet, and a writer of free
-// text, as the diagnostic event is, appends only through a journal that does.
+// applies the no-value check to a body; it does. Before the journal's lock is
+// taken or any line is written, repair lines included, every event is held to
+// the fixed list of credential shapes of the schema package, in its values and
+// its member names, and an event with a string of a listed shape is refused
+// whole with an error that names the field and the shape and never the text.
+// A writer of free text, as the diagnostic event is, appends only through a
+// journal that says so. The check applies to appending alone: a line is read
+// as it was written.
 //
 // Reading takes no lock. A Reader resumes after a cursor, the last
 // home_sequence its consumer handled, validates every line through the

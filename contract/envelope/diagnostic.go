@@ -1,6 +1,10 @@
 package envelope
 
-import "unicode/utf8"
+import (
+	"unicode/utf8"
+
+	"github.com/kesk-git/hive/contract/schema"
+)
 
 // The bounds of a diagnostic (spec/events.md, Kinds): the chain holds at most
 // MaxDiagnosticDetail strings of at most MaxDetailBytes bytes each, and the
@@ -19,6 +23,11 @@ const (
 type Diagnostic struct {
 	Chain []string
 	Stack string
+	// Shaped is true when a string of the chain or the stack, whole and before
+	// it was clipped, held a string of a shape on the fixed list of credential
+	// shapes. Clipping can cut a credential into a fragment that is no longer
+	// a listed shape, so the harness drops a shaped diagnostic whole.
+	Shaped bool
 }
 
 // Empty reports whether the diagnostic holds nothing to record.
@@ -47,10 +56,13 @@ func (d *Diagnostic) add(err error) {
 	if len(d.Chain) >= MaxDiagnosticDetail {
 		return
 	}
-	d.Chain = append(d.Chain, clipBytes(err.Error(), MaxDetailBytes))
+	text := err.Error()
+	d.Shaped = d.Shaped || schema.HoldsShape(text)
+	d.Chain = append(d.Chain, clipBytes(text, MaxDetailBytes))
 	switch e := err.(type) {
 	case *Failure:
 		if e.diagnostic != nil {
+			d.Shaped = d.Shaped || e.diagnostic.Shaped
 			d.Chain = append(d.Chain, e.diagnostic.Chain[:min(len(e.diagnostic.Chain), MaxDiagnosticDetail-len(d.Chain))]...)
 			if d.Stack == "" {
 				d.Stack = e.diagnostic.Stack
@@ -89,7 +101,8 @@ func (f *Failure) Detail() *Diagnostic {
 	if f.diagnostic != nil {
 		return f.diagnostic
 	}
-	return &Diagnostic{Chain: []string{clipBytes(f.Err.Code+": "+f.Err.Message, MaxDetailBytes)}}
+	text := f.Err.Code + ": " + f.Err.Message
+	return &Diagnostic{Chain: []string{clipBytes(text, MaxDetailBytes)}, Shaped: schema.HoldsShape(text)}
 }
 
 // Carry takes the detail of another Failure that this one answers in its
@@ -107,6 +120,7 @@ func (f *Failure) Panicked(stack []byte) *Failure {
 	if f.diagnostic == nil {
 		f.diagnostic = &Diagnostic{}
 	}
+	f.diagnostic.Shaped = f.diagnostic.Shaped || schema.HoldsShape(string(stack))
 	f.diagnostic.Stack = clipBytes(string(stack), MaxStackBytes)
 	return f
 }

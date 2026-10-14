@@ -55,17 +55,17 @@ func TestOtherFactsDoNotBorrowTheDiagnosticSchema(t *testing.T) {
 	}
 }
 
-// The journal landed in stage 1 does not apply the no-value check, and says
-// so; Opener opens it for the package named.
-func TestJournalSaysItDoesNotYetApplyTheNoValueCheck(t *testing.T) {
+// The journal says truthfully that its own validation applies the no-value
+// check; Opener opens it for the package named.
+func TestJournalSaysItAppliesTheNoValueCheck(t *testing.T) {
 	home := newHome(t, false)
 	j, err := Opener("pool")(home)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c, ok := j.(interface{ ChecksValues() bool })
-	if !ok || c.ChecksValues() {
-		t.Errorf("the journal says it applies the check: %v", ok)
+	if !ok || !c.ChecksValues() {
+		t.Errorf("the journal does not say it applies the check: %v", ok)
 	}
 	if jj, _ := j.(*Journal); jj == nil || jj.Package() != "pool" {
 		t.Errorf("journal %v", j)
