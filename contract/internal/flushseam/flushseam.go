@@ -9,9 +9,9 @@
 // TestMain, so that the flush itself is not made; every other step stays.
 //
 // The package is under contract/internal/, so Go lets no package outside
-// contract/ import it, and no delivered executable's own code can select it.
-// Under contract/ the store only reads it, through Skipped, and only test
-// files call Skip and Real.
+// contract/ import it. Test access from outside contract/ is documented by
+// contract/flushtest.
+// The store only reads it, through Skipped.
 package flushseam
 
 // skip is false in every delivered executable, which so makes the real flush.
