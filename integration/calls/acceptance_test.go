@@ -14,10 +14,10 @@ import (
 // TestAcceptanceDeclaredCallCrossesTheCommandLine sends the call that word
 // declares on pool (spec/packages.md, Calls between packages) to the built
 // hive-pool, as a package's code would: a request document in a file, a
-// response read from standard output. hive-pool's open-generation is declared
-// and not built, so the call is proved up to its refusal: a complete response that
-// echoes the request, refused with unsupported_operation, exit code 4, no
-// body, and nothing written in the home.
+// response read from standard output. The request is an incomplete one, so
+// the call is proved up to the refusal of an incomplete request: a complete
+// response that echoes the request, invalid with schema_violation, exit code
+// 3, no body, and nothing written in the home.
 //
 // It catches a call that does not cross the real command line: an
 // executable that is missing from dist/, that answers in a form a caller does
@@ -31,14 +31,14 @@ func TestAcceptanceDeclaredCallCrossesTheCommandLine(t *testing.T) {
 	r := call{program: "hive-pool", operation: "open-generation", home: home, req: req}.run(t)
 	resp := r.must(t)
 
-	if got := r.result.Code; got != 4 {
-		t.Errorf("exit code = %d, want 4 (refused)", got)
+	if got := r.result.Code; got != 3 {
+		t.Errorf("exit code = %d, want 3 (invalid)", got)
 	}
-	if string(resp.Status) != "refused" {
-		t.Errorf("status = %q, want refused", resp.Status)
+	if string(resp.Status) != "invalid" {
+		t.Errorf("status = %q, want invalid", resp.Status)
 	}
-	if resp.Error == nil || resp.Error.Code != "unsupported_operation" {
-		t.Errorf("error = %+v, want code unsupported_operation", resp.Error)
+	if resp.Error == nil || resp.Error.Code != "schema_violation" {
+		t.Errorf("error = %+v, want code schema_violation", resp.Error)
 	}
 	if resp.RequestID != req.id {
 		t.Errorf("request_id = %q, want the request's %q", resp.RequestID, req.id)

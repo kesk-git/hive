@@ -16,6 +16,8 @@ func Register(r *entry.Registry) {
 		operation("add", add, "pool.item.added", "pool.hold.placed"),
 		operation("update", update, "pool.hold.placed", "pool.hold.released"),
 		operation("transition", transition, "pool.item.transitioned"),
+		operation("open-generation", openGeneration, "pool.generation.opened"),
+		operation("close-generation", closeGeneration, "pool.generation.closed"),
 		operation("hold", hold, "pool.hold.placed"),
 		operation("release", release, "pool.hold.released"),
 	} {
