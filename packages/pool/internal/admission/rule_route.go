@@ -16,7 +16,9 @@ import (
 // own sentence recorded as a rule, and clears a sensitive boundary before launch
 // only when its subject names that one boundary, its applying authority is a
 // word that stands at its scope, it is in force when the work is checked, and
-// its scope contains the admission's. Any other rule clears nothing.
+// its scope contains the admission's. A rule narrowed to a task clears only an
+// admission of that task, and one narrowed to a generation clears nothing, since
+// an admission is bound to no generation. Any other rule clears nothing.
 
 // subjectPrefix begins the subject of a rule on a boundary of admission.
 const subjectPrefix = "admission."
@@ -26,8 +28,9 @@ const subjectPrefix = "admission."
 // readable rule of this home has no rule and says why.
 type ruleClaim struct {
 	rule *rule.Rule
-	// scope is the admission's own.
+	// scope is the admission's own, and task the item it concerns.
 	scope envelope.Scope
+	task  string
 	// word is the verdict on the rule's applying authority at the rule's scope.
 	word decision.Standing
 	// unread says why no rule is read, where none is.
@@ -38,7 +41,7 @@ type ruleClaim struct {
 // readable rule of this home gives a claim that clears nothing; only a failing
 // store is an error.
 func readRule(st *cstore.Store, rec *Record, auth envelope.Authority) (*ruleClaim, error) {
-	claim := &ruleClaim{scope: rec.Scope()}
+	claim := &ruleClaim{scope: rec.Scope(), task: rec.TaskID()}
 	ref := auth.Ref
 	if ref == nil || ref.Schema != rule.SchemaRule || ref.ID == "" || ref.RecordRevision <= 0 ||
 		(ref.HomeID != "" && ref.HomeID != claim.scope.HomeID) {
@@ -87,6 +90,10 @@ func (c *ruleClaim) clears(boundary string, at time.Time) string {
 		return "the word the rule was applied by no longer stands"
 	case !inForce(r, at):
 		return "the rule is not in force"
+	case r.Generation != 0:
+		return "the rule is narrowed to a generation and an admission is bound to none"
+	case r.TaskID != "" && r.TaskID != c.task:
+		return "the rule is narrowed to another task"
 	case !contains(r.Scope, c.scope):
 		return "the rule's scope does not contain the admission's"
 	}

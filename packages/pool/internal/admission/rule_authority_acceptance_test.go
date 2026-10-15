@@ -86,6 +86,14 @@ func TestARuleOnEachBoundaryAdmitsWorkThatTouchesIt(t *testing.T) {
 	}
 }
 
+func TestARuleNarrowedToThisTaskClears(t *testing.T) {
+	h := newHome(t)
+	h.work(sensitive("spend"))
+	h.hiveQuestion(t)
+	id := h.admission(request{authority: h.ruleOn(t, "admission.spend", func(r map[string]any) { r["task_id"] = taskID })})
+	wants(t, h, id, h.check(id, map[string]any{}), outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
+}
+
 func TestARuleClearsNothingThatDoesNotMeetTheConditions(t *testing.T) {
 	lifted := func(rule map[string]any) {
 		subject := map[string]any{"schema": "synapse.round", "id": "round_a"}
@@ -129,6 +137,8 @@ func TestARuleClearsNothingThatDoesNotMeetTheConditions(t *testing.T) {
 		"a scope that is another": {"admission.spend", func(r map[string]any) {
 			r["scope_level"], r["workspace_id"], r["project_id"] = "project", workspaceID, "proj_01jc7d8e9f0g1h2j3k4m5n6p7d"
 		}, "scope does not contain"},
+		"another task": {"admission.spend", func(r map[string]any) { r["task_id"] = "task_01jc7d8e9f0g1h2j3k4m5n6p7g" }, "another task"},
+		"a generation":                 {"admission.spend", func(r map[string]any) { r["task_id"], r["generation"] = taskID, int64(1) }, "generation"},
 		"an authority that is no word": {"admission.spend", func(r map[string]any) { r["authority"] = map[string]any{"kind": "none"} }, "not a word"},
 		"a word that no longer stands": {"admission.spend", func(r map[string]any) { r["authority"] = word(1) }, "no longer stands"},
 	} {
