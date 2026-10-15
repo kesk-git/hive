@@ -125,7 +125,7 @@ func TestRetainedStoreNormalization(t *testing.T) {
 // importPath checks that import-legacy does not change its bytes or mtime.
 func retainedStoreImport(t *testing.T, h *home, text string) *imported {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "backlog.md")
+	path := requestPath(t, filepath.Join(t.TempDir(), "backlog.md"))
 	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
 		t.Fatal(err)
 	}
