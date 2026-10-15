@@ -78,7 +78,7 @@ func TestARenderingRecordsWhatItReadAndAnEqualOneWritesNothing(t *testing.T) {
 	a2 := h.rule("always", filing, hiveScope, R{"applies": []any{"hive"}})
 	other := h.subject(hiveScope, "class.3", "A fact of the subject.")
 	sub := h.rule("subject", other, hiveScope, nil)
-	product := fixture(t, "pool.rule", "product-target")
+	product := fixture(t, "pool.rule_v2", "product-target")
 	product["home_id"], product["record_revision"], product["rule_id"] = homeID, int64(1), mint(t, ids.Rule)
 	h.plant("rule", product["rule_id"].(string), product)
 
@@ -284,21 +284,30 @@ func TestCheckReportsSizeDuplicatesAndDrift(t *testing.T) {
 		}
 	})
 
+	// The budget is raised again by the Hive Mind's word, as a change would.
+	b["record_revision"] = b["record_revision"].(int64) + 1
+	for _, v := range b["projections"].([]any) {
+		v.(map[string]any)["max_bytes"] = int64(18432)
+	}
+	h.plant("budget", "memory", b)
+
 	// Two projections of one scope and audience that carry one rule.
+	shared := mint(t, ids.Rule)
 	for i, tier := range []string{"always", "subject"} {
 		rec := fixture(t, "pool.projection_v2", "minimal")
 		rec["projection_id"], rec["home_id"], rec["record_revision"] = "mem_01jc7d8e9f0g1h2j3k4m5n6p7"+string(rune('d'+i)), homeID, int64(1)
-		rec["audience"], rec["tier"], rec["budget_revision"] = "class-5", tier, int64(1)
+		rec["scope_level"], rec["workspace_id"] = "workspace", workspaceID
+		rec["audience"], rec["tier"], rec["budget_revision"] = "fleet", tier, int64(1)
 		if tier == "subject" {
 			rec["subject_id"] = "subj_01jc7d8e9f0g1h2j3k4m5n6p7s"
 		}
 		c := rec["current"].(map[string]any)
 		c["rendering"], c["bytes"] = int64(1), int64(100)
-		c["rules"] = []any{map[string]any{"rule_id": line, "record_revision": int64(1)}}
+		c["rules"] = []any{map[string]any{"rule_id": shared, "record_revision": int64(1)}}
 		h.plant("projection", rec["projection_id"].(string), rec)
 	}
 	m := checked(t, h.check(""), "mem_01jc7d8e9f0g1h2j3k4m5n6p7d")
-	if d := m["duplicates"].([]any); len(d) != 1 || d[0].(map[string]any)["rule_id"] != line || d[0].(map[string]any)["also_in"] != "mem_01jc7d8e9f0g1h2j3k4m5n6p7e" {
+	if d := m["duplicates"].([]any); len(d) != 1 || d[0].(map[string]any)["rule_id"] != shared || d[0].(map[string]any)["also_in"] != "mem_01jc7d8e9f0g1h2j3k4m5n6p7e" {
 		t.Errorf("duplicates %v", m["duplicates"])
 	}
 
@@ -410,6 +419,10 @@ func TestBudgetChangesAreFitCheckedAndReRenderedAtomically(t *testing.T) {
 	})
 
 	before := h.budgetRecord()
+	renderings := map[string]int64{}
+	for _, id := range []string{aid, sid} {
+		renderings[id] = current(h.stored("projection", id))["rendering"].(int64)
+	}
 	resp := change(now+4000, expect())
 	body := h.ok(resp)
 	stored := h.budgetRecord()
@@ -428,7 +441,7 @@ func TestBudgetChangesAreFitCheckedAndReRenderedAtomically(t *testing.T) {
 	}
 	for _, id := range []string{aid, sid} {
 		p := h.stored("projection", id)
-		if p["budget_revision"] != stored["record_revision"] || current(p)["rendering"] != int64(2) {
+		if p["budget_revision"] != stored["record_revision"] || current(p)["rendering"] != renderings[id]+1 {
 			t.Errorf("%s: budget revision %v, rendering %v", id, p["budget_revision"], current(p)["rendering"])
 		}
 		if m := h.freshness(id); m["state"] != "fresh" {

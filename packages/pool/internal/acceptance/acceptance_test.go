@@ -138,6 +138,12 @@ func request(t testing.TB, command, operation string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// An empty body breaks the schema of every built operation but check, whose
+	// members are all optional: an identity that is not one breaks its.
+	body := map[string]any{}
+	if command == "hive-memory" && operation == "check" {
+		body["projection_id"] = "not-a-projection"
+	}
 	out, err := canon.Encode(map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
 		"command": command, "operation": operation, "operation_version": "1.0",
@@ -145,7 +151,7 @@ func request(t testing.TB, command, operation string) []byte {
 		"issued_at": "2026-10-11T08:00:00.000Z", "caller": map[string]any{"kind": "test"},
 		"scope_level": "hive", "home_id": homeID,
 		"authority": map[string]any{"kind": "none"},
-		"body":      map[string]any{},
+		"body":      body,
 	})
 	if err != nil {
 		t.Fatal(err)

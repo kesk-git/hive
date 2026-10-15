@@ -42,7 +42,7 @@ func newPlan(t testing.TB) *plan {
 	}
 	return &plan{t: t, s: s, snap: &memory.Snapshot{
 		Subjects: []*rule.Subject{s},
-		Budget:   memory.Budget{Revision: 2, Entries: map[string]int64{}, Defaults: memory.Defaults{HiveAlways: 1000, FleetAlways: 1000, Subject: 400}},
+		Budget:   memory.Budget{Revision: 2, Entries: map[string]int64{}, Defaults: memory.Defaults{HiveAlways: 1000, FleetAlways: 1000, Subject: 300}},
 	}}
 }
 
@@ -80,11 +80,11 @@ func overBudget(t testing.TB, err error) *envelope.Failure {
 // fits now and not at the instant the rule becomes effective.
 func TestThePlannerRefusesAWriteThatOverflowsAtAFutureBoundary(t *testing.T) {
 	p := newPlan(t)
-	p.snap.Rules = []*rule.Rule{p.rule(hiveScope, 100, nil)}
+	p.snap.Rules = []*rule.Rule{p.rule(hiveScope, 140, nil)}
 	if _, err := p.snap.Plan(start, memory.Write{Rules: []*rule.Rule{p.rule(hiveScope, 10, R{"effective_at": d20})}}); err != nil {
 		t.Fatalf("a small later rule: %v", err)
 	}
-	if _, err := p.snap.Plan(start, memory.Write{Rules: []*rule.Rule{p.rule(hiveScope, 100, R{"effective_at": d20})}}); err == nil {
+	if _, err := p.snap.Plan(start, memory.Write{Rules: []*rule.Rule{p.rule(hiveScope, 140, R{"effective_at": d20})}}); err == nil {
 		t.Fatal("a later rule that overflows at its effective instant was planned")
 	} else {
 		f := overBudget(t, err)
@@ -94,8 +94,8 @@ func TestThePlannerRefusesAWriteThatOverflowsAtAFutureBoundary(t *testing.T) {
 	}
 	// An expiry is a boundary too: the rule that ends at d15 leaves, and a rule
 	// that begins at d15 does not overflow in its place.
-	p.snap.Rules = []*rule.Rule{p.rule(hiveScope, 100, R{"expires_at": d15})}
-	if _, err := p.snap.Plan(start, memory.Write{Rules: []*rule.Rule{p.rule(hiveScope, 100, R{"effective_at": d15})}}); err != nil {
+	p.snap.Rules = []*rule.Rule{p.rule(hiveScope, 140, R{"expires_at": d15})}
+	if _, err := p.snap.Plan(start, memory.Write{Rules: []*rule.Rule{p.rule(hiveScope, 140, R{"effective_at": d15})}}); err != nil {
 		t.Fatalf("a rule that replaces an expiring one at its boundary: %v", err)
 	}
 }
