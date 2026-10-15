@@ -3,6 +3,7 @@ package admission
 import (
 	"fmt"
 
+	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
@@ -18,7 +19,7 @@ import (
 // held. The response status follows: ok, refused with the first finding's code,
 // or held with the hold in error.hold. An earlier check is never changed. A
 // held check places a hold of kind admission; a check that admits releases the
-// holds earlier checks of the admission placed, by its own receipt.
+// holds of kind admission on the item, by its own receipt.
 
 // Check runs the checks against the admission the request names.
 func Check(c *cli.Call) (*cli.Result, error) {
@@ -33,6 +34,11 @@ func Check(c *cli.Call) (*cli.Result, error) {
 	}
 	if err := checkScope(c, rec.Scope()); err != nil {
 		return nil, err
+	}
+	if prior, err := priorResult(c, rec); err != nil {
+		return nil, err
+	} else if prior != nil {
+		return nil, prior
 	}
 	taskID := rec.TaskID()
 
@@ -92,13 +98,54 @@ func Check(c *cli.Call) (*cli.Result, error) {
 	return conclude(c, f, placement, result, reason, findings)
 }
 
+// priorResult is the refusal or the hold an earlier run of this request gave,
+// read from the check it appended, or nil where the request has none. A refused
+// or held check commits as an intent and its outcome is recorded after, so a
+// request sent again after a crash between the two finds its check on the
+// record and answers it, and appends nothing. The receipt of that check is
+// already durable and is not written again.
+func priorResult(c *cli.Call, rec *Record) (*envelope.Failure, error) {
+	for _, v := range list(rec.Data["checks"]) {
+		check := tree(v)
+		if str(check["request_id"]) != c.Request.RequestID {
+			continue
+		}
+		findings := list(check["findings"])
+		message := clip(findingMessage(findings))
+		switch str(check["result"]) {
+		case resultRefused:
+			return envelope.Fail(envelope.Refused, str(tree(findings[0])["code"]), message), nil
+		case resultHeld:
+			l, om, err := poolstore.Load(c.Store, "hold", str(check["hold_id"]))
+			if err != nil || om != nil {
+				return nil, malformed("the hold of an earlier check of this request cannot be read", str(check["hold_id"]))
+			}
+			content, err := canon.Encode(l.Data)
+			if err != nil {
+				return nil, internal("a hold cannot be encoded", err)
+			}
+			digest, err := canon.RecordDigest(content)
+			if err != nil {
+				return nil, internal("a hold cannot be given a digest", err)
+			}
+			return envelope.Hold(envelope.RecordRef{Schema: "pool.hold", ID: l.ID, HomeID: c.Home.HomeID, RecordRevision: l.Revision, Digest: digest}, message), nil
+		}
+	}
+	return nil, nil
+}
+
 // placeChecked is the place the check is about. Of kind requested it is the
 // place the item requests, and the request names no other; of kind resolved it
-// is the place the caller's policy resolved.
+// is the place the caller's policy resolved. A request for codex-cloud, by the
+// item or by the Imperative's Setup, is never substituted: it is the place
+// checked whatever the placement names.
 func placeChecked(f *facts, placement map[string]any) (string, error) {
 	value := str(placement["value"])
 	if placement["kind"] == "requested" && value != f.itemPlace() {
 		return "", envelope.Common(envelope.CodeSchemaViolation, "a placement of kind requested names the place the item requests")
+	}
+	if f.itemPlace() == placeCodexCloud || str(f.section("setup", "placement")["requested"]) == placeCodexCloud {
+		return placeCodexCloud, nil
 	}
 	return value, nil
 }
@@ -227,14 +274,14 @@ func holdFor(b *builder, f *facts, reason, now string, scope envelope.Scope, rec
 	return ref, nil
 }
 
-// releaseHolds releases every active hold of kind admission that earlier checks
-// of this admission placed, by the receipt that admits, with the event that
-// releases a hold on that receipt.
+// releaseHolds releases every active hold of kind admission on the item,
+// whichever admission of the item placed it, by the receipt that admits, with
+// the event that releases a hold on that receipt: an admission of a corrected
+// Imperative obsoletes the holds of the revisions it corrects.
 func releaseHolds(b *builder, f *facts, now, receiptID string, scope envelope.Scope) error {
-	admission := f.rec.Data["admission_id"]
 	scope.TaskID = f.rec.TaskID()
 	for _, h := range f.graph.Holds[f.item.ID] {
-		if h.Kind != "admission" || h.State != "active" || h.Data["admission_id"] != admission {
+		if h.Kind != "admission" || h.State != "active" {
 			continue
 		}
 		next := copyTree(h.Data).(map[string]any)

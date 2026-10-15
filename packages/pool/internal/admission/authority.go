@@ -26,13 +26,22 @@ const (
 )
 
 // authorityStanding says what the record gives a sensitive boundary. A word
-// authority is verified against the Pool's own question record by the rule of
-// spec/word.md, The word stands, at the scope of the admission. A rule
+// authority, whether the approval on the record or the request's own, is
+// verified against the Pool's own question record by the rule of spec/word.md,
+// The word stands, at the scope of the admission, so an approval never
+// outlives a superseding answer. A rule
 // authority is not verified here: the contract names the kind as verifiable
 // and states no rule for it, so it gives nothing until it does.
 func authorityStanding(st *cstore.Store, rec *Record) (standing, error) {
 	if rec.Approved() {
-		return given, nil
+		approval := authorityOf(tree(tree(rec.Data["approval"])["authority"]))
+		verdict, err := decision.WordStands(st, rec.Scope(), approval)
+		if err != nil {
+			return notGiven, err
+		}
+		if verdict.Stands() {
+			return given, nil
+		}
 	}
 	auth := authorityOf(tree(tree(rec.Data["request"])["authority"]))
 	switch auth.Kind {

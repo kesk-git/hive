@@ -9,6 +9,7 @@ import (
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/ids"
 )
 
 // The acceptance test of hive-admit create and check (spec/pool.md, Admission).
@@ -1038,4 +1039,132 @@ func TestARuleReferenceAloneIsHeldUntilApproved(t *testing.T) {
 		t.Fatalf("approve: %s %+v", resp.Status, resp.Error)
 	}
 	wants(t, h, id, h.check(id, map[string]any{}), outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
+}
+
+// An approval is verified when the check reads it, as the request's own word
+// is: an approval whose answer a later answer superseded authorizes nothing.
+func TestAnApprovalDoesNotOutliveASupersedingAnswer(t *testing.T) {
+	h := newHome(t)
+	h.work(sensitive("spend"))
+	h.plant("question", questionID, fixture(t, "pool.question", "answered-superseding"))
+	id := h.admission(none())
+	if resp := h.approve(request{authority: word(3)}, id); resp.Status != envelope.Ok {
+		t.Fatalf("approve: %s %+v", resp.Status, resp.Error)
+	}
+	held := outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"pool.authority_required"}, reason: "authority_required"}
+
+	q := h.stored("question", questionID)
+	answers := q["answers"].([]any)
+	third := copyOf(answers[1]).(map[string]any)
+	third["sequence"], third["record_revision"], third["supersedes"] = int64(3), int64(4), int64(2)
+	third["option_id"], third["option_label"] = "keep-vendor", "Keep the vendor"
+	q["answers"] = append(answers, third)
+	q["applied"] = map[string]any{"answer_sequence": int64(3), "record_revision": int64(4)}
+	q["record_revision"] = int64(4)
+	h.plant("question", questionID, q)
+
+	wants(t, h, id, h.check(id, map[string]any{}), held)
+}
+
+// An admitting check releases every active admission hold on the item, whichever
+// admission placed it: the hold of an admission bound to a revision since
+// corrected is released by the admission of the corrected one.
+func TestAnAdmittingCheckReleasesTheHoldsOfEarlierAdmissionsOfTheItem(t *testing.T) {
+	h := newHome(t)
+	h.work(guess("task", "object"))
+	a := h.admission(none())
+	first := h.check(a, map[string]any{})
+	wants(t, h, a, first, outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"pool.admission_guess"}, reason: "field_guess"})
+	holdID := first.Error.Hold.ID
+
+	imp := h.stored("imperative", taskID)
+	second := copyRevision(imp["revisions"].([]any)[0].(map[string]any), 2)
+	tree(tree(second["task"])["object"])["confidence"] = map[string]any{"level": "high"}
+	imp["revisions"], imp["current_revision"] = append(imp["revisions"].([]any), second), int64(2)
+	h.plant("imperative", taskID, imp)
+
+	resp := h.create(none(), 2)
+	if resp.Status != envelope.Ok {
+		t.Fatalf("create: %s %+v", resp.Status, resp.Error)
+	}
+	b := resp.Body["admission"].(map[string]any)["admission_id"].(string)
+	admit := h.check(b, map[string]any{})
+	wants(t, h, b, admit, outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
+
+	stored := h.stored("hold", holdID)
+	by := tree(stored["released_by"])
+	if stored["state"] != "released" || by["schema"] != "hive.receipt" || by["id"] != admit.Receipts[0].ReceiptID {
+		t.Errorf("the hold of the earlier admission: %v", stored)
+	}
+	h.holdEvents(t, "pool.hold.released", admit.Receipts[0].ReceiptID, 1)
+	if got := h.stored("admission", a)["state"]; got != "held" {
+		t.Errorf("the earlier admission is %v; a check never changes another admission", got)
+	}
+}
+
+// A held or a refused check is committed as an intent and its outcome is
+// recorded after. A request sent again when only the intent is durable answers
+// the first check and appends nothing.
+func TestARequestSentAgainAfterACrashAnswersItsFirstCheck(t *testing.T) {
+	cases := map[string]struct {
+		mods []mod
+		body map[string]any
+		want outcome
+	}{
+		"held": {[]mod{guess("task", "object")}, map[string]any{},
+			outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"pool.admission_guess"}, reason: "field_guess"}},
+		"refused": {[]mod{place("claude-cloud-session"), harness("codex")}, map[string]any{"source_branch": pushed("true")},
+			outcome{status: envelope.Refused, code: "pool.setup_contradiction", result: "refused", findings: []string{"pool.setup_contradiction"}}},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := newHome(t)
+			h.work(tc.mods...)
+			id := h.admission(none())
+			body := map[string]any{"admission_id": id, "placement": requested(tree(tree(h.stored("imperative", taskID)["revisions"].([]any)[0])["setup"])["placement"].(map[string]any)["requested"].(string))}
+			for k, v := range tc.body {
+				body[k] = v
+			}
+			r := none()
+			r.id = mint(t, ids.Request)
+			first := h.send("hive-admit", "check", body, r)
+			wants(t, h, id, first, tc.want)
+			if err := os.Remove(filepath.Join(h.dir, "pool", "requests", r.id+".json")); err != nil {
+				t.Fatalf("the replay record of the request: %v", err)
+			}
+			h.unchanged(func() {
+				again := h.send("hive-admit", "check", body, r)
+				if again.Status != first.Status || again.Error == nil || again.Error.Code != first.Error.Code {
+					t.Fatalf("sent again: status %s, error %+v; first %s %+v", again.Status, again.Error, first.Status, first.Error)
+				}
+				if tc.want.result == "held" && (again.Error.Hold == nil || again.Error.Hold.ID != first.Error.Hold.ID) {
+					t.Errorf("sent again: error.hold %+v; the first named %+v", again.Error.Hold, first.Error.Hold)
+				}
+			})
+			if n := len(h.stored("admission", id)["checks"].([]any)); n != 1 {
+				t.Errorf("%d checks after the request was sent again", n)
+			}
+		})
+	}
+}
+
+// A request for codex-cloud, by the item or by the Imperative's Setup, is
+// refused whatever place the request resolves to: it is never substituted.
+func TestACodexCloudRequestIsNotSubstitutedByAResolvedPlace(t *testing.T) {
+	resolved := map[string]any{"kind": "resolved", "value": "mac",
+		"resolved_by": map[string]any{"schema": "dispatch.resolution", "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7x"}}
+	parked := outcome{status: envelope.Refused, code: "pool.placement_parked", result: "refused", findings: []string{"pool.placement_parked"}}
+	h := newHome(t)
+	h.work(place("codex-cloud"), harness("codex"))
+	id := h.admission(none())
+	wants(t, h, id, h.check(id, map[string]any{"placement": resolved, "source_branch": pushed("true")}), parked)
+
+	h = newHome(t)
+	h.work(func(_, rev map[string]any) { tree(tree(rev["setup"])["placement"])["requested"] = "codex-cloud" })
+	id = h.admission(none())
+	check := wants(t, h, id, h.check(id, map[string]any{"placement": resolved, "source_branch": pushed("true")}), outcome{status: envelope.Refused, code: "pool.imperative_stale",
+		result: "refused", findings: []string{"pool.imperative_stale", "pool.placement_parked"}})
+	if !equalTree(check["placement"], resolved) {
+		t.Errorf("placement %v", check["placement"])
+	}
 }
