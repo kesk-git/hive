@@ -18,6 +18,7 @@ import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/flushtest"
 	"github.com/kesk-git/hive/contract/ids"
 	"github.com/kesk-git/hive/contract/journal"
 	cstore "github.com/kesk-git/hive/contract/store"
@@ -69,6 +70,9 @@ var (
 var scratch string
 
 func TestMain(m *testing.M) {
+	// The proof observes the steps the store reports, all of which stay; the
+	// real flush to the medium is skipped.
+	flushtest.Skip()
 	dir, err := os.MkdirTemp("", "pool-store-proof-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
