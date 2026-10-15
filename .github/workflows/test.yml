@@ -51,7 +51,7 @@ jobs:
             }
           }
           # Include individual test outcomes in the relayed log.
-          $lines += '$env:GOFLAGS = ($env:GOFLAGS + '' -v'').Trim()'
+          $lines += '$env:GOFLAGS = ($env:GOFLAGS + '' -test.v=true'').Trim()'
           $lines += "Set-Location -LiteralPath '" + $env:GITHUB_WORKSPACE.Replace("'", "''") + "'"
           $lines += @'
           & make test *> (Join-Path $PSScriptRoot 'output.log')
