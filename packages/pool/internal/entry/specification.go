@@ -19,10 +19,8 @@ func RegisterSpecification(r *Registry, define, accept, closeSpecification Handl
 		handle   Handler
 		receipts []string
 	}{
-		// define is declared at the contract's version for the complete body,
-		// 1.2, and accepts the two before it: 1.1 added product bindings and
-		// 1.2 touched subjects, both optional members of the one body.
-		{"define", []string{"1.2", "1.1", "1.0"}, define, []string{"pool.specification.defined", "pool.specification.invalidated", "pool.hold.placed"}},
+		// define is declared at the contract's version for the complete body.
+		{"define", []string{"1.2"}, define, []string{"pool.specification.defined", "pool.specification.invalidated", "pool.hold.placed"}},
 		{"accept", []string{"1.0"}, accept, []string{"pool.specification.accepted", "pool.hold.released"}},
 		{"close", []string{"1.0"}, closeSpecification, []string{"pool.specification.closed"}},
 	} {
