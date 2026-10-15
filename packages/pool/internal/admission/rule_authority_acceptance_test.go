@@ -86,12 +86,60 @@ func TestARuleOnEachBoundaryAdmitsWorkThatTouchesIt(t *testing.T) {
 	}
 }
 
-func TestARuleNarrowedToThisTaskClears(t *testing.T) {
+func TestARuleNarrowedToThisTaskClearsNothing(t *testing.T) {
 	h := newHome(t)
 	h.work(sensitive("spend"))
 	h.hiveQuestion(t)
 	id := h.admission(request{authority: h.ruleOn(t, "admission.spend", func(r map[string]any) { r["task_id"] = taskID })})
-	wants(t, h, id, h.check(id, map[string]any{}), outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
+	heldBecause(t, h, id, "not in force")
+}
+
+// extension is an amendment that extends the rule's expiry to the instant
+// given, under the authority given.
+func extension(t *testing.T, to string, auth map[string]any) map[string]any {
+	t.Helper()
+	return map[string]any{
+		"sequence": int64(1), "kind": "extend", "words": "Extended.", "authority": auth, "new_expires_at": to,
+		"recorded_at": "2026-10-14T07:00:00.000Z", "recorded_by": map[string]any{"kind": "test"},
+		"request_id": mint(t, ids.Request), "receipt_id": mint(t, ids.Receipt),
+	}
+}
+
+func TestARuleSupersededByARuleInForceClearsNothing(t *testing.T) {
+	h := newHome(t)
+	h.work(sensitive("spend"))
+	h.hiveQuestion(t)
+	ref := h.ruleOn(t, "admission.spend", nil)
+	later := fixture(t, "pool.rule_v2", "minimal")
+	later["record_revision"], later["home_id"], later["subject"] = int64(1), homeID, "admission.spend"
+	later["rule_id"], later["authority"] = mint(t, ids.Rule), word(3)
+	later["changes"] = map[string]any{"rule_id": ref["ref"].(map[string]any)["id"], "record_revision": int64(1), "relation": "supersedes"}
+	h.plant("rule", later["rule_id"].(string), later)
+	id := h.admission(request{authority: ref})
+	heldBecause(t, h, id, "not in force")
+}
+
+func TestARuleExtendedPastItsExpiry(t *testing.T) {
+	expired := func(extension map[string]any) func(map[string]any) {
+		return func(r map[string]any) {
+			r["expires_at"] = "2026-10-14T08:00:00.000Z"
+			r["amendments"] = []any{extension}
+		}
+	}
+	t.Run("under a word that stands it clears", func(t *testing.T) {
+		h := newHome(t)
+		h.work(sensitive("spend"))
+		h.hiveQuestion(t)
+		id := h.admission(request{authority: h.ruleOn(t, "admission.spend", expired(extension(t, "2026-10-16T08:00:00.000Z", word(3))))})
+		wants(t, h, id, h.check(id, map[string]any{}), outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
+	})
+	t.Run("under an authority that is no word it clears nothing", func(t *testing.T) {
+		h := newHome(t)
+		h.work(sensitive("spend"))
+		h.hiveQuestion(t)
+		id := h.admission(request{authority: h.ruleOn(t, "admission.spend", expired(extension(t, "2026-10-16T08:00:00.000Z", map[string]any{"kind": "none"})))})
+		heldBecause(t, h, id, "extension")
+	})
 }
 
 func TestARuleClearsNothingThatDoesNotMeetTheConditions(t *testing.T) {
@@ -136,9 +184,16 @@ func TestARuleClearsNothingThatDoesNotMeetTheConditions(t *testing.T) {
 		"lifted":            {"admission.spend", lifted, "not in force"},
 		"a scope that is another": {"admission.spend", func(r map[string]any) {
 			r["scope_level"], r["workspace_id"], r["project_id"] = "project", workspaceID, "proj_01jc7d8e9f0g1h2j3k4m5n6p7d"
-		}, "scope does not contain"},
-		"another task":                 {"admission.spend", func(r map[string]any) { r["task_id"] = "task_01jc7d8e9f0g1h2j3k4m5n6p7g" }, "another task"},
-		"a generation":                 {"admission.spend", func(r map[string]any) { r["task_id"], r["generation"] = taskID, int64(1) }, "generation"},
+		}, "not in force"},
+		"another task": {"admission.spend", func(r map[string]any) { r["task_id"] = "task_01jc7d8e9f0g1h2j3k4m5n6p7g" }, "not in force"},
+		"a generation": {"admission.spend", func(r map[string]any) { r["task_id"], r["generation"] = taskID, int64(1) }, "not in force"},
+		"a role":       {"admission.spend", func(r map[string]any) { r["applies"] = []any{"reviewer"} }, "not in force"},
+		"a product rule": {"admission.spend", func(r map[string]any) {
+			r["kind"], r["governs"], r["specifications"] = "product", map[string]any{"target_id": taskID}, []any{}
+			delete(r, "tier")
+			delete(r, "filed_under")
+			delete(r, "rule_line")
+		}, "not in force"},
 		"an authority that is no word": {"admission.spend", func(r map[string]any) { r["authority"] = map[string]any{"kind": "none"} }, "not a word"},
 		"a word that no longer stands": {"admission.spend", func(r map[string]any) { r["authority"] = word(1) }, "no longer stands"},
 	} {
