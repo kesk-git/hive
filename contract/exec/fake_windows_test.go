@@ -38,9 +38,9 @@ func selfKill() {
 
 func fakeIDs() string { return fmt.Sprintf("pid=%d", os.Getpid()) }
 
-// openDescriptors has nothing to list on Windows: the handle a child
+// heldIdentities has nothing to report on Windows: the handle a child
 // inherits is tested by writing to it (see writehandle).
-func openDescriptors() []string { return nil }
+func heldIdentities(want []string) []string { return nil }
 
 func isTerminal(f *os.File) bool {
 	var mode uint32

@@ -26,6 +26,9 @@ import (
 // that the lookup rules find it on all three platforms.
 const fakeFlag = "--fake"
 
+// extraFakes holds the modes a platform's tests add to the fake program.
+var extraFakes = map[string]func(out *os.File, args []string){}
+
 func TestMain(m *testing.M) {
 	if len(os.Args) > 1 && os.Args[1] == fakeFlag {
 		runFake(os.Args[2:])
@@ -50,7 +53,8 @@ func TestMain(m *testing.M) {
 //	            its id once it is ready, and hold ignoring them too
 //	selfkill    end itself with a signal it does not handle
 //	ids         print the process id, group and session
-//	fds         print the descriptors open beyond the standard three
+//	fds         print "fds:" and which of the file identities in the
+//	            arguments the process holds open beyond the standard three
 //	tty         report the terminal, then wait for Control-C
 //	needstty    exit 1 unless standard input is a terminal
 func runFake(args []string) {
@@ -102,7 +106,7 @@ func runFake(args []string) {
 	case "ids":
 		fmt.Fprintln(out, fakeIDs())
 	case "fds":
-		fmt.Fprintln(out, strings.Join(openDescriptors(), " "))
+		fmt.Fprintln(out, strings.TrimSpace("fds: "+strings.Join(heldIdentities(args), " ")))
 	case "tty":
 		fakeTTY(out)
 	case "needstty":
@@ -116,6 +120,10 @@ func runFake(args []string) {
 	case "writehandle":
 		fakeWriteHandle(out, args)
 	default:
+		if f, ok := extraFakes[mode]; ok {
+			f(out, args)
+			return
+		}
 		fmt.Fprintf(os.Stderr, "unknown fake mode %q\n", mode)
 		os.Exit(99)
 	}
