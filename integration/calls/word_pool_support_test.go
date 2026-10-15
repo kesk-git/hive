@@ -1,13 +1,19 @@
 package calls
 
 import (
+	"errors"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/exec"
 	"github.com/kesk-git/hive/contract/ids"
 )
 
@@ -205,12 +211,6 @@ func (f *wpFixture) read(kind, id string) map[string]any {
 func (f *wpFixture) revision(question string) int64 {
 	f.t.Helper()
 	n, _ := f.read("question", question)["record_revision"].(int64)
-	if n == 0 {
-		// A document read back may carry its numbers as float64.
-		if x, ok := f.read("question", question)["record_revision"].(float64); ok {
-			n = int64(x)
-		}
-	}
 	return n
 }
 
@@ -299,4 +299,125 @@ func wpWrite(t testing.TB, home, rel string, data []byte) {
 	if err := os.WriteFile(filepath.Join(home, filepath.FromSlash(rel)), data, 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// holdPoolSource is the Go source of the pass-through hive-pool, which the
+// tests build once and place first on the search path of one hive-word.
+const holdPoolSource = "./integration/calls/holdpool.go"
+
+// goConfig are the Go toolchain's own configuration variables, passed by name
+// to the run of it where they are set; the rest of its environment is built
+// from nothing.
+var goConfig = []string{
+	"CGO_ENABLED", "GOCACHE", "GOENV", "GOEXPERIMENT", "GOFLAGS", "GOINSECURE", "GOMODCACHE",
+	"GONOPROXY", "GONOSUMDB", "GOPATH", "GOPRIVATE", "GOPROXY", "GOROOT", "GOSUMDB",
+	"GOTMPDIR", "GOTOOLCHAIN", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
+}
+
+var holdPool struct {
+	sync.Once
+	path string
+	err  error
+}
+
+// builtHoldPool builds the pass-through hive-pool from its Go source, once for
+// all tests, and returns the path of the executable.
+func builtHoldPool(t testing.TB) string {
+	t.Helper()
+	holdPool.Do(func() {
+		holdPool.path = filepath.Join(workRoot, "holdpool"+suffix())
+		r, err := exec.Start(exec.Spec{
+			Program: exec.Program{Kind: exec.Project, Name: "go"},
+			Args:    []string{"build", "-trimpath", "-o", holdPool.path, holdPoolSource},
+			Dir:     repoRoot(t),
+			Config:  goConfig,
+			Stdout:  exec.Pipe(),
+			Stderr:  exec.Pipe(),
+		})
+		if err != nil {
+			holdPool.err = err
+			return
+		}
+		defer r.Close()
+		var out []byte
+		done := make(chan struct{})
+		go func() { defer close(done); out, _ = io.ReadAll(r.Stderr()) }()
+		go io.Copy(io.Discard, r.Stdout())
+		<-done
+		if res := r.Wait(); !res.Passed() {
+			holdPool.err = errors.New("go build " + holdPoolSource + " " + res.String() + ": " + string(out))
+		}
+	})
+	if holdPool.err != nil {
+		t.Fatal(holdPool.err)
+	}
+	return holdPool.path
+}
+
+// wpHeldHandoff is a hive-word started with a pass-through hive-pool first on
+// its search path alone, which holds the word's handoff to the Pool until the
+// test releases it.
+type wpHeldHandoff struct {
+	t    testing.TB
+	dir  string
+	wait func() reply
+	once sync.Once
+}
+
+// holdHandoff starts the call of hive-word with a pass-through hive-pool
+// placed first on the search path of that one hive-word, and returns at once.
+// Every call the word makes to hive-pool passes through to the real one
+// unchanged, the handoff excepted, which is held.
+func holdHandoff(t testing.TB, c call) *wpHeldHandoff {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "holdpool")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	exe, err := os.ReadFile(builtHoldPool(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "hive-pool"+suffix()), exe, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	h := &wpHeldHandoff{t: t, dir: dir}
+	t.Cleanup(h.release)
+
+	// The environment of the process is read when the word starts, and not
+	// again: no other word started after this one sees the directory.
+	was := os.Getenv("PATH")
+	if err := os.Setenv("PATH", dir+string(os.PathListSeparator)+was); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Setenv("PATH", was)
+	h.wait = c.begin(t)
+	return h
+}
+
+// arrived waits until the held handoff has arrived, and returns the operation
+// of hive-pool it names. The word has read the Pool by then, and the handoff
+// is sent only after its read.
+func (h *wpHeldHandoff) arrived() string {
+	h.t.Helper()
+	for end := time.Now().Add(time.Minute); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+		data, err := os.ReadFile(filepath.Join(h.dir, "arrived"))
+		if err == nil {
+			return string(data)
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			h.t.Fatal(err)
+		}
+	}
+	h.t.Fatal("the word's handoff to the Pool did not arrive")
+	return ""
+}
+
+// release lets the held handoff go on to the real hive-pool.
+func (h *wpHeldHandoff) release() {
+	h.once.Do(func() {
+		if err := os.WriteFile(filepath.Join(h.dir, "release"), nil, 0o600); err != nil {
+			h.t.Error(err)
+		}
+	})
 }

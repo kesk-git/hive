@@ -229,6 +229,15 @@ type ran struct {
 // start runs program with the arguments, to its end, through contract/exec.
 func start(t testing.TB, program string, args []string, in input) ran {
 	t.Helper()
+	return begin(t, program, args, in)()
+}
+
+// begin starts program with the arguments through contract/exec and returns
+// at once, with the function that waits for the run's end and gives what it
+// left. The program is started with the environment of this process as it is
+// when begin returns.
+func begin(t testing.TB, program string, args []string, in input) func() ran {
+	t.Helper()
 	stage(t)
 	spec := exec.Spec{
 		Program: exec.Program{Kind: exec.Hive, Name: program},
@@ -245,7 +254,6 @@ func start(t testing.TB, program string, args []string, in input) ran {
 	if err != nil {
 		t.Fatalf("%s %v: not started: %v", program, args, err)
 	}
-	defer run.Close()
 	var wg sync.WaitGroup
 	var out, errOut []byte
 	wg.Add(2)
@@ -259,8 +267,11 @@ func start(t testing.TB, program string, args []string, in input) ran {
 			run.Stdin().Close()
 		}()
 	}
-	wg.Wait()
-	return ran{result: run.Wait(), stdout: out, stderr: errOut}
+	return func() ran {
+		defer run.Close()
+		wg.Wait()
+		return ran{result: run.Wait(), stdout: out, stderr: errOut}
+	}
 }
 
 // reply is what a caller makes of one call.
@@ -298,6 +309,13 @@ type call struct {
 // output, against the request's identity and the exit code.
 func (c call) run(t testing.TB) reply {
 	t.Helper()
+	return c.begin(t)()
+}
+
+// begin starts the call and returns at once, with the function that waits for
+// its end and reads the response as run does.
+func (c call) begin(t testing.TB) func() reply {
+	t.Helper()
 	dir := t.TempDir()
 	args := []string{c.operation}
 	if c.home != "" {
@@ -321,17 +339,20 @@ func (c call) run(t testing.TB) reply {
 		respPath = filepath.Join(dir, "response.json")
 		args = append(args, "--response-file", respPath)
 	}
-	r := reply{ran: start(t, c.program, args, in)}
-	r.raw = r.stdout
-	if c.responseFile {
-		data, err := os.ReadFile(respPath)
-		if err != nil && !os.IsNotExist(err) {
-			t.Fatal(err)
+	wait := begin(t, c.program, args, in)
+	return func() reply {
+		r := reply{ran: wait()}
+		r.raw = r.stdout
+		if c.responseFile {
+			data, err := os.ReadFile(respPath)
+			if err != nil && !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+			r.raw = data
 		}
-		r.raw = data
+		r.resp, r.failure = r.result.HiveResult(r.raw, c.req.id)
+		return r
 	}
-	r.resp, r.failure = r.result.HiveResult(r.raw, c.req.id)
-	return r
 }
 
 // must fails the test unless the output was accepted as a response.
