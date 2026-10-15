@@ -32,16 +32,32 @@ var scope = envelope.Scope{Level: envelope.ScopeProject, HomeID: homeID, Workspa
 func pool(t testing.TB, question string) *cstore.Store {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "home")
+	// The root is made and secured first, as Hive makes a home, so that every
+	// entry made in it is owner-only and owned by the user.
+	if err := cstore.MakeDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := cstore.SecureDir(dir); err != nil {
+		t.Fatal(err)
+	}
 	put := func(rel string, rec map[string]any) {
 		data, err := canon.Encode(rec)
 		if err != nil {
 			t.Fatal(err)
 		}
 		path := filepath.Join(dir, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		if err := cstore.MakeDir(filepath.Dir(path)); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
+		f, err := cstore.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.Write(append(data, '\n')); err != nil {
+			f.Close()
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}
