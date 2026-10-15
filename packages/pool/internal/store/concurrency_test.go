@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -114,10 +115,16 @@ func conflictOf(resp *envelope.Response) []string {
 // expecting a record the first replaces at the revision it was at. It expects
 // what the first request expects, where that names a record the first
 // replaces, and otherwise the first record the operation replaced. It reports
-// whether the writer replaces a record at all.
+// whether the writer replaces a record at all. Where the request carries a body
+// edit, the second writer prepared another one.
 func stale(p *prepared) (*req, bool) {
 	replaced := p.replaced()
 	b := p.req.again()
+	if p.sc.rival != nil {
+		body := copyOf(b.body).(map[string]any)
+		b.edits = p.sc.rival(body)
+		b.body = body
+	}
 	if len(replaced) == 0 {
 		return b, false
 	}
@@ -136,10 +143,52 @@ func stale(p *prepared) (*req, bool) {
 	return b, true
 }
 
+// unedited reports where the later version of a record does not hold what the
+// first writer wrote: every field of the first, but for the revision and the
+// time and writer of the last edit, is in the later one as it was, a list as
+// its beginning.
+func unedited(first, later any, path string) []string {
+	switch f := first.(type) {
+	case map[string]any:
+		l, ok := later.(map[string]any)
+		if !ok {
+			return []string{path + " is no longer an object"}
+		}
+		var bad []string
+		for k, v := range f {
+			if path == "" && (k == "record_revision" || k == "updated_at" || k == "writer") {
+				continue
+			}
+			lv, ok := l[k]
+			if !ok {
+				bad = append(bad, path+"/"+k+" is lost")
+				continue
+			}
+			bad = append(bad, unedited(v, lv, path+"/"+k)...)
+		}
+		return bad
+	case []any:
+		l, ok := later.([]any)
+		if !ok || len(l) < len(f) {
+			return []string{path + " lost items"}
+		}
+		var bad []string
+		for i := range f {
+			bad = append(bad, unedited(f[i], l[i], fmt.Sprintf("%s/%d", path, i))...)
+		}
+		return bad
+	}
+	if !reflect.DeepEqual(first, later) {
+		return []string{fmt.Sprintf("%s is %v, the first writer wrote %v", path, later, first)}
+	}
+	return nil
+}
+
 // kept checks that the transaction of the first writer stands whole after the
-// second: no record of its intent is older than the intent made it, and the
-// receipts and the outcome are as it wrote them.
-func kept(all map[string][]byte, in *intent) []string {
+// second: every record it wrote is as it wrote it, or at a later revision that
+// holds its words and fields, and the receipts and the outcome are as it wrote
+// them. first is the home as the first writer left it.
+func kept(first, all map[string][]byte, in *intent) []string {
 	var bad []string
 	digest := func(data []byte) string {
 		d, err := canon.RecordDigest(data)
@@ -147,6 +196,13 @@ func kept(all map[string][]byte, in *intent) []string {
 			return err.Error()
 		}
 		return d
+	}
+	parse := func(data []byte) any {
+		v, err := canon.Parse(data)
+		if err != nil {
+			return nil
+		}
+		return v
 	}
 	for _, f := range in.Records {
 		data, ok := all[f.Path]
@@ -157,6 +213,13 @@ func kept(all map[string][]byte, in *intent) []string {
 			bad = append(bad, fmt.Sprintf("record %s is at revision %d; the first writer wrote %d", f.Path, revisionOf(data), f.Expected+1))
 		case revisionOf(data) == f.Expected+1 && digest(data) != f.Digest:
 			bad = append(bad, "record "+f.Path+" is at the revision the first writer wrote and not its words")
+		case revisionOf(data) > f.Expected+1:
+			if digest(first[f.Path]) != f.Digest {
+				bad = append(bad, "record "+f.Path+" was not as the first writer wrote it when the second began")
+			}
+			for _, b := range unedited(parse(first[f.Path]), parse(data), "") {
+				bad = append(bad, "record "+f.Path+": "+b)
+			}
 		}
 	}
 	once := append([]intentFile{}, in.Receipts...)
@@ -168,6 +231,21 @@ func kept(all map[string][]byte, in *intent) []string {
 			bad = append(bad, "lost or changed: "+f.Path)
 		}
 	}
+	return bad
+}
+
+// absent reports the words of the second writer's edit that a record of the
+// Pool holds.
+func absent(all map[string][]byte, words []string) []string {
+	var bad []string
+	for path, data := range poolFiles(all) {
+		for _, w := range words {
+			if strings.Contains(string(data), w) {
+				bad = append(bad, fmt.Sprintf("%s holds %q of the second writer's edit", path, w))
+			}
+		}
+	}
+	slices.Sort(bad)
 	return bad
 }
 
@@ -201,6 +279,7 @@ func TestTwoWritersOfEveryWriterLoseNoUpdate(t *testing.T) {
 				if a.Status != p.clean.resp.Status {
 					t.Errorf("the first writer is answered %s, a clean run %s", a.Status, p.clean.resp.Status)
 				}
+				first := files(h.dir)
 				proceed()
 				r := <-done
 				if r.err != nil {
@@ -214,6 +293,10 @@ func TestTwoWritersOfEveryWriterLoseNoUpdate(t *testing.T) {
 				check(t, "the first writer's transaction", completeOnce(all, events, in))
 				if guarded {
 					check(t, "the second writer", conflictOf(r.run.resp))
+					check(t, "the first writer's words", absent(all, b.edits))
+					if d := differences(first, all); len(d) != 0 {
+						t.Errorf("the second writer changed the home: %v", d)
+					}
 					if got := shapeOf(before, all, p.beforeEv, events); !sameShape(got, p.cleanShape) {
 						t.Errorf("the second writer changed the home: it wrote %s, the first alone %s", got, p.cleanShape)
 					}
@@ -222,10 +305,10 @@ func TestTwoWritersOfEveryWriterLoseNoUpdate(t *testing.T) {
 				// A writer that replaces nothing leaves the second its own records.
 				switch r.run.resp.Status {
 				case envelope.Ok:
-					check(t, "the first writer's transaction", kept(all, in))
-				case envelope.Conflict:
+					check(t, "the first writer's transaction", kept(first, all, in))
+				case envelope.Conflict, envelope.Refused:
 					if got := shapeOf(before, all, p.beforeEv, events); !sameShape(got, p.cleanShape) {
-						t.Errorf("a refused second writer changed the home: %s against %s", got, p.cleanShape)
+						t.Errorf("a second writer that was turned away changed the home: %s against %s", got, p.cleanShape)
 					}
 				default:
 					t.Errorf("the second writer is answered %s %+v", r.run.resp.Status, r.run.resp.Error)
@@ -251,8 +334,12 @@ func TestTwoWritersOfEveryWriterLoseNoUpdate(t *testing.T) {
 					t.Fatal(err)
 				}
 				check(t, "the second writer", conflictOf(r.resp))
+				check(t, "the first writer's words", absent(files(dir), b.edits))
 				if d := differences(mid, files(dir)); len(d) != 0 {
 					t.Errorf("a conflict changed the home: %v", d)
+				}
+				if got := shapeOf(files(p.before), files(dir), p.beforeEv, mustEvents(dir)); !sameShape(got, p.cleanShape) {
+					t.Errorf("the second writer changed the home: the first alone wrote %s, the home shows %s", p.cleanShape, got)
 				}
 			})
 
@@ -270,17 +357,27 @@ func TestTwoWritersOfEveryWriterLoseNoUpdate(t *testing.T) {
 					t.Fatalf("the second writer ended while the first held the lock: %+v, %v", r.run, r.err)
 				}
 				h.finish(t)
+				first := files(h.dir)
 				proceed()
 				r := <-done
 				if r.err != nil {
 					t.Fatal(r.err)
 				}
 				all := files(h.dir)
-				check(t, "the first writer's transaction", kept(all, in))
+				check(t, "the first writer's transaction", kept(first, all, in))
 				check(t, "the home", leftovers(all))
 				events, err := journalEvents(h.dir)
 				if err != nil {
 					t.Fatal(err)
+				}
+				switch r.run.resp.Status {
+				case envelope.Ok:
+				case envelope.Conflict, envelope.Refused:
+					if got := shapeOf(before, all, p.beforeEv, events); !sameShape(got, p.cleanShape) {
+						t.Errorf("a second writer that was turned away changed the home: %s against %s", got, p.cleanShape)
+					}
+				default:
+					t.Errorf("the second writer is answered %s %+v", r.run.resp.Status, r.run.resp.Error)
 				}
 				seen := map[string]int{}
 				for _, e := range events {

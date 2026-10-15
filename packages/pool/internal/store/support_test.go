@@ -131,6 +131,7 @@ type home struct {
 func newHome() *home {
 	h := &home{dir: filepath.Join(newDir(), "home"), clk: clock.NewFake(start)}
 	must(os.Mkdir(h.dir, 0o700))
+	must(cstore.SecureDir(h.dir))
 	h.write("home.json", map[string]any{
 		"schema": "hive.home", "schema_version": "1.0", "record_revision": int64(1),
 		"home_id": homeID, "role": "hive", "name": "A test home", "parent": map[string]any{"kind": "none"},
@@ -219,6 +220,9 @@ type req struct {
 	handoff     bool
 	id          string
 	correlation string
+	// edits are the words of the body edit the request prepares that no other
+	// writer's request carries.
+	edits []string
 }
 
 // bytes is the request as the command reads it. The request_id and the
@@ -331,6 +335,8 @@ func clone(t testing.TB, src string) string {
 	if t != nil {
 		t.Cleanup(func() { os.RemoveAll(filepath.Dir(dst)) })
 	}
+	must(os.MkdirAll(dst, 0o700))
+	must(cstore.SecureDir(dst))
 	must(filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -679,6 +685,10 @@ type scenario struct {
 	// request of a second writer expects; empty takes the first the
 	// operation replaced.
 	stale string
+	// rival, when the request carries a body edit, changes a copy of its body
+	// to another edit of the same record and returns the words that edit adds,
+	// as a second caller prepares it from the revision the first one read.
+	rival func(body map[string]any) []string
 }
 
 // prepared is a scenario seeded once: the home as the request finds it, the
@@ -856,31 +866,37 @@ func completeOnce(all map[string][]byte, evAfter []event, in *intent) []string {
 }
 
 // agrees checks that the receipts and events of a response are on disk and
-// consistent with it: every receipt the response names is a file of the Pool's
-// receipts, and every event of the Pool that is new names, as its basis, a
-// receipt or a record that is there.
+// consistent with it: every receipt the response returns is the receipt of the
+// Pool's receipts file of its identity, whole, and every event of the Pool
+// that is new names, as its basis, a receipt that is there.
 func agrees(all map[string][]byte, resp *envelope.Response, newEvents []event) []string {
 	var bad []string
 	for _, r := range resp.Receipts {
-		if _, ok := all[cstore.ReceiptPath("pool", r.ReceiptID)]; !ok {
+		data, ok := all[cstore.ReceiptPath("pool", r.ReceiptID)]
+		if !ok {
 			bad = append(bad, "the response names receipt "+r.ReceiptID+", which is not on disk")
+			continue
+		}
+		stored, err := envelope.DecodeReceipt(data)
+		if err != nil {
+			bad = append(bad, "receipt "+r.ReceiptID+" on disk does not decode: "+err.Error())
+			continue
+		}
+		have, err1 := r.Encode()
+		want, err2 := stored.Encode()
+		if err1 != nil || err2 != nil {
+			bad = append(bad, fmt.Sprintf("receipt %s does not encode: %v, %v", r.ReceiptID, err1, err2))
+		} else if string(have) != string(want) {
+			bad = append(bad, "the response returns receipt "+r.ReceiptID+" as "+string(have)+", and it is on disk as "+string(want))
 		}
 	}
 	for _, e := range newEvents {
 		ref, _ := e.Basis["ref"].(map[string]any)
 		id, _ := ref["id"].(string)
-		switch kind, _ := e.Basis["kind"].(string); kind {
-		case "receipt":
-			if _, ok := all[cstore.ReceiptPath("pool", id)]; !ok {
-				bad = append(bad, "event "+e.ID+" has the basis receipt "+id+", which is not on disk")
-			}
-		case "record":
-			schema, _ := ref["schema"].(string)
-			if kind, found := strings.CutPrefix(schema, "pool."); found {
-				if _, ok := all["pool/records/"+kind+"/"+id+".json"]; !ok && !strings.Contains(id, "memory") {
-					bad = append(bad, "event "+e.ID+" has the basis record "+id+", which is not on disk")
-				}
-			}
+		if kind, _ := e.Basis["kind"].(string); kind != "receipt" {
+			bad = append(bad, fmt.Sprintf("event %s has the basis %q, not a receipt", e.ID, kind))
+		} else if _, ok := all[cstore.ReceiptPath("pool", id)]; !ok {
+			bad = append(bad, "event "+e.ID+" has the basis receipt "+id+", which is not on disk")
 		}
 	}
 	return bad
@@ -917,6 +933,15 @@ func outcomeOf(dir, request string) (*envelope.Response, error) {
 // The scenarios are the writers of the Pool: every mutating operation the
 // entry registry registers, each with a home that holds what it finds and the
 // request that drives it.
+
+// rivalWords is the edit of a request that sets one field of its body to other
+// words.
+func rivalWords(field, words string) func(map[string]any) []string {
+	return func(body map[string]any) []string {
+		body[field] = words
+		return []string{words}
+	}
+}
 
 func poolReq(op string, body map[string]any, expected ...rev) *req {
 	return &req{command: "hive-pool", op: op, body: body, expected: expected}
@@ -989,6 +1014,10 @@ var itemScenarios = []*scenario{
 	{name: "hive-pool update", command: "hive-pool", op: "update", build: func(h *home) (*req, []string) {
 		id := h.addItem(nil)
 		return poolReq("update", map[string]any{"task_id": id, "patch": map[string]any{"title": "Renamed", "add_body_lines": []any{"one"}}}), []string{itemPath(id)}
+	}, rival: func(body map[string]any) []string {
+		patch := tree(body["patch"])
+		patch["title"], patch["add_body_lines"] = "Renamed by the second caller", []any{"two"}
+		return []string{"Renamed by the second caller", "two"}
 	}},
 	{name: "hive-pool transition", command: "hive-pool", op: "transition", build: func(h *home) (*req, []string) {
 		id := h.addItem(nil)
@@ -1223,7 +1252,7 @@ var ruleScenarios = []*scenario{
 		return ruleReq("record", opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), &req{}),
 			[]string{kindPath("subject", filing), kindPath("budget", "memory")}
 	}},
-	{name: "hive-rule amend", command: "hive-rule", op: "amend", build: func(h *home) (*req, []string) {
+	{name: "hive-rule amend", command: "hive-rule", op: "amend", rival: rivalWords("words", "Extended by the second caller."), build: func(h *home) (*req, []string) {
 		filing := h.seedRules()
 		body := opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms.")
 		body["expires_at"] = d15
@@ -1232,7 +1261,7 @@ var ruleScenarios = []*scenario{
 		return ruleReq("amend", map[string]any{"rule_id": id, "kind": "extend", "words": "Extended by five days.", "new_expires_at": d20},
 			&req{expected: []rev{revOf("pool.rule", id, rule)}}), []string{kindPath("rule", id), kindPath("subject", filing)}
 	}},
-	{name: "hive-rule amend (lift)", command: "hive-rule", op: "amend", build: func(h *home) (*req, []string) {
+	{name: "hive-rule amend (lift)", command: "hive-rule", op: "amend", rival: rivalWords("words", "Lifted by the second caller."), build: func(h *home) (*req, []string) {
 		filing := h.seedRules()
 		body := opRule("dispatch.cap", "always", filing, "Dispatch at most one Swarm until the round closes.")
 		body["lift"] = map[string]any{"receipt_kind": "synapse.round.closed", "subject": map[string]any{"schema": "synapse.round", "id": "round_a"}}
@@ -1504,7 +1533,7 @@ var specificationScenarios = []*scenario{
 		return specReq("define", map[string]any{"title": "A specification", "text": "What the change must satisfy.", "criteria": criteria(), "touched_subjects": []any{}}),
 			[]string{itemPath(target)}
 	}},
-	{name: "hive-spec define (revise)", command: "hive-spec", op: "define", build: func(h *home) (*req, []string) {
+	{name: "hive-spec define (revise)", command: "hive-spec", op: "define", rival: rivalWords("text", "What the second caller says the change must satisfy."), build: func(h *home) (*req, []string) {
 		target := h.needsSpec()
 		spec := h.defineSpec()
 		return specReq("define", map[string]any{"specification_id": spec, "text": "What the change must satisfy, narrowed.", "criteria": criteria(), "touched_subjects": []any{}},
@@ -1748,7 +1777,7 @@ var decisionScenarios = []*scenario{
 		item := h.addItem(nil)
 		return handoff("hold-question", holdQuestionBody(item)), []string{itemPath(item)}
 	}},
-	{name: "hive-pool revise-question", command: "hive-pool", op: "revise-question", build: func(h *home) (*req, []string) {
+	{name: "hive-pool revise-question", command: "hive-pool", op: "revise-question", rival: rivalWords("text", "Which vendor does the second caller want?"), build: func(h *home) (*req, []string) {
 		q := h.raiseQuestion()
 		body := map[string]any{
 			"question_id": q.question, "text": "Which vendor should the integration use after the price rise?",

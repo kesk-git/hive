@@ -48,12 +48,18 @@ func leftovers(all map[string][]byte) []string {
 	return bad
 }
 
-// sameResponse reports how two responses to one request differ, ignoring the
-// time they were completed and whether one is a replay.
+// sameResponse reports how two responses to one request differ, in anything
+// but the time they were completed and whether one is a replay: the request,
+// command, operation and responder, the status, the receipts in full, the body
+// and the error.
 func sameResponse(a, b *envelope.Response) []string {
 	var bad []string
 	if a.Status != b.Status {
 		bad = append(bad, fmt.Sprintf("status %s against %s", a.Status, b.Status))
+	}
+	if a.RequestID != b.RequestID || a.Command != b.Command || a.Operation != b.Operation || a.Responder != b.Responder {
+		bad = append(bad, fmt.Sprintf("request %s %s %s %+v against %s %s %s %+v",
+			a.RequestID, a.Command, a.Operation, a.Responder, b.RequestID, b.Command, b.Operation, b.Responder))
 	}
 	if !reflect.DeepEqual(a.Body, b.Body) {
 		bad = append(bad, fmt.Sprintf("body %v against %v", a.Body, b.Body))
@@ -61,9 +67,8 @@ func sameResponse(a, b *envelope.Response) []string {
 	if !reflect.DeepEqual(a.Error, b.Error) {
 		bad = append(bad, fmt.Sprintf("error %+v against %+v", a.Error, b.Error))
 	}
-	ra, rb := receiptIDs(a), receiptIDs(b)
-	if !slices.Equal(ra, rb) {
-		bad = append(bad, fmt.Sprintf("receipts %v against %v", ra, rb))
+	if !reflect.DeepEqual(a.Receipts, b.Receipts) {
+		bad = append(bad, fmt.Sprintf("receipts %+v against %+v", a.Receipts, b.Receipts))
 	}
 	return bad
 }
@@ -111,7 +116,9 @@ func settled(t *testing.T, p *prepared, before, crashed map[string][]byte, dir s
 		if resp.Replayed {
 			t.Errorf("a request of which nothing was durable is answered as a replay")
 		}
-		check(t, "the response against a clean run", sameResponse(&envelope.Response{Status: resp.Status}, &envelope.Response{Status: p.clean.resp.Status}))
+		if resp.Status != p.clean.resp.Status {
+			t.Errorf("the response is %s, a clean run %s", resp.Status, p.clean.resp.Status)
+		}
 	}
 	got := shapeOf(before, all, p.beforeEv, events)
 	if !sameShape(got, p.cleanShape) {
