@@ -318,26 +318,35 @@ func FuzzParseNeverPanics(f *testing.F) {
 // The prefixes of stage 2 registered so far, all minted by the Pool
 // (spec/pool.md, Identifiers). Each mints and parses, is a row of the identity
 // table, and agrees with its pattern in the shared definitions of
-// records/pool.item, or of records/pool.note for a note.
+// records/pool.item, or of records/pool.note for a note and records/pool.miss for a miss.
 func TestStageTwoPrefixes(t *testing.T) {
-	definitions := func(file string) map[string]struct {
+	type pattern = struct {
 		Pattern string `json:"pattern"`
-	} {
+	}
+	definitions := func(file string) map[string]pattern {
 		data, err := spec.Schemas.ReadFile("schemas/records/" + file)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var doc struct {
-			Defs map[string]struct {
-				Pattern string `json:"pattern"`
-			} `json:"$defs"`
+			Defs       map[string]pattern `json:"$defs"`
+			Properties map[string]pattern `json:"properties"`
 		}
 		if err := json.Unmarshal(data, &doc); err != nil {
 			t.Fatal(err)
 		}
+		// A record's own identity is a property of it; the shared ones are definitions.
+		for k, v := range doc.Properties {
+			if _, shared := doc.Defs[k]; !shared {
+				if doc.Defs == nil {
+					doc.Defs = map[string]pattern{}
+				}
+				doc.Defs[k] = v
+			}
+		}
 		return doc.Defs
 	}
-	item, note := definitions("pool.item.v1.schema.json"), definitions("pool.note.v1.schema.json")
+	item, note, miss := definitions("pool.item.v1.schema.json"), definitions("pool.note.v1.schema.json"), definitions("pool.miss.v1.schema.json")
 	table, err := os.ReadFile("../../spec/identities.md")
 	if err != nil {
 		t.Fatal(err)
@@ -354,6 +363,7 @@ func TestStageTwoPrefixes(t *testing.T) {
 		{"mem", "projection_id"},
 		{"migr", "migration_id"},
 		{"mnote", "note_id"},
+		{"miss", "miss_id"},
 	} {
 		t.Run(string(c.prefix), func(t *testing.T) {
 			if !Registered(c.prefix) {
@@ -373,8 +383,11 @@ func TestStageTwoPrefixes(t *testing.T) {
 				t.Errorf("Check(%q, task) = %v; want ErrWrongPrefix", id, err)
 			}
 			defs := item
-			if c.prefix == Note {
+			switch c.prefix {
+			case Note:
 				defs = note
+			case Miss:
+				defs = miss
 			}
 			pattern := defs[c.def].Pattern
 			if pattern == "" {

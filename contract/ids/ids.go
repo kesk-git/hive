@@ -56,13 +56,14 @@ const (
 	Projection Prefix = "mem"
 	Migration  Prefix = "migr"
 	Note       Prefix = "mnote"
+	Miss       Prefix = "miss"
 )
 
 var registry = []Prefix{
 	Home, Workspace, Project, Clone, Session, Message, Input, Task, Question,
 	DecisionRound, Card, Lease, Review, FeedbackEvent, ReviewNote, Response,
 	Request, Correlation, Receipt, Event, Spoor, Admission, Spec, Rule, Hold,
-	Projection, Migration, Note,
+	Projection, Migration, Note, Miss,
 }
 
 // Prefixes returns the registered prefixes in registration order.
