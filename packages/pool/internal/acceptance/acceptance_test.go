@@ -139,10 +139,15 @@ func request(t testing.TB, command, operation string) []byte {
 		t.Fatal(err)
 	}
 	// An empty body breaks the schema of every built operation but check, whose
-	// members are all optional: an identity that is not one breaks its.
+	// members are all optional: an identity that is not one breaks its. The
+	// body of fold is empty by its contract, so a member it has none of breaks
+	// its.
 	body := map[string]any{}
 	if command == "hive-memory" && operation == "check" {
 		body["projection_id"] = "not-a-projection"
+	}
+	if command == "hive-memory" && operation == "fold" {
+		body["notes"] = []any{}
 	}
 	// Each built operation is sent the version it is declared at.
 	version := "1.0"
@@ -177,15 +182,15 @@ func request(t testing.TB, command, operation string) []byte {
 // complete-question and close-question, and the dry-run import and export of
 // the legacy backlog, hive-admit approve, and the operations define, accept and
 // close of hive-spec, record, amend, expire and resolve of hive-rule, and
-// render, check, propagate, budget and subject of hive-memory, and create,
-// revise, render and deliver of hive-imperative. Every other
+// render, check, propagate, enqueue, fold, budget and subject of hive-memory, and
+// create, revise, render and deliver of hive-imperative. Every other
 // operation of the declaration is declared and refused.
 var built = map[string][]string{
 	"hive-pool":   {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question", "release-question", "complete-question", "close-question", "import-legacy", "export-legacy"},
 	"hive-admit":  {"approve"},
 	"hive-spec":   {"define", "accept", "close"},
 	"hive-rule":   {"record", "amend", "expire", "resolve"},
-	"hive-memory": {"render", "check", "propagate", "budget", "subject"},
+	"hive-memory": {"render", "check", "propagate", "enqueue", "fold", "budget", "subject"},
 
 	"hive-imperative": {"create", "revise", "render", "deliver"},
 }
