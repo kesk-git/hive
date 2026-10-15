@@ -132,12 +132,12 @@ func (c *Call) SendHandoff(h Handoff) (*envelope.Response, error) {
 
 // handoffKey is the digest a callee records as a request's request_digest and
 // compares on a repeat: the causation's, for a handoff, and the request's own
-// otherwise. A request is a handoff when its caller is a package that declares
-// no home path and its causation is a hive.request of its own request_id with
-// a digest.
+// otherwise. A request is a handoff when its caller names a package that
+// declares no home path and the command of that package the executable lists,
+// and its causation is a hive.request of its own request_id with a digest.
 func (e *Executable) handoffKey(req *envelope.Request, own string) string {
 	c := req.Causation
-	if req.Caller.Kind == envelope.CallerPackage && slices.ContainsFunc(e.Handoffs, func(h HandoffCaller) bool { return h.Package == req.Caller.Package }) &&
+	if req.Caller.Kind == envelope.CallerPackage && slices.Contains(e.Handoffs, HandoffCaller{Package: req.Caller.Package, Command: req.Caller.Command}) &&
 		c != nil && c.Schema == envelope.RequestSchema && c.ID == req.RequestID && c.Digest != "" {
 		return c.Digest
 	}
