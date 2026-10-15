@@ -120,13 +120,9 @@ func TestLockFileLeftByACrashIsNotStale(t *testing.T) {
 	home := newHome(t)
 	w, _, pauses := waiting(50 * time.Millisecond)
 	locks := filepath.Join(home, locksDir)
-	if err := os.Mkdir(locks, dirMode); err != nil {
-		t.Fatal(err)
-	}
+	makeDir(t, locks)
 	path := filepath.Join(locks, "pool.lock")
-	if err := os.WriteFile(path, []byte("pid 4242, long gone\n"), fileMode); err != nil {
-		t.Fatal(err)
-	}
+	makeFile(t, path, []byte("pid 4242, long gone\n"))
 	l, err := Acquire(home, "pool", false, w)
 	if err != nil {
 		t.Fatalf("a left-over lock file blocked: %v", err)

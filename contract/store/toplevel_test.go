@@ -277,10 +277,8 @@ func TestClearingTmpTouchesNothingElse(t *testing.T) {
 		t.Helper()
 		for _, rel := range append(slices.Clone(left), kept...) {
 			full := filepath.Join(home, filepath.FromSlash(rel))
-			os.MkdirAll(filepath.Dir(full), dirMode)
-			if err := os.WriteFile(full, []byte("x"), fileMode); err != nil {
-				t.Fatal(err)
-			}
+			makeDir(t, filepath.Dir(full))
+			makeFile(t, full, []byte("x"))
 		}
 	}
 	check := func(t *testing.T, home string, left, kept []string) {

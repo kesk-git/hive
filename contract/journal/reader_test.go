@@ -677,7 +677,7 @@ func TestReaderRefusesAMalformedJournal(t *testing.T) {
 			writeSegment(t, home, SegmentName(2), append(slices.Clone(good[1]), good[2]...))
 		}, store.ErrRecordMalformed, []int64{1}},
 		{"a segment named like one that is not a file", func() {
-			os.Mkdir(filepath.Join(home, journalDir, SegmentName(4)), dirMode)
+			makeDir(t, filepath.Join(home, journalDir, SegmentName(4)))
 		}, store.ErrRecordMalformed, nil},
 	}
 	for _, c := range cases {
@@ -709,7 +709,7 @@ func TestReaderRefusesAMalformedJournal(t *testing.T) {
 	// segment is left alone.
 	restore()
 	writeSegment(t, home, SegmentName(3), append(slices.Clone(good[3]), "{\"torn"...))
-	os.WriteFile(filepath.Join(home, journalDir, "README"), []byte("not a segment\n"), fileMode)
+	access.WriteFile(t, filepath.Join(home, journalDir, "README"), []byte("not a segment\n"))
 	var got []int64
 	for _, e := range readAll(t, j, 0) {
 		got = append(got, e.HomeSequence)

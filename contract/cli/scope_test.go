@@ -2,12 +2,12 @@ package cli
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 	"github.com/kesk-git/hive/contract/store"
 )
 
@@ -27,9 +27,7 @@ func TestRegisteredScopes(t *testing.T) {
 	record(t, dir, "dispatch/registry/projects/"+inRetired+".json", projectRecord(inRetired, retiredWS, homeID, "active"))
 	record(t, dir, "dispatch/registry/projects/"+retired+".json", projectRecord(retired, workspaceID, homeID, "retired"))
 	record(t, dir, "dispatch/registry/projects/"+inParent+".json", projectRecord(inParent, parentWS, homeID, "active"))
-	if err := os.WriteFile(filepath.Join(dir, "dispatch", "registry", "workspaces", "notes.txt"), []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	access.WriteFile(t, filepath.Join(dir, "dispatch", "registry", "workspaces", "notes.txt"), []byte("x"))
 	home, err := store.CheckHome(dir)
 	if err != nil {
 		t.Fatal(err)

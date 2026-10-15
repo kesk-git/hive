@@ -139,17 +139,63 @@ func (s *Store) abs(rel string) string {
 	return filepath.Join(s.Dir, filepath.FromSlash(rel))
 }
 
+// newHome makes an empty home under a temporary directory, which the test
+// removes, as Hive makes one: the directory is made and secured first, so that
+// everything made in it is owner-only and owned by the user.
+func newHome(t testing.TB) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "home")
+	makeDir(t, dir)
+	secureHome(t, dir)
+	return dir
+}
+
+// secureHome makes the home at dir what spec/records.md says a home is: open
+// to its owner only, on Windows by a protected access-control list of the
+// owner alone, which what is made in it inherits.
+func secureHome(t testing.TB, dir string) {
+	t.Helper()
+	if err := SecureDir(dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// makeDir makes the directory at path in a home, and the directories above it
+// that are not there, through the store's own primitive, so that each is
+// owner-only and owned by the user, as Hive makes it.
+func makeDir(t testing.TB, path string) {
+	t.Helper()
+	if err := MakeDir(path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// makeFile puts the file at path in a home, with the content given, through
+// the store's own primitive, so that it is owner-only and owned by the user,
+// as Hive makes it. A file that is there is emptied first; the directory it is
+// in must be there.
+func makeFile(t testing.TB, path string, data []byte) {
+	t.Helper()
+	f, err := CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // write puts a file in a store by hand, as a crash or a stranger would leave
 // it, making the directories it needs.
 func write(t testing.TB, s *Store, rel string, data []byte) {
 	t.Helper()
 	full := s.abs(rel)
-	if err := os.MkdirAll(filepath.Dir(full), dirMode); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(full, data, fileMode); err != nil {
-		t.Fatal(err)
-	}
+	makeDir(t, filepath.Dir(full))
+	makeFile(t, full, data)
 }
 
 // record is the content of a record with the given members, in canonical

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -57,13 +56,7 @@ func record(t testing.TB, dir, rel string, tree map[string]any) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, append(out, '\n'), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	access.WriteFile(t, filepath.Join(dir, filepath.FromSlash(rel)), append(out, '\n'))
 }
 
 func writer() map[string]any {

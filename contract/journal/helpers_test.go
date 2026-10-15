@@ -49,9 +49,7 @@ func newHome(t testing.TB, bare bool) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "home.json"), data, fileMode); err != nil {
-		t.Fatal(err)
-	}
+	access.WriteFile(t, filepath.Join(dir, "home.json"), data)
 	return dir
 }
 
@@ -176,11 +174,14 @@ func segmentBytes(t testing.TB, home, name string) []byte {
 // stranger would leave it.
 func writeSegment(t testing.TB, home, name string, data []byte) {
 	t.Helper()
-	dir := filepath.Join(home, journalDir)
-	if err := os.MkdirAll(dir, dirMode); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, name), data, fileMode); err != nil {
+	access.WriteFile(t, filepath.Join(home, journalDir, name), data)
+}
+
+// makeDir makes the directory at path in a home as Hive does, through the
+// store's own primitive, owned by the user and open to its owner only.
+func makeDir(t testing.TB, path string) {
+	t.Helper()
+	if err := store.MakeDir(path); err != nil {
 		t.Fatal(err)
 	}
 }

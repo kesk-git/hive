@@ -457,13 +457,9 @@ func TestAppendStopsAtAMalformedTail(t *testing.T) {
 	}
 	// An entry that is not a segment is left alone; one named like a segment
 	// that is not a file is not read around.
-	if err := os.WriteFile(filepath.Join(home, journalDir, "notes.txt"), []byte("mine\n"), fileMode); err != nil {
-		t.Fatal(err)
-	}
+	access.WriteFile(t, filepath.Join(home, journalDir, "notes.txt"), []byte("mine\n"))
 	append_(t, j, event(t, "pool", 3))
-	if err := os.Mkdir(filepath.Join(home, journalDir, SegmentName(9)), dirMode); err != nil {
-		t.Fatal(err)
-	}
+	makeDir(t, filepath.Join(home, journalDir, SegmentName(9)))
 	wantErr(t, "a directory named like a segment", j.Append(events(t, "pool", 4, 4)), store.ErrRecordMalformed)
 }
 
@@ -515,9 +511,7 @@ func TestAppendNeedsTheHomeRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(bare, "home.json"), data, fileMode); err != nil {
-		t.Fatal(err)
-	}
+	access.WriteFile(t, filepath.Join(bare, "home.json"), data)
 	other := eventEnvelope("pool", 2)
 	other["home_id"] = id(ids.Home, 9)
 	wantErr(t, "another home", j.Append([]store.Event{encoded(t, other)}), ErrEvent)
