@@ -453,14 +453,19 @@ func (r *renderer) links(title string, data map[string]any) (string, []item.Link
 // is never written back.
 func (r *renderer) hold(id string) (*Hold, error) {
 	for _, h := range r.g.Holds[id] {
+		if _, ok := holdWords[h.Kind]; !ok || !r.g.InForce(h) {
+			continue
+		}
+		if reason, _ := h.Data["reason"].(string); strings.ContainsAny(reason, "()") {
+			return nil, fmt.Errorf("a hold reason containing parentheses cannot be written in a legacy tag")
+		}
+	}
+	for _, h := range r.g.Holds[id] {
 		word, ok := holdWords[h.Kind]
 		if !r.g.InForce(h) || !ok {
 			continue
 		}
 		reason, _ := h.Data["reason"].(string)
-		if strings.ContainsAny(reason, "()") {
-			return nil, fmt.Errorf("a hold reason containing parentheses cannot be written in a legacy tag")
-		}
 		out := Hold{Reason: legacyReason(reason), Kind: word}
 		if until, ok := h.Data["until"].(map[string]any); ok {
 			if _, timed := until["at"]; timed {

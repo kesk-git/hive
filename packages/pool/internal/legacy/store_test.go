@@ -784,3 +784,20 @@ func TestRetainedStoreHoldParenthesesExport(t *testing.T) {
 		}
 	}
 }
+
+// A parenthesized reason is refused whichever of the item's holds the legacy
+// form would have selected.
+func TestRetainedStoreHoldParenthesesExportSecondHold(t *testing.T) {
+	h := newHome(t)
+	im := h.importText("# Backlog\n\n## Queued\n- [ ] held-a - Hold text\n", "UTC")
+	id := im.taskID("held-a")
+	ok(t, h.do("hold", map[string]any{"task_id": id, "kind": "parked", "reason": "wait"}))
+	ok(t, h.do("hold", map[string]any{"task_id": id, "kind": "external", "reason": "wait (blocked)"}))
+	for _, body := range []map[string]any{
+		{"zone": "UTC", "selector": map[string]any{"task_id": id}},
+		{"zone": "UTC", "migration_id": im.migration["migration_id"]},
+		{"zone": "UTC", "migration_id": im.migration["migration_id"], "normalize": true},
+	} {
+		refused(t, h.do("export-legacy", body), envelope.Invalid, "pool.legacy_malformed")
+	}
+}
