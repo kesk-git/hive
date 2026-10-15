@@ -1,6 +1,7 @@
 package decision_test
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -736,24 +737,87 @@ func TestAHandoffSentAgainIsReplayed(t *testing.T) {
 	refused(t, h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id, digest: canon.FileDigest([]byte("another request"))}), envelope.Conflict, envelope.CodeReplayMismatch)
 }
 
+// requestFiles are the outcomes the Pool has recorded of requests, by name,
+// with their bytes.
+func (h *home) requestFiles() map[string]string {
+	h.t.Helper()
+	out := map[string]string{}
+	entries, err := os.ReadDir(filepath.Join(h.dir, "pool", "requests"))
+	if err != nil && !os.IsNotExist(err) {
+		h.t.Fatal(err)
+	}
+	for _, e := range entries {
+		data, err := os.ReadFile(filepath.Join(h.dir, "pool", "requests", e.Name()))
+		if err != nil {
+			h.t.Fatal(err)
+		}
+		out[e.Name()] = string(data)
+	}
+	return out
+}
+
+// untouched runs f and fails if it changed any record or any recorded outcome
+// of a request under pool/.
+func (h *home) untouched(f func()) {
+	h.t.Helper()
+	before := h.requestFiles()
+	h.unchanged(f)
+	if after := h.requestFiles(); !maps.Equal(before, after) {
+		h.t.Errorf("the Pool changed its recorded outcomes: %d before, %d after", len(before), len(after))
+	}
+}
+
+var otherCommandCaller = map[string]any{"kind": "package", "package": "word", "command": "hive-other"}
+
+// A request that names the package word and another command than hive-word is
+// not a handoff, though its causation is its own request: where no outcome is
+// recorded of its request_id it is refused with authority_insufficient, and
+// nothing is written.
+func TestAnotherCommandOfWordWithAFreshRequestIsRefused(t *testing.T) {
+	h := newHome(t)
+	item := h.item()
+	h.untouched(func() {
+		resp := h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{caller: otherCommandCaller})
+		refused(t, resp, envelope.Refused, envelope.CodeAuthorityInsufficient)
+		if resp.Replayed || len(resp.Receipts) != 0 {
+			t.Errorf("replayed %v, receipts %v", resp.Replayed, kinds(resp))
+		}
+	})
+}
+
 // A resend of a recorded handoff's exact request_id and causation under
-// another command of the package is not that handoff: it is not answered from
-// the outcome hive-word's request recorded, and nothing is written. The
-// genuine handoff sent again is still answered from its recorded outcome.
-func TestAResendUnderAnotherCommandIsNotTheHandoff(t *testing.T) {
+// another command of the package is not that handoff: it is keyed on its own
+// digest, which is not the recorded one, so it is a replay_mismatch and is not
+// answered from the outcome hive-word's request recorded, and nothing is
+// written.
+func TestAResendUnderAnotherCommandIsAReplayMismatch(t *testing.T) {
+	h := newHome(t)
+	item := h.item()
+	id := mint(t, ids.Request)
+	h.ok(h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id}))
+	h.untouched(func() {
+		resp := h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id, caller: otherCommandCaller})
+		refused(t, resp, envelope.Conflict, envelope.CodeReplayMismatch)
+		if resp.Replayed || len(resp.Receipts) != 0 {
+			t.Errorf("replayed %v, receipts %v", resp.Replayed, kinds(resp))
+		}
+	})
+}
+
+// The handoff itself, sent again with the identities minted anew, is still
+// answered from the outcome recorded of the first, replayed.
+func TestTheGenuineHandoffResentIsAnsweredFromItsRecordedOutcome(t *testing.T) {
 	h := newHome(t)
 	item := h.item()
 	id := mint(t, ids.Request)
 	first := h.ok(h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id}))
-	h.unchanged(func() {
-		other := map[string]any{"kind": "package", "package": "word", "command": "hive-other"}
-		resp := h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id, caller: other})
-		if resp.Status == envelope.Ok || resp.Replayed || resp.Error == nil || resp.Body != nil {
-			t.Fatalf("status %s, replayed %v, error %+v, with a body: %v", resp.Status, resp.Replayed, resp.Error, resp.Body != nil)
-		}
+	h.untouched(func() {
 		again := h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id})
-		if again.Status != envelope.Ok || !again.Replayed || rec(again.Body, "question")["question_id"] != rec(first, "question")["question_id"] {
-			t.Fatalf("the handoff itself: status %s, replayed %v, error %+v", again.Status, again.Replayed, again.Error)
+		if again.Status != envelope.Ok || !again.Replayed {
+			t.Fatalf("status %s, replayed %v, error %+v", again.Status, again.Replayed, again.Error)
+		}
+		if rec(again.Body, "question")["question_id"] != rec(first, "question")["question_id"] {
+			t.Errorf("the replay gave the identities of the second request")
 		}
 	})
 }
