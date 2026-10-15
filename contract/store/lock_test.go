@@ -137,6 +137,20 @@ func TestLockFileLeftByACrashIsNotStale(t *testing.T) {
 	}
 }
 
+// A home's files can be listed while a command holds a lock: the lock file
+// is listed, on every platform, and the held lock does not stop the listing.
+func TestTreeListsAHeldLockFile(t *testing.T) {
+	home := newHome(t)
+	l, err := Acquire(home, "pool", false, Waiting{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Release()
+	if _, ok := tree(t, home)["locks/pool.lock"]; !ok {
+		t.Errorf("the held lock file is not listed: %v", files(t, home))
+	}
+}
+
 func TestAcquireNamesAndModes(t *testing.T) {
 	home := newHome(t)
 	w, _, _ := waiting(time.Millisecond)
