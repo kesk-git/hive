@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/ids"
 )
 
 // A standing rule clears a sensitive boundary before launch only when it is the
@@ -40,6 +42,16 @@ func (h *home) hiveQuestion(t *testing.T) {
 	h.plant("question", questionID, q)
 }
 
+// heldBecause checks the spend boundary is held on authority_required, with a
+// finding that gives the clause for the rule it did not accept.
+func heldBecause(t *testing.T, h *home, id, clause string) {
+	t.Helper()
+	check := wants(t, h, id, h.check(id, map[string]any{}), heldOn("spend"))
+	if message := check["findings"].([]any)[0].(map[string]any)["message"].(string); !strings.Contains(message, clause) {
+		t.Errorf("the finding %q does not say %q", message, clause)
+	}
+}
+
 func heldOn(boundaries ...string) outcome {
 	findings := []string{}
 	for range boundaries {
@@ -51,7 +63,7 @@ func heldOn(boundaries ...string) outcome {
 func TestARuleOnOneBoundaryClearsThatBoundaryOnly(t *testing.T) {
 	h := newHome(t)
 	h.work(sensitive(boundaries...))
-	h.plant("question", questionID, fixture(t, "pool.question", "answered-superseding"))
+	h.hiveQuestion(t)
 	id := h.admission(request{authority: h.ruleOn(t, "admission.spend", nil)})
 	check := wants(t, h, id, h.check(id, map[string]any{}), heldOn("deletion", "security", "publication"))
 	for i, b := range boundaries[1:] {
@@ -67,7 +79,7 @@ func TestARuleOnEachBoundaryAdmitsWorkThatTouchesIt(t *testing.T) {
 		t.Run(b, func(t *testing.T) {
 			h := newHome(t)
 			h.work(sensitive(b))
-			h.plant("question", questionID, fixture(t, "pool.question", "answered-superseding"))
+			h.hiveQuestion(t)
 			id := h.admission(request{authority: h.ruleOn(t, "admission."+b, nil)})
 			wants(t, h, id, h.check(id, map[string]any{}), outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
 		})
@@ -76,53 +88,72 @@ func TestARuleOnEachBoundaryAdmitsWorkThatTouchesIt(t *testing.T) {
 
 func TestARuleClearsNothingThatDoesNotMeetTheConditions(t *testing.T) {
 	lifted := func(rule map[string]any) {
-		subject := map[string]any{"schema": "pool.question", "id": questionID}
-		rule["lift"] = map[string]any{"receipt_kind": "pool.question.answered", "subject": subject}
+		subject := map[string]any{"schema": "synapse.round", "id": "round_a"}
+		receipt := envelope.Receipt{
+			ReceiptID: mint(t, ids.Receipt), Kind: "synapse.round.closed", KindVersion: "1.0", WrittenAt: "2026-10-14T08:00:00.000Z",
+			Writer:    envelope.Writer{Package: "synapse", Command: "hive-synapse", Operation: "close", ImplementationVersion: "test"},
+			RequestID: mint(t, ids.Request), CorrelationID: mint(t, ids.Correlation),
+			Scope:     envelope.Scope{Level: "hive", HomeID: homeID},
+			Authority: envelope.Authority{Kind: "none"},
+			Subject:   &envelope.RecordRef{Schema: "synapse.round", ID: "round_a", HomeID: homeID, RecordRevision: 3},
+			Evidence:  []envelope.Evidence{}, Body: map[string]any{},
+		}
+		data, err := receipt.Encode()
+		if err != nil {
+			t.Fatal(err)
+		}
+		whole, err := canon.Parse(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rule["lift"] = map[string]any{"receipt_kind": "synapse.round.closed", "subject": subject}
 		rule["amendments"] = []any{map[string]any{
-			"sequence": int64(1), "kind": "lift", "words": "Lifted.", "authority": map[string]any{"kind": "none"},
-			"receipt":     map[string]any{"kind": "pool.question.answered", "subject": subject},
-			"recorded_at": "2026-10-12T08:00:00.000Z", "recorded_by": map[string]any{"kind": "test"},
-			"request_id": "req_01jc7d8e9f0g1h2j3k4m5n6p7y", "receipt_id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7z",
+			"sequence": int64(1), "kind": "lift", "words": "The round closed.", "authority": map[string]any{"kind": "none"},
+			"evidence":    map[string]any{"schema": "pool.receipt", "id": receipt.ReceiptID, "home_id": homeID, "record_revision": int64(1)},
+			"receipt":     whole,
+			"recorded_at": "2026-10-14T08:30:00.000Z", "recorded_by": map[string]any{"kind": "test"},
+			"request_id": mint(t, ids.Request), "receipt_id": mint(t, ids.Receipt),
 		}}
 	}
 	for name, c := range map[string]struct {
 		subject string
 		change  func(rule map[string]any)
+		why     string
 	}{
-		"another subject":   {"example.subject", nil},
-		"another boundary":  {"admission.deletion", nil},
-		"not yet in effect": {"admission.spend", func(r map[string]any) { r["effective_at"] = "2026-10-15T09:00:00.000Z" }},
-		"expired":           {"admission.spend", func(r map[string]any) { r["expires_at"] = "2026-10-14T08:00:00.000Z" }},
-		"ended":             {"admission.spend", func(r map[string]any) { r["status"] = "ended" }},
-		"lifted":            {"admission.spend", lifted},
+		"another subject":   {"example.subject", nil, "subject is not admission.spend"},
+		"another boundary":  {"admission.deletion", nil, "subject is not admission.spend"},
+		"not yet in effect": {"admission.spend", func(r map[string]any) { r["effective_at"] = "2026-10-15T09:00:00.000Z" }, "not in force"},
+		"expired":           {"admission.spend", func(r map[string]any) { r["expires_at"] = "2026-10-14T08:00:00.000Z" }, "not in force"},
+		"ended":             {"admission.spend", func(r map[string]any) { r["status"] = "ended" }, "not in force"},
+		"lifted":            {"admission.spend", lifted, "not in force"},
 		"a scope that is another": {"admission.spend", func(r map[string]any) {
 			r["scope_level"], r["workspace_id"], r["project_id"] = "project", workspaceID, "proj_01jc7d8e9f0g1h2j3k4m5n6p7d"
-		}},
-		"a authority that is no word":  {"admission.spend", func(r map[string]any) { r["authority"] = map[string]any{"kind": "none"} }},
-		"a word that no longer stands": {"admission.spend", func(r map[string]any) { r["authority"] = word(1) }},
+		}, "scope does not contain"},
+		"an authority that is no word": {"admission.spend", func(r map[string]any) { r["authority"] = map[string]any{"kind": "none"} }, "not a word"},
+		"a word that no longer stands": {"admission.spend", func(r map[string]any) { r["authority"] = word(1) }, "no longer stands"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			h := newHome(t)
 			h.work(sensitive("spend"))
 			h.hiveQuestion(t)
 			id := h.admission(request{authority: h.ruleOn(t, c.subject, c.change)})
-			wants(t, h, id, h.check(id, map[string]any{}), heldOn("spend"))
+			heldBecause(t, h, id, c.why)
 		})
 	}
 	t.Run("a reference naming no readable rule", func(t *testing.T) {
 		h := newHome(t)
 		h.work(sensitive("spend"))
-		h.plant("question", questionID, fixture(t, "pool.question", "answered-superseding"))
+		h.hiveQuestion(t)
 		id := h.admission(request{authority: authority("rule", "pool.rule", "rule_01jc7d8e9f0g1h2j3k4m5n6p7e", 1)})
-		wants(t, h, id, h.check(id, map[string]any{}), heldOn("spend"))
+		heldBecause(t, h, id, "names no rule")
 	})
 	t.Run("a reference at a revision beyond the rule's", func(t *testing.T) {
 		h := newHome(t)
 		h.work(sensitive("spend"))
-		h.plant("question", questionID, fixture(t, "pool.question", "answered-superseding"))
+		h.hiveQuestion(t)
 		ref := h.ruleOn(t, "admission.spend", nil)
 		ref["ref"].(map[string]any)["record_revision"] = int64(2)
 		id := h.admission(request{authority: ref})
-		wants(t, h, id, h.check(id, map[string]any{}), heldOn("spend"))
+		heldBecause(t, h, id, "has not reached")
 	})
 }
