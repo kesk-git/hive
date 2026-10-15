@@ -25,7 +25,8 @@ import (
 // the stage that builds the operation. An operation that a callee has built
 // and declares supported is proved only up to what no body decides: its
 // capability declaration, its addressing, and the refusals that come before a
-// request is read.
+// request is read. The call from hive-word to hive-pool is proved past that
+// point, in word_pool_test.go.
 
 var declaredCalls = []struct{ caller, callee string }{
 	{"word", "pool"},
