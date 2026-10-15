@@ -67,8 +67,10 @@ func RegisterMemorySubject(r *Registry, subject Handler) {
 // RegisterMemoryMiss builds miss of hive-memory into the registry, with the
 // handler of the package that records the misses. It is a new memory operation,
 // so it is declared at 1.0. A miss writes pool.rule.missed, and a correction of
-// its provenance pool.miss.revised.
-func RegisterMemoryMiss(r *Registry, miss Handler) {
+// its provenance pool.miss.revised. The reader of the kind miss is registered
+// with it, as the readers of the kinds note and maintenance-queue are with the
+// operations that write those.
+func RegisterMemoryMiss(r *Registry, miss Handler, reader read.Kind) {
 	r.RegisterOperation("hive-memory", &cli.Operation{
 		OperationDecl: envelope.OperationDecl{
 			Name:           "miss",
@@ -84,6 +86,7 @@ func RegisterMemoryMiss(r *Registry, miss Handler) {
 		},
 		Handle: miss,
 	})
+	r.Reads.Register(reader)
 }
 
 // RegisterMemoryMaintenance builds enqueue and fold of hive-memory into the

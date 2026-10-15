@@ -9,10 +9,9 @@ import (
 )
 
 // The refusal of hive-imperative render for a stale subject projection names the
-// rules that make it stale, so it cites rules; but render is a read-only
-// operation, which writes no miss and no receipt, so the Pool cannot report it as
-// one. The test holds the refusal as it is and the Pool as it was, and stands as
-// the case of that path until render is declared as a writer.
+// rules that make it stale. render is read-only and stays so: it writes no miss
+// and no receipt, and the caller that meets the refusal reports it through
+// hive-memory miss. The test holds the refusal as it is and the Pool as it was.
 func TestAStaleProjectionRefusalNamesTheRuleAndWritesNoMiss(t *testing.T) {
 	h, _ := seed(t)
 	d02 := "2026-10-02T00:00:00.000Z"

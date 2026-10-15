@@ -28,9 +28,10 @@ const (
 )
 
 // StepOfPoolRefusals is the step the Pool names for a refusal of its own that it
-// reports as a miss. The contract names no step for a writer of rules, which is
-// no step a subject loads at, and a miss carries one.
-const StepOfPoolRefusals = "dispatch"
+// reports as a miss. The refusals reported are those of hive-rule record and
+// amend, which write a rule record when a stow binds one, so they are met at the
+// stow step.
+const StepOfPoolRefusals = "stow"
 
 // recordRef is a reference to one record as a provenance carries it: its schema
 // and identity, and the home it is of, which is the reporting home where omitted.
@@ -111,16 +112,8 @@ func loadMisses(st *cstore.Store) ([]*Miss, error) {
 }
 
 // mintMissID gives a miss its identity: the prefix of a miss and a ULID
-// (spec/pool.md, Identifiers). The contract library registers no prefix for a
-// miss, so the ULID is minted under a registered one and given the miss's.
-func mintMissID(c *cli.Call) (string, error) {
-	id, err := ids.Mint(c.Clock, ids.Note)
-	if err != nil {
-		return "", err
-	}
-	_, ulid, _ := strings.Cut(id, "_")
-	return missPrefix + ulid, nil
-}
+// (spec/pool.md, Identifiers).
+func mintMissID(c *cli.Call) (string, error) { return ids.Mint(c.Clock, ids.Miss) }
 
 // citedRule is a rule a miss is filed for, read as it stands: its revision and
 // the subject it is filed under.

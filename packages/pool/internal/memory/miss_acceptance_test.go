@@ -745,7 +745,7 @@ func (w *missWorld) reportedMiss(resp *envelope.Response, code string, actor map
 	prov := found["provenance"].(map[string]any)
 	incident := prov["incident"].(map[string]any)
 	if found["subject_id"] != w.subject || found["rule"].(map[string]any)["record_revision"] != revision || !equal(found["actor"], actor) ||
-		found["step"] != "dispatch" || prov["independence"] != "independent" || len(prov["derived_from"].([]any)) != 0 ||
+		found["step"] != "stow" || prov["independence"] != "independent" || len(prov["derived_from"].([]any)) != 0 ||
 		incident["schema"] != "hive.request" || incident["home_id"] != homeID || found["observed_at"] != seenAt {
 		w.t.Errorf("the miss is %v", found)
 	}
@@ -872,7 +872,8 @@ func TestAProductConflictRefusalNamesRulesThatHaveNoFilingSubjectAndLeavesNoMiss
 
 func TestARecordNamingARuleOfAnotherConflictKeyIsRefusedAsInvalidAndLeavesNoMiss(t *testing.T) {
 	// hive-rule record, schema_violation from changes naming a rule of another
-	// conflict key: a refusal with the status invalid, which leaves no write.
+	// conflict key: a malformed reference, not a rule the actor was never given,
+	// so it is no miss.
 	w := newMissWorld(t)
 	standing := w.stored("rule", w.rule)
 	caller, _ := sessionActor(t)
@@ -884,4 +885,50 @@ func TestARecordNamingARuleOfAnotherConflictKeyIsRefusedAsInvalidAndLeavesNoMiss
 			t.Errorf("status %s, error %+v, receipts %v", resp.Status, resp.Error, resp.Receipts)
 		}
 	})
+}
+
+// A miss is given an identity of the registered prefix, and is read back by
+// hive-pool read, by its identity and as a list, whole as it is stored.
+func TestAMissHasARegisteredIdentityAndIsReadByHivePoolRead(t *testing.T) {
+	w := newMissWorld(t)
+	_, a := workerActor(t)
+	_, b := workerActor(t)
+	first := w.missed(a, accountOf("incident_a", "independent"))
+	second := w.missed(b, accountOf("incident_b", "independent"))
+	for _, m := range []map[string]any{first, second} {
+		if err := ids.Check(m["miss_id"].(string), ids.Miss); err != nil {
+			t.Errorf("%v", err)
+		}
+	}
+	read := func(selector map[string]any) []any {
+		body := w.ok(w.send("hive-pool", "read", map[string]any{"kind": "miss", "selector": selector}, request{}))
+		return body["records"].([]any)
+	}
+	one := read(map[string]any{"id": first["miss_id"]})
+	if len(one) != 1 || !equal(one[0], w.stored("miss", first["miss_id"].(string))) {
+		t.Errorf("read by identity: %v", one)
+	}
+	if all := read(map[string]any{}); len(all) != 2 {
+		t.Errorf("read of all: %d records, want 2", len(all))
+	}
+	if limited := read(map[string]any{"limit": int64(1)}); len(limited) != 1 {
+		t.Errorf("read with a limit of one: %d records", len(limited))
+	}
+}
+
+// hive-rule record and amend write pool.rule.missed beside a refusal of their own,
+// so they declare it.
+func TestRecordAndAmendDeclareTheReceiptOfAMiss(t *testing.T) {
+	h := newHome(t)
+	for _, c := range h.exe.Commands {
+		if c.Name != "hive-rule" {
+			continue
+		}
+		for _, op := range c.Operations {
+			want := op.Name == "record" || op.Name == "amend"
+			if got := slices.Contains(op.ReceiptKinds, missedKind); got != want {
+				t.Errorf("hive-rule %s declares %v: %v, want %v", op.Name, missedKind, got, want)
+			}
+		}
+	}
 }
