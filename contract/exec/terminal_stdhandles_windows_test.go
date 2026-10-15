@@ -1,7 +1,6 @@
 package exec
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -11,8 +10,6 @@ import (
 	"time"
 	"unsafe"
 )
-
-func init() { extraFakes["termhandles"] = fakeTermHandles }
 
 var procSetStdHandle = testKernel32.NewProc("SetStdHandle")
 
@@ -24,14 +21,6 @@ func setStdHandle(id int, h syscall.Handle) error {
 		return err
 	}
 	return nil
-}
-
-// fakeTermHandles reports whether each of its three standard handles is a
-// console, writes a line to standard error, and waits to be ended.
-func fakeTermHandles(out *os.File, args []string) {
-	fmt.Fprintf(out, "stdin=%v stdout=%v stderr=%v\r\n", isTerminal(os.Stdin), isTerminal(os.Stdout), isTerminal(os.Stderr))
-	fmt.Fprint(os.Stderr, "written-to-stderr\r\n")
-	time.Sleep(time.Hour)
 }
 
 // parentPipes makes the standard handles of this process pipes, as they are

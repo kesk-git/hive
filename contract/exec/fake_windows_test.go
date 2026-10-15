@@ -95,3 +95,11 @@ func fakeWriteHandle(out *os.File, args []string) {
 	err := syscall.WriteFile(syscall.Handle(n), []byte("leaked"), &written, nil)
 	fmt.Fprintf(out, "written=%d err=%v\n", written, err)
 }
+
+// fakeTermHandles reports whether each of its three standard handles is a
+// console, writes a line to standard error, and waits to be ended.
+func fakeTermHandles(out *os.File, args []string) {
+	fmt.Fprintf(out, "stdin=%v stdout=%v stderr=%v\r\n", isTerminal(os.Stdin), isTerminal(os.Stdout), isTerminal(os.Stderr))
+	fmt.Fprint(os.Stderr, "written-to-stderr\r\n")
+	time.Sleep(time.Hour)
+}

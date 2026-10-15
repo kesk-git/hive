@@ -26,9 +26,6 @@ import (
 // that the lookup rules find it on all three platforms.
 const fakeFlag = "--fake"
 
-// extraFakes holds the modes a platform's tests add to the fake program.
-var extraFakes = map[string]func(out *os.File, args []string){}
-
 func TestMain(m *testing.M) {
 	if len(os.Args) > 1 && os.Args[1] == fakeFlag {
 		runFake(os.Args[2:])
@@ -57,6 +54,8 @@ func TestMain(m *testing.M) {
 //	            arguments the process holds open beyond the standard three
 //	tty         report the terminal, then wait for Control-C
 //	needstty    exit 1 unless standard input is a terminal
+//	termhandles report which standard handles are terminals, write to
+//	            standard error, and wait (Windows only)
 func runFake(args []string) {
 	out := os.Stdout
 	mode := ""
@@ -119,11 +118,9 @@ func runFake(args []string) {
 		fakeStarter(args)
 	case "writehandle":
 		fakeWriteHandle(out, args)
+	case "termhandles":
+		fakeTermHandles(out, args)
 	default:
-		if f, ok := extraFakes[mode]; ok {
-			f(out, args)
-			return
-		}
 		fmt.Fprintf(os.Stderr, "unknown fake mode %q\n", mode)
 		os.Exit(99)
 	}
