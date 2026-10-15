@@ -137,7 +137,7 @@ func TestARuleClearsNothingThatDoesNotMeetTheConditions(t *testing.T) {
 		"a scope that is another": {"admission.spend", func(r map[string]any) {
 			r["scope_level"], r["workspace_id"], r["project_id"] = "project", workspaceID, "proj_01jc7d8e9f0g1h2j3k4m5n6p7d"
 		}, "scope does not contain"},
-		"another task": {"admission.spend", func(r map[string]any) { r["task_id"] = "task_01jc7d8e9f0g1h2j3k4m5n6p7g" }, "another task"},
+		"another task":                 {"admission.spend", func(r map[string]any) { r["task_id"] = "task_01jc7d8e9f0g1h2j3k4m5n6p7g" }, "another task"},
 		"a generation":                 {"admission.spend", func(r map[string]any) { r["task_id"], r["generation"] = taskID, int64(1) }, "generation"},
 		"an authority that is no word": {"admission.spend", func(r map[string]any) { r["authority"] = map[string]any{"kind": "none"} }, "not a word"},
 		"a word that no longer stands": {"admission.spend", func(r map[string]any) { r["authority"] = word(1) }, "no longer stands"},
