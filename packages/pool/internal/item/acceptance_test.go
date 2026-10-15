@@ -408,7 +408,7 @@ func TestEveryTransitionOfTheStateTable(t *testing.T) {
 		}
 		return id
 	}
-	evidence := []any{map[string]any{"kind": "harvest", "url": "https://example.invalid/harvest/7"}}
+	evidence := []any{map[string]any{"kind": "harvest", "url": "https://forge.example.org/o/r/pulls/7"}}
 	closed := "2026-10-14T08:30:00.000Z"
 	for _, tc := range []struct{ from, to string }{
 		{"queued", "in-flight"}, {"queued", "done"}, {"queued", "archived"},
