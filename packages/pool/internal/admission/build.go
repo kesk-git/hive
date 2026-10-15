@@ -23,8 +23,11 @@ const (
 	receiptRefused  = "pool.admission.refused"
 	receiptHeld     = "pool.admission.held"
 
-	// eventChecked is the one event of the three check receipts.
-	eventChecked = "pool.admission.checked"
+	// eventChecked is the one event of the three check receipts, and the other
+	// two are those of the Pool's hold writers.
+	eventChecked  = "pool.admission.checked"
+	eventPlaced   = "pool.hold.placed"
+	eventReleased = "pool.hold.released"
 )
 
 func internal(what string, err error) *envelope.Failure {
@@ -132,6 +135,12 @@ func (b *builder) seal(r envelope.Receipt, subject *envelope.RecordRef, scope en
 	if event == "" {
 		return nil
 	}
+	return b.event(event, r.ReceiptID, scope)
+}
+
+// event appends the event of the kind, with an empty body, whose basis is the
+// receipt, in the scope given.
+func (b *builder) event(kind, receiptID string, scope envelope.Scope) error {
 	eventID, err := ids.Mint(b.c.Clock, ids.Event)
 	if err != nil {
 		return internal("an event cannot be made", err)
@@ -142,12 +151,12 @@ func (b *builder) seal(r envelope.Receipt, subject *envelope.RecordRef, scope en
 	}
 	e := map[string]any{
 		"schema": "hive.event", "schema_version": versionOne, "event_id": eventID,
-		"kind": event, "kind_version": versionOne,
+		"kind": kind, "kind_version": versionOne,
 		"source":         map[string]any{"package": poolstore.Package, "source_id": poolstore.Package},
 		"correlation_id": b.c.Request.CorrelationID,
 		"causation":      map[string]any{"schema": schemaRequest, "id": b.c.Request.RequestID},
 		"occurred_at":    now, "observed_at": now,
-		"basis": map[string]any{"kind": "receipt", "ref": map[string]any{"schema": schemaReceipt, "id": r.ReceiptID}},
+		"basis": map[string]any{"kind": "receipt", "ref": map[string]any{"schema": schemaReceipt, "id": receiptID}},
 		"body":  map[string]any{},
 	}
 	putScope(e, scope, true)

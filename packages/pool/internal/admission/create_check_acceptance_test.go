@@ -253,7 +253,7 @@ func wants(t *testing.T, h *home, id string, resp *envelope.Response, want outco
 		}
 		stored := h.stored("hold", hold.ID)
 		if stored["kind"] != "admission" || stored["state"] != "active" || stored["reason_code"] != want.reason ||
-			stored["admission_id"] != id || stored["task_id"] != taskID || tree(stored["placed_by"])["request_id"] != resp.RequestID {
+			stored["admission_id"] != id || stored["task_id"] != taskID {
 			t.Errorf("the hold %v", stored)
 		}
 	} else if _, ok := check["hold_id"]; ok {
@@ -694,6 +694,9 @@ func TestALaterCheckWithNewEvidenceAdmitsWhatAnEarlierOneHeld(t *testing.T) {
 	first := h.check(id, map[string]any{})
 	held := wants(t, h, id, first, outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"source_branch_not_pushed"}, reason: "source_branch_not_pushed"})
 	holdID := first.Error.Hold.ID
+	if by := tree(h.stored("hold", holdID)["placed_by"]); by["request_id"] != first.RequestID {
+		t.Errorf("the hold was placed by %v, not by the first check", by)
+	}
 	// Run again: held for the same reason, the same hold named, none placed.
 	again := h.check(id, map[string]any{"source_branch": pushed("unknown")})
 	wants(t, h, id, again, outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"source_branch_not_pushed"}, reason: "source_branch_not_pushed"})

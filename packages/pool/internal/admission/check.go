@@ -70,6 +70,7 @@ func Check(c *cli.Call) (*cli.Result, error) {
 	if f.repository, err = repositoryOf(c, rec, rev); err != nil {
 		return nil, err
 	}
+	f.authorityKind = str(tree(tree(rec.Data["request"])["authority"])["kind"])
 	if f.authority, err = authorityStanding(c.Store, rec); err != nil {
 		return nil, poolstore.Failure("the authority of the admission", err)
 	}
@@ -152,27 +153,13 @@ func conclude(c *cli.Call, f *facts, placement map[string]any, result, reason st
 	scope := rec.Scope()
 	var holdRef *envelope.RecordRef
 	if result == resultHeld {
-		holdID, err := ids.Mint(c.Clock, ids.Hold)
-		if err != nil {
-			return nil, internal("a hold cannot be given an identity", err)
-		}
-		hold := map[string]any{
-			"schema": "pool.hold", "schema_version": versionOne, "record_revision": int64(1),
-			"hold_id": holdID, "task_id": taskID, "kind": "admission", "state": "active",
-			"reason": clip(fmt.Sprintf("The admission check held dispatch: %s", findingMessage(findings))), "reason_code": reason,
-			"admission_id": rec.Data["admission_id"], "placed_at": now,
-			"placed_by":  map[string]any{"request_id": c.Request.RequestID, "caller": c.Request.Tree()["caller"]},
-			"created_at": now, "updated_at": now,
-		}
-		putScope(hold, scope, false)
-		_, holdRef, err = b.put("hold", holdID, hold, 0)
-		if err != nil {
+		if holdRef, err = holdFor(b, f, reason, now, scope, r.ReceiptID, findings); err != nil {
 			return nil, err
 		}
-		check["hold_id"] = holdID
+		check["hold_id"] = holdRef.ID
 	}
 	if result == resultAdmitted {
-		if err := releaseHolds(b, f, now, r.ReceiptID); err != nil {
+		if err := releaseHolds(b, f, now, r.ReceiptID, scope); err != nil {
 			return nil, err
 		}
 	}
@@ -205,10 +192,47 @@ func conclude(c *cli.Call, f *facts, placement map[string]any, result, reason st
 	return nil, envelope.Fail(envelope.Refused, str(tree(findings[0])["code"]), message)
 }
 
+// holdFor names the hold a held check waits on. An active hold of kind
+// admission that this admission already holds for the reason is reused and
+// nothing is placed; otherwise one is placed, with the event that places a hold,
+// whose basis is the check's receipt.
+func holdFor(b *builder, f *facts, reason, now string, scope envelope.Scope, receiptID string, findings []any) (*envelope.RecordRef, error) {
+	c, rec := b.c, f.rec
+	for _, h := range f.graph.Holds[f.item.ID] {
+		if h.Kind == "admission" && h.State == "active" && h.Data["admission_id"] == rec.Data["admission_id"] && h.Data["reason_code"] == reason {
+			return &envelope.RecordRef{Schema: "pool.hold", ID: h.ID, HomeID: c.Home.HomeID, RecordRevision: h.Revision}, nil
+		}
+	}
+	holdID, err := ids.Mint(c.Clock, ids.Hold)
+	if err != nil {
+		return nil, internal("a hold cannot be given an identity", err)
+	}
+	hold := map[string]any{
+		"schema": "pool.hold", "schema_version": versionOne, "record_revision": int64(1),
+		"hold_id": holdID, "task_id": rec.TaskID(), "kind": "admission", "state": "active",
+		"reason": clip(fmt.Sprintf("The admission check held dispatch: %s", findingMessage(findings))), "reason_code": reason,
+		"admission_id": rec.Data["admission_id"], "placed_at": now,
+		"placed_by":  map[string]any{"request_id": c.Request.RequestID, "caller": c.Request.Tree()["caller"]},
+		"created_at": now, "updated_at": now,
+	}
+	putScope(hold, scope, false)
+	_, ref, err := b.put("hold", holdID, hold, 0)
+	if err != nil {
+		return nil, err
+	}
+	scope.TaskID = rec.TaskID()
+	if err := b.event(eventPlaced, receiptID, scope); err != nil {
+		return nil, err
+	}
+	return ref, nil
+}
+
 // releaseHolds releases every active hold of kind admission that earlier checks
-// of this admission placed, by the receipt that admits.
-func releaseHolds(b *builder, f *facts, now, receiptID string) error {
+// of this admission placed, by the receipt that admits, with the event that
+// releases a hold on that receipt.
+func releaseHolds(b *builder, f *facts, now, receiptID string, scope envelope.Scope) error {
 	admission := f.rec.Data["admission_id"]
+	scope.TaskID = f.rec.TaskID()
 	for _, h := range f.graph.Holds[f.item.ID] {
 		if h.Kind != "admission" || h.State != "active" || h.Data["admission_id"] != admission {
 			continue
@@ -217,6 +241,9 @@ func releaseHolds(b *builder, f *facts, now, receiptID string) error {
 		next["state"], next["released_at"], next["updated_at"] = "released", now, now
 		next["released_by"] = map[string]any{"schema": schemaReceipt, "id": receiptID}
 		if _, _, err := b.put("hold", h.ID, next, h.Revision); err != nil {
+			return err
+		}
+		if err := b.event(eventReleased, receiptID, scope); err != nil {
 			return err
 		}
 	}

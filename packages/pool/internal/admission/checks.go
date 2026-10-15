@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/kesk-git/hive/contract/cli"
-	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/packages/pool/internal/read"
 )
 
@@ -26,11 +25,10 @@ const (
 	codeDeliveryMismatch  = "pool.delivery_mismatch"
 	codeNeedsForge        = "pool.publication_needs_forge"
 
-	reasonGuess      = "field_guess"
-	reasonBranch     = "source_branch_not_pushed"
-	reasonAuthority  = "authority_required"
-	findingBranch    = "source_branch_not_pushed"
-	findingInsuffice = envelope.CodeAuthorityInsufficient
+	reasonGuess     = "field_guess"
+	reasonBranch    = "source_branch_not_pushed"
+	reasonAuthority = "authority_required"
+	findingBranch   = "source_branch_not_pushed"
 
 	placeCodexCloud   = "codex-cloud"
 	placeClaudeCloud  = "claude-cloud-session"
@@ -87,6 +85,8 @@ type facts struct {
 	branch map[string]any
 	// authority is what the record gives a sensitive boundary.
 	authority standing
+	// authorityKind is the kind of the authority the request carried.
+	authorityKind string
 }
 
 // run runs every check of the table in order and returns the rows that did not
@@ -238,26 +238,39 @@ func (f *facts) placement() row {
 // unknown, which holds.
 func (f *facts) sourceBranch() row {
 	r := row{result: resultHeld, reason: reasonBranch}
-	if void(f.place) && str(f.branch["pushed"]) != "true" {
+	if void(f.place) && !f.pushedEvidence() {
 		r.findings = append(r.findings, finding{code: findingBranch, field: "setup.source_branch",
-			message: "The caller's evidence does not show the source branch pushed."})
+			message: "The caller's evidence does not show Setup's source branch pushed at Setup's revision."})
 	}
 	return r
 }
 
+// pushedEvidence says whether the evidence shows the source branch pushed: it
+// is about Setup's source branch, says pushed, and where Setup carries a source
+// revision names that revision.
+func (f *facts) pushedEvidence() bool {
+	setup := f.section("setup")
+	if f.branch == nil || str(f.branch["pushed"]) != "true" || str(f.branch["branch"]) != str(setup["source_branch"]) {
+		return false
+	}
+	want := str(setup["source_revision"])
+	return want == "" || str(f.branch["revision"]) == want
+}
+
 // sensitive: each sensitive boundary has explicit, applicable authority. A
-// posture, charter or instruction reference is insufficient for one.
+// posture, charter or instruction reference is insufficient for one, and held
+// like any other missing authority.
 func (f *facts) sensitive() row {
 	r := row{result: resultHeld, reason: reasonAuthority}
 	if f.authority == given {
 		return r
 	}
 	for _, b := range list(f.section("rules", "boundary")["sensitive"]) {
-		code, message := codeAuthorityRequired, fmt.Sprintf("The %s boundary needs the Hive Mind's explicit authority: an approval on the admission or an authority that stands.", str(b))
+		message := fmt.Sprintf("The %s boundary needs the Hive Mind's explicit authority: an approval on the admission or an authority that stands.", str(b))
 		if f.authority == insufficient {
-			code, message = findingInsuffice, fmt.Sprintf("The %s boundary needs the Hive Mind's explicit authority, and a posture, charter or instruction reference is not accepted for one yet.", str(b))
+			message = fmt.Sprintf("The %s boundary needs the Hive Mind's explicit authority, and a %s reference is authority_insufficient for a sensitive boundary until stage 4 adds its route; an approval on the admission lifts the hold.", str(b), f.authorityKind)
 		}
-		r.findings = append(r.findings, finding{code: code, field: sensitiveBoundary, message: message})
+		r.findings = append(r.findings, finding{code: codeAuthorityRequired, field: sensitiveBoundary, message: message})
 	}
 	return r
 }
