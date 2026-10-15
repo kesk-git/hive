@@ -759,11 +759,18 @@ func TestAnExistingCoverageNeedsAStandingBinding(t *testing.T) {
 	})
 }
 
-// define is declared at the contract's version, 1.2, which adds touched
-// subjects to the complete body: a request at 1.2 is accepted and carries them.
-func TestDefineIsAcceptedAtTheContractVersion(t *testing.T) {
-	h := newHome(t)
-	subj := subject(t)
-	resp := h.sendAt("1.2", "", "hive-spec", "define", define("Counter reset", "The first prose.", criteria(), map[string]any{"touched_subjects": []any{subj}}))
-	h.ok(resp)
+// define is declared at the contract's version, 1.2, and also accepts 1.1 and
+// 1.0: 1.1 adds product bindings and 1.2 touched subjects, each an optional
+// member of the one body, so a request at any of the three is accepted.
+func TestDefineIsAcceptedAtEveryVersionTheContractNames(t *testing.T) {
+	for _, version := range []string{"1.2", "1.1", "1.0"} {
+		t.Run(version, func(t *testing.T) {
+			h := newHome(t)
+			extra := map[string]any{}
+			if version == "1.2" {
+				extra["touched_subjects"] = []any{subject(t)}
+			}
+			h.ok(h.sendAt(version, "", "hive-spec", "define", define("Counter reset", "The first prose.", criteria(), extra)))
+		})
+	}
 }
