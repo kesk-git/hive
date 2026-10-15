@@ -83,8 +83,8 @@ type facts struct {
 	// nil where the request gave none.
 	place  string
 	branch map[string]any
-	// authority is what the record gives a sensitive boundary.
-	authority standing
+	// authority is what the record gives the sensitive boundaries.
+	authority *grant
 	// authorityKind is the kind of the authority the request carried.
 	authorityKind string
 }
@@ -257,18 +257,24 @@ func (f *facts) pushedEvidence() bool {
 	return want == "" || str(f.branch["revision"]) == want
 }
 
-// sensitive: each sensitive boundary has explicit, applicable authority. A
-// posture, charter or instruction reference is insufficient for one, and held
-// like any other missing authority.
+// sensitive: each sensitive boundary has explicit, applicable authority. An
+// approval or a word that stands covers every boundary, and a rule only the one
+// its subject names. A posture, charter or instruction reference is
+// insufficient for one, and held like any other missing authority.
 func (f *facts) sensitive() row {
 	r := row{result: resultHeld, reason: reasonAuthority}
-	if f.authority == given {
-		return r
-	}
+	now := f.c.Clock.Now()
 	for _, b := range list(f.section("rules", "boundary")["sensitive"]) {
+		have, why := f.authority.of(str(b), now)
+		if have == given {
+			continue
+		}
 		message := fmt.Sprintf("The %s boundary needs the Hive Mind's explicit authority: an approval on the admission or an authority that stands.", str(b))
-		if f.authority == insufficient {
+		if have == insufficient {
 			message = fmt.Sprintf("The %s boundary needs the Hive Mind's explicit authority, and a %s reference is authority_insufficient for a sensitive boundary until stage 4 adds its route; an approval on the admission lifts the hold.", str(b), f.authorityKind)
+		}
+		if why != "" {
+			message = fmt.Sprintf("The %s boundary needs the Hive Mind's explicit authority: an approval on the admission or an authority that stands; the rule named clears nothing here, because %s.", str(b), why)
 		}
 		r.findings = append(r.findings, finding{code: codeAuthorityRequired, field: sensitiveBoundary, message: message})
 	}

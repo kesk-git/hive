@@ -1023,10 +1023,11 @@ func TestCheckRefusesWhatItCannotRecord(t *testing.T) {
 	})
 }
 
-// Rule verification is not built: a request whose only authority is a rule
-// reference gives a sensitive boundary nothing and is held on authority_required,
-// and an approval on the record lets a later check admit it.
-func TestARuleReferenceAloneIsHeldUntilApproved(t *testing.T) {
+// A request whose only authority is a rule that does not meet the conditions
+// of the rule route (here, a rule on no boundary of admission) gives a
+// sensitive boundary nothing and is held on authority_required, and an approval
+// on the record lets a later check admit it.
+func TestARuleThatMeetsNoConditionIsHeldUntilApproved(t *testing.T) {
 	h := newHome(t)
 	h.work(sensitive("deletion"))
 	h.plant("question", questionID, fixture(t, "pool.question", "answered-superseding"))
