@@ -123,10 +123,11 @@ type citedRule struct {
 	Subject  *rule.Subject
 }
 
-// readCited reads the rule at the revision cited and the subject it is filed
-// under. A rule the Pool does not hold, or not at that revision, is not found; a
-// rule with no filing subject, which a product rule is, is refused: a miss counts
-// against the filing subject and there is none.
+// readCited binds the cited revision to the rule's filing subject. Earlier
+// revisions remain eligible so a later rule update cannot erase an earlier
+// miss. A rule the Pool does not hold or a revision beyond its recorded revision
+// is not found; a product rule has no filing subject to count against and is
+// refused.
 func readCited(st *cstore.Store, ruleID string, revision int64) (*citedRule, error) {
 	l, om, err := poolstore.Load(st, "rule", ruleID)
 	switch {

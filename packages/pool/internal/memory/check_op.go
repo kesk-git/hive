@@ -88,8 +88,9 @@ func CheckOp(c *cli.Call) (*cli.Result, error) {
 	}}, nil
 }
 
-// missRows are the subjects with a miss in the scope of the request, each with
-// its count over the misses within it.
+// missRows keeps all retained misses available for provenance resolution before
+// restricting the report to subjects with a miss in the request's scope. Filtering
+// the inputs first would lose roots held by wider-scoped misses.
 func missRows(c *cli.Call, st *cstore.Store) ([]any, error) {
 	misses, err := loadMisses(st)
 	if err != nil {

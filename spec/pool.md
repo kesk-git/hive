@@ -40,23 +40,9 @@ Everything the Pool owns is under `pool/` in the home, in the five places [recor
 
 ## Identifiers
 
-Stage 2 uses the following prefixes, each minted by `pool`:
+Registered prefixes and their minting owners are defined in [identities.md](identities.md#identifier-form), with the registry in `contract/ids` checked by `test-contract`. Shared Pool identifier patterns are the `$defs` of [`records/pool.item.v1`](schemas/records/pool.item.v1.schema.json); the subject, note and miss patterns are in their respective record schemas.
 
-| Prefix | Identifies |
-| --- | --- |
-| `adm_` | an admission record |
-| `spec_` | a specification |
-| `rule_` | a rule |
-| `hold_` | a hold on an item |
-| `mem_` | a knowledge projection |
-| `migr_` | a legacy migration |
-| `subj_` | a memory subject |
-| `mnote_` | a maintenance note |
-| `miss_` | one reported miss incident |
-
-The first six patterns are the `$defs` of [`records/pool.item.v1`](schemas/records/pool.item.v1.schema.json); the last three are in their respective new record schemas.
-The first six are registered; the subject, note and miss builders register the last three in the identity library and identities.md before their first producer is built.
-The table in [identities.md](identities.md#identifier-form) and the registry in `contract/ids` stay in step by `test-contract`; this definition supplies only the new prefixes' schema patterns. The Imperative has no prefix of its own: it is keyed by its item. A generation and a criterion are numbered or slugged inside their records and have no prefix. No prefix is registered for a [level](#levels): a Target is a Pool item and keeps the prefix every item has. The `q_`, `dr_` and `card_` identities of a question, a decision round and a card are minted by `word`, as identities.md already registers them, and written by `pool`; an option and an answer are numbered or slugged inside their question.
+The Imperative has no prefix of its own: it is keyed by its item. A generation and a criterion are numbered or slugged inside their records and have no prefix. No prefix is registered for a [level](#levels): a Target is a Pool item and keeps the prefix every item has. A question, decision round and card are minted by `word` and written by `pool`; an option and an answer are numbered or slugged inside their question.
 
 ## Items
 
@@ -366,6 +352,7 @@ An independent root has no derivation links, a derived account has at least one,
 The reporting owner verifies the root and its evidence; attribution alone is no authentication or proof of independence.
 Incident identity is the tuple of originating home (`incident.home_id`, or the reporting home when omitted), schema and record identity; revisions and digests bind evidence but do not create another incident.
 Counts are the distinct verified independent root incidents per filing subject, following derivation links transitively; two rule misses in one incident count once, echoes and parent/child accounts share that root, and a dangling or cyclic derivation contributes no count until reconciled.
+A scoped `check` reports subjects with misses in that scope, resolving derivation links against all misses retained in the home, including wider scopes. A link may name a miss or an incident whose retained accounts supply its roots under their current provenance.
 `check` reports each subject's count, contributing miss identities and `decision_due` once the count reaches two and no earlier second-miss question names that subject in `origin.ref`; the supervisor's decision card uses `origin.kind: rule` and an `origin.ref` of schema `pool.subject` naming the subject identity, through the existing question origin.
 The subject is the card's durable deduplication key: `hive-pool hold-question` compares this origin under its mutation lock and refuses a second matching origin with `already_exists`, naming the earlier question, so concurrent checks and corrected provenance cannot open duplicate cards; correction below threshold reports no new due card and retains any earlier question for its owner to reconcile.
 Unknown independence is not assumed, and a provenance change invalidates the affected derived counts even when the words did not change. Acceptance: one incident echoed by a worker, its supervisor and a synchronized report counts once and raises no second-miss decision; another independently observed incident can reach the threshold, and corrected provenance recomputes the count without deleting evidence. Sources: [upstream backpass/pull/151](https://github.com/kunchenguid/backpass/pull/151).
