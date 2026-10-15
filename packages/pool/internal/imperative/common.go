@@ -21,6 +21,8 @@ const (
 	codeNotDispatchable   = "pool.not_dispatchable"
 	codeRuleConflict      = memory.CodeRuleConflict
 	codeDeliveryInventory = memory.CodeDeliveryInvent
+	codeProjectionStale   = "pool.projection_stale"
+	codeNotOpen           = "pool.generation_not_open"
 
 	receiptRevised   = "pool.imperative.revised"
 	receiptDelivered = "pool.imperative.delivered"

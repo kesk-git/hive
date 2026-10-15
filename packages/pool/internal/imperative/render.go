@@ -90,12 +90,17 @@ func Render(c *cli.Call) (*cli.Result, error) {
 				Scope: rule.Scope{Level: scope.Level, HomeID: scope.HomeID, WorkspaceID: scope.WorkspaceID, ProjectID: scope.ProjectID},
 				Tier:  memory.TierSubject, Audience: role, SubjectID: id,
 			}
-			// A projection that is not fresh is read as it stands: whether a
-			// rendering is refused for it is not settled by the contract, and
-			// is not decided here.
 			e, err := snap.SubjectProjection(key, now)
 			if err != nil {
 				return nil, err
+			}
+			// A projection that is stale at this instant is not given to a worker.
+			fresh, err := snap.Fresh(e, now)
+			if err != nil {
+				return nil, internal("the freshness of the projection cannot be computed", err)
+			}
+			if fresh.State != memory.StateFresh {
+				return nil, staleRefusal(e.ID, c.Home.HomeID, fresh.Stale)
 			}
 			embedded = append(embedded, e)
 			in.Projections = append(in.Projections, projectionBlock{
@@ -169,6 +174,17 @@ func criteriaOf(st *cstore.Store, ref map[string]any) (*criteriaBlock, []string,
 		touched = append(touched, strOf(v))
 	}
 	return &criteriaBlock{SpecificationID: id, Revision: number, Criteria: listOf(revision["criteria"])}, touched, nil
+}
+
+// staleRefusal refuses the rendering for a stale subject projection, naming the
+// projection and the sources that differ from the ones it was rendered from.
+func staleRefusal(projectionID, homeID string, stale []memory.Source) *envelope.Failure {
+	sources := make([]any, len(stale))
+	for i, s := range stale {
+		sources[i] = map[string]any{"schema": s.Schema, "id": s.ID, "home_id": homeID, "record_revision": s.Revision}
+	}
+	return refuse(codeProjectionStale, "a subject projection the Imperative would embed is stale, so the Imperative is not rendered").
+		With("projection", projectionID).With("stale_sources", sources)
 }
 
 // playbookOf is the playbook of the class: the rules the resolver gives for
