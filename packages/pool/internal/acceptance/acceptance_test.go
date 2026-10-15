@@ -183,8 +183,8 @@ func request(t testing.TB, command, operation string) []byte {
 // complete-question and close-question, and the dry-run import and export of
 // the legacy backlog, create, check and approve of hive-admit, and the
 // operations define, accept and close of hive-spec, record, amend, expire and
-// resolve of hive-rule, and render, check, propagate, enqueue, fold, budget and
-// subject of hive-memory, and create, revise, render and deliver of
+// resolve of hive-rule, and render, check, propagate, enqueue, fold, miss, budget
+// and subject of hive-memory, and create, revise, render and deliver of
 // hive-imperative. Every other operation of the declaration is declared and
 // refused.
 var built = map[string][]string{
@@ -192,7 +192,7 @@ var built = map[string][]string{
 	"hive-admit":  {"create", "check", "approve"},
 	"hive-spec":   {"define", "accept", "close"},
 	"hive-rule":   {"record", "amend", "expire", "resolve"},
-	"hive-memory": {"render", "check", "propagate", "enqueue", "fold", "budget", "subject"},
+	"hive-memory": {"render", "check", "propagate", "enqueue", "fold", "miss", "budget", "subject"},
 
 	"hive-imperative": {"create", "revise", "render", "deliver"},
 }
