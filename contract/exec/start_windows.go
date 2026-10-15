@@ -292,7 +292,10 @@ func envBlock(env []string) ([]uint16, error) {
 // started only after it was resumed outside every job.
 //
 // For a terminal start the process inherits no handle at all: the
-// pseudoconsole is its terminal, and the start passes no handle list.
+// pseudoconsole is its terminal, and the start passes no handle list. It sets
+// STARTF_USESTDHANDLES with all three standard handles zero, so that a
+// parent whose own standard handles are pipes does not pass them on and the
+// child's standard handles are the pseudoconsole's.
 func startPlatform(p plan) (*started, *StartError) {
 	var closers []func()
 	defer func() {
@@ -396,6 +399,9 @@ func startPlatform(p plan) (*started, *StartError) {
 		}
 		tree.console = newWinConsole(hpc, inW, outR)
 		st.term = tree.console
+		// StdInput, StdOutput and StdErr stay zero: with the flag set, the
+		// child does not take the parent's standard handles.
+		si.Flags |= syscall.STARTF_USESTDHANDLES
 	} else {
 		var std [3]syscall.Handle
 		for i, s := range []Stream{p.spec.Stdin, p.spec.Stdout, p.spec.Stderr} {
