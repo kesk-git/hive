@@ -165,3 +165,27 @@ func TestThePlannerChecksTheFactsOfANewSubjectInEveryAudience(t *testing.T) {
 	}())
 	overBudget(t, errOf(p.snap.Plan(start, memory.Write{Subjects: []*rule.Subject{big}, Rules: []*rule.Rule{r}})))
 }
+
+// A write is checked in the inherited renderings of every scope the home
+// registers, a workspace with no Pool records of its own among them: the
+// Hive's projection fits its raised budget while the workspace's, which does
+// not stand, would exceed the default a new entry is initialized from.
+func TestThePlannerChecksTheInheritedRenderingsOfARegisteredScope(t *testing.T) {
+	p := newPlan(t)
+	p.snap.Budget.Defaults.Subject = 9216
+	hive := mint(t, ids.Projection)
+	p.snap.Projections = []memory.Existing{{ID: hive, Scope: rule.Scope{Level: "hive", HomeID: homeID}, Tier: "subject", Audience: "class-3", SubjectID: p.s.SubjectID}}
+	p.snap.Budget.Entries[hive] = 20000
+	var w memory.Write
+	for range 30 {
+		w.Rules = append(w.Rules, p.rule(hiveScope, 320, R{"applies": []any{"class-3"}}))
+	}
+	if _, err := p.snap.Plan(start, w); err != nil {
+		t.Fatalf("with no scope registered beneath the Hive: %v", err)
+	}
+	p.snap.Scopes = []rule.Scope{{Level: "workspace", HomeID: homeID, WorkspaceID: workspaceID}}
+	f := overBudget(t, errOf(p.snap.Plan(start, w)))
+	if _, named := f.Err.Detail["projection_id"]; named || !strings.HasPrefix(f.Err.Detail["projection"].(string), "workspace/"+workspaceID) || f.Err.Detail["max_bytes"] != int64(9216) {
+		t.Errorf("detail %v", f.Err.Detail)
+	}
+}

@@ -84,7 +84,7 @@ func overBudget(id string, k Key, at time.Time, bytes, max int64) *envelope.Fail
 // after is the snapshot the write leaves: its rules and subjects in place of
 // those of their identities, and its budget entries.
 func (s *Snapshot) after(w Write) *Snapshot {
-	out := &Snapshot{Projections: s.Projections, Budget: s.Budget, budgetData: s.budgetData}
+	out := &Snapshot{Projections: s.Projections, Budget: s.Budget, Scopes: s.Scopes, budgetData: s.budgetData}
 	out.Budget.Entries = map[string]int64{}
 	for id, max := range s.Budget.Entries {
 		out.Budget.Entries[id] = max
@@ -142,8 +142,8 @@ func (s *Snapshot) instants(now time.Time) []time.Time {
 }
 
 // reachable are the keys of every projection that can be rendered from the
-// records: those that stand, the always projections of the Hive and of each
-// workspace, and, for each subject, a projection in every scope the subject's
+// records, in every scope the records name or the home registers: those that
+// stand, the always projections of the Hive and of each workspace, and, for each subject, a projection in every scope the subject's
 // own contains and in every role audience: the subject's facts render for each
 // of them whether or not a rule applies to it.
 func (s *Snapshot) reachable() []Key {
@@ -171,6 +171,9 @@ func (s *Snapshot) reachable() []Key {
 	}
 	for _, sub := range s.Subjects {
 		addScope(sub.Scope)
+	}
+	for _, sc := range s.Scopes {
+		addScope(sc)
 	}
 	for _, e := range s.Projections {
 		addScope(e.Scope)

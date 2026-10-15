@@ -30,7 +30,7 @@ func BudgetOp(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	snap, err := Load(c.Store, c.Home.HomeID)
+	snap, err := Load(c.Store, c.Home)
 	if err != nil {
 		return nil, err
 	}

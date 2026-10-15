@@ -25,7 +25,7 @@ func CheckOp(c *cli.Call) (*cli.Result, error) {
 		return nil, err
 	}
 	defer release()
-	snap, err := Load(st, c.Home.HomeID)
+	snap, err := Load(st, c.Home)
 	if err != nil {
 		return nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
 	cstore "github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/pool/internal/budget"
@@ -58,13 +59,15 @@ func (e Existing) Key() Key {
 }
 
 // Snapshot is what a write is planned against, and what a rendering is made
-// from: the rules, the subjects with their facts, the projections as they stand
-// and the budget configuration.
+// from: the rules, the subjects with their facts, the projections as they stand,
+// the budget configuration and the workspace and project scopes the home
+// registers.
 type Snapshot struct {
 	Rules       []*rule.Rule
 	Subjects    []*rule.Subject
 	Projections []Existing
 	Budget      Budget
+	Scopes      []rule.Scope
 
 	// budgetData is the budget record as it was read.
 	budgetData map[string]any
@@ -78,12 +81,20 @@ type resKey struct {
 }
 
 // Load reads the Pool's rules, subjects, projections and budget configuration
-// under the lock the caller holds. A record that cannot be read ends the read:
-// what is in force cannot be known over a hole in the records.
-func Load(st *cstore.Store, homeID string) (*Snapshot, error) {
-	s, err := loadSources(st, homeID)
+// under the lock the caller holds, and the scopes the home's registry admits. A
+// record that cannot be read ends the read: what is in force cannot be known
+// over a hole in the records.
+func Load(st *cstore.Store, home *cstore.Home) (*Snapshot, error) {
+	s, err := loadSources(st, home.HomeID)
 	if err != nil {
 		return nil, err
+	}
+	scopes, err := cli.RegisteredScopes(home)
+	if err != nil {
+		return nil, err
+	}
+	for _, sc := range scopes {
+		s.Scopes = append(s.Scopes, rule.Scope{Level: sc.Level, HomeID: sc.HomeID, WorkspaceID: sc.WorkspaceID, ProjectID: sc.ProjectID})
 	}
 	projections, omitted, err := poolstore.LoadAll(st, "projection")
 	if err != nil {

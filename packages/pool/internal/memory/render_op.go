@@ -39,7 +39,7 @@ func RenderOp(c *cli.Call) (*cli.Result, error) {
 	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
-	snap, err := Load(c.Store, c.Home.HomeID)
+	snap, err := Load(c.Store, c.Home)
 	if err != nil {
 		return nil, err
 	}
