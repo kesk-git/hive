@@ -69,6 +69,8 @@ func TestATextWithAMalformedLabelIsNotLabeled(t *testing.T) {
 		"two playbooks":                      "### Playbook (class 3)\n### Playbook (class 3)\n",
 		"a projection without its heading":   "### Subject projection mem_a\n",
 		"a projection without its rules":     "### Subject projection mem_a digest sha256:" + strings.Repeat("a", 64) + "\n",
+		"a projection embedded twice": "### Subject projection mem_a digest sha256:" + strings.Repeat("a", 64) + "\n" + inventoryLabel + noRules + "\n" +
+			"### Subject projection mem_a digest sha256:" + strings.Repeat("a", 64) + "\n" + inventoryLabel + noRules + "\n",
 	} {
 		if _, err := labelsOf(text); err == nil {
 			t.Errorf("%s was read", name)
@@ -121,5 +123,37 @@ func TestARuleLineKeepsItsAuthoredWhitespaceAndItsSource(t *testing.T) {
 	}
 	if w := []ruleKey{{"rule_aaa", 2}, {"rule_bbb", 1}}; !slices.Equal(got.Playbook, w) {
 		t.Errorf("playbook %v, want %v", got.Playbook, w)
+	}
+}
+
+// Each projection the text embeds is named once in the inventory delivered, so
+// that every one of them is recorded received: an inventory naming one twice in
+// place of another is refused.
+func TestAnInventoryNamingAProjectionTwiceDoesNotAgree(t *testing.T) {
+	in := plainInput()
+	in.Projections = append(in.Projections, projectionBlock{
+		ID: "mem_two", Number: 1, Digest: "sha256:" + strings.Repeat("b", 64),
+		Rules: []memory.RuleRef{{RuleID: "rule_aaa", Revision: 2}}, Text: "another fact\n",
+	})
+	text := renderText(in)
+	inventory := func(ids ...int) map[string]any {
+		var projections []any
+		for _, i := range ids {
+			p := in.Projections[i]
+			projections = append(projections, map[string]any{
+				"projection_id": p.ID, "rendering": p.Number, "digest": p.Digest,
+				"rules": []any{map[string]any{"rule_id": "rule_aaa", "record_revision": int64(2)}},
+			})
+		}
+		return map[string]any{
+			"rules":               []any{map[string]any{"rule_id": "rule_aaa", "record_revision": int64(2)}},
+			"subject_projections": projections,
+		}
+	}
+	if err := agree(text, inventory(0, 1)); err != nil {
+		t.Fatalf("the inventory of the text does not agree: %v", err)
+	}
+	if err := agree(text, inventory(0, 0)); err == nil {
+		t.Error("an inventory naming one projection twice agreed")
 	}
 }

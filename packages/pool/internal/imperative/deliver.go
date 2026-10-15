@@ -132,9 +132,9 @@ func checkOpen(c *cli.Call, taskID string, generation int64) error {
 
 // agree checks that the inventories of the request are those the text is
 // labeled with: the rules are the duplicate-free union of the playbook's and of
-// the embedded projections', and the projections are those embedded, each with
-// its digest and rules; its rendering is the inventory's, not the text's, and
-// the digest is checked against it when the receipt is staged.
+// the embedded projections', and the projections are those embedded, each named
+// once with its digest and rules; its rendering is the inventory's, not the
+// text's, and the digest is checked against it when the receipt is staged.
 func agree(text string, body map[string]any) error {
 	disagree := func(what string) error {
 		return refuse(codeDeliveryInventory, "the inventory delivered does not agree with the text supplied: "+what)
@@ -170,8 +170,13 @@ func agree(text string, body map[string]any) error {
 	if len(projections) != len(l.Projections) {
 		return disagree("the projections differ")
 	}
+	named := map[string]bool{}
 	for _, v := range projections {
 		p := mapOf(v)
+		if named[strOf(p["projection_id"])] {
+			return disagree("a projection is named twice")
+		}
+		named[strOf(p["projection_id"])] = true
 		i := slices.IndexFunc(l.Projections, func(lp labeledProjection) bool { return lp.ID == strOf(p["projection_id"]) })
 		if i < 0 {
 			return disagree("a projection is not in the text")

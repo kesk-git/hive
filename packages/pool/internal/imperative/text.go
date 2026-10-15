@@ -3,6 +3,7 @@ package imperative
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -328,7 +329,7 @@ func labelsOf(text string) (*labeled, error) {
 			mode, seenPlaybook = inPlaybook, true
 		case strings.HasPrefix(ln, headingProjection):
 			m := projectionHead.FindStringSubmatch(ln)
-			if m == nil {
+			if m == nil || slices.ContainsFunc(l.Projections, func(p labeledProjection) bool { return p.ID == m[1] }) {
 				return nil, errNotLabelable
 			}
 			l.Projections = append(l.Projections, labeledProjection{ID: m[1], Digest: m[2]})
