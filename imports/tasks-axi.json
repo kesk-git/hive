@@ -115,6 +115,34 @@
         "test/backends/markdown-grammar.test.ts"
       ],
       "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/legacy/store_test.go",
+      "upstream_paths": [
+        "test/backends/markdown.test.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/item/state_test.go",
+      "upstream_paths": [
+        "test/commands/state.test.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/item/crud_test.go",
+      "upstream_paths": [
+        "test/commands/crud.test.ts"
+      ],
+      "disposition": "translated"
+    },
+    {
+      "hive_path": "packages/pool/internal/item/derive_test.go",
+      "upstream_paths": [
+        "test/derive.test.ts"
+      ],
+      "disposition": "translated"
     }
   ],
   "transitive": [
@@ -239,10 +267,6 @@
     {
       "upstream_path": "src/backends/markdown.ts (the store: create, update, remove, moveTo, moveManyTo, transition, addDep, removeDep, prune, the writing of render, locking and atomic writes)",
       "reason": "Not taken by these portions. The pure normalization, the archive lookup, the reading of a file whole and its report, the render of items in the legacy form and the write of a read file as a migration with its items and holds are translated; the store verbs of the upstream are the Pool's operations on items, which are Hive's own and not translated from them; the moves are left behind, and prune is not carried for Hive's records."
-    },
-    {
-      "upstream_path": "test/backends/markdown.test.ts, test/commands/state.test.ts, test/commands/crud.test.ts, test/derive.test.ts",
-      "reason": "Tests of the store verbs and derived facts, which this portion does not translate."
     },
     {
       "upstream_path": "test/backends/markdown-grammar.test.ts (the case that reads the upstream author's own backlog)",
