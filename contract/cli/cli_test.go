@@ -287,12 +287,11 @@ func TestRefused(t *testing.T) {
 	home := newHome(t)
 	before := tree(t, home)
 	inRepo := filepath.Join(t.TempDir(), "repo", "home")
-	if err := os.MkdirAll(inRepo, 0o700); err != nil {
+	if err := store.MakeDir(inRepo); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(inRepo, "..", ".git"), []byte("gitdir: elsewhere\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	access.SecureHome(t, inRepo)
+	access.WriteFile(t, filepath.Join(inRepo, "..", ".git"), []byte("gitdir: elsewhere\n"))
 	record(t, inRepo, "home.json", homeRecord(homeID))
 
 	project := func(m map[string]any) {
@@ -435,7 +434,7 @@ func TestRefused(t *testing.T) {
 func TestReadOnly(t *testing.T) {
 	h := newHarness(t)
 	home := newHome(t)
-	if err := os.Mkdir(filepath.Join(home, "stuff"), 0o700); err != nil {
+	if err := store.MakeDir(filepath.Join(home, "stuff")); err != nil {
 		t.Fatal(err)
 	}
 	before := tree(t, home)
@@ -832,9 +831,7 @@ func TestTooLarge(t *testing.T) {
 func TestUnavailable(t *testing.T) {
 	h := newHarness(t)
 	broken := newHome(t)
-	if err := os.WriteFile(filepath.Join(broken, "home.json"), []byte("{\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	access.WriteFile(t, filepath.Join(broken, "home.json"), []byte("{\n"))
 	expect(t, h.invoke(t, broken, "echo", request(t, "echo", 1, nil)), envelope.Unavailable, "record_malformed")
 	record(t, broken, "home.json", func() map[string]any { m := homeRecord(homeID); m["role"] = "nest"; return m }())
 	expect(t, h.invoke(t, broken, "echo", request(t, "echo", 1, nil)), envelope.Unavailable, "record_malformed")
