@@ -523,9 +523,10 @@ func TestWordPoolRetryAfterTheRoundChanged(t *testing.T) {
 // requests racing through hive-word share one outcome and one set of records.
 // The race is run by control, as spec/test-targets.md, rule 5, asks: the
 // second hive-word is started with a pass-through hive-pool first on its
-// search path alone, built from Go (rule 3), which forwards every call to the
-// real hive-pool unchanged except the handoff, which it holds until the test
-// releases it and tells the test when it has arrived. In order:
+// search path alone, this test executable, built from Go (rule 3) and copied
+// under that name, which forwards every call to the real hive-pool unchanged
+// except the handoff, which it holds until the test releases it and tells the
+// test when it has arrived. In order:
 //
 //   - the second hive-word starts, reads the Pool's recorded outcome and finds
 //     none, and its handoff is held;
