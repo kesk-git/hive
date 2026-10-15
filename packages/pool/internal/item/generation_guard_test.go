@@ -224,6 +224,7 @@ func TestOpenGenerationRequiresAnAdmittedAdmissionThatReadTheCurrentRecords(t *t
 	})
 	t.Run("a last check that read an older revision of the item", func(t *testing.T) {
 		h, id := setup(t)
+		h.ok(h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"priority": int64(2)}}))
 		stale(t, h, id, h.admit(id, func(_, check map[string]any) { check["item_revision"] = h.revisionOf("item", id) - 1 }))
 	})
 	t.Run("a last check that read an older revision of the Imperative", func(t *testing.T) {
