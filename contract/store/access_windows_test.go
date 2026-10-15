@@ -8,8 +8,10 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/kesk-git/hive/contract/exec"
 	"github.com/kesk-git/hive/contract/internal/testsupport"
@@ -149,4 +151,94 @@ func TestOpenPrivateRefusesAnOpenFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.Close()
+}
+
+// The security descriptors this test reads are read through calls of its own,
+// not through the store's checker, so that the store is not asked to approve
+// what it made.
+var (
+	readerAdvapi32         = syscall.NewLazyDLL("advapi32.dll")
+	readerGetNamedSecurity = readerAdvapi32.NewProc("GetNamedSecurityInfoW")
+	readerSeFileObject     = uintptr(1)
+	readerOwnerInformation = uintptr(0x1)
+)
+
+// ownerOf reads the owner of the entry at path from its security descriptor
+// and returns the owner's security identifier in its string form.
+func ownerOf(t testing.TB, path string) string {
+	t.Helper()
+	name, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var owner, descriptor unsafe.Pointer
+	r, _, _ := readerGetNamedSecurity.Call(
+		uintptr(unsafe.Pointer(name)), readerSeFileObject, readerOwnerInformation,
+		uintptr(unsafe.Pointer(&owner)), 0, 0, 0, uintptr(unsafe.Pointer(&descriptor)))
+	if r != 0 {
+		t.Fatalf("reading the owner of %s: %v", path, syscall.Errno(r))
+	}
+	defer syscall.LocalFree(syscall.Handle(uintptr(descriptor)))
+	if owner == nil {
+		t.Fatalf("%s has no owner", path)
+	}
+	sid, err := (*syscall.SID)(owner).String()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sid
+}
+
+// tokenUser is the security identifier of the user in the token of this
+// process, the user Hive runs as.
+func tokenUser(t testing.TB) string {
+	t.Helper()
+	token, err := syscall.OpenCurrentProcessToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer token.Close()
+	user, err := token.GetTokenUser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sid, err := user.User.Sid.String()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sid
+}
+
+// The user Hive runs as owns what the store makes: the directories MakeDir
+// creates, every one it had to make on the way, and the file CreateFile
+// creates, even where the process's token would own a new entry through its
+// default owner, as an elevated token's does (spec/records.md, The home: "The
+// owner is the user Hive runs as"). The owners are read from the security
+// descriptors, not from the store's own check.
+func TestMakeDirAndCreateFileAreOwnedByTheUser(t *testing.T) {
+	home := newHome(t)
+	dir := filepath.Join(home, "pool", "records", "thing")
+	if err := MakeDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "first.json")
+	f, err := CreateFile(file, os.O_WRONLY|os.O_CREATE|os.O_EXCL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	user := tokenUser(t)
+	for _, path := range []string{
+		home,
+		filepath.Join(home, "pool"),
+		filepath.Join(home, "pool", "records"),
+		dir,
+		file,
+	} {
+		if got := ownerOf(t, path); got != user {
+			t.Errorf("%s is owned by %s, not by the user %s", path, got, user)
+		}
+	}
 }
