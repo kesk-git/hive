@@ -143,6 +143,9 @@ func (s *Snapshot) RefuseConflicts(now time.Time, w Write) error {
 	return nil
 }
 
+// Roles are the roles a rule applies to, every one the resolver resolves for.
+func Roles() []string { return slices.Clone(roles) }
+
 // bringing are the keys of the projections the write brings: those a rendering
 // of the records it leaves is owed for its rules and its subjects.
 func bringing(w Write) []Key {

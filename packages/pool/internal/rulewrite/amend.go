@@ -3,6 +3,7 @@ package rulewrite
 import (
 	"time"
 
+	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
@@ -88,8 +89,12 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 		if !meetsCondition(r, receiptBody) {
 			return nil, envelope.Common(envelope.CodeAuthorityInsufficient, "the receipt is not of the kind and about the subject the rule's lift condition names")
 		}
+		evidence, err := evidenceOf(body, receiptBody)
+		if err != nil {
+			return nil, err
+		}
 		amendment["receipt"] = copyValue(receiptBody)
-		amendment["evidence"] = evidenceOf(body, receiptBody)
+		amendment["evidence"] = evidence
 		next["status"] = rule.StatusLifted
 	}
 	next["amendments"] = append(list(next["amendments"]), amendment)
@@ -182,14 +187,34 @@ func meetsCondition(r *rule.Rule, receipt map[string]any) bool {
 }
 
 // evidenceOf is the receipt of a lift by reference: the reference the caller
-// names, or one made from the receipt itself.
-func evidenceOf(body, receipt map[string]any) map[string]any {
-	if ev := tree(body["evidence"]); ev != nil {
-		return copyValue(ev).(map[string]any)
-	}
-	ref := map[string]any{"schema": "hive.receipt", "id": str(receipt["receipt_id"])}
+// names, which must name the receipt the request carries whole, by its schema
+// and identity and by its home, its revision, which is the first, and its digest
+// where the reference gives them; or one made from the receipt itself.
+func evidenceOf(body, receipt map[string]any) (map[string]any, error) {
+	ref := map[string]any{"schema": envelope.ReceiptSchema, "id": str(receipt["receipt_id"])}
 	if home := str(receipt["home_id"]); home != "" {
 		ref["home_id"] = home
 	}
-	return ref
+	ev := tree(body["evidence"])
+	if ev == nil {
+		return ref, nil
+	}
+	content, err := canon.Encode(receipt)
+	if err != nil {
+		return nil, internal("the receipt cannot be encoded", err)
+	}
+	same := ev["schema"] == ref["schema"] && ev["id"] == ref["id"]
+	if home, given := ev["home_id"]; given && home != receipt["home_id"] {
+		same = false
+	}
+	if revision, given := ev["record_revision"]; given && whole(revision) != 1 {
+		same = false
+	}
+	if digest, given := ev["digest"]; given && digest != canon.FileDigest(content) {
+		same = false
+	}
+	if !same {
+		return nil, invalid("evidence does not name the receipt the request carries whole")
+	}
+	return copyValue(ev).(map[string]any), nil
 }

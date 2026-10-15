@@ -661,3 +661,52 @@ func TestAProductRuleSupersededForSomeRolesStillConflictsForTheOthers(t *testing
 	// A rule for the Fleet that supersedes the Fleet's rule is no conflict.
 	h.recorded(supersedes(product("fleet"), fleet), request{})
 }
+
+func TestAProductRuleThatSupersedesARuleForEveryRoleNamedIsNoConflict(t *testing.T) {
+	h, _ := seed(t)
+	product := func(applies ...any) map[string]any {
+		return map[string]any{
+			"subject": "stage.ruling", "words": "The ruling.", "origin": map[string]any{"kind": "ruling"},
+			"applies": append([]any{}, applies...), "kind": "product", "governs": map[string]any{"stage": int64(2)},
+		}
+	}
+	everyone := h.recorded(product(), request{})
+	named := h.recorded(supersedes(product("hive", "fleet", "class-0", "class-1", "class-2", "class-3", "class-4", "class-5", "class-6", "class-7", "reviewer", "fixer", "validation"), everyone), request{})
+	h.recorded(supersedes(product(), named), request{})
+}
+
+func TestALiftsEvidenceNamesTheReceiptItCarries(t *testing.T) {
+	h, filing := seed(t)
+	body := opRule("dispatch.cap", "always", filing, "Dispatch at most one Swarm until the round closes.")
+	body["lift"] = map[string]any{"receipt_kind": "synapse.round.closed", "subject": map[string]any{"schema": "synapse.round", "id": "round_a"}}
+	rec := h.recorded(body, request{})
+	receipt := liftReceipt(t, "synapse.round.closed", "round_a")
+	content, err := canon.Encode(receipt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := func(edit map[string]any) map[string]any {
+		out := map[string]any{"schema": "hive.receipt", "id": receipt["receipt_id"], "home_id": homeID, "record_revision": int64(1), "digest": canon.FileDigest(content)}
+		for k, v := range edit {
+			out[k] = v
+		}
+		return out
+	}
+	h.unchanged(func() {
+		for name, evidence := range map[string]map[string]any{
+			"another receipt":  ref(map[string]any{"id": mint(t, ids.Receipt)}),
+			"another schema":   ref(map[string]any{"schema": "synapse.round"}),
+			"another digest":   ref(map[string]any{"digest": "sha256:" + strings.Repeat("0", 64)}),
+			"another revision": ref(map[string]any{"record_revision": int64(2)}),
+		} {
+			resp := h.amend(rec, map[string]any{"kind": "lift", "words": "The round closed.", "receipt": receipt, "evidence": evidence})
+			if resp.Status != envelope.Invalid || resp.Error.Code != "schema_violation" {
+				t.Errorf("%s: status %s, error %+v", name, resp.Status, resp.Error)
+			}
+		}
+	})
+	lifted := ok(t, h.amend(rec, map[string]any{"kind": "lift", "words": "The round closed.", "receipt": receipt, "evidence": ref(nil)}))["rule"].(map[string]any)
+	if a := lifted["amendments"].([]any)[0].(map[string]any); !same(t, a["evidence"], ref(nil)) {
+		t.Errorf("the lift records the evidence %v", a["evidence"])
+	}
+}

@@ -285,9 +285,7 @@ func checkProductConflict(rules []*rule.Rule, now time.Time, w *rule.Rule) error
 		}
 	}
 	after = append(after, w)
-	// The role "" stands for every role no rule of the group names, to which
-	// only a rule that applies to every role applies.
-	instants, roles := []time.Time{now}, []string{""}
+	instants := []time.Time{now}
 	for _, s := range append(slices.Clone(before), w) {
 		if t, err := clock.Parse(s.EffectiveAt); err == nil && t.After(now) {
 			instants = append(instants, t)
@@ -295,15 +293,10 @@ func checkProductConflict(rules []*rule.Rule, now time.Time, w *rule.Rule) error
 		if t, ok, err := s.EffectiveExpiry(); err == nil && ok && t.After(now) {
 			instants = append(instants, t)
 		}
-		for _, role := range s.Applies {
-			if !slices.Contains(roles, role) {
-				roles = append(roles, role)
-			}
-		}
 	}
 	slices.SortFunc(instants, func(a, b time.Time) int { return a.Compare(b) })
 	for _, at := range instants {
-		for _, role := range roles {
+		for _, role := range memory.Roles() {
 			involved := productConflict(after, at, role)
 			if len(involved) > 0 && !slices.Equal(involved, productConflict(before, at, role)) {
 				instant, _ := clock.Format(at)
