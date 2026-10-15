@@ -1,6 +1,7 @@
 package imperative
 
 import (
+	"errors"
 	"slices"
 	"unicode/utf8"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/packages/pool/internal/memory"
+	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
 )
 
 // The operation deliver of hive-imperative (spec/pool.md, The Imperative). It
@@ -46,6 +48,10 @@ func Deliver(c *cli.Call) (*cli.Result, error) {
 	}
 	if revisionNamed(l.Data, number) == nil {
 		return nil, notFound("revision")
+	}
+
+	if err := checkOpen(c, taskID, generation); err != nil {
+		return nil, err
 	}
 
 	text := strOf(body["rendered_text"])
@@ -98,6 +104,30 @@ func Deliver(c *cli.Call) (*cli.Result, error) {
 		b.tx = tx
 	}
 	return b.stage(map[string]any{"imperative": final})
+}
+
+// checkOpen refuses a delivery to a generation that the item does not have or
+// that is not open: a generation is delivered to while it is open on the item.
+func checkOpen(c *cli.Call, taskID string, generation int64) error {
+	l, om, err := poolstore.Load(c.Store, "item", taskID)
+	switch {
+	case errors.Is(err, poolstore.ErrNotFound):
+		return notFound("item")
+	case err != nil:
+		return poolstore.Failure("the item", err)
+	case om != nil:
+		return malformed("the item cannot be read", om.ID)
+	}
+	if err := checkScope(c, l.Data); err != nil {
+		return err
+	}
+	for _, v := range listOf(l.Data["generations"]) {
+		if g := mapOf(v); intOf(g["generation"]) == generation && g["state"] == "open" {
+			return nil
+		}
+	}
+	return refuse(codeNotOpen, "the generation is not open on the item, so nothing is delivered to it").
+		With("task_id", taskID).With("generation", generation)
 }
 
 // agree checks that the inventories of the request are those the text is
