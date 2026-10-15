@@ -12,6 +12,7 @@ import (
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/word/internal/entry"
 	"github.com/kesk-git/hive/packages/word/internal/poolfake"
 )
@@ -54,7 +55,10 @@ func mint(t testing.TB, p ids.Prefix) string {
 func newRig(t testing.TB) *rig {
 	t.Helper()
 	r := &rig{t: t, home: filepath.Join(t.TempDir(), "home"), pool: &poolfake.Pool{}, homeID: mint(t, ids.Home), workspaceID: mint(t, ids.Workspace)}
-	if err := os.Mkdir(r.home, 0o700); err != nil {
+	if err := store.MakeDir(r.home); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SecureDir(r.home); err != nil {
 		t.Fatal(err)
 	}
 	r.exe = entry.ExecutableWith(r.pool)
@@ -80,11 +84,26 @@ func (r *rig) write(rel string, tree map[string]any) {
 		r.t.Fatal(err)
 	}
 	path := filepath.Join(r.home, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	if err := store.MakeDir(filepath.Dir(path)); err != nil {
 		r.t.Fatal(err)
 	}
-	if err := os.WriteFile(path, append(out, '\n'), 0o600); err != nil {
-		r.t.Fatal(err)
+	writeFile(r.t, path, append(out, '\n'))
+}
+
+// writeFile writes home entries through the store, including deliberate record
+// corruption, so their ownership and access do not add an unintended fault.
+func writeFile(t testing.TB, path string, data []byte) {
+	t.Helper()
+	f, err := store.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 
