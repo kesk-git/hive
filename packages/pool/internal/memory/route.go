@@ -1,6 +1,8 @@
 package memory
 
 import (
+	"errors"
+
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
@@ -49,8 +51,16 @@ func (b *builder) routeItem(n *Note, reason string) (string, error) {
 		links = append(links, map[string]any{"kind": "record", "ref": copyValue(e)})
 	}
 	deps := []any{}
+	// The edge is to an item this Pool holds: where the origin is not known to
+	// it, the note is routed without one.
 	if origin := n.originatingTask(); origin != "" {
-		deps = append(deps, map[string]any{"type": "discovered-from", "task_id": origin})
+		held, err := b.holdsItem(origin)
+		if err != nil {
+			return "", err
+		}
+		if held {
+			deps = append(deps, map[string]any{"type": "discovered-from", "task_id": origin})
+		}
 	}
 	rec := map[string]any{
 		"schema": schemaItem, "schema_version": itemVersion, "record_revision": int64(1),
@@ -66,6 +76,21 @@ func (b *builder) routeItem(n *Note, reason string) (string, error) {
 	scope := envelopeOf(n.Scope)
 	scope.TaskID = taskID
 	return taskID, b.itemAdded(ref, scope)
+}
+
+// holdsItem says whether the Pool holds the item. One it cannot read is a source
+// that fails the fold.
+func (b *builder) holdsItem(taskID string) (bool, error) {
+	_, om, err := poolstore.Load(b.c.Store, kindItem, taskID)
+	switch {
+	case errors.Is(err, poolstore.ErrNotFound):
+		return false, nil
+	case err != nil:
+		return false, poolstore.Failure("an item", err)
+	case om != nil:
+		return false, malformed("an item a note was discovered from cannot be read", taskID, nil)
+	}
+	return true, nil
 }
 
 // itemAdded adds the receipt that the item was added, with the event the Pool

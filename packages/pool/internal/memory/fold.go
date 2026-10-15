@@ -2,7 +2,6 @@ package memory
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/kesk-git/hive/contract/cli"
@@ -23,18 +22,23 @@ import (
 // and the receipt accounts for every note once. A note or a source that cannot
 // be read fails the whole transaction, with the queue and its notes intact.
 //
-// It calls the renderer and Rerender and does not rewrite them: the budget
-// each filing is measured against is the planner's, with the notes before it in
-// the queue already filed.
+// It calls the renderer and Rerender and does not rewrite them. Each filing is
+// measured by rendering the subject's projections, at the clock and at each
+// later instant the live set changes, with the notes before it in the queue
+// already filed; a filing that leaves any of them over its budget routes the
+// note, and a budget never fails the fold.
 func FoldOp(c *cli.Call) (*cli.Result, error) {
+	if sc := c.Request.Scope; sc.Level != envelope.ScopeHive {
+		return nil, envelope.Common(envelope.CodeScopeMismatch, "the fold drains the home's whole queue, which holds notes of every scope, so it is made at the Hive's scope")
+	}
 	if !expectsQueue(c) {
 		return nil, invalid("hive-memory fold names the expected revision of the maintenance queue, " + schemaQueue + " " + queueID)
 	}
-	if err := checkExpected(c); err != nil {
-		return nil, err
-	}
 	q, err := loadQueue(c)
 	if err != nil {
+		return nil, err
+	}
+	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
 	receipt, err := c.NewReceipt(receiptFolded, versionOne, nil, nil, nil)
@@ -213,7 +217,8 @@ func (w *working) place(snap *Snapshot, now time.Time, n *Note) (placement, erro
 		return placement{reason: reasonSubjectUnknown}, nil
 	}
 	sub := w.subject(snap, n.SubjectID)
-	if sub == nil {
+	if sub == nil || !sameScope(sub.Scope, n.Scope) {
+		// A subject is known to a note only at exactly the note's scope.
 		return placement{reason: reasonSubjectUnknown}, nil
 	}
 	fact := factOf(n)
@@ -227,11 +232,12 @@ func (w *working) place(snap *Snapshot, now time.Time, n *Note) (placement, erro
 	if _, changed := w.subjects[sub.SubjectID]; !changed {
 		next.RecordRevision = sub.RecordRevision + 1
 	}
-	if _, err := snap.Plan(now, Write{Subjects: w.with(next)}); err != nil {
-		if overBudgetOf(err, sub.SubjectID) {
-			return placement{reason: reasonOverBudget}, nil
-		}
+	over, err := snap.overBudget(now, Write{Subjects: w.with(next)}, sub.SubjectID)
+	if err != nil {
 		return placement{}, err
+	}
+	if over {
+		return placement{reason: reasonOverBudget}, nil
 	}
 	if _, changed := w.subjects[sub.SubjectID]; !changed {
 		w.order = append(w.order, sub.SubjectID)
@@ -240,15 +246,38 @@ func (w *working) place(snap *Snapshot, now time.Time, n *Note) (placement, erro
 	return placement{factID: fact.FactID}, nil
 }
 
-// overBudgetOf says whether the error is the planner's refusal of a projection
-// of the subject. A projection of another subject that is over its budget is
-// no reason to route this note: it fails the fold, as any source it cannot
-// make sense of does.
-func overBudgetOf(err error, subjectID string) bool {
-	f := envelope.AsFailure(err)
-	if f == nil || f.Err.Code != CodeOverBudget {
-		return false
+// sameScope says whether two scopes are the same scope.
+func sameScope(a, b rule.Scope) bool {
+	return a.Level == b.Level && a.HomeID == b.HomeID && a.WorkspaceID == b.WorkspaceID && a.ProjectID == b.ProjectID
+}
+
+// overBudget says whether, after the write, any projection of the subject
+// would exceed its budget: each that stands or would be brought, rendered by
+// the renderer the planner uses, at the clock and at each later instant at
+// which a rule takes effect or expires. It measures the subject's projections
+// alone, which are the only ones a fact changes, and returns no refusal for a
+// budget.
+func (s *Snapshot) overBudget(now time.Time, w Write, subjectID string) (bool, error) {
+	after := s.after(w)
+	instants := after.instants(now)
+	for _, k := range after.reachable() {
+		if k.SubjectID != subjectID {
+			continue
+		}
+		id := ""
+		if e, ok := after.projection(k); ok {
+			id = e.ID
+		}
+		max := after.Budget.Max(id, k)
+		for _, at := range instants {
+			r, err := after.render(k, at, after.Budget.Revision)
+			if err != nil {
+				return false, err
+			}
+			if r.Bytes > max {
+				return true, nil
+			}
+		}
 	}
-	projection, _ := f.Err.Detail["projection"].(string)
-	return strings.HasSuffix(projection, " "+subjectID)
+	return false, nil
 }

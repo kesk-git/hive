@@ -61,18 +61,8 @@ func ParseNote(data map[string]any) (*Note, error) {
 }
 
 // mintNoteID gives a note its identity: the prefix of a maintenance note and a
-// ULID taken from the identity library. The prefix is the Pool's (spec/pool.md,
-// Identifiers) and the library does not register it yet, so the ULID is minted
-// under a registered prefix and carried over; the form is the one the note
-// schema holds the identity to.
-func mintNoteID(c *cli.Call) (string, error) {
-	id, err := ids.Mint(c.Clock, ids.Event)
-	if err != nil {
-		return "", err
-	}
-	_, ulid, _ := strings.Cut(id, "_")
-	return notePrefix + ulid, nil
-}
+// ULID (spec/pool.md, Identifiers).
+func mintNoteID(c *cli.Call) (string, error) { return ids.Mint(c.Clock, ids.Note) }
 
 // newNote is a note record as enqueue writes it: pending, at the scope of the
 // request, with the members the caller gave kept as they were given.

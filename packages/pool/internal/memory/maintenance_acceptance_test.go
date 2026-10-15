@@ -449,8 +449,11 @@ func TestFoldRepeatedIdenticalFactIsIdempotent(t *testing.T) {
 }
 
 func TestFoldRoutesWhatCannotBeFiledToTheSupervisorAsPrey(t *testing.T) {
-	h, subject := foldSeed(t)
+	h, _ := foldSeed(t)
+	// The subject is at the scope of the notes that name it.
+	subject := h.subject(projectScope, "class.p", "The first fact.")
 	task := "task_01jc7d8e9f0g1h2j3k4m5n6p7t"
+	h.plantItem(task)
 	big := strings.Repeat("A fact too long for its subject's budget. ", 300)
 	missing := "subj_" + strings.TrimPrefix(mint(t, ids.Task), "task_")
 	filing := h.subject(hiveScope, "filing.always")
@@ -676,8 +679,8 @@ func TestFoldNeedsTheQueueAtItsRevision(t *testing.T) {
 
 func TestFoldAndEnqueueNeedAQueue(t *testing.T) {
 	h, _ := seed(t)
-	refused(t, h.fold(1), envelope.Conflict, envelope.CodeRevisionConflict)
-	refused(t, h.enqueue(hiveScope, 1, note(t, "Nowhere to go.", nil)), envelope.Conflict, envelope.CodeRevisionConflict)
+	refused(t, h.fold(1), envelope.NotFound, envelope.CodeNotFound)
+	refused(t, h.enqueue(hiveScope, 1, note(t, "Nowhere to go.", nil)), envelope.NotFound, envelope.CodeNotFound)
 }
 
 func TestHivePoolReadsNotesAndTheQueue(t *testing.T) {
@@ -716,5 +719,119 @@ func TestEnqueueAndFoldAcceptOnlyVersionOne(t *testing.T) {
 		if resp.Status != envelope.Invalid || resp.Error == nil || resp.Error.Code != envelope.CodeUnsupportedVersion {
 			t.Errorf("%s at 2.0: status %s, error %+v; want unsupported_version", operation, resp.Status, resp.Error)
 		}
+	}
+}
+
+// plantItem stands an item of the project in the Pool, as the owner of the
+// Pool's items would.
+func (h *home) plantItem(task string) {
+	h.t.Helper()
+	rec := fixture(h.t, "pool.item", "decision-item")
+	rec["task_id"], rec["home_id"], rec["workspace_id"], rec["project_id"] = task, homeID, workspaceID, projectID
+	h.plant("item", task, rec)
+}
+
+// foldAt sends hive-memory fold at the scope.
+func (h *home) foldAt(scope map[string]any, queueRevision int64) *envelope.Response {
+	h.t.Helper()
+	return h.rawCall("hive-memory", "fold", h.document("fold", map[string]any{}, scope, queueRevision))
+}
+
+// The fold drains the home's whole queue, which holds notes of every scope, so
+// it is made at the Hive's scope and at no other.
+func TestFoldIsMadeAtTheHivesScope(t *testing.T) {
+	h, subject := foldSeed(t)
+	h.enqueued(note(t, "Waiting.", map[string]any{"subject_id": subject}))
+	h.unchanged(func() {
+		refused(t, h.foldAt(workspaceScope, 2), envelope.Refused, envelope.CodeScopeMismatch)
+		refused(t, h.foldAt(projectScope, 2), envelope.Refused, envelope.CodeScopeMismatch)
+	})
+	h.ok(h.foldAt(hiveScope, 2))
+}
+
+// A note's subject is known to it only at exactly the note's scope: a note of
+// a project naming a subject of the Hive, or the reverse, is routed as a note
+// with no known subject, and nothing of a project is filed into a broader one.
+func TestANoteKnowsASubjectOnlyAtItsOwnScope(t *testing.T) {
+	h, hiveSubject := foldSeed(t)
+	projectSubject := h.subject(projectScope, "class.p")
+	var order []string
+	order = append(order, h.enqueuedAt(projectScope, note(t, "Project note, Hive subject.", map[string]any{"subject_id": hiveSubject, "fact_id": "up"}))...)
+	order = append(order, h.enqueuedAt(hiveScope, note(t, "Hive note, project subject.", map[string]any{"subject_id": projectSubject, "fact_id": "down"}))...)
+	order = append(order, h.enqueuedAt(projectScope, note(t, "Project note, project subject.", map[string]any{"subject_id": projectSubject, "fact_id": "level"}))...)
+	body := h.ok(h.fold(h.queue()["record_revision"].(int64)))
+	reasons := map[string]any{}
+	for _, v := range body["items"].([]any) {
+		m := v.(map[string]any)
+		reasons[m["note_id"].(string)] = m["reason"]
+	}
+	if !equal(reasons, map[string]any{order[0]: "subject-unknown", order[1]: "subject-unknown"}) {
+		t.Errorf("routed %v", reasons)
+	}
+	if facts := body["facts"].([]any); len(facts) != 1 || facts[0].(map[string]any)["note_id"] != order[2] {
+		t.Errorf("facts %v", facts)
+	}
+	if got := h.factsOf(hiveSubject); got["up"] != "" || len(got) != 1 {
+		t.Errorf("a broader subject was filed into: %v", got)
+	}
+	if got := h.factsOf(projectSubject); got["level"] == "" || got["down"] != "" {
+		t.Errorf("facts of the project's subject: %v", got)
+	}
+}
+
+// The edge discovered-from names the originating task where the Pool holds
+// that item, and no edge names an item it does not hold.
+func TestDiscoveredFromNamesOnlyAnItemThePoolHolds(t *testing.T) {
+	h, _ := foldSeed(t)
+	held, unheld := "task_01jc7d8e9f0g1h2j3k4m5n6p7t", "task_01jc7d8e9f0g1h2j3k4m5n6p7v"
+	h.plantItem(held)
+	a, b := note(t, "From a task the Pool holds.", nil), note(t, "From a task it does not.", nil)
+	a["provenance"], b["provenance"] = provenance(t, held), provenance(t, unheld)
+	order := h.enqueued(a, b)
+	body := h.ok(h.fold(h.queue()["record_revision"].(int64)))
+	tasks := map[string]string{}
+	for _, v := range body["items"].([]any) {
+		m := v.(map[string]any)
+		tasks[m["note_id"].(string)] = m["task_id"].(string)
+	}
+	deps := func(i int) []any { return h.stored("item", tasks[order[i]])["deps"].([]any) }
+	if d := deps(0); len(d) != 1 || d[0].(map[string]any)["type"] != "discovered-from" || d[0].(map[string]any)["task_id"] != held {
+		t.Errorf("deps of the first %v", d)
+	}
+	if d := deps(1); len(d) != 0 {
+		t.Errorf("deps of the second %v", d)
+	}
+}
+
+// A refusal of any of the subject's projections, at a later instant as at the
+// clock, routes the note as over budget, and the fold still drains the queue.
+func TestAFilingThatFitsNowButNotLaterIsRoutedAsOverBudget(t *testing.T) {
+	text := strings.Repeat("x", 9100)
+	for _, c := range []struct {
+		name   string
+		future bool
+		reason string
+	}{{"with a rule that takes effect later", true, "over-budget"}, {"with no such rule", false, ""}} {
+		t.Run(c.name, func(t *testing.T) {
+			h, subject := foldSeed(t)
+			if c.future {
+				h.rule("subject", subject, hiveScope, R{"rule_line": strings.Repeat("l", 200), "effective_at": d25})
+			}
+			ids := h.enqueued(note(t, text, map[string]any{"subject_id": subject, "fact_id": "big"}))
+			body := h.ok(h.fold(h.queue()["record_revision"].(int64)))
+			if len(h.pending()) != 0 || body["remaining"] != int64(0) {
+				t.Fatalf("the queue was not drained: %v", body)
+			}
+			routed := body["items"].([]any)
+			if c.reason == "" {
+				if len(routed) != 0 || h.factsOf(subject)["big"] != text {
+					t.Errorf("the fact was not filed: %v", body)
+				}
+				return
+			}
+			if len(routed) != 1 || routed[0].(map[string]any)["reason"] != c.reason || routed[0].(map[string]any)["note_id"] != ids[0] || h.factsOf(subject)["big"] != "" {
+				t.Errorf("routed %v", routed)
+			}
+		})
 	}
 }

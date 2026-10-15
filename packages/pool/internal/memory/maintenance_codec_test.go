@@ -7,7 +7,6 @@ import (
 
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/clock"
-	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/packages/pool/internal/rule"
 )
 
@@ -90,33 +89,3 @@ func TestParseNoteRefusesWhatIsNotANote(t *testing.T) {
 		})
 	}
 }
-
-// Only the planner's refusal of a projection of the note's own subject routes
-// the note; any other refusal fails the fold.
-func TestOnlyTheSubjectsOwnBudgetRoutesANote(t *testing.T) {
-	over := func(projection string) error {
-		return refuse(CodeOverBudget, "over").With("projection", projection)
-	}
-	const subject = "subj_01jc7d8e9f0g1h2j3k4m5n6p7a"
-	for name, c := range map[string]struct {
-		err  error
-		want bool
-	}{
-		"its own projection":    {over("hive subject class-0 " + subject), true},
-		"another subject's":     {over("hive subject class-0 subj_01jc7d8e9f0g1h2j3k4m5n6p7b"), false},
-		"an always projection":  {over("hive always hive"), false},
-		"another refusal":       {refuse(CodeRuleConflict, "conflict").With("projection", "x "+subject), false},
-		"not a failure at all":  {errTest, false},
-		"a failure of a status": {envelope.Common(envelope.CodeInternal, "x"), false},
-	} {
-		if got := overBudgetOf(c.err, subject); got != c.want {
-			t.Errorf("%s: %v", name, got)
-		}
-	}
-}
-
-type testError string
-
-func (e testError) Error() string { return string(e) }
-
-const errTest = testError("not a failure")

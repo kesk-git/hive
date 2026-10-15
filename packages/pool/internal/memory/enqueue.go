@@ -31,11 +31,11 @@ func EnqueueOp(c *cli.Call) (*cli.Result, error) {
 	if !expectsQueue(c) {
 		return nil, invalid("hive-memory enqueue names the expected revision of the maintenance queue, " + schemaQueue + " " + queueID)
 	}
-	if err := checkExpected(c); err != nil {
-		return nil, err
-	}
 	q, err := loadQueue(c)
 	if err != nil {
+		return nil, err
+	}
+	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
 	stamp, err := c.Stamp()
