@@ -758,3 +758,10 @@ func TestAnExistingCoverageNeedsAStandingBinding(t *testing.T) {
 		refused(t, h.spec("accept", b), envelope.Refused, "pool.specification_unaccepted")
 	})
 }
+
+// define is declared at the contract's version for the complete body, 1.2, and
+// a request at 1.2 is accepted.
+func TestDefineIsAcceptedAtItsDeclaredVersion(t *testing.T) {
+	h := newHome(t)
+	h.ok(h.send("", "hive-spec", "define", define("Counter reset", "The first prose.", criteria(), map[string]any{"touched_subjects": []any{subject(t)}})))
+}

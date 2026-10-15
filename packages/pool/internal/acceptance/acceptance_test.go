@@ -144,9 +144,17 @@ func request(t testing.TB, command, operation string) []byte {
 	if command == "hive-memory" && operation == "check" {
 		body["projection_id"] = "not-a-projection"
 	}
+	// Each built operation is sent the version it is declared at.
+	version := "1.0"
+	switch {
+	case command == "hive-memory" && (operation == "render" || operation == "check" || operation == "propagate"):
+		version = "2.0"
+	case command == "hive-spec" && operation == "define":
+		version = "1.2"
+	}
 	out, err := canon.Encode(map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
-		"command": command, "operation": operation, "operation_version": "1.0",
+		"command": command, "operation": operation, "operation_version": version,
 		"request_id": requestID, "correlation_id": correlationID,
 		"issued_at": "2026-10-11T08:00:00.000Z", "caller": map[string]any{"kind": "test"},
 		"scope_level": "hive", "home_id": homeID,

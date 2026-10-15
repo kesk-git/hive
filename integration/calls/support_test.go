@@ -368,14 +368,56 @@ var testHome = ident(ids.Home, 1)
 // the call.
 type asPackage struct{ pkg, command string }
 
+// declaredVersions caches the operations each command declares in its
+// capabilities, so that a request carries the version its operation's own
+// declaration gives and no test writes one.
+var declaredVersions struct {
+	sync.Mutex
+	byCommand map[string]map[string][]string
+}
+
+// declaredVersion is the operation version a request to the operation carries:
+// the first version its declaration lists, which is the version of its current
+// body. An operation the command does not declare has no declaration to read,
+// and a request to it is refused before any version is read; it carries 1.0.
+func declaredVersion(t testing.TB, command, operation string) string {
+	t.Helper()
+	declaredVersions.Lock()
+	defer declaredVersions.Unlock()
+	ops, ok := declaredVersions.byCommand[command]
+	if !ok {
+		ops = map[string][]string{}
+		for _, op := range capabilitiesOf(t, command).Operations {
+			ops[op.Name] = op.Versions
+		}
+		if declaredVersions.byCommand == nil {
+			declaredVersions.byCommand = map[string]map[string][]string{}
+		}
+		declaredVersions.byCommand[command] = ops
+	}
+	if v := ops[operation]; len(v) > 0 {
+		return v[0]
+	}
+	return "1.0"
+}
+
 // newRequest builds the request document of a call: a caller, the command and
-// operation addressed, the body, in the hive scope of the test home. n makes
-// the request's identity.
-func newRequest(from asPackage, command, operation string, n int, body map[string]any) request {
+// operation addressed, the body, in the hive scope of the test home, at the
+// operation version the operation declares. n makes the request's identity.
+func newRequest(t testing.TB, from asPackage, command, operation string, n int, body map[string]any) request {
+	t.Helper()
+	return newMisaddressed(t, from, command, command, operation, n, body)
+}
+
+// newMisaddressed is newRequest for a request that names a command other than
+// the one that is called: the version is the one the operation declares in
+// the command called, declaredIn, and the document names command.
+func newMisaddressed(t testing.TB, from asPackage, declaredIn, command, operation string, n int, body map[string]any) request {
+	t.Helper()
 	r := envelope.Request{
 		Command:          command,
 		Operation:        operation,
-		OperationVersion: "1.0",
+		OperationVersion: declaredVersion(t, declaredIn, operation),
 		RequestID:        ident(ids.Request, n),
 		CorrelationID:    ident(ids.Correlation, 1),
 		IssuedAt:         "2026-10-11T08:00:00.000Z",

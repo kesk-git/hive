@@ -15,12 +15,14 @@ import (
 func RegisterSpecification(r *Registry, define, accept, closeSpecification Handler) {
 	for _, op := range []struct {
 		name     string
+		versions []string
 		handle   Handler
 		receipts []string
 	}{
-		{"define", define, []string{"pool.specification.defined", "pool.specification.invalidated", "pool.hold.placed"}},
-		{"accept", accept, []string{"pool.specification.accepted", "pool.hold.released"}},
-		{"close", closeSpecification, []string{"pool.specification.closed"}},
+		// define is declared at the contract's version for the complete body.
+		{"define", []string{"1.2"}, define, []string{"pool.specification.defined", "pool.specification.invalidated", "pool.hold.placed"}},
+		{"accept", []string{"1.0"}, accept, []string{"pool.specification.accepted", "pool.hold.released"}},
+		{"close", []string{"1.0"}, closeSpecification, []string{"pool.specification.closed"}},
 	} {
 		r.RegisterOperation("hive-spec", &cli.Operation{
 			OperationDecl: envelope.OperationDecl{
@@ -28,7 +30,7 @@ func RegisterSpecification(r *Registry, define, accept, closeSpecification Handl
 				State:          envelope.Supported,
 				Mode:           envelope.Unary,
 				Mutates:        true,
-				Versions:       []string{"1.0"},
+				Versions:       op.versions,
 				RequestSchema:  "urn:hive:schema:ops:hive-spec." + op.name + ".request:v1",
 				ResponseSchema: "urn:hive:schema:ops:hive-spec." + op.name + ".response:v1",
 				ReceiptKinds:   op.receipts,

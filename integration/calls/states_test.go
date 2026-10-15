@@ -71,11 +71,11 @@ func TestDeclaredCallsExitStatesRepeatAndSize(t *testing.T) {
 			before := snapshot(t, home)
 
 			t.Run("usage", func(t *testing.T) {
-				req := newRequest(from, command, "no-such-operation", nextRequest(), map[string]any{})
+				req := newRequest(t, from, command, "no-such-operation", nextRequest(), map[string]any{})
 				r := call{program: command, operation: "no-such-operation", home: home, req: req}.run(t)
 				wantEarly(t, r, 2, "usage", "unknown_operation")
 
-				req = newRequest(from, command, operation, nextRequest(), map[string]any{})
+				req = newRequest(t, from, command, operation, nextRequest(), map[string]any{})
 				r = call{program: command, operation: operation, req: req}.run(t) // no --home
 				wantEarly(t, r, 2, "usage", "usage")
 			})
@@ -87,7 +87,7 @@ func TestDeclaredCallsExitStatesRepeatAndSize(t *testing.T) {
 			})
 
 			t.Run("refused", func(t *testing.T) {
-				req := newRequest(from, command, operation, nextRequest(), map[string]any{})
+				req := newRequest(t, from, command, operation, nextRequest(), map[string]any{})
 				r := call{program: command, operation: operation, home: home, req: req}.run(t)
 				refusedByState(t, r, req.id, callee, command, operation, state, false)
 			})
@@ -104,7 +104,7 @@ func TestDeclaredCallsExitStatesRepeatAndSize(t *testing.T) {
 			})
 
 			t.Run("repeated", func(t *testing.T) {
-				req := newRequest(from, command, operation, nextRequest(), map[string]any{})
+				req := newRequest(t, from, command, operation, nextRequest(), map[string]any{})
 				first := call{program: command, operation: operation, home: home, req: req}.run(t)
 				second := call{program: command, operation: operation, home: home, req: req, stdin: true, responseFile: true}.run(t)
 				refusedByState(t, first, req.id, callee, command, operation, state, false)
@@ -115,7 +115,7 @@ func TestDeclaredCallsExitStatesRepeatAndSize(t *testing.T) {
 			})
 
 			t.Run("record of 2,097,152 bytes", func(t *testing.T) {
-				req := newRequest(from, command, operation, nextRequest(), map[string]any{"record": pattern(recordBytes)})
+				req := newRequest(t, from, command, operation, nextRequest(), map[string]any{"record": pattern(recordBytes)})
 				r := call{program: command, operation: operation, home: home, req: req, stdin: true, responseFile: true}.run(t)
 				if int64(len(req.data)) > limit {
 					wantTooLarge(t, r, "request", limit)

@@ -198,6 +198,9 @@ type rev struct {
 // request is how a request is made: the scope it is made at, the authority it
 // carries and the revisions it expects.
 type request struct {
+	// version is the operation version the request carries; empty is the
+	// version the operation is declared at.
+	version   string
 	scope     map[string]any
 	authority map[string]any
 	expected  []rev
@@ -227,9 +230,12 @@ func (h *home) send(command, operation string, body map[string]any, r request) *
 	if r.authority == nil {
 		r.authority = map[string]any{"kind": "none"}
 	}
+	if r.version == "" {
+		r.version = versions[operation]
+	}
 	req := map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
-		"command": command, "operation": operation, "operation_version": versions[operation],
+		"command": command, "operation": operation, "operation_version": r.version,
 		"request_id": mint(h.t, ids.Request), "correlation_id": mint(h.t, ids.Correlation),
 		"issued_at": "2026-10-14T09:00:00.000Z", "caller": map[string]any{"kind": "test"},
 		"authority": r.authority, "body": body,

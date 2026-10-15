@@ -30,7 +30,7 @@ func RegisterMemory(r *Registry, render, check, propagate, budget Handler, deriv
 				State:          envelope.Supported,
 				Mode:           envelope.Unary,
 				Mutates:        op.mutates,
-				Versions:       versions(op.version),
+				Versions:       []string{op.version},
 				RequestSchema:  "urn:hive:schema:ops:hive-memory." + op.request,
 				ResponseSchema: "urn:hive:schema:ops:hive-memory." + op.response,
 				ReceiptKinds:   op.receipts,
@@ -41,16 +41,4 @@ func RegisterMemory(r *Registry, render, check, propagate, budget Handler, deriv
 		})
 	}
 	read.RegisterProjectionReader(r.Reads, derive)
-}
-
-// versions are the operation versions an operation accepts: the version of its
-// body schema, and 1.0, which every operation of the Pool accepts and which the
-// cross-package call proof sends to each operation it calls. No v1 body of
-// render, check or propagate exists, so a request at 1.0 is read against the
-// current schema.
-func versions(current string) []string {
-	if current == "1.0" {
-		return []string{"1.0"}
-	}
-	return []string{current, "1.0"}
 }

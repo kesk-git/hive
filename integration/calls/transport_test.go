@@ -38,7 +38,7 @@ func TestTransportEnvelopes(t *testing.T) {
 	before := snapshot(t, home)
 
 	t.Run("response", func(t *testing.T) {
-		req := newRequest(fromDispatch, calleeExe, "echo", 1, map[string]any{"record": "hello"})
+		req := newRequest(t, fromDispatch, calleeExe, "echo", 1, map[string]any{"record": "hello"})
 		r := call{program: calleeExe, operation: "echo", home: home, req: req}.run(t)
 		resp := r.must(t)
 		if !isOneDocument(r.raw) {
@@ -104,7 +104,7 @@ func TestTransportEnvelopes(t *testing.T) {
 	})
 
 	t.Run("a field the request does not know", func(t *testing.T) {
-		req := newRequest(fromDispatch, calleeExe, "echo", 2, map[string]any{"record": "x"})
+		req := newRequest(t, fromDispatch, calleeExe, "echo", 2, map[string]any{"record": "x"})
 		tree := parseObject(t, req.data)
 		tree["unexpected"] = "member"
 		req.data = encodeObject(t, tree)
@@ -114,14 +114,14 @@ func TestTransportEnvelopes(t *testing.T) {
 
 	t.Run("another command or operation", func(t *testing.T) {
 		for _, c := range []struct{ command, operation string }{{calleeSmallName, "echo"}, {calleeExe, "state"}} {
-			req := newRequest(fromDispatch, c.command, c.operation, 3, map[string]any{"record": "x"})
+			req := newRequest(t, fromDispatch, c.command, c.operation, 3, map[string]any{"record": "x"})
 			r := call{program: calleeExe, operation: "echo", home: home, req: req}.run(t)
 			wantFailure(t, r, req.id, 3, "invalid", "envelope_mismatch")
 		}
 	})
 
 	t.Run("a body version the operation does not accept", func(t *testing.T) {
-		req := newRequest(fromDispatch, calleeExe, "echo", 4, map[string]any{"record": "x"})
+		req := newRequest(t, fromDispatch, calleeExe, "echo", 4, map[string]any{"record": "x"})
 		tree := parseObject(t, req.data)
 		tree["operation_version"] = "9.0"
 		req.data = encodeObject(t, tree)
@@ -173,18 +173,18 @@ func TestTransportEachExitState(t *testing.T) {
 			switch want.status {
 			case "usage":
 				// An operation the command does not have, and no request is read.
-				req := newRequest(fromDispatch, calleeExe, "no-such-operation", 10, map[string]any{})
+				req := newRequest(t, fromDispatch, calleeExe, "no-such-operation", 10, map[string]any{})
 				r = call{program: calleeExe, operation: "no-such-operation", home: home, req: req}.run(t)
 			case "invalid":
 				// Bytes that are no request: the identity cannot be read.
 				req := request{id: ident(ids.Request, 11), data: []byte(`{"schema":"hive.request",`)}
 				r = call{program: calleeExe, operation: "echo", home: home, req: req}.run(t)
 			case "too_large":
-				req := newRequest(fromDispatch, calleeSmallName, "echo", 12, map[string]any{"record": pattern(recordBytes)})
+				req := newRequest(t, fromDispatch, calleeSmallName, "echo", 12, map[string]any{"record": pattern(recordBytes)})
 				r = call{program: calleeSmallName, operation: "echo", home: home, req: req}.run(t)
 			default:
 				// ok and the states the callee gives are asked of its state operation.
-				req := newRequest(fromDispatch, calleeExe, "state", 13, map[string]any{"status": want.status})
+				req := newRequest(t, fromDispatch, calleeExe, "state", 13, map[string]any{"status": want.status})
 				id = req.id
 				r = call{program: calleeExe, operation: "state", home: home, req: req}.run(t)
 			}
@@ -245,7 +245,7 @@ func TestTransportEachExitState(t *testing.T) {
 func TestTransportUsage(t *testing.T) {
 	home := newHome(t)
 	before := snapshot(t, home)
-	req := newRequest(fromDispatch, calleeExe, "echo", 20, map[string]any{"record": "x"})
+	req := newRequest(t, fromDispatch, calleeExe, "echo", 20, map[string]any{"record": "x"})
 	r := call{program: calleeExe, operation: "echo", req: req}.run(t) // no --home
 	if r.failure != nil || r.result.Code != 2 || string(r.resp.Status) != "usage" || r.resp.Error.Code != "usage" {
 		t.Errorf("no home: exit %v, response %+v, failure %v; want exit 2, usage", r.result, r.resp, r.failure)
@@ -265,7 +265,7 @@ func TestTransportUsage(t *testing.T) {
 func TestTransportReplay(t *testing.T) {
 	home := newHome(t)
 	empty := snapshot(t, home)
-	first := newRequest(fromDispatch, calleeExe, "put", 30, map[string]any{"name": "alpha", "record": "first"})
+	first := newRequest(t, fromDispatch, calleeExe, "put", 30, map[string]any{"name": "alpha", "record": "first"})
 
 	r1 := call{program: calleeExe, operation: "put", home: home, req: first}.run(t)
 	resp1 := r1.must(t)
@@ -292,13 +292,13 @@ func TestTransportReplay(t *testing.T) {
 	sameSnapshot(t, "a replay", written, snapshot(t, home))
 
 	// The same request_id with another request.
-	other := newRequest(fromDispatch, calleeExe, "put", 30, map[string]any{"name": "beta", "record": "second"})
+	other := newRequest(t, fromDispatch, calleeExe, "put", 30, map[string]any{"name": "beta", "record": "second"})
 	r3 := call{program: calleeExe, operation: "put", home: home, req: other}.run(t)
 	wantFailure(t, r3, other.id, 5, "conflict", "replay_mismatch")
 	sameSnapshot(t, "a reused request_id", written, snapshot(t, home))
 
 	// Another request_id for the identifier that exists with other content.
-	again := newRequest(fromDispatch, calleeExe, "put", 31, map[string]any{"name": "alpha", "record": "third"})
+	again := newRequest(t, fromDispatch, calleeExe, "put", 31, map[string]any{"name": "alpha", "record": "third"})
 	r4 := call{program: calleeExe, operation: "put", home: home, req: again}.run(t)
 	wantFailure(t, r4, again.id, 5, "conflict", "already_exists")
 	sameSnapshot(t, "a write that lost to the state", written, snapshot(t, home))

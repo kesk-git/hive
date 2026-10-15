@@ -137,7 +137,7 @@ func proveCommand(t *testing.T, from asPackage, callee *declare.Package, cmd dec
 
 	if len(cmd.Operations) == 0 {
 		// Nothing to call: the command refuses every operation name as usage.
-		req := newRequest(from, cmd.Name, "no-such-operation", nextRequest(), map[string]any{})
+		req := newRequest(t, from, cmd.Name, "no-such-operation", nextRequest(), map[string]any{})
 		r := call{program: cmd.Name, operation: "no-such-operation", home: home, req: req}.run(t)
 		wantEarly(t, r, 2, "usage", "unknown_operation")
 		return
@@ -153,7 +153,7 @@ func proveCommand(t *testing.T, from asPackage, callee *declare.Package, cmd dec
 func proveOperation(t *testing.T, from asPackage, callee *declare.Package, command, operation string, state envelope.OperationState, home string) {
 	before := snapshot(t, home)
 
-	req := newRequest(from, command, operation, nextRequest(), map[string]any{})
+	req := newRequest(t, from, command, operation, nextRequest(), map[string]any{})
 	r := call{program: command, operation: operation, home: home, req: req}.run(t)
 	switch state {
 	case envelope.Unsupported:
@@ -164,7 +164,7 @@ func proveOperation(t *testing.T, from asPackage, callee *declare.Package, comma
 		wantAccepted(t, r, req.id, callee, command, operation, false)
 	}
 
-	other := newRequest(from, "hive-other", operation, nextRequest(), map[string]any{})
+	other := newMisaddressed(t, from, command, "hive-other", operation, nextRequest(), map[string]any{})
 	r = call{program: command, operation: operation, home: home, req: other}.run(t)
 	wantFailure(t, r, other.id, 3, "invalid", "envelope_mismatch")
 
