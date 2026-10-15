@@ -474,3 +474,48 @@ func TestAReadOfAProjectionSurvivesAMalformedOneBesideIt(t *testing.T) {
 		t.Errorf("a query: derived %v, omitted %v (body %v)", derived, omitted, body)
 	}
 }
+
+// stale renders a projection, changes its rule and renders it again, and
+// returns its identity, its first rendering, and the revision of it a caller
+// read before the second rendering and the revision after.
+func stale(h *home, filing string) (id string, first map[string]any, before, after []rev) {
+	line := h.rule("always", filing, hiveScope, nil)
+	p, _ := h.rendered(hiveScope, "always", "hive", "")
+	id, first = p["projection_id"].(string), current(p)
+	h.amend(line, R{"rule_line": "A changed line."})
+	np, _ := h.rendered(hiveScope, "always", "hive", "")
+	return id, first, []rev{{"pool.projection", id, p["record_revision"].(int64)}}, []rev{{"pool.projection", id, np["record_revision"].(int64)}}
+}
+
+// render compares every revision the request expects before it returns
+// unchanged or stages a write: a mismatch is revision_conflict and nothing is
+// written.
+func TestRenderChecksTheRevisionsTheRequestExpects(t *testing.T) {
+	h, filing := seed(t)
+	_, _, before, after := stale(h, filing)
+	render := func(expected []rev) *envelope.Response {
+		return h.send("hive-memory", "render", map[string]any{"tier": "always", "audience": "hive"}, request{expected: expected})
+	}
+	h.unchanged(func() { refused(t, render(before), envelope.Conflict, "revision_conflict") })
+	if body := h.ok(render(after)); body["unchanged"] != true {
+		t.Errorf("at the revision read: %v", body)
+	}
+}
+
+// propagate compares every revision the request expects before it returns
+// unchanged or stages a write: a mismatch is revision_conflict and nothing is
+// written.
+func TestPropagateChecksTheRevisionsTheRequestExpects(t *testing.T) {
+	h, filing := seed(t)
+	id, first, before, after := stale(h, filing)
+	propagate := func(expected []rev) *envelope.Response {
+		return h.send("hive-memory", "propagate", map[string]any{
+			"projection_id": id, "step": "received", "rendering": first["rendering"], "digest": first["digest"], "at": "2026-10-14T09:00:00.000Z",
+			"consumer": map[string]any{"kind": "generation", "task_id": mint(t, ids.Task), "generation": int64(1)},
+		}, request{expected: expected})
+	}
+	h.unchanged(func() { refused(t, propagate(before), envelope.Conflict, "revision_conflict") })
+	if resp := propagate(after); len(h.ok(resp)) == 0 || len(resp.Receipts) != 1 {
+		t.Errorf("at the revision read: receipts %v", resp.Receipts)
+	}
+}

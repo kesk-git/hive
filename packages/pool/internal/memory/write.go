@@ -1,7 +1,9 @@
 package memory
 
 import (
+	"errors"
 	"slices"
+	"strings"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
@@ -192,6 +194,32 @@ func checkContained(c *cli.Call, scope rule.Scope) error {
 	want := rule.Scope{Level: c.Request.Scope.Level, HomeID: c.Request.Scope.HomeID, WorkspaceID: c.Request.Scope.WorkspaceID, ProjectID: c.Request.Scope.ProjectID}
 	if !within(want, scope) {
 		return envelope.Common(envelope.CodeScopeMismatch, "the projection is outside the scope of the request")
+	}
+	return nil
+}
+
+// checkExpected compares every expected revision the request supplies with the
+// record it names, whether or not the operation writes that record, under the
+// lock the operation holds and before anything is computed. A record the Pool
+// does not hold is not at the revision named.
+func checkExpected(c *cli.Call) error {
+	for _, e := range c.Request.ExpectedRevisions {
+		stale := envelope.Common(envelope.CodeRevisionConflict, "the record is not at the revision the request expects")
+		kind, ok := strings.CutPrefix(e.Schema, "pool.")
+		if _, known := poolstore.Lookup(kind); !ok || !known {
+			return stale
+		}
+		l, om, err := poolstore.Load(c.Store, kind, e.ID)
+		switch {
+		case errors.Is(err, poolstore.ErrNotFound):
+			return stale
+		case err != nil:
+			return poolstore.Failure("a record the request expects", err)
+		case om != nil:
+			return envelope.Common(envelope.CodeRecordMalformed, "a record the request expects cannot be read").With("record", om.ID)
+		case l.Revision != e.RecordRevision:
+			return stale
+		}
 	}
 	return nil
 }

@@ -25,6 +25,9 @@ func PropagateOp(c *cli.Call) (*cli.Result, error) {
 	rendering, digest := num(body["rendering"]), str(body["digest"])
 	consumer := tree(body["consumer"])
 
+	if err := checkExpected(c); err != nil {
+		return nil, err
+	}
 	l, om, err := poolstore.Load(c.Store, kindProj, id)
 	switch {
 	case errors.Is(err, poolstore.ErrNotFound):

@@ -36,6 +36,9 @@ func RenderOp(c *cli.Call) (*cli.Result, error) {
 	if err := key.Valid(); err != nil {
 		return nil, invalid(err.Error())
 	}
+	if err := checkExpected(c); err != nil {
+		return nil, err
+	}
 	snap, err := Load(c.Store, c.Home.HomeID)
 	if err != nil {
 		return nil, err
