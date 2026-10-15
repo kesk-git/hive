@@ -196,6 +196,9 @@ type rev struct {
 type request struct {
 	scope    map[string]any
 	expected []rev
+	// version is the operation version the request carries, where it is not
+	// the one the operation is declared at.
+	version string
 }
 
 // versions are the operation versions the requests carry.
@@ -212,6 +215,9 @@ func (h *home) send(command, operation string, body map[string]any, r request) *
 	version := versions[operation]
 	if command == "hive-memory" && operation == "render" {
 		version = "2.0"
+	}
+	if r.version != "" {
+		version = r.version
 	}
 	req := map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
@@ -485,4 +491,15 @@ func expectedDigest(t testing.TB, revision map[string]any) string {
 		t.Fatal(err)
 	}
 	return canon.FileDigest(data)
+}
+
+// closeGeneration marks generation 1 of the item closed, as close-generation would.
+func (h *home) closeGeneration(id string) {
+	h.t.Helper()
+	rec := h.stored("item", id)
+	rec["record_revision"] = rec["record_revision"].(int64) + 1
+	g := rec["generations"].([]any)[0].(map[string]any)
+	g["state"], g["closed_at"], g["outcome"] = "closed", d02, "delivered"
+	g["closed_by"] = map[string]any{"schema": "dispatch.session.ended", "id": mint(h.t, ids.Receipt)}
+	h.plant("item", id, rec)
 }

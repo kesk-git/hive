@@ -1,6 +1,8 @@
 package imperative_test
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -325,6 +327,9 @@ func TestRenderGivesAnotherTextWhenARuleChanges(t *testing.T) {
 	w.created()
 	before := ok(t, w.render(w.hunt))
 	w.reword(w.playbook[0], "Work in one commit and run the declared command once.")
+	// A rule written through hive-rule re-renders the projections of its scope in
+	// its own transaction; the planted one is rendered again here.
+	ok(t, w.send("hive-memory", "render", map[string]any{"tier": "subject", "audience": "class-3", "subject_id": w.touched}, request{}))
 	after := ok(t, w.render(w.hunt))
 	if before["text_digest"] == after["text_digest"] || !strings.Contains(after["text"].(string), "["+w.playbook[0]+"@2]") {
 		t.Error("a changed rule left the rendering as it was")
@@ -341,6 +346,37 @@ func TestRenderRefusesAConflictedPlaybook(t *testing.T) {
 	w.unchanged(func() {
 		refused(t, w.render(w.hunt), envelope.Refused, "pool.rule_conflict")
 	})
+}
+
+func TestRenderRefusesAStaleSubjectProjectionAndNamesIt(t *testing.T) {
+	w := newWorld(t)
+	w.created()
+	ok(t, w.render(w.hunt))
+	// A rule now in force that the projection was not rendered from makes it
+	// stale, with no writer having marked it.
+	w.reword(w.touchedRule, "Exports retry at most five times.")
+	w.unchanged(func() {
+		resp := refused(t, w.render(w.hunt), envelope.Refused, "pool.projection_stale")
+		d := resp.Error.Detail
+		sources := list(d["stale_sources"])
+		if d["projection"] != w.projection || len(sources) != 1 || tree(sources[0])["id"] != w.touchedRule || tree(sources[0])["schema"] != "pool.rule" {
+			t.Errorf("detail %v", d)
+		}
+	})
+	// Rendered again, it is fresh and the Imperative renders.
+	ok(t, w.send("hive-memory", "render", map[string]any{"tier": "subject", "audience": "class-3", "subject_id": w.touched}, request{}))
+	ok(t, w.render(w.hunt))
+
+	// A conflicted playbook stays pool.rule_conflict, and a bound subject with no
+	// projection stays not found.
+	w.rule(w.classSubject, "class3.steps", "A second rule on a subject the class already rules.", "class-3")
+	refused(t, w.render(w.hunt), envelope.Refused, "pool.rule_conflict")
+	other := newWorld(t)
+	other.created()
+	if err := os.Remove(filepath.Join(other.dir, "pool", "records", "projection", other.projection+".json")); err != nil {
+		t.Fatal(err)
+	}
+	refused(t, other.render(other.hunt), envelope.NotFound, "not_found")
 }
 
 func TestRenderWithoutASpecificationHasNoCriteriaAndNoSubjects(t *testing.T) {
@@ -480,6 +516,44 @@ func TestDeliverRefusesWhatDoesNotAgreeWithTheRenderingSupplied(t *testing.T) {
 	body := w.delivery(r, 1, "launch-prompt")
 	body["revision"] = int64(4)
 	refused(t, w.send("hive-imperative", "deliver", body, request{}), envelope.NotFound, "not_found")
+}
+
+func TestDeliverRefusesAGenerationThatIsNotOpen(t *testing.T) {
+	w := newWorld(t)
+	w.created()
+	r := ok(t, w.render(w.hunt))
+	check := func(generation int64) {
+		t.Helper()
+		w.unchanged(func() {
+			resp := refused(t, w.send("hive-imperative", "deliver", w.delivery(r, generation, "launch-prompt"), request{}), envelope.Refused, "pool.generation_not_open")
+			if d := resp.Error.Detail; d["task_id"] != w.hunt || d["generation"] != generation {
+				t.Errorf("detail %v", d)
+			}
+		})
+	}
+	// The item has no generation yet, then a generation that is not the one named,
+	// then the one named once it is closed.
+	check(1)
+	w.open(w.hunt)
+	check(2)
+	w.closeGeneration(w.hunt)
+	check(1)
+}
+
+func TestCreateAndReviseAreDeclaredAtOneZeroOnly(t *testing.T) {
+	w := newWorld(t)
+	w.unchanged(func() {
+		refused(t, w.send("hive-imperative", "create", w.body(w.hunt), request{version: "1.1"}), envelope.Invalid, "unsupported_version")
+	})
+	w.created()
+	body := w.body(w.hunt)
+	body["supersedes_reason"] = "A steer."
+	w.unchanged(func() {
+		refused(t, w.send("hive-imperative", "revise", body, request{version: "1.1", expected: []rev{{"pool.imperative", w.hunt, 1}}}), envelope.Invalid, "unsupported_version")
+	})
+	for _, op := range []string{"render", "deliver"} {
+		refused(t, w.send("hive-imperative", op, map[string]any{"task_id": w.hunt}, request{version: "1.0"}), envelope.Invalid, "unsupported_version")
+	}
 }
 
 func TestTheReaderReturnsTheImperativeWhole(t *testing.T) {
