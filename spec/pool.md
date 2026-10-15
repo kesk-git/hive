@@ -449,7 +449,7 @@ They add no event kinds: their durable receipts and source revisions are what re
 | `pool.subject_invalid` | `refused` | A filing subject, loading step, scoped key or governed work does not agree with the request. |
 | `pool.delivery_inventory` | `refused` | The delivered rule or projection inventory does not agree with the exact rendering supplied. |
 | `pool.projection_stale` | `refused` | A subject projection that `hive-imperative render` would embed is stale at the instant of rendering, its rules and sources no longer those it was rendered from; the detail names the projection and its stale sources. |
-| `pool.generation_not_open` | `refused` | `hive-imperative deliver` names a generation that the item does not have or that is not open; the detail names the item and the generation. |
+| `pool.generation_not_open` | `refused` | `hive-pool close-generation` or `hive-imperative deliver` names a generation that the item does not have or that is not open; a delivery refusal's detail names the item and the generation. |
 | `pool.legacy_malformed` | `invalid` | The file is not a legacy backlog the grammar accepts, or an item to export carries an in-force hold with a legacy word whose reason holds parentheses, which the legacy form cannot represent. |
 | `pool.legacy_not_round_trip` | `refused` | The parsed file does not render back byte for byte, so it is not imported. |
 | `pool.fleet_not_a_task` | `refused` | A request tries to add a persistent supervisor as an item. |
