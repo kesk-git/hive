@@ -11,15 +11,9 @@ import (
 	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
 )
 
-// The rule route of spec/pool.md, Admission: a standing rule is the Hive Mind's
-// own sentence recorded as a rule, and clears a sensitive boundary before launch
-// only when its subject names that one boundary, its applying authority is a
-// word that stands at its scope, every extension of its expiry was made under a
-// word that stands, and the resolver of spec/pool.md, Rules, resolve, gives it
-// among the rules in force for the admission's scope at the instant of the check,
-// with no conflict on its subject. An admission carries no role, task generation
-// or generation, so a rule narrowed to a task or a generation, one that applies
-// to a role, and a product rule clear nothing. Any other rule clears nothing.
+// The rule route is defined in spec/pool.md, Admission. Use the shared resolver
+// so supersession, applicability and conflicts cannot diverge from other rule
+// consumers.
 
 // subjectPrefix begins the subject of a rule on a boundary of admission.
 const subjectPrefix = "admission."
