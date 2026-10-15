@@ -427,9 +427,7 @@ func TestAHomeInsideAWorkingTreeIsRefused(t *testing.T) {
 	isolateGit(t)
 	repo := newClone(t, "")
 	home := filepath.Join(repo, "home")
-	if err := os.Mkdir(home, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	emptyHome(t, home)
 	expect(t, send(t, home, request(t, mint(t, ids.Home), hiveBody("Hive"))), envelope.Refused, envelope.CodeHomeInsideRepository)
 	if _, err := os.Stat(filepath.Join(home, "home.json")); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("a home record was written inside a working tree: %v", err)
@@ -746,9 +744,7 @@ func TestACloneWithASeparateGitDirectoryIsOneThroughItsLinkedTrees(t *testing.T)
 // says so again; a home with none has no such member.
 func TestAnUnknownHomeEntryIsLeftAloneAndNamedInTheResponse(t *testing.T) {
 	home := newHome(t)
-	if err := os.WriteFile(filepath.Join(home, "notes.txt"), []byte("mine"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, filepath.Join(home, "notes.txt"), []byte("mine"))
 	req := request(t, mint(t, ids.Home), hiveBody("Hive"))
 	for _, attempt := range []string{"first", "replay"} {
 		resp := send(t, home, req)
