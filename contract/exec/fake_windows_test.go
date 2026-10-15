@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime/debug"
 	"strconv"
 	"syscall"
 	"time"
@@ -28,10 +29,17 @@ func leaveTree(cmd *exec.Cmd, leave bool) {
 	}
 }
 
-// selfKill ends the process with an exception status it does not handle,
-// which Windows reports as the status of the process.
+// selfKill ends the process by a native exception it does not handle, which
+// Windows reports as the status of the process. The Go runtime installs its own
+// exception handlers, and by default one that sees an exception it does not
+// recognise prints a traceback and returns through the ordinary exit(2), so the
+// process would end with code 2. Crash mode makes that handler hand the
+// original exception record to the native fail-fast path
+// (RaiseFailFastException) instead, so the process ends by the exception
+// raised here, with its code as the status.
 func selfKill() {
 	procSetErrorMode.Call(errorModeNoFaultDialog)
+	debug.SetTraceback("crash")
 	procRaiseException.Call(0xC0000999, 1, 0, 0)
 	time.Sleep(time.Hour)
 }
