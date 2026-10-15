@@ -153,9 +153,7 @@ func TestAReadNamesWhatItCouldNotReturn(t *testing.T) {
 		t.Fatalf("%s %+v", resp.Status, resp.Error)
 	}
 	broken := filepath.Join(p.dir, "pool", "records", "hold", "hold_broken.json")
-	if err := os.WriteFile(broken, []byte("{\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	p.put(broken, []byte("{\n"))
 	if resp := p.do("read", map[string]any{"kind": "hold", "selector": map[string]any{"id": "hold_absent"}}); resp.Status != envelope.NotFound || resp.Error.Code != envelope.CodeNotFound {
 		t.Errorf("an absent record: %s %+v", resp.Status, resp.Error)
 	}

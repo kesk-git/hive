@@ -17,7 +17,12 @@ import (
 func newStore(t testing.TB) (*cstore.Store, string) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, 0o700); err != nil {
+	// The root is made and secured first, as Hive makes a home, so that every
+	// entry made in it is owner-only and owned by the user.
+	if err := cstore.MakeDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := cstore.SecureDir(dir); err != nil {
 		t.Fatal(err)
 	}
 	homeID, err := ids.Mint(clock.System{}, ids.Home)
@@ -33,9 +38,7 @@ func newStore(t testing.TB) (*cstore.Store, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "home.json"), append(home, '\n'), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	putFile(t, filepath.Join(dir, "home.json"), append(home, '\n'))
 	st, err := cstore.Open(dir, Package, cstore.Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -46,11 +49,27 @@ func newStore(t testing.TB) (*cstore.Store, string) {
 // put writes a record file as a writer would have left it.
 func put(t testing.TB, dir, kind, id string, content []byte) {
 	t.Helper()
-	path := filepath.Join(dir, "pool", "records", kind, id+".json")
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	putFile(t, filepath.Join(dir, "pool", "records", kind, id+".json"), content)
+}
+
+// putFile puts the file at path in a home with the content given, through the
+// store's own primitives, so that the directories above it and the file are
+// owner-only and owned by the user, as Hive makes them. A file that is there is
+// emptied first.
+func putFile(t testing.TB, path string, content []byte) {
+	t.Helper()
+	if err := cstore.MakeDir(filepath.Dir(path)); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, content, 0o600); err != nil {
+	f, err := cstore.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(content); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -75,11 +94,9 @@ func TestARecordThatCannotBeReadIsNamedAndNeverGuessed(t *testing.T) {
 	put(t, dir, "hold", "hold_schema", file(func(m map[string]any) { delete(m, "reason"); m["hold_id"] = "hold_schema" }))
 	put(t, dir, "hold", "hold_newer", file(func(m map[string]any) { m["schema_version"] = "1.5"; m["hold_id"] = "hold_newer" }))
 	put(t, dir, "hold", "hold_other", file(func(m map[string]any) {}))
-	if err := os.WriteFile(filepath.Join(dir, "pool", "records", "hold", "notes.txt"), []byte("not a record"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	putFile(t, filepath.Join(dir, "pool", "records", "hold", "notes.txt"), []byte("not a record"))
 	put(t, dir, "hold", "Bad Name", []byte("{}"))
-	if err := os.Mkdir(filepath.Join(dir, "pool", "records", "hold", "hold_dir.json"), 0o700); err != nil {
+	if err := cstore.MakeDir(filepath.Join(dir, "pool", "records", "hold", "hold_dir.json")); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(filepath.Join(dir, "pool", "records", "hold", id+".json"), filepath.Join(dir, "pool", "records", "hold", "hold_link.json")); err != nil {

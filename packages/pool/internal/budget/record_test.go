@@ -1,7 +1,6 @@
 package budget_test
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -54,12 +53,7 @@ func TestTheReaderRefusesWhatItCannotRead(t *testing.T) {
 
 	garbled := newHome(t)
 	path := filepath.Join(garbled.dir, "pool", "records", "budget", "memory.json")
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte("not a record\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	garbled.put(path, []byte("not a record\n"))
 	if _, err := garbled.read(homeID); envelope.AsFailure(err) == nil || envelope.AsFailure(err).Err.Code != envelope.CodeRecordMalformed {
 		t.Errorf("a record that cannot be read: %v", err)
 	}

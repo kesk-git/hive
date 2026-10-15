@@ -1,7 +1,6 @@
 package memory_test
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -461,9 +460,7 @@ func TestAReadOfAProjectionSurvivesAMalformedOneBesideIt(t *testing.T) {
 	p, _ := h.rendered(hiveScope, "always", "hive", "")
 	id := p["projection_id"].(string)
 	bad := mint(t, ids.Projection)
-	if err := os.WriteFile(filepath.Join(h.dir, "pool", "records", "projection", bad+".json"), []byte("{"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	h.put(filepath.Join(h.dir, "pool", "records", "projection", bad+".json"), []byte("{"))
 	if m := h.freshness(id); m["state"] != "fresh" {
 		t.Errorf("by identity: %v", m)
 	}

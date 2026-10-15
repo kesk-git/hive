@@ -130,7 +130,7 @@ type home struct {
 // one workspace and one project not bound to a repository.
 func newHome() *home {
 	h := &home{dir: filepath.Join(newDir(), "home"), clk: clock.NewFake(start)}
-	must(os.Mkdir(h.dir, 0o700))
+	must(cstore.MakeDir(h.dir))
 	must(cstore.SecureDir(h.dir))
 	h.write("home.json", map[string]any{
 		"schema": "hive.home", "schema_version": "1.0", "record_revision": int64(1),
@@ -160,8 +160,22 @@ func (h *home) write(rel string, rec map[string]any) {
 	data, err := canon.Encode(rec)
 	must(err)
 	path := filepath.Join(h.dir, filepath.FromSlash(rel))
-	must(os.MkdirAll(filepath.Dir(path), 0o700))
-	must(os.WriteFile(path, append(data, '\n'), 0o600))
+	putFile(path, append(data, '\n'))
+}
+
+// putFile puts the file at path in a home with the content given, through the
+// store's own primitives, so that the directories above it and the file are
+// owner-only and owned by the user, as Hive makes them. A file that is there is
+// emptied first.
+func putFile(path string, data []byte) {
+	must(cstore.MakeDir(filepath.Dir(path)))
+	f, err := cstore.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	must(err)
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		must(err)
+	}
+	must(f.Close())
 }
 
 // plant stands a record in the Pool as the writers of other lanes would.
@@ -316,9 +330,10 @@ func (h *home) do(r *req) *envelope.Response {
 	return resp
 }
 
-// writeFile replaces a file of the home.
+// writeFile replaces a file of the home, through the store's own primitives, so
+// that it keeps the owner and the access of the file it replaces.
 func writeFile(dir, rel string, data []byte) {
-	must(os.WriteFile(filepath.Join(dir, filepath.FromSlash(rel)), data, 0o600))
+	putFile(filepath.Join(dir, filepath.FromSlash(rel)), data)
 }
 
 // clone copies a home to a directory of its own, which the test removes when
@@ -328,7 +343,7 @@ func clone(t testing.TB, src string) string {
 	if t != nil {
 		t.Cleanup(func() { os.RemoveAll(filepath.Dir(dst)) })
 	}
-	must(os.MkdirAll(dst, 0o700))
+	must(cstore.MakeDir(dst))
 	must(cstore.SecureDir(dst))
 	must(filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -340,13 +355,14 @@ func clone(t testing.TB, src string) string {
 		}
 		target := filepath.Join(dst, rel)
 		if d.IsDir() {
-			return os.MkdirAll(target, 0o700)
+			return cstore.MakeDir(target)
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(target, data, 0o600)
+		putFile(target, data)
+		return nil
 	}))
 	return dst
 }

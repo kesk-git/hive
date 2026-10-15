@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/store"
 	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
 )
 
@@ -33,7 +34,7 @@ func TestAFIFOAtARecordPathIsMalformedAndNeverOpened(t *testing.T) {
 	p := newPool(t)
 	id, body := p.hold()
 	path := filepath.Join(p.dir, filepath.FromSlash(holdPath(id)))
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	if err := store.MakeDir(filepath.Dir(path)); err != nil {
 		t.Fatal(err)
 	}
 	if err := syscall.Mkfifo(path, 0o600); err != nil {

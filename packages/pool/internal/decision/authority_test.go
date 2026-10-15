@@ -1,7 +1,6 @@
 package decision_test
 
 import (
-	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -196,12 +195,7 @@ func TestTheWordDoesNotStandOnAnUnknownOrAMalformedReference(t *testing.T) {
 	t.Run("a question record that cannot be read", func(t *testing.T) {
 		id := mint(t, ids.Question)
 		path := filepath.Join(h.dir, "pool", "records", "question", id+".json")
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte("not a record\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
+		h.put(path, []byte("not a record\n"))
 		is(t, h.stands(scope, id, 1), "malformed")
 	})
 }
