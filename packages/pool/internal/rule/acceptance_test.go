@@ -277,7 +277,11 @@ func TestARuleOfAnotherRoleIsLeftOut(t *testing.T) {
 	h := newHome(t)
 	every := h.rule("a.subject", "hive", nil)
 	classThree := h.rule("b.subject", "hive", R{"applies": []any{"class-3", "reviewer"}})
-	same(t, "class-3", applied(h.resolved("class-3", "", nil)), []string{every, classThree})
+	// Both rules are of the Hive layer with one effective time, so resolve
+	// orders them by rule identity, not by the order they were made in.
+	ids := []string{every, classThree}
+	slices.Sort(ids)
+	same(t, "class-3", applied(h.resolved("class-3", "", nil)), ids)
 	body := h.resolved("class-4", "", nil)
 	same(t, "class-4", applied(body), []string{every})
 	if got := excluded(body); len(got) != 1 || got[classThree] != "role" {
