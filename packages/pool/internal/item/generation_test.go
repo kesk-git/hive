@@ -350,8 +350,9 @@ func TestCloseGenerationRecordsEachOutcomeAndChangesNoState(t *testing.T) {
 	}
 }
 
-// A close names a generation of the item that is open: any other is refused and
-// changes nothing, and so is an item that does not exist.
+// A close names a generation of the item that is open: any other, one the item
+// does not have or one closed already, is pool.generation_not_open and changes
+// nothing, and an item that does not exist is not found.
 func TestCloseGenerationRefusesWhatIsNotAnOpenGeneration(t *testing.T) {
 	h := newHome(t)
 	id := h.addID(leaf("A leaf"))
@@ -362,9 +363,7 @@ func TestCloseGenerationRefusesWhatIsNotAnOpenGeneration(t *testing.T) {
 	for name, generation := range map[string]int64{"an earlier one closed already": 1, "one never opened": 3} {
 		t.Run(name, func(t *testing.T) {
 			h.unchanged(func() {
-				if resp := h.closeGeneration(id, generation, "failed"); resp.Status == envelope.Ok || resp.Error == nil {
-					t.Fatalf("generation %d was closed: %s", generation, resp.Status)
-				}
+				refused(t, h.closeGeneration(id, generation, "failed"), envelope.Refused, "pool.generation_not_open")
 			})
 		})
 	}
@@ -372,4 +371,40 @@ func TestCloseGenerationRefusesWhatIsNotAnOpenGeneration(t *testing.T) {
 	if g := h.generations(id); len(g) != 2 || g[1].(map[string]any)["state"] != "open" {
 		t.Errorf("the generations are %v", g)
 	}
+}
+
+// An open is a queued or an in-flight item's: a done or an archived item is
+// refused as a transition the table does not list, with nothing written.
+func TestOpenGenerationOnADoneOrArchivedItemIsNotInTheTable(t *testing.T) {
+	for _, to := range []string{"done", "archived"} {
+		t.Run(to, func(t *testing.T) {
+			h := newHome(t)
+			id := h.addID(leaf("A leaf"))
+			h.imperative(id, nil)
+			h.move(id, to)
+			admission := h.admit(id)
+			h.unchanged(func() {
+				refused(t, h.open(id, admission), envelope.Refused, "pool.state_transition")
+			})
+			if record, _ := h.item(id); record["state"] != to || len(h.generations(id)) != 0 {
+				t.Errorf("the refusal left the item %v with %d generations", record["state"], len(h.generations(id)))
+			}
+		})
+	}
+}
+
+// Criteria the Imperative names for an item that has no effective specification
+// differ from it: absent on one side and a binding on the other is
+// pool.imperative_stale, and absent on both sides agrees.
+func TestCriteriaNamedForAnItemWithNoEffectiveSpecificationDiffer(t *testing.T) {
+	h := newHome(t)
+	id := h.addID(leaf("A leaf"))
+	binding := map[string]any{"specification_id": mint(t, ids.Spec), "revision": int64(1), "digest": "sha256:" + strings.Repeat("a", 64)}
+	h.imperative(id, binding)
+	admission := h.admit(id)
+	h.unchanged(func() {
+		refused(t, h.open(id, admission), envelope.Refused, "pool.imperative_stale")
+	})
+	h.imperative(id, nil)
+	h.opened(id)
 }
