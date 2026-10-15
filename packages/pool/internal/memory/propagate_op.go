@@ -21,76 +21,114 @@ import (
 // received.
 func PropagateOp(c *cli.Call) (*cli.Result, error) {
 	body := c.Request.Body
-	id, step := str(body["projection_id"]), str(body["step"])
-	rendering, digest := num(body["rendering"]), str(body["digest"])
-	consumer := tree(body["consumer"])
-
 	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
-	l, om, err := poolstore.Load(c.Store, kindProj, id)
+	tx, out, err := stageStep(c, poolstore.Transaction{}, projectionStep{
+		ProjectionID: str(body["projection_id"]), Step: str(body["step"]), Rendering: num(body["rendering"]),
+		Digest: str(body["digest"]), Consumer: tree(body["consumer"]), At: str(body["at"]), Evidence: tree(body["evidence"]),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !out.Changed {
+		return &cli.Result{Body: map[string]any{"projection": out.Projection, "consumer": out.Consumer}}, nil
+	}
+	staged, err := poolstore.Stage(c, tx)
+	if err != nil {
+		return nil, err
+	}
+	return staged.Result(map[string]any{"projection": out.Projection, "consumer": out.Consumer}), nil
+}
+
+// projectionStep is one step of one consumer on one rendering of a projection:
+// the step received or acknowledged, the rendering and its digest, the time, and
+// the consumer's own record where it gave one.
+type projectionStep struct {
+	ProjectionID string
+	Step         string
+	Rendering    int64
+	Digest       string
+	Consumer     map[string]any
+	At           string
+	Evidence     map[string]any
+}
+
+// stepOutcome is what staging a step came to: the projection and the
+// consumer's entry as they stand, and whether the step added anything to the
+// transaction; a step already recorded adds nothing.
+type stepOutcome struct {
+	Projection map[string]any
+	Consumer   map[string]any
+	Changed    bool
+}
+
+// stageStep is the one implementation of the steps of propagate. It adds the
+// record of the step and its receipt to the transaction, and returns it.
+func stageStep(c *cli.Call, tx poolstore.Transaction, s projectionStep) (poolstore.Transaction, stepOutcome, error) {
+	l, om, err := poolstore.Load(c.Store, kindProj, s.ProjectionID)
 	switch {
 	case errors.Is(err, poolstore.ErrNotFound):
-		return nil, envelope.Common(envelope.CodeNotFound, "no projection has that identity")
+		return tx, stepOutcome{}, envelope.Common(envelope.CodeNotFound, "no projection has that identity")
 	case err != nil:
-		return nil, poolstore.Failure("the projection", err)
+		return tx, stepOutcome{}, poolstore.Failure("the projection", err)
 	case om != nil:
-		return nil, envelope.Common(envelope.CodeRecordMalformed, "the projection cannot be read").With("record", om.ID)
+		return tx, stepOutcome{}, envelope.Common(envelope.CodeRecordMalformed, "the projection cannot be read").With("record", om.ID)
 	}
 	e, err := ParseProjection(l.Data)
 	if err != nil {
-		return nil, malformed("the projection cannot be read", id, err)
+		return tx, stepOutcome{}, malformed("the projection cannot be read", s.ProjectionID, err)
 	}
 	if err := checkContained(c, e.Scope); err != nil {
-		return nil, err
+		return tx, stepOutcome{}, err
 	}
 	named := e.Current
-	if named.Number != rendering {
+	if named.Number != s.Rendering {
 		found := false
 		for _, h := range list(l.Data["history"]) {
-			if r, err := parseRendering(h); err == nil && r.Number == rendering {
+			if r, err := parseRendering(h); err == nil && r.Number == s.Rendering {
 				named, found = r, true
 			}
 		}
 		if !found {
-			return nil, refuse(CodeDeliveryInvent, "the projection has no such rendering")
+			return tx, stepOutcome{}, refuse(CodeDeliveryInvent, "the projection has no such rendering")
 		}
 	}
-	if named.Digest != digest {
-		return nil, refuse(CodeDeliveryInvent, "the digest is not the digest of the rendering named")
+	if named.Digest != s.Digest {
+		return tx, stepOutcome{}, refuse(CodeDeliveryInvent, "the digest is not the digest of the rendering named")
 	}
 
-	same := func(s map[string]any) bool { return num(s["rendering"]) == rendering && str(s["digest"]) == digest }
+	same := func(r map[string]any) bool { return num(r["rendering"]) == s.Rendering && str(r["digest"]) == s.Digest }
 	var received map[string]any
 	for _, h := range list(l.Data["receipt_history"]) {
 		h := tree(h)
-		if !sameTree(h["consumer"], consumer) {
+		if !sameTree(h["consumer"], s.Consumer) {
 			continue
 		}
 		if r := tree(h["received"]); same(r) {
 			received = r
-			if step == "received" && h["acknowledged"] == nil {
-				return &cli.Result{Body: map[string]any{"projection": l.Data, "consumer": h}}, nil
+			if s.Step == "received" && h["acknowledged"] == nil {
+				return tx, stepOutcome{Projection: l.Data, Consumer: h}, nil
 			}
 		}
-		if a := tree(h["acknowledged"]); step == "acknowledged" && a != nil && same(a) {
-			return &cli.Result{Body: map[string]any{"projection": l.Data, "consumer": h}}, nil
+		if a := tree(h["acknowledged"]); s.Step == "acknowledged" && a != nil && same(a) {
+			return tx, stepOutcome{Projection: l.Data, Consumer: h}, nil
 		}
 	}
-	if step == "acknowledged" && received == nil {
-		return nil, refuse(CodeDeliveryInvent, "the consumer has not received that rendering, so it cannot acknowledge it")
+	if s.Step == "acknowledged" && received == nil {
+		return tx, stepOutcome{}, refuse(CodeDeliveryInvent, "the consumer has not received that rendering, so it cannot acknowledge it")
 	}
 
 	receiptID, err := ids.Mint(c.Clock, ids.Receipt)
 	if err != nil {
-		return nil, internal("a receipt cannot be made", err)
+		return tx, stepOutcome{}, internal("a receipt cannot be made", err)
 	}
-	next := map[string]any{"rendering": rendering, "digest": digest, "at": str(body["at"]), "receipt_id": receiptID}
-	if ev := tree(body["evidence"]); ev != nil {
-		next["evidence"] = ev
+	next := map[string]any{"rendering": s.Rendering, "digest": s.Digest, "at": s.At, "receipt_id": receiptID}
+	if s.Evidence != nil {
+		next["evidence"] = copyValue(s.Evidence)
 	}
-	entry := map[string]any{"consumer": copyValue(consumer)}
-	if step == "received" {
+	entry := map[string]any{"consumer": copyValue(s.Consumer)}
+	if s.Step == "received" {
 		entry["received"] = next
 	} else {
 		entry["received"], entry["acknowledged"] = copyValue(received), next
@@ -101,7 +139,7 @@ func PropagateOp(c *cli.Call) (*cli.Result, error) {
 	consumers := list(rec["consumers"])
 	at := -1
 	for i, v := range consumers {
-		if sameTree(tree(v)["consumer"], consumer) {
+		if sameTree(tree(v)["consumer"], s.Consumer) {
 			at = i
 		}
 	}
@@ -109,32 +147,28 @@ func PropagateOp(c *cli.Call) (*cli.Result, error) {
 		consumers = append(consumers, copyValue(entry))
 	} else {
 		cur := tree(consumers[at])
-		if step == "received" && rendering >= num(tree(cur["received"])["rendering"]) {
+		if s.Step == "received" && s.Rendering >= num(tree(cur["received"])["rendering"]) {
 			cur["received"] = copyValue(next)
 		}
-		if step == "acknowledged" && (cur["acknowledged"] == nil || rendering >= num(tree(cur["acknowledged"])["rendering"])) {
+		if s.Step == "acknowledged" && (cur["acknowledged"] == nil || s.Rendering >= num(tree(cur["acknowledged"])["rendering"])) {
 			cur["acknowledged"] = copyValue(next)
 		}
 	}
 	rec["consumers"] = consumers
 
-	b := &builder{c: c}
-	final, ref, err := b.put(kindProj, id, rec, l.Revision)
+	b := &builder{c: c, tx: tx}
+	final, ref, err := b.put(kindProj, s.ProjectionID, rec, l.Revision)
 	if err != nil {
-		return nil, err
+		return tx, stepOutcome{}, err
 	}
 	kind := receiptReceived
-	if step == "acknowledged" {
+	if s.Step == "acknowledged" {
 		kind = receiptAcknowledged
 	}
 	if err := b.receipt(receiptID, kind, ref, e.Scope); err != nil {
-		return nil, err
+		return tx, stepOutcome{}, err
 	}
-	staged, err := poolstore.Stage(c, b.tx)
-	if err != nil {
-		return nil, err
-	}
-	return staged.Result(map[string]any{"projection": final, "consumer": entry}), nil
+	return b.tx, stepOutcome{Projection: final, Consumer: entry, Changed: true}, nil
 }
 
 // sameTree says whether two decoded values are one value.
