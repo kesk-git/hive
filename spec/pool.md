@@ -40,9 +40,23 @@ Everything the Pool owns is under `pool/` in the home, in the five places [recor
 
 ## Identifiers
 
-Registered prefixes and their minting owners are defined in [identities.md](identities.md#identifier-form), with the registry in `contract/ids` checked by `test-contract`. Shared Pool identifier patterns are the `$defs` of [`records/pool.item.v1`](schemas/records/pool.item.v1.schema.json); the subject, note and miss patterns are in their respective record schemas.
+Stage 2 uses the following prefixes, each minted by `pool`:
 
-The Imperative has no prefix of its own: it is keyed by its item. A generation and a criterion are numbered or slugged inside their records and have no prefix. No prefix is registered for a [level](#levels): a Target is a Pool item and keeps the prefix every item has. A question, decision round and card are minted by `word` and written by `pool`; an option and an answer are numbered or slugged inside their question.
+| Prefix | Identifies |
+| --- | --- |
+| `adm_` | an admission record |
+| `spec_` | a specification |
+| `rule_` | a rule |
+| `hold_` | a hold on an item |
+| `mem_` | a knowledge projection |
+| `migr_` | a legacy migration |
+| `subj_` | a memory subject |
+| `mnote_` | a maintenance note |
+| `miss_` | one reported miss incident |
+
+The first six patterns are the `$defs` of [`records/pool.item.v1`](schemas/records/pool.item.v1.schema.json); the last three are in their respective new record schemas.
+The first six are registered; the subject, note and miss builders register the last three in the identity library and identities.md before their first producer is built.
+The table in [identities.md](identities.md#identifier-form) and the registry in `contract/ids` stay in step by `test-contract`; this definition supplies only the new prefixes' schema patterns. The Imperative has no prefix of its own: it is keyed by its item. A generation and a criterion are numbered or slugged inside their records and have no prefix. No prefix is registered for a [level](#levels): a Target is a Pool item and keeps the prefix every item has. The `q_`, `dr_` and `card_` identities of a question, a decision round and a card are minted by `word`, as identities.md already registers them, and written by `pool`; an option and an answer are numbered or slugged inside their question.
 
 ## Items
 
