@@ -36,15 +36,16 @@ func RegisterRuleResolve(r *Registry, resolve Handler) {
 // is declared at 2.0, its v2 request; amend and expire at 1.0 like resolve, their
 // unchanged v1 request bodies. Each writes the rule and re-renders the projections
 // of its scope in the same transaction, so each declares the receipt of the
-// rendering beside its own.
+// rendering beside its own. record and amend also declare the receipt of a miss,
+// which they write beside a refusal of their own that cites a rule.
 func RegisterRuleWriters(r *Registry, record, amend, expire Handler) {
 	for _, op := range []struct {
 		name, version, request, response string
 		handle                           Handler
 		receipts                         []string
 	}{
-		{"record", "2.0", "record.request:v2", "record.response:v2", record, []string{"pool.rule.recorded", "pool.projection.rendered"}},
-		{"amend", "1.0", "amend.request:v1", "amend.response:v2", amend, []string{"pool.rule.amended", "pool.rule.lifted", "pool.projection.rendered"}},
+		{"record", "2.0", "record.request:v2", "record.response:v2", record, []string{"pool.rule.recorded", "pool.projection.rendered", "pool.rule.missed"}},
+		{"amend", "1.0", "amend.request:v1", "amend.response:v2", amend, []string{"pool.rule.amended", "pool.rule.lifted", "pool.projection.rendered", "pool.rule.missed"}},
 		{"expire", "1.0", "expire.request:v1", "expire.response:v2", expire, []string{"pool.rule.expired", "pool.projection.rendered"}},
 	} {
 		r.RegisterOperation("hive-rule", &cli.Operation{

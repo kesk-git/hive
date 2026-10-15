@@ -121,10 +121,10 @@ func Record(c *cli.Call) (*cli.Result, error) {
 
 	write := memory.Write{Rules: []*rule.Rule{r}, Subjects: subjects}
 	if err := snap.RefuseConflicts(now, write); err != nil {
-		return nil, err
+		return memory.ReportRefusal(c, err)
 	}
 	if err := checkProductConflict(snap.Rules, now, r); err != nil {
-		return nil, err
+		return memory.ReportRefusal(c, err)
 	}
 	if _, err := snap.Plan(now, write); err != nil {
 		return nil, err

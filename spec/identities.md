@@ -48,6 +48,7 @@ Every identifier Hive mints is a registered prefix, an underscore and a ULID in 
 | `mem_` | a knowledge projection | `pool` |
 | `migr_` | a legacy migration | `pool` |
 | `mnote_` | a maintenance note | `pool` |
+| `miss_` | a miss record | `pool` |
 
 A later stage registers a new prefix by adding a row here. A prefix is one to eight lowercase letters and digits, begins with a letter, and is never reused for another kind of thing.
 
