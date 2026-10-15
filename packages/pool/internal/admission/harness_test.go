@@ -187,6 +187,9 @@ type request struct {
 	scope     map[string]any
 	authority map[string]any
 	expected  []rev
+	// id and correlation are the request_id and the correlation_id of a request
+	// sent again; each is minted where it is empty.
+	id, correlation string
 }
 
 // word is the authority of kind word that names the question at a record
@@ -213,10 +216,16 @@ func (h *home) send(command, operation string, body map[string]any, r request) *
 	if r.scope == nil {
 		r.scope = projectScope
 	}
+	if r.id == "" {
+		r.id = mint(h.t, ids.Request)
+	}
+	if r.correlation == "" {
+		r.correlation = mint(h.t, ids.Correlation)
+	}
 	req := map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
 		"command": command, "operation": operation, "operation_version": "1.0",
-		"request_id": mint(h.t, ids.Request), "correlation_id": mint(h.t, ids.Correlation),
+		"request_id": r.id, "correlation_id": r.correlation,
 		"issued_at": "2026-10-14T09:00:00.000Z", "caller": map[string]any{"kind": "test"},
 		"authority": r.authority, "body": body,
 	}

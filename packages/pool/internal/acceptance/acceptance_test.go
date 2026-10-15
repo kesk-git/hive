@@ -180,14 +180,15 @@ func request(t testing.TB, command, operation string) []byte {
 // that are not the decision intake's, with the read of their kinds, and the
 // operations hold-question, revise-question, answer-question, release-question,
 // complete-question and close-question, and the dry-run import and export of
-// the legacy backlog, hive-admit approve, and the operations define, accept and
-// close of hive-spec, record, amend, expire and resolve of hive-rule, and
-// render, check, propagate, enqueue, fold, budget and subject of hive-memory, and
-// create, revise, render and deliver of hive-imperative. Every other
-// operation of the declaration is declared and refused.
+// the legacy backlog, create, check and approve of hive-admit, and the
+// operations define, accept and close of hive-spec, record, amend, expire and
+// resolve of hive-rule, and render, check, propagate, enqueue, fold, budget and
+// subject of hive-memory, and create, revise, render and deliver of
+// hive-imperative. Every other operation of the declaration is declared and
+// refused.
 var built = map[string][]string{
 	"hive-pool":   {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question", "release-question", "complete-question", "close-question", "import-legacy", "export-legacy"},
-	"hive-admit":  {"approve"},
+	"hive-admit":  {"create", "check", "approve"},
 	"hive-spec":   {"define", "accept", "close"},
 	"hive-rule":   {"record", "amend", "expire", "resolve"},
 	"hive-memory": {"render", "check", "propagate", "enqueue", "fold", "budget", "subject"},

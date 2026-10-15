@@ -151,6 +151,13 @@ func (s *Staged) Result(body map[string]any) *cli.Result {
 	return &cli.Result{Body: body, Records: s.Records, Receipts: s.Receipts, Events: s.Events}
 }
 
+// Ended is the handler's result for a refusal or a hold that writes, carrying
+// the staged transaction: the harness commits it with the recorded outcome as
+// one transaction, as it does for ok.
+func (s *Staged) Ended(f *envelope.Failure) *cli.Result {
+	return &cli.Result{Failure: f, Records: s.Records, Receipts: s.Receipts, Events: s.Events}
+}
+
 // compare checks that the record at the path of rw is at the revision rw
 // expects, or absent when it expects none. It is the harness's own comparison,
 // made once more here so that a stale expectation is answered before the

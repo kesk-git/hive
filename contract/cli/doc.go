@@ -20,7 +20,9 @@
 // A handler sees a Call and returns a Result. It never writes a response,
 // never exits and never parses an argument; it returns a *envelope.Failure
 // to end the invocation with a status other than ok, and the receipts a
-// refusal or a hold leaves ride on that Failure.
+// refusal or a hold leaves ride on that Failure. A refusal or a hold that also
+// writes records and events returns a Result with the Failure, and the harness
+// commits its writes with the recorded outcome as it does an ok result's.
 //
 // A message is one sentence naming the field and shape that failed, and
 // standard error is one line, <command> <operation>: <status> <code>

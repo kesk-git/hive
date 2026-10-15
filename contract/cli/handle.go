@@ -396,8 +396,16 @@ func (e *Executable) handle(inv Invocation, read **envelope.Request) (resp *enve
 	}
 	// Every receipt of the request is returned: those of the intents first,
 	// then those written now, then those already durable, which are in the
-	// response and not in the transaction.
-	resp = ok(res.Body, slices.Concat(call.intent, res.Receipts, res.Durable))
+	// response and not in the transaction. A refusal or a hold that writes
+	// carries them as an ok response does.
+	receipts := slices.Concat(call.intent, res.Receipts, res.Durable)
+	if res.Failure != nil {
+		f := *res.Failure
+		f.Receipts = receipts
+		resp = fail(req.RequestID, &f)
+	} else {
+		resp = ok(res.Body, receipts)
+	}
 	// The response is checked and sized before anything is written, so that a
 	// response too large to return leaves nothing behind. After an intent
 	// something is behind, and the answer is unknown.
@@ -466,6 +474,17 @@ func (e *Executable) run(c *Call) (res *Result, err error) {
 		return nil, envelope.Common(envelope.CodeInternal, "the operation has no handler")
 	}
 	res, err = c.Operation.Handle(c)
+	if err == nil && res != nil && res.Failure != nil {
+		f := res.Failure
+		if c.Store == nil || (f.Status != envelope.Refused && f.Status != envelope.Held) || len(f.Receipts) > 0 || res.Body != nil || res.After != nil {
+			return nil, envelope.Common(envelope.CodeInternal, "the operation returned writes with a status that leaves none").Carry(f)
+		}
+		f.Err.Message = clip(f.Err.Message, string(f.Status))
+		if cerr := f.Check(); cerr != nil {
+			return nil, envelope.Common(envelope.CodeInternal, "the operation returned a failure the contract does not admit").Because(fmt.Errorf("%w: %w", f, cerr))
+		}
+		return res, nil
+	}
 	if err != nil {
 		// The intent of this request, durable and not complete: handle answers it.
 		var interrupted *store.InterruptedError
