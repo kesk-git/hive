@@ -9,6 +9,7 @@ import (
 	_ "github.com/kesk-git/hive/packages/pool/internal/admission"
 	_ "github.com/kesk-git/hive/packages/pool/internal/decision"
 	"github.com/kesk-git/hive/packages/pool/internal/entry"
+	_ "github.com/kesk-git/hive/packages/pool/internal/imperative"
 	_ "github.com/kesk-git/hive/packages/pool/internal/item"
 	_ "github.com/kesk-git/hive/packages/pool/internal/legacy"
 	_ "github.com/kesk-git/hive/packages/pool/internal/memory"
