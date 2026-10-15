@@ -41,18 +41,17 @@ func ID(p ids.Prefix, n int) string {
 // the digest of any file's bytes.
 const LockPlaceholder = "lock file, not read"
 
-// Tree is the state of a directory: every file by slash path below it, with
-// the digest of its bytes.
+// Tree maps every file's slash path below dir to the SHA-256 digest of its
+// bytes, except for lock files as described below.
 //
 // A lock file is listed without being opened, the same on every platform: a
 // file directly inside the top-level locks/ directory of dir (locks/pool.lock,
 // whatever its name) appears under its slash path with LockPlaceholder as its
-// value, whatever its content. A lock file's content is never a record and no
-// test compares it, and a lock held through a handle that shares deletion
-// cannot be opened by os.ReadFile on Windows. The rule is by place alone: a
-// file in a deeper directory under locks/ (locks/x/y.lock) and a file named
-// like a lock file elsewhere (pool/pool.lock, a nested locks/ directory) are
-// read and digested like any other file.
+// value, whatever its content. Lock-file contents are not records; leaving
+// them unread avoids Windows sharing and byte-range lock restrictions.
+// The rule is by place alone: a file in a deeper directory under locks/
+// (locks/x/y.lock) and a file named like a lock file elsewhere (pool/pool.lock,
+// a nested locks/ directory) are read and digested like any other file.
 func Tree(t testing.TB, dir string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
