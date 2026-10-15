@@ -357,12 +357,6 @@ func clone(t testing.TB, src string) string {
 		if d.IsDir() {
 			return cstore.MakeDir(target)
 		}
-		if strings.HasPrefix(filepath.ToSlash(rel), "locks/") {
-			// A lock file is copied as a name, never opened: the store may hold
-			// it, and on Windows a plain open of a held lock file is refused.
-			putFile(target, nil)
-			return nil
-		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err

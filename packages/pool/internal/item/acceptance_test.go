@@ -226,19 +226,12 @@ func (h *home) files(under string) map[string]string {
 	out := map[string]string{}
 	filepath.WalkDir(filepath.Join(h.dir, under), func(path string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
-			rel, _ := filepath.Rel(h.dir, path)
-			rel = filepath.ToSlash(rel)
-			if strings.HasPrefix(rel, "locks/") {
-				// A lock file is listed, never opened: the store may hold it,
-				// and on Windows a plain open of a held lock file is refused.
-				out[rel] = ""
-				return nil
-			}
 			data, rerr := os.ReadFile(path)
 			if rerr != nil {
 				h.t.Fatal(rerr)
 			}
-			out[rel] = string(data)
+			rel, _ := filepath.Rel(h.dir, path)
+			out[filepath.ToSlash(rel)] = string(data)
 		}
 		return nil
 	})
