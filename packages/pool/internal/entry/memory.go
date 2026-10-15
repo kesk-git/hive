@@ -64,6 +64,28 @@ func RegisterMemorySubject(r *Registry, subject Handler) {
 	})
 }
 
+// RegisterMemoryMiss builds miss of hive-memory into the registry, with the
+// handler of the package that records the misses. It is a new memory operation,
+// so it is declared at 1.0. A miss writes pool.rule.missed, and a correction of
+// its provenance pool.miss.revised.
+func RegisterMemoryMiss(r *Registry, miss Handler) {
+	r.RegisterOperation("hive-memory", &cli.Operation{
+		OperationDecl: envelope.OperationDecl{
+			Name:           "miss",
+			State:          envelope.Supported,
+			Mode:           envelope.Unary,
+			Mutates:        true,
+			Versions:       []string{"1.0"},
+			RequestSchema:  "urn:hive:schema:ops:hive-memory.miss.request:v1",
+			ResponseSchema: "urn:hive:schema:ops:hive-memory.miss.response:v1",
+			ReceiptKinds:   []string{"pool.rule.missed", "pool.miss.revised"},
+			Executes:       []string{},
+			Calls:          []string{},
+		},
+		Handle: miss,
+	})
+}
+
 // RegisterMemoryMaintenance builds enqueue and fold of hive-memory into the
 // registry, with the handlers of the package that keeps the maintenance queue,
 // and the readers of the kinds note and maintenance-queue. Both are new memory

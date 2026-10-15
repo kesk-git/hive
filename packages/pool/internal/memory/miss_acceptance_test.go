@@ -828,7 +828,6 @@ func TestAmendRefusedForAConflictReportsTheRulesNamedAsMissed(t *testing.T) {
 		}, request{version: "1.0", expected: []rev{{"pool.rule", tempRule["rule_id"].(string), tempRule["record_revision"].(int64)}}})
 	}
 	w.thePoolReports(t, "pool.rule_conflict", []string{tempRule["rule_id"].(string), nextRule["rule_id"].(string)}, extend)
-	// The refusal names two rules of one subject in one incident: two misses, one incident.
 	got := map[string]bool{}
 	for _, m := range w.misses() {
 		got[m["rule"].(map[string]any)["rule_id"].(string)] = true
@@ -836,9 +835,11 @@ func TestAmendRefusedForAConflictReportsTheRulesNamedAsMissed(t *testing.T) {
 	if !got[tempRule["rule_id"].(string)] || !got[nextRule["rule_id"].(string)] {
 		t.Errorf("misses of %v, want both rules the refusal names", got)
 	}
-	// The same actor met one refusal: one incident, one count.
-	if row := w.counted(); row == nil || row["decision_due"] != false {
-		t.Errorf("subject row %v", row)
+	// Each refusal names two rules of one subject: two misses of one incident, and
+	// two refusals are two incidents, the second of which reaches the threshold.
+	row := w.counted()
+	if row == nil || len(row["misses"].([]any)) != 4 || row["independent_misses"] != int64(2) || row["decision_due"] != true {
+		t.Errorf("subject row %v, want four misses of two incidents", row)
 	}
 }
 

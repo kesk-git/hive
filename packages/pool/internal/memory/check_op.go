@@ -3,6 +3,7 @@ package memory
 import (
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
+	cstore "github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/pool/internal/read"
 )
 
@@ -16,9 +17,12 @@ import (
 // consumers whose received or acknowledged digest is not the current one. It
 // repairs nothing.
 //
-// The misses counted against each subject belong to the lane that records and
-// counts them: until then the report's subjects member is empty, which says
-// nothing of any subject.
+// It also reports the misses counted against each subject in the scope of the
+// request: the number of distinct verified independent root incidents, the
+// misses that contribute to it, and whether a decision is due, which is so once
+// the count reaches two and no earlier question names the subject in its
+// origin. It records no question and places no hold; a Shadow wakes the
+// supervisor that owns the home, which raises the card.
 func CheckOp(c *cli.Call) (*cli.Result, error) {
 	st, release, err := read.OpenShared(c)
 	if err != nil {
@@ -75,7 +79,35 @@ func CheckOp(c *cli.Call) (*cli.Result, error) {
 	if want != "" && len(rows) == 0 {
 		return nil, envelope.Common(envelope.CodeNotFound, "no projection in the scope of the request has that identity")
 	}
+	subjects, err := missRows(c, st)
+	if err != nil {
+		return nil, err
+	}
 	return &cli.Result{Body: map[string]any{
-		"checked_at": checkedAt, "projections": rows, "budget_revision": snap.Budget.Revision, "subjects": []any{},
+		"checked_at": checkedAt, "projections": rows, "budget_revision": snap.Budget.Revision, "subjects": subjects,
 	}}, nil
+}
+
+// missRows are the subjects with a miss in the scope of the request, each with
+// its count over the misses within it.
+func missRows(c *cli.Call, st *cstore.Store) ([]any, error) {
+	misses, err := loadMisses(st)
+	if err != nil {
+		return nil, err
+	}
+	var scoped []*Miss
+	for _, m := range misses {
+		if checkContained(c, m.Scope) == nil {
+			scoped = append(scoped, m)
+		}
+	}
+	counts := countMisses(scoped)
+	if err := decisionsDue(st, counts); err != nil {
+		return nil, err
+	}
+	rows := make([]any, len(counts))
+	for i, s := range counts {
+		rows[i] = s.tree()
+	}
+	return rows, nil
 }
