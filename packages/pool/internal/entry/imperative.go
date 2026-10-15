@@ -17,7 +17,7 @@ import (
 // (spec/pool.md, Contract versions). render and deliver serve the additive
 // bodies of 1.1, the inventories and the instant of the rendering, and are
 // declared at 1.1 only. create and revise have no member that 1.1 added, so
-// their body is the same at 1.0 and 1.1 and each is declared at both. render
+// their bodies are unchanged and each is declared at 1.0 only. render
 // writes nothing and returns no receipt; deliver writes the delivery, and the
 // receipts of each projection it records received beside it.
 func RegisterImperative(r *Registry, create, revise, render, deliver Handler) {
@@ -28,8 +28,8 @@ func RegisterImperative(r *Registry, create, revise, render, deliver Handler) {
 		mutates  bool
 		receipts []string
 	}{
-		{"create", []string{"1.0", "1.1"}, create, true, []string{"pool.imperative.revised"}},
-		{"revise", []string{"1.0", "1.1"}, revise, true, []string{"pool.imperative.revised"}},
+		{"create", []string{"1.0"}, create, true, []string{"pool.imperative.revised"}},
+		{"revise", []string{"1.0"}, revise, true, []string{"pool.imperative.revised"}},
 		{"render", []string{"1.1"}, render, false, []string{}},
 		{"deliver", []string{"1.1"}, deliver, true, []string{"pool.imperative.delivered", "pool.projection.received"}},
 	} {
