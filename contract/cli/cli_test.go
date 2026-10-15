@@ -596,6 +596,81 @@ func TestHeld(t *testing.T) {
 	same(t, after, tree(t, home))
 }
 
+// A refusal or a hold that writes returns its records, receipts and events
+// with its Failure, and the harness commits them with the recorded outcome in
+// one transaction, as it does an ok result's: the response carries the
+// receipts, and the request sent again is the response as recorded.
+func TestARefusalOrAHoldCommitsItsWritesWithTheOutcome(t *testing.T) {
+	for n, c := range []struct {
+		operation, name string
+		status          envelope.Status
+		code            string
+	}{
+		{"hold", "held", envelope.Held, "held"},
+		{"refuse", "refused", envelope.Refused, "authority_missing"},
+	} {
+		t.Run(c.operation, func(t *testing.T) {
+			h := newHarness(t)
+			home := newHome(t)
+			req := request(t, c.operation, n+1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = "with writes" })
+			intents := 0
+			h.exe.Fault = func(step string) error {
+				if strings.HasPrefix(step, "create dispatch/tx/") {
+					intents++
+				}
+				return nil
+			}
+			resp := h.invoke(t, home, c.operation, req)
+			h.exe.Fault = nil
+			expect(t, resp, c.status, c.code)
+			if len(resp.Receipts) != 1 || resp.Receipts[0].Kind != "dispatch.thing."+c.name || resp.Body != nil {
+				t.Fatalf("%+v", resp)
+			}
+			if intents != 1 {
+				t.Errorf("%d transactions; want one", intents)
+			}
+			if rec, err := openStore(t, home).ReadRecord(store.RecordPath("dispatch", "thing", c.name)); err != nil || rec.Revision != 1 {
+				t.Errorf("record %+v, %v", rec, err)
+			}
+			if got := receiptsOnDisk(t, home); len(got) != 1 || got[0] != resp.Receipts[0].ReceiptID {
+				t.Errorf("receipts on disk %v", got)
+			}
+			if !outcomeOf(home, n+1) || len(h.journal.order) != 1 {
+				t.Errorf("outcome %v, events %v", outcomeOf(home, n+1), h.journal.order)
+			}
+			after := tree(t, home)
+			again := h.invoke(t, home, c.operation, req)
+			expect(t, again, c.status, c.code)
+			if !again.Replayed || len(again.Receipts) != 1 || again.Receipts[0].ReceiptID != resp.Receipts[0].ReceiptID || h.calls[c.operation] != 1 {
+				t.Errorf("%+v, calls %d", again, h.calls[c.operation])
+			}
+			same(t, after, tree(t, home))
+		})
+	}
+	// Writes ride only on a refusal or a hold of a mutating operation with a
+	// store, with no body and no receipts of the failure's own; any other is
+	// the harness's internal failure, and nothing is written.
+	for n, c := range []struct{ operation, name string }{
+		{"hold", "with writes and a body"},
+		{"hold", "with writes and a receipt"},
+		{"fail", "held with writes"},
+	} {
+		t.Run(c.operation+" "+c.name, func(t *testing.T) {
+			h := newHarness(t)
+			home := newHome(t)
+			before := tree(t, home)
+			resp := h.invoke(t, home, c.operation, request(t, c.operation, n+1, func(m map[string]any) { m["body"].(map[string]any)["home"].(map[string]any)["name"] = c.name }))
+			expect(t, resp, envelope.Failed, "internal")
+			if len(resp.Receipts) != 0 {
+				t.Errorf("receipts %v", resp.Receipts)
+			}
+			after := tree(t, home)
+			delete(after, "locks/dispatch.lock")
+			same(t, before, after)
+		})
+	}
+}
+
 // A command that fails for a reason of its own exits 1 and changes nothing;
 // an unknown outcome exits 9 and is never retryable; a package's own code
 // keeps its status.

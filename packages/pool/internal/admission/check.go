@@ -3,7 +3,6 @@ package admission
 import (
 	"fmt"
 
-	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
@@ -21,10 +20,11 @@ import (
 // held check places a hold of kind admission; a check that admits releases the
 // holds of kind admission on the item, by its own receipt.
 
-// Check runs the checks against the admission the request names. A request
-// whose check is already on the admission is reconciled first, before the
-// revisions it expects are compared.
+// Check runs the checks against the admission the request names.
 func Check(c *cli.Call) (*cli.Result, error) {
+	if err := checkExpected(c); err != nil {
+		return nil, err
+	}
 	body := c.Request.Body
 	id := str(body["admission_id"])
 	rec, err := Load(c, id)
@@ -32,12 +32,6 @@ func Check(c *cli.Call) (*cli.Result, error) {
 		return nil, err
 	}
 	if err := checkScope(c, rec.Scope()); err != nil {
-		return nil, err
-	}
-	if err := reconcile(c, rec); err != nil {
-		return nil, err
-	}
-	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
 	taskID := rec.TaskID()
@@ -98,90 +92,6 @@ func Check(c *cli.Call) (*cli.Result, error) {
 	return conclude(c, f, placement, result, reason, findings)
 }
 
-// reconcile answers a request sent again whose check is already on the
-// admission (spec/commands.md, Replay). A refused or a held check commits as an
-// intent, and its receipt is written after, with the refusal or the hold and
-// the request's outcome; a request that ended between the two finds its check
-// here. It ends with that check's own result, as first given, and with its
-// receipt under the check's receipt_id, which the harness writes with the
-// outcome, so a later resend is replayed. A request whose placement, source
-// branch or rules digest differ from the check's is another request:
-// replay_mismatch, and nothing is written. An admitted check is written with its
-// outcome, which the harness replays before the check runs.
-func reconcile(c *cli.Call, rec *Record) error {
-	for _, v := range list(rec.Data["checks"]) {
-		check := tree(v)
-		if str(check["request_id"]) != c.Request.RequestID || check["result"] == resultAdmitted {
-			continue
-		}
-		for _, member := range []string{"placement", "source_branch", "rules_digest"} {
-			if !sameTree(check[member], c.Request.Body[member]) {
-				return envelope.Common(envelope.CodeReplayMismatch, "the request_id was used before with another check")
-			}
-		}
-		b := &builder{c: c}
-		r, err := b.receipt(receiptOf[str(check["result"])], evidenceOf(c, rec.TaskID(), integer(check["item_revision"])))
-		if err != nil {
-			return err
-		}
-		r.ReceiptID = str(check["receipt_id"])
-		content, err := canon.Encode(rec.Data)
-		if err != nil {
-			return internal("the admission record cannot be encoded", err)
-		}
-		digest, err := canon.RecordDigest(content)
-		if err != nil {
-			return internal("the admission record cannot be given a digest", err)
-		}
-		scope := rec.Scope()
-		scope.TaskID = rec.TaskID()
-		subject := &envelope.RecordRef{Schema: "pool.admission", ID: str(rec.Data["admission_id"]), HomeID: c.Home.HomeID, RecordRevision: rec.Revision, Digest: digest}
-		if err := b.seal(r, subject, scope, ""); err != nil {
-			return err
-		}
-		staged, err := b.stage()
-		if err != nil {
-			return err
-		}
-		f := answer(c, check)
-		f.Receipts = staged.Receipts
-		return f
-	}
-	return nil
-}
-
-// sameTree says whether two members of a request or a check are the same,
-// both absent included.
-func sameTree(a, b any) bool {
-	x, errX := canon.Encode(a)
-	y, errY := canon.Encode(b)
-	return errX == nil && errY == nil && string(x) == string(y)
-}
-
-// receiptOf is the kind of the receipt of each result of a check.
-var receiptOf = map[string]string{resultAdmitted: receiptAdmitted, resultRefused: receiptRefused, resultHeld: receiptHeld}
-
-// evidenceOf is the evidence of a check's receipt: the item at the revision the
-// check read, and its Imperative.
-func evidenceOf(c *cli.Call, taskID string, itemRevision int64) []envelope.Evidence {
-	return []envelope.Evidence{
-		{Role: "item", Ref: envelope.RecordRef{Schema: "pool.item", ID: taskID, HomeID: c.Home.HomeID, RecordRevision: itemRevision}},
-		{Role: "imperative", Ref: envelope.RecordRef{Schema: "pool.imperative", ID: taskID, HomeID: c.Home.HomeID}},
-	}
-}
-
-// answer is the refusal or the hold a check that does not admit ends with: a
-// refusal with the first finding's code, or the hold the check names, as it
-// was placed, in error.hold.
-func answer(c *cli.Call, check map[string]any) *envelope.Failure {
-	findings := list(check["findings"])
-	message := clip(findingMessage(findings))
-	if check["result"] == resultHeld {
-		return envelope.Hold(envelope.RecordRef{Schema: "pool.hold", ID: str(check["hold_id"]), HomeID: c.Home.HomeID, RecordRevision: 1}, message)
-	}
-	return envelope.Fail(envelope.Refused, str(tree(findings[0])["code"]), message)
-}
-
 // placeChecked is the place the check is about. Of kind requested it is the
 // place the item requests, and the request names no other; of kind resolved it
 // is the place the caller's policy resolved. A request for codex-cloud, by the
@@ -211,17 +121,21 @@ func repositoryOf(c *cli.Call, rec *Record, rev map[string]any) (string, error) 
 // conclude appends the check to the admission, places or releases holds, writes
 // the receipt and the event, and ends the request with the status the result
 // gives. An admitted check answers ok with its body; a refused or a held one
-// commits its records and events as an intent, since the harness commits
-// nothing of a failure but receipts, and ends with the refusal or the hold,
-// which carries the receipt: the harness writes it with the request's outcome.
+// ends with the refusal or the hold, which carries no body, and its writes,
+// which the harness commits with the recorded outcome in one transaction, as
+// it does an admitted one's.
 func conclude(c *cli.Call, f *facts, placement map[string]any, result, reason string, findings []any) (*cli.Result, error) {
 	rec, taskID := f.rec, f.rec.TaskID()
 	now, err := c.Stamp()
 	if err != nil {
 		return nil, internal("a check cannot be given a time", err)
 	}
+	kindOfReceipt := map[string]string{resultAdmitted: receiptAdmitted, resultRefused: receiptRefused, resultHeld: receiptHeld}[result]
 	b := &builder{c: c}
-	r, err := b.receipt(receiptOf[result], evidenceOf(c, taskID, f.item.Revision))
+	r, err := b.receipt(kindOfReceipt, []envelope.Evidence{
+		{Role: "item", Ref: envelope.RecordRef{Schema: "pool.item", ID: taskID, HomeID: c.Home.HomeID, RecordRevision: f.item.Revision}},
+		{Role: "imperative", Ref: envelope.RecordRef{Schema: "pool.imperative", ID: taskID, HomeID: c.Home.HomeID}},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -243,12 +157,12 @@ func conclude(c *cli.Call, f *facts, placement map[string]any, result, reason st
 	}
 
 	scope := rec.Scope()
+	var holdRef *envelope.RecordRef
 	if result == resultHeld {
-		holdID, err := holdFor(b, f, reason, now, scope, r.ReceiptID, findings)
-		if err != nil {
+		if holdRef, err = holdFor(b, f, reason, now, scope, r.ReceiptID, findings); err != nil {
 			return nil, err
 		}
-		check["hold_id"] = holdID
+		check["hold_id"] = holdRef.ID
 	}
 	if result == resultAdmitted {
 		if err := releaseHolds(b, f, now, r.ReceiptID, scope); err != nil {
@@ -274,28 +188,27 @@ func conclude(c *cli.Call, f *facts, placement map[string]any, result, reason st
 	if result == resultAdmitted {
 		return staged.Result(map[string]any{"admission": final, "check": check}), nil
 	}
-	if _, err := c.CommitIntent(cli.Intent{Records: staged.Records, Events: staged.Events}); err != nil {
-		return nil, err
+	message := clip(findingMessage(findings))
+	if result == resultHeld {
+		return staged.Ended(envelope.Hold(*holdRef, message)), nil
 	}
-	failure := answer(c, check)
-	failure.Receipts = staged.Receipts
-	return nil, failure
+	return staged.Ended(envelope.Fail(envelope.Refused, str(tree(findings[0])["code"]), message)), nil
 }
 
 // holdFor names the hold a held check waits on. An active hold of kind
 // admission that this admission already holds for the reason is reused and
 // nothing is placed; otherwise one is placed, with the event that places a hold,
 // whose basis is the check's receipt.
-func holdFor(b *builder, f *facts, reason, now string, scope envelope.Scope, receiptID string, findings []any) (string, error) {
+func holdFor(b *builder, f *facts, reason, now string, scope envelope.Scope, receiptID string, findings []any) (*envelope.RecordRef, error) {
 	c, rec := b.c, f.rec
 	for _, h := range f.graph.Holds[f.item.ID] {
 		if h.Kind == "admission" && h.State == "active" && h.Data["admission_id"] == rec.Data["admission_id"] && h.Data["reason_code"] == reason {
-			return h.ID, nil
+			return &envelope.RecordRef{Schema: "pool.hold", ID: h.ID, HomeID: c.Home.HomeID, RecordRevision: h.Revision}, nil
 		}
 	}
 	holdID, err := ids.Mint(c.Clock, ids.Hold)
 	if err != nil {
-		return "", internal("a hold cannot be given an identity", err)
+		return nil, internal("a hold cannot be given an identity", err)
 	}
 	hold := map[string]any{
 		"schema": "pool.hold", "schema_version": versionOne, "record_revision": int64(1),
@@ -306,14 +219,15 @@ func holdFor(b *builder, f *facts, reason, now string, scope envelope.Scope, rec
 		"created_at": now, "updated_at": now,
 	}
 	putScope(hold, scope, false)
-	if _, _, err := b.put("hold", holdID, hold, 0); err != nil {
-		return "", err
+	_, ref, err := b.put("hold", holdID, hold, 0)
+	if err != nil {
+		return nil, err
 	}
 	scope.TaskID = rec.TaskID()
 	if err := b.event(eventPlaced, receiptID, scope); err != nil {
-		return "", err
+		return nil, err
 	}
-	return holdID, nil
+	return ref, nil
 }
 
 // releaseHolds releases every active hold of kind admission on the item,

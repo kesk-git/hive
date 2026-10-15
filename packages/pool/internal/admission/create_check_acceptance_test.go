@@ -1110,124 +1110,103 @@ func resent(t *testing.T) request {
 	return r
 }
 
-// crashAfterIntent makes the store stop, as a crash would, at the transaction
-// after the request's intent: the one that writes its receipt and its outcome.
-func (h *home) crashAfterIntent(r request) {
-	intents := 0
-	h.exe.Fault = func(step string) error {
-		if step == "create pool/tx/"+r.id+".json" {
-			if intents++; intents > 1 {
-				return os.ErrClosed
-			}
-		}
-		return nil
-	}
+// The two checks that do not admit, each with the body that gives it.
+var unadmitted = map[string]struct {
+	mods []mod
+	body map[string]any
+	want outcome
+}{
+	"held": {[]mod{guess("task", "object")}, map[string]any{"placement": requested("mac")},
+		outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"pool.admission_guess"}, reason: "field_guess"}},
+	"refused": {[]mod{place("claude-cloud-session"), harness("codex")}, map[string]any{"placement": requested("claude-cloud-session"), "source_branch": pushed("true")},
+		outcome{status: envelope.Refused, code: "pool.setup_contradiction", result: "refused", findings: []string{"pool.setup_contradiction"}}},
 }
 
-// A held or a refused check commits its records and events as an intent, and
-// its receipt with the request's outcome after. A request that ended between
-// the two, sent again, is reconciled: it ends with the first check's result,
-// its receipt under the check's receipt_id and, held, the hold the check
-// placed, appends nothing and places nothing, and records its outcome, so a
-// further resend is a replay.
-func TestARequestThatEndedAfterItsIntentIsReconciledFromItsCheck(t *testing.T) {
-	cases := map[string]struct {
-		mods []mod
-		body map[string]any
-		want outcome
-	}{
-		"held": {[]mod{guess("task", "object")}, map[string]any{"placement": requested("mac")},
-			outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"pool.admission_guess"}, reason: "field_guess"}},
-		"refused": {[]mod{place("claude-cloud-session"), harness("codex")}, map[string]any{"placement": requested("claude-cloud-session"), "source_branch": pushed("true")},
-			outcome{status: envelope.Refused, code: "pool.setup_contradiction", result: "refused", findings: []string{"pool.setup_contradiction"}}},
-	}
-	for name, tc := range cases {
+// A held or a refused check commits its check, its hold, its receipt, its
+// events and the request's outcome as one transaction: before whichever file
+// of the write a crash stops the store, the request sent again finds either
+// nothing of it or all of it, and ends with one check whose receipt and
+// outcome are on disk.
+func TestAHeldOrRefusedCheckCommitsAsOneTransaction(t *testing.T) {
+	for name, tc := range unadmitted {
 		t.Run(name, func(t *testing.T) {
-			h := newHome(t)
-			h.work(tc.mods...)
-			id := h.admission(none())
-			tc.body["admission_id"] = id
-			r := resent(t)
-			h.crashAfterIntent(r)
-			ended := h.send("hive-admit", "check", tc.body, r)
-			h.exe.Fault = nil
-			if ended.Status != envelope.Unknown || len(ended.Receipts) != 0 {
-				t.Fatalf("a request that ended after its intent: status %s, receipts %v, error %+v", ended.Status, ended.Receipts, ended.Error)
-			}
-			first := lastCheck(h.stored("admission", id))
-			if first["request_id"] != r.id {
-				t.Fatalf("the intent did not append the check: %v", first)
-			}
-			if n := h.filesWith("pool/receipts", first["receipt_id"].(string)); n != 0 {
-				t.Fatalf("the receipt was written with the intent")
-			}
-			holds := h.holdCount()
-
-			again := h.send("hive-admit", "check", tc.body, r)
-			wants(t, h, id, again, tc.want)
-			if again.Replayed {
-				t.Errorf("a request with no recorded outcome was answered as a replay")
-			}
-			if got := again.Receipts[0].ReceiptID; got != first["receipt_id"] {
-				t.Errorf("receipt %s; the check names %v", got, first["receipt_id"])
-			}
-			if tc.want.result == "held" {
-				want := envelope.RecordRef{Schema: "pool.hold", ID: first["hold_id"].(string), HomeID: homeID, RecordRevision: 1}
-				if *again.Error.Hold != want {
-					t.Errorf("error.hold %+v; want the hold the check placed, %+v", *again.Error.Hold, want)
+			for point := 1; ; point++ {
+				h := newHome(t)
+				h.work(tc.mods...)
+				id := h.admission(none())
+				body := copyOf(tc.body).(map[string]any)
+				body["admission_id"] = id
+				r := resent(t)
+				points, crashed := 0, false
+				h.exe.Fault = func(step string) error {
+					if !strings.HasPrefix(step, "create ") && !strings.HasPrefix(step, "events ") && !strings.HasPrefix(step, "remove ") {
+						return nil
+					}
+					if points++; points == point {
+						crashed = true
+						return os.ErrClosed
+					}
+					return nil
 				}
-			}
-			if n := len(h.stored("admission", id)["checks"].([]any)); n != 1 || h.holdCount() != holds {
-				t.Errorf("%d checks and %d holds after the reconciliation; want 1 and %d", n, h.holdCount(), holds)
-			}
-			if n := h.filesWith("journal", `"pool.admission.checked"`); n != 1 {
-				t.Errorf("%d pool.admission.checked events", n)
-			}
+				h.send("hive-admit", "check", body, r)
+				h.exe.Fault = nil
+				if !crashed {
+					if point == 1 {
+						t.Fatal("the check wrote nothing a crash can stop")
+					}
+					return
+				}
 
-			replay := h.send("hive-admit", "check", tc.body, r)
-			if !replay.Replayed || replay.Status != again.Status || len(replay.Receipts) != 1 || replay.Receipts[0].ReceiptID != first["receipt_id"] {
-				t.Errorf("the next resend: replayed %v, status %s, receipts %v", replay.Replayed, replay.Status, replay.Receipts)
-			}
-			if tc.want.result == "held" && *replay.Error.Hold != *again.Error.Hold {
-				t.Errorf("the replay names hold %+v; the reconciliation %+v", *replay.Error.Hold, *again.Error.Hold)
+				again := h.send("hive-admit", "check", body, r)
+				wants(t, h, id, again, tc.want)
+				check := lastCheck(h.stored("admission", id))
+				if n := len(h.stored("admission", id)["checks"].([]any)); n != 1 {
+					t.Fatalf("crash at point %d: %d checks after the request was sent again", point, n)
+				}
+				if h.filesWith("pool/receipts", check["receipt_id"].(string)) == 0 {
+					t.Errorf("crash at point %d: the check's receipt is not on disk", point)
+				}
+				if _, err := os.Stat(filepath.Join(h.dir, "pool", "requests", r.id+".json")); err != nil {
+					t.Errorf("crash at point %d: the request has no recorded outcome: %v", point, err)
+				}
 			}
 		})
 	}
 }
 
-// A request sent again whose placement, source branch or rules digest differ
-// from those its check recorded is another request under the same request_id:
-// replay_mismatch, and nothing is written.
-func TestARequestSentAgainWithOtherEvidenceIsAReplayMismatch(t *testing.T) {
-	h := newHome(t)
-	h.work(all(place("claude-cloud-session"), harness("claude")))
-	id := h.admission(none())
-	body := map[string]any{"admission_id": id, "placement": requested("claude-cloud-session")}
-	r := resent(t)
-	h.crashAfterIntent(r)
-	if ended := h.send("hive-admit", "check", body, r); ended.Status != envelope.Unknown {
-		t.Fatalf("a request that ended after its intent: status %s, error %+v", ended.Status, ended.Error)
-	}
-	h.exe.Fault = nil
-	for name, change := range map[string]func(map[string]any){
-		"source_branch": func(b map[string]any) { b["source_branch"] = pushed("true") },
-		"rules_digest":  func(b map[string]any) { b["rules_digest"] = "sha256:" + strings.Repeat("a", 64) },
-		"placement": func(b map[string]any) {
-			b["placement"] = map[string]any{"kind": "resolved", "value": "claude-cloud-session",
-				"resolved_by": map[string]any{"schema": "dispatch.resolution", "id": "rcpt_01jc7d8e9f0g1h2j3k4m5n6p7x"}}
-		},
-	} {
+// A held or a refused check sent again is replayed by the harness: the
+// response as recorded, its receipt and hold the first's, and nothing written.
+// Sent again with other evidence, it is replay_mismatch and writes nothing.
+func TestAHeldOrRefusedCheckSentAgainIsReplayed(t *testing.T) {
+	for name, tc := range unadmitted {
 		t.Run(name, func(t *testing.T) {
-			other := copyOf(body).(map[string]any)
-			change(other)
+			h := newHome(t)
+			h.work(tc.mods...)
+			id := h.admission(none())
+			body := copyOf(tc.body).(map[string]any)
+			body["admission_id"] = id
+			r := resent(t)
+			first := h.send("hive-admit", "check", body, r)
+			wants(t, h, id, first, tc.want)
 			h.unchanged(func() {
-				resp := h.send("hive-admit", "check", other, r)
-				if resp.Status != envelope.Conflict || resp.Error == nil || resp.Error.Code != envelope.CodeReplayMismatch || len(resp.Receipts) != 0 {
-					t.Errorf("status %s, error %+v, receipts %v", resp.Status, resp.Error, resp.Receipts)
+				again := h.send("hive-admit", "check", body, r)
+				if !again.Replayed || again.Status != first.Status || again.Error.Code != first.Error.Code || again.Error.Message != first.Error.Message ||
+					len(again.Receipts) != 1 || again.Receipts[0].ReceiptID != first.Receipts[0].ReceiptID {
+					t.Errorf("sent again: replayed %v, status %s, error %+v, receipts %v; first %s %+v %v",
+						again.Replayed, again.Status, again.Error, again.Receipts, first.Status, first.Error, first.Receipts)
+				}
+				if tc.want.result == "held" && *again.Error.Hold != *first.Error.Hold {
+					t.Errorf("sent again: error.hold %+v; first %+v", *again.Error.Hold, *first.Error.Hold)
+				}
+				other := copyOf(body).(map[string]any)
+				other["rules_digest"] = "sha256:" + strings.Repeat("a", 64)
+				changed := h.send("hive-admit", "check", other, r)
+				if changed.Status != envelope.Conflict || changed.Error == nil || changed.Error.Code != envelope.CodeReplayMismatch || len(changed.Receipts) != 0 {
+					t.Errorf("sent again changed: status %s, error %+v, receipts %v", changed.Status, changed.Error, changed.Receipts)
 				}
 			})
-			if _, err := os.Stat(filepath.Join(h.dir, "pool", "requests", r.id+".json")); err == nil {
-				t.Errorf("a replay_mismatch recorded an outcome")
+			if n := len(h.stored("admission", id)["checks"].([]any)); n != 1 {
+				t.Errorf("%d checks", n)
 			}
 		})
 	}

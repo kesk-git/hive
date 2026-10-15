@@ -109,7 +109,8 @@ type Operation struct {
 	// Handle does the operation's own work. It is called once the whole
 	// request is validated and the home, the scope, the state, the version
 	// and the replay are checked, with the store's lock held for a mutating
-	// operation. It returns a *envelope.Failure to end with another status.
+	// operation. It returns a *envelope.Failure to end with another status,
+	// or a Result with a Failure to end refused or held with what it writes.
 	Handle func(*Call) (*Result, error)
 	// Adapt gives the operation's own response body from the response of its
 	// callee: the ok response recorded for the request, when a command with
@@ -242,9 +243,11 @@ func (c *Call) Committed() ([]envelope.Receipt, error) {
 	return decodeReceipts(receipts)
 }
 
-// Result is what a handler returns for ok.
+// Result is what a handler returns for ok, or for a refusal or a hold that
+// writes records and events.
 type Result struct {
-	// Body is the operation's own response. It is required.
+	// Body is the operation's own response. It is required, but with a
+	// Failure, which has none.
 	Body map[string]any
 	// Records, Receipts and Events are what the operation writes, committed
 	// in one transaction with the recorded outcome. A record is written as
@@ -263,6 +266,12 @@ type Result struct {
 	// resident operation, which then runs until stopped. Its error ends the
 	// process with exit code 1.
 	After func() error
+	// Failure, where set, ends a mutating operation of a command with a
+	// store refused or held in place of ok. Records, Receipts and Events are
+	// committed with the recorded outcome in one transaction, as an ok
+	// result's are, and the response carries the receipts. The Failure
+	// carries none of its own, and the Result no Body and no After.
+	Failure *envelope.Failure
 }
 
 // Writer is the writer of a record this call makes.

@@ -281,6 +281,9 @@ func newHarness(t testing.TB) *harness {
 			case "conflict":
 				f = envelope.Common(envelope.CodeAlreadyExists, "it exists")
 			}
+			if name == "with writes" {
+				return writing(c, f, "refused")
+			}
 			if name == "record it" || name == "unknown" || name == "record big" || name == "conflict" {
 				rc, err := c.NewReceipt("dispatch.thing.refused", "1.0", nil, nil, nil)
 				if err != nil {
@@ -298,6 +301,17 @@ func newHarness(t testing.TB) *harness {
 			}
 			f := envelope.Hold(envelope.RecordRef{Schema: "word.question", ID: id(ids.Question, 1)}, "waiting on a decision")
 			switch c.Request.Body["home"].(map[string]any)["name"] {
+			case "with writes":
+				return writing(c, f, "held")
+			case "with writes and a body":
+				res, err := writing(c, f, "held")
+				if res != nil {
+					res.Body = map[string]any{}
+				}
+				return res, err
+			case "with writes and a receipt":
+				f.Receipts = []envelope.Receipt{rc}
+				return writing(c, f, "held")
 			case "oversize":
 				f.Err.Message = strings.Repeat("é", 2000)
 			case "bad hold":
@@ -428,6 +442,8 @@ func newHarness(t testing.TB) *harness {
 				return &Result{Body: map[string]any{}, Records: []store.RecordWrite{{Path: "dispatch/records/x/y.json"}}}, nil
 			case "package code":
 				return nil, envelope.Fail(envelope.Unavailable, "dispatch.adapter_down", "the adapter is down").Retry()
+			case "held with writes":
+				return &Result{Failure: envelope.Hold(envelope.RecordRef{Schema: "word.question", ID: id(ids.Question, 1)}, "waiting on a decision")}, nil
 			}
 			return nil, errors.New("something of its own")
 		})},
@@ -469,6 +485,21 @@ func newHarness(t testing.TB) *harness {
 		Journal:  func(string) (store.Journal, error) { return h.journal, nil },
 	}
 	return h
+}
+
+// writing is the Result of a refusal or a hold that writes: the record named
+// for it, a receipt and an event, ended with the failure.
+func writing(c *Call, f *envelope.Failure, name string) (*Result, error) {
+	rc, err := c.NewReceipt("dispatch.thing."+name, "1.0", &envelope.RecordRef{Schema: "dispatch.thing", ID: name}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &Result{
+		Failure:  f,
+		Records:  []store.RecordWrite{{Path: store.RecordPath("dispatch", "thing", name), Content: []byte(`{"schema":"dispatch.thing","schema_version":"1.0","name":"` + name + `"}`)}},
+		Receipts: []envelope.Receipt{rc},
+		Events:   []store.Event{{ID: id(ids.Event, 900), Content: []byte(`{"schema":"dispatch.thing.` + name + `"}`)}},
+	}, nil
 }
 
 // faultAt makes every store the executable opens fail, as a crash would, at
