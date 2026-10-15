@@ -69,7 +69,7 @@ func (h *home) work(mods ...mod) {
 	imp := fixture(h.t, "pool.imperative", "project-swarm-claude-mac")
 	rev := imp["revisions"].([]any)[0].(map[string]any)
 	tree(rev["setup"])["placement"] = map[string]any{"requested": "mac", "item_revision": item["record_revision"]}
-	tree(tree(tree(rev["task"])["standard"]))["criteria"] = item["specification"]
+	tree(tree(rev["task"])["standard"])["criteria"] = copyOf(item["specification"])
 	for _, m := range mods {
 		m(item, rev)
 	}
@@ -377,6 +377,12 @@ func TestCreateRefusesARevisionThatIsNotCurrent(t *testing.T) {
 	}
 }
 
+func copyOf(v any) any {
+	data, _ := canon.Encode(v)
+	out, _ := canon.Parse(data)
+	return out
+}
+
 func copyRevision(rev map[string]any, n int64) map[string]any {
 	data, _ := canon.Encode(rev)
 	v, _ := canon.Parse(data)
@@ -523,7 +529,7 @@ func TestCheckRunsTheTable(t *testing.T) {
 		{name: "Codex Cloud", mods: all(place("codex-cloud"), harness("codex")), body: map[string]any{"source_branch": pushed("true")},
 			want: outcome{status: envelope.Refused, code: "pool.placement_parked", result: "refused", findings: []string{"pool.placement_parked"}}},
 		{name: "a cloud session for a project with no forge", mods: cloud, project: map[string]any{"kind": "local-only"}, body: map[string]any{"source_branch": pushed("true")},
-			want: outcome{status: envelope.Refused, code: "pool.placement_local_only", result: "refused", findings: []string{"pool.placement_local_only"}}},
+			want: outcome{status: envelope.Refused, code: "pool.placement_local_only", result: "refused", findings: []string{"pool.placement_local_only", "pool.publication_needs_forge"}}},
 		{name: "a local place for a project with no forge", mods: all(pmode("local-only"), func(item, _ map[string]any) { tree(item["delivery"])["publication"] = "local-only" }),
 			project: map[string]any{"kind": "local-only"}, want: outcome{status: envelope.Ok, result: "admitted", findings: []string{}}},
 		{name: "a cloud session with no branch evidence", mods: cloud,
@@ -622,7 +628,7 @@ func TestTheFirstFailureFixesTheResultAndEveryFindingIsRecorded(t *testing.T) {
 		item := h.stored("item", taskID)
 		item["placement_requested"], item["record_revision"] = "claude-cloud-session", int64(4)
 		h.plant("item", taskID, item)
-		wants(t, h, id, h.check(id, map[string]any{"placement": requested("claude-cloud-session")}), outcome{
+		wants(t, h, id, h.check(id, map[string]any{"placement": requested("claude-cloud-session"), "source_branch": pushed("true")}), outcome{
 			status: envelope.Refused, code: "pool.imperative_stale", result: "refused", findings: []string{"pool.imperative_stale"}})
 		if c := lastCheck(h.stored("admission", id)); c["item_revision"] != int64(4) {
 			t.Errorf("the check read item revision %v", c["item_revision"])
@@ -646,7 +652,7 @@ func TestAResolvedPlaceIsCheckedAndRecordedWithItsReceipt(t *testing.T) {
 			t.Errorf("a resolved place with no receipt: status %s, error %+v", resp.Status, resp.Error)
 		}
 	})
-	check := wants(t, h, id, h.check(id, map[string]any{"placement": resolved("codex-cloud")}), outcome{
+	check := wants(t, h, id, h.check(id, map[string]any{"placement": resolved("codex-cloud"), "source_branch": pushed("true")}), outcome{
 		status: envelope.Refused, code: "pool.placement_parked", result: "refused", findings: []string{"pool.placement_parked"}})
 	if !equalTree(check["placement"], resolved("codex-cloud")) {
 		t.Errorf("placement %v", check["placement"])
@@ -786,7 +792,7 @@ func TestTheReaderReturnsTheAdmissionWhole(t *testing.T) {
 	}
 	for name, selector := range map[string]map[string]any{
 		"by identity": {"id": id}, "by task": {"task_id": taskID}, "by project": {"project_id": projectID},
-		"by state": {"states": []any{"admitted"}}, "with a limit": {"limit": int64(1)},
+		"with a limit": {"limit": int64(1)},
 	} {
 		resp := read(selector)
 		if resp.Status != envelope.Ok {
@@ -801,7 +807,7 @@ func TestTheReaderReturnsTheAdmissionWhole(t *testing.T) {
 		}
 	}
 	for name, selector := range map[string]map[string]any{
-		"another state": {"states": []any{"held"}}, "another task": {"task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7z"},
+		"another task": {"task_id": "task_01jc7d8e9f0g1h2j3k4m5n6p7z"}, "another project": {"project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7z"},
 	} {
 		if resp := read(selector); resp.Status != envelope.Ok || len(resp.Body["records"].([]any)) != 0 {
 			t.Errorf("%s: status %s, records %v", name, resp.Status, resp.Body["records"])
@@ -811,12 +817,75 @@ func TestTheReaderReturnsTheAdmissionWhole(t *testing.T) {
 		t.Errorf("an admission that does not exist: status %s", resp.Status)
 	}
 	// A member that does not apply to the kind is a violation of the request.
-	for _, selector := range []map[string]any{{"ready": true}, {"active": true}, {"due_before": "2026-10-14T09:00:00.000Z"}} {
+	for _, selector := range []map[string]any{{"ready": true}, {"active": true}, {"due_before": "2026-10-14T09:00:00.000Z"}, {"states": []any{"admitted"}}} {
 		if resp := read(selector); resp.Status != envelope.Invalid {
 			t.Errorf("%v: status %s", selector, resp.Status)
 		}
 	}
-	if resp := read(map[string]any{"states": []any{"queued"}}); resp.Status != envelope.Invalid {
-		t.Errorf("a state outside the admission's: status %s", resp.Status)
+}
+
+// A check of the Hive's own work at no project reads the repository binding
+// from the Imperative's Setup.
+func TestCheckOfWorkAtNoProjectReadsTheImperativesRepository(t *testing.T) {
+	h := newHome(t)
+	h.work(func(item, rev map[string]any) {
+		for _, k := range []string{"workspace_id", "project_id", "clone_id"} {
+			delete(item, k)
+		}
+		item["scope_level"] = "hive"
+		tree(rev["setup"])["repository"] = map[string]any{"kind": "local-only"}
+	})
+	imp := h.stored("imperative", taskID)
+	imp["scope_level"] = "hive"
+	for _, k := range []string{"workspace_id", "project_id", "clone_id"} {
+		delete(imp, k)
 	}
+	h.plant("imperative", taskID, imp)
+	r := request{scope: hiveScope, authority: map[string]any{"kind": "none"}}
+	resp := h.create(r, 1)
+	if resp.Status != envelope.Ok {
+		t.Fatalf("create: %s %+v", resp.Status, resp.Error)
+	}
+	id := resp.Body["admission"].(map[string]any)["admission_id"].(string)
+	if rec := h.stored("admission", id); rec["scope_level"] != "hive" || rec["project_id"] != nil {
+		t.Errorf("the admission is at scope %v project %v", rec["scope_level"], rec["project_id"])
+	}
+	check := h.send("hive-admit", "check", map[string]any{"admission_id": id, "placement": requested("mac")}, r)
+	wants(t, h, id, check, outcome{status: envelope.Refused, code: "pool.publication_needs_forge", result: "refused", findings: []string{"pool.publication_needs_forge"}})
+}
+
+// The place a check is about is the item's when it is of kind requested; the
+// request names no other, and a check outside the admission's scope is refused.
+func TestCheckRefusesWhatItCannotRecord(t *testing.T) {
+	h := newHome(t)
+	h.work()
+	id := h.admission(none())
+	h.unchanged(func() {
+		resp := h.send("hive-admit", "check", map[string]any{"admission_id": id, "placement": requested("claude-cloud-session")}, none())
+		if resp.Status != envelope.Invalid || len(resp.Receipts) != 0 {
+			t.Errorf("another place of kind requested: status %s, error %+v", resp.Status, resp.Error)
+		}
+		other := request{authority: map[string]any{"kind": "none"}, scope: map[string]any{"scope_level": "project", "home_id": homeID, "workspace_id": workspaceID, "project_id": "proj_01jc7d8e9f0g1h2j3k4m5n6p7z"}}
+		resp = h.send("hive-admit", "check", map[string]any{"admission_id": id, "placement": requested("mac")}, other)
+		if resp.Status == envelope.Ok || len(resp.Receipts) != 0 {
+			t.Errorf("a check at another project: status %s", resp.Status)
+		}
+		resp = h.send("hive-admit", "check", map[string]any{"admission_id": "adm_01jc7d8e9f0g1h2j3k4m5n6p7z", "placement": requested("mac")}, none())
+		if resp.Status != envelope.NotFound {
+			t.Errorf("an admission that does not exist: status %s", resp.Status)
+		}
+	})
+}
+
+// A rule reference is named by the contract as verifiable at stage 2 and the
+// contract states no rule for verifying it, so it gives a sensitive boundary
+// nothing: the check holds on authority_required (s2-1m-gap).
+func TestARuleReferenceIsNotVerifiedUntilTheContractSaysHow(t *testing.T) {
+	h := newHome(t)
+	h.work(sensitive("deletion"))
+	rule := fixture(t, "pool.rule_v2", "minimal")
+	h.plant("rule", rule["rule_id"].(string), rule)
+	id := h.admission(request{authority: authority("rule", "pool.rule", rule["rule_id"].(string), 1)})
+	wants(t, h, id, h.check(id, map[string]any{}), outcome{status: envelope.Held, code: "held", result: "held",
+		findings: []string{"pool.authority_required"}, reason: "authority_required"})
 }
