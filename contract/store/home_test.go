@@ -56,10 +56,17 @@ func TestCheckHomeValidLayouts(t *testing.T) {
 	})
 	t.Run("a relative path", func(t *testing.T) {
 		home := fullHome(t)
-		wd, _ := os.Getwd()
+		// The working directory is a sibling of the home, so the two share a
+		// volume and the relative path exists on macOS, Windows and Linux.
+		wd := filepath.Join(filepath.Dir(home), "cwd")
+		makeDir(t, wd)
+		t.Chdir(wd)
 		rel, err := filepath.Rel(wd, home)
 		if err != nil {
-			t.Skip(err)
+			t.Fatal(err)
+		}
+		if filepath.IsAbs(rel) {
+			t.Fatalf("relative path %q is absolute", rel)
 		}
 		h, err := CheckHome(rel)
 		if err != nil {
