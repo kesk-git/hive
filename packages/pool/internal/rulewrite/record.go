@@ -3,6 +3,7 @@ package rulewrite
 import (
 	"slices"
 	"strconv"
+	"time"
 	"unicode/utf8"
 
 	"github.com/kesk-git/hive/contract/cli"
@@ -23,10 +24,11 @@ var steps = []string{"dispatch", "gate", "define", "stow", "project"}
 
 // Record is hive-rule record (spec/pool.md, Rules, What a write refuses): it
 // appends a rule and writes pool.rule.recorded, the words and dates given never
-// changed afterwards. It refuses a line over 300 code points, a second rule on a
-// subject that already has one in force at the scope, whole of its task
-// generation, unless the request names that rule in changes, and a rule after which a projection would exceed its
-// budget at the clock or at any later instant at which the live set changes. A
+// changed afterwards. It refuses a line over 300 code points, a second rule of a
+// kind on a subject that already has one of that kind in force at the scope,
+// whole of its task generation, unless the request names that rule in changes,
+// and a rule after which a projection would exceed its budget at the clock or at
+// any later instant at which the live set changes. A
 // subject created beside an operating rule, and the facts filed under its
 // subject, commit with the rule or not at all.
 func Record(c *cli.Call) (*cli.Result, error) {
@@ -119,6 +121,9 @@ func Record(c *cli.Call) (*cli.Result, error) {
 
 	write := memory.Write{Rules: []*rule.Rule{r}, Subjects: subjects}
 	if err := snap.RefuseConflicts(now, write); err != nil {
+		return nil, err
+	}
+	if err := checkProductConflict(snap.Rules, now, r); err != nil {
 		return nil, err
 	}
 	if _, err := snap.Plan(now, write); err != nil {
@@ -256,6 +261,114 @@ func checkChanges(snap *memory.Snapshot, r *rule.Rule) error {
 		}
 	}
 	return envelope.Common(envelope.CodeNotFound, "the rule that changes names is not a rule of the Pool")
+}
+
+// checkProductConflict refuses, with pool.rule_conflict, a write of a product
+// rule after which two product rules of its conflict key and full scope that
+// apply to a common role are in force together at the clock or at a later
+// instant at which one takes effect or expires, neither naming the other in
+// changes, where the rules before the write were not. A rule that a rule in
+// force supersedes is not in force beside it. An operating rule is never
+// compared with a product rule: the resolver weighs those.
+func checkProductConflict(rules []*rule.Rule, now time.Time, w *rule.Rule) error {
+	if w.Kind != rule.KindProduct {
+		return nil
+	}
+	var before, after []*rule.Rule
+	for _, s := range rules {
+		if s.Kind != rule.KindProduct || s.Subject != w.Subject || s.Scope != w.Scope || s.TaskID != w.TaskID || s.Generation != w.Generation {
+			continue
+		}
+		before = append(before, s)
+		if s.RuleID != w.RuleID {
+			after = append(after, s)
+		}
+	}
+	after = append(after, w)
+	instants := []time.Time{now}
+	for _, s := range append(slices.Clone(before), w) {
+		if t, err := clock.Parse(s.EffectiveAt); err == nil && t.After(now) {
+			instants = append(instants, t)
+		}
+		if t, ok, err := s.EffectiveExpiry(); err == nil && ok && t.After(now) {
+			instants = append(instants, t)
+		}
+	}
+	slices.SortFunc(instants, func(a, b time.Time) int { return a.Compare(b) })
+	for _, at := range instants {
+		involved := productConflict(after, at)
+		if len(involved) > 0 && !slices.Equal(involved, productConflict(before, at)) {
+			instant, _ := clock.Format(at)
+			ruleIDs := make([]any, len(involved))
+			for i, id := range involved {
+				ruleIDs[i] = id
+			}
+			return refuse(CodeRuleConflict, "after the write two product rules would be in force on the subject at this scope, neither naming the other in changes").
+				With("subject", w.Subject).With("rules", ruleIDs).With("at", instant)
+		}
+	}
+	return nil
+}
+
+// productConflict are the identities, in order, of the product rules of one
+// conflict key and full scope in force at the instant, and not superseded by
+// one in force, that have a partner applying to a common role that neither
+// names the other in changes.
+func productConflict(group []*rule.Rule, at time.Time) []string {
+	var live []*rule.Rule
+	superseded := map[string]bool{}
+	for _, s := range group {
+		if inForce(s, at) {
+			live = append(live, s)
+			if s.Changes != nil && s.Changes.Relation == rule.RelationSupersedes {
+				superseded[s.Changes.RuleID] = true
+			}
+		}
+	}
+	related := func(a, b *rule.Rule) bool {
+		return a.Changes != nil && a.Changes.RuleID == b.RuleID || b.Changes != nil && b.Changes.RuleID == a.RuleID
+	}
+	var involved []string
+	for _, a := range live {
+		if superseded[a.RuleID] {
+			continue
+		}
+		for _, b := range live {
+			if b != a && !superseded[b.RuleID] && !related(a, b) && overlaps(a.Applies, b.Applies) {
+				involved = append(involved, a.RuleID)
+				break
+			}
+		}
+	}
+	slices.Sort(involved)
+	return involved
+}
+
+// inForce says whether the rule is in force at the instant: in force by its
+// status, begun, and not past its effective expiry by the clock.
+func inForce(s *rule.Rule, at time.Time) bool {
+	if s.Status != rule.StatusInForce {
+		return false
+	}
+	effective, err := clock.Parse(s.EffectiveAt)
+	if err != nil || at.Before(effective) {
+		return false
+	}
+	past, err := s.ExpiredAt(at)
+	return err == nil && !past
+}
+
+// overlaps says whether two rules apply to a common role; none is every role.
+func overlaps(a, b []string) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return true
+	}
+	for _, x := range a {
+		if slices.Contains(b, x) {
+			return true
+		}
+	}
+	return false
 }
 
 // checkGoverned holds a product rule's governed work to the Pool: a governed

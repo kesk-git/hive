@@ -550,3 +550,94 @@ func TestAnExtendMovesTheEffectiveExpiryLaterAndAnEndEarlier(t *testing.T) {
 	})
 	ok(t, h.amend(open, map[string]any{"kind": "end", "words": "Until the twenty-fifth.", "new_expires_at": d25}))
 }
+
+func TestAnAmendmentThatRestoresAConflictBetweenOtherRulesIsRefused(t *testing.T) {
+	h, filing := seed(t)
+	a := h.recorded(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), request{})
+	b := h.recorded(supersedes(opRule("dispatch.cap", "always", filing, "Dispatch at most five Swarms."), a), request{})
+	h.recorded(supersedes(opRule("dispatch.cap", "always", filing, "Dispatch at most six Swarms."), b), request{})
+	h.unchanged(func() {
+		resp := refused(t, h.amend(b, map[string]any{"kind": "end", "words": "Until the twentieth.", "new_expires_at": d20}), envelope.Refused, "pool.rule_conflict")
+		if d := detail(t, resp); d["at"] != d20 {
+			t.Errorf("detail %v", d)
+		}
+	})
+}
+
+func TestASecondProductRuleOnOneSubjectAtOneScopeIsRefusedUnlessItNamesTheRuleInForce(t *testing.T) {
+	h, filing := seed(t)
+	product := func() map[string]any {
+		return map[string]any{
+			"subject": "stage.ruling", "words": "The ruling.", "origin": map[string]any{"kind": "ruling"},
+			"applies": []any{}, "kind": "product", "governs": map[string]any{"stage": int64(2)},
+		}
+	}
+	temp := h.recorded(withExpiry(product(), d15), request{})
+	h.unchanged(func() {
+		refused(t, h.record(product(), request{}), envelope.Refused, "pool.rule_conflict")
+	})
+
+	// A product rule that begins when the other has expired is in force alone,
+	// and an extend that would put the two in force together is refused.
+	later := product()
+	later["effective_at"] = d20
+	scheduled := h.recorded(later, request{})
+	h.unchanged(func() {
+		refused(t, h.amend(temp, map[string]any{"kind": "extend", "words": "Longer.", "new_expires_at": d25}), envelope.Refused, "pool.rule_conflict")
+	})
+
+	// A rule that names the one in force beside it in changes is no conflict, and
+	// an operating rule of the same conflict key is never compared with a product rule.
+	successor := product()
+	successor["effective_at"] = d20
+	h.recorded(supersedes(successor, scheduled), request{})
+	h.recorded(opRule("stage.ruling", "always", filing, "Rule on stages by the Hive Mind's word."), request{})
+}
+
+func TestARuleNoLongerInForceTakesANoteOnly(t *testing.T) {
+	h, filing := seed(t)
+	invalidStatus := func(resp *envelope.Response, status string) {
+		t.Helper()
+		if resp.Status != envelope.Invalid || resp.Error.Code != "schema_violation" || detail(t, resp)["status"] != status {
+			t.Errorf("status %s, error %+v", resp.Status, resp.Error)
+		}
+	}
+
+	ended := ok(t, h.amend(h.recorded(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), request{}),
+		map[string]any{"kind": "end", "words": "Ended now.", "new_expires_at": "2026-10-14T09:00:00.000Z"}))["rule"].(map[string]any)
+	if ended["status"] != "ended" {
+		t.Fatalf("ended %v", ended)
+	}
+	h.unchanged(func() {
+		invalidStatus(h.amend(ended, map[string]any{"kind": "extend", "words": "Again.", "new_expires_at": d25}), "ended")
+		invalidStatus(h.amend(ended, map[string]any{"kind": "end", "words": "Sooner.", "new_expires_at": "2026-10-14T08:00:00.000Z"}), "ended")
+	})
+	ok(t, h.amend(ended, map[string]any{"kind": "note", "words": "Ended on purpose."}))
+
+	// A rule ended at a later time stays in force until then.
+	pending := h.recorded(opRule("dispatch.model", "always", filing, "Use the small model."), request{})
+	pending = ok(t, h.amend(pending, map[string]any{"kind": "end", "words": "Until the twentieth.", "new_expires_at": d20}))["rule"].(map[string]any)
+	if pending["status"] != "in-force" || !slices.Contains(h.resolvedIDs(hiveScope, nil), pending["rule_id"].(string)) {
+		t.Fatalf("a rule ended at a later time is not in force: %v", pending)
+	}
+	pending = ok(t, h.amend(pending, map[string]any{"kind": "extend", "words": "Until the twenty-fifth.", "new_expires_at": d25}))["rule"].(map[string]any)
+
+	// Past its expiry by the clock, before and after the expiry is noticed.
+	h.clk.Set(time.Date(2026, 10, 25, 1, 0, 0, 0, time.UTC))
+	h.unchanged(func() {
+		invalidStatus(h.amend(pending, map[string]any{"kind": "extend", "words": "Again.", "new_expires_at": "2026-10-30T00:00:00.000Z"}), "in-force")
+	})
+	expired := ok(t, h.expire(pending, "2026-10-25T01:00:00.000Z"))["rule"].(map[string]any)
+	h.unchanged(func() {
+		invalidStatus(h.amend(expired, map[string]any{"kind": "extend", "words": "Again.", "new_expires_at": "2026-10-30T00:00:00.000Z"}), "expired")
+	})
+	ok(t, h.amend(expired, map[string]any{"kind": "note", "words": "Expired as planned."}))
+
+	// A lifted rule takes no second lift.
+	body := opRule("dispatch.gate", "always", filing, "Gate every Swarm until the round closes.")
+	body["lift"] = map[string]any{"receipt_kind": "synapse.round.closed", "subject": map[string]any{"schema": "synapse.round", "id": "round_a"}}
+	lifted := ok(t, h.amend(h.recorded(body, request{}), map[string]any{"kind": "lift", "words": "The round closed.", "receipt": liftReceipt(t, "synapse.round.closed", "round_a")}))["rule"].(map[string]any)
+	h.unchanged(func() {
+		invalidStatus(h.amend(lifted, map[string]any{"kind": "lift", "words": "Again.", "receipt": liftReceipt(t, "synapse.round.closed", "round_a")}), "lifted")
+	})
+}

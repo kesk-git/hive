@@ -14,10 +14,11 @@ import (
 // amendment of the rule's operation, extend or end with a new expiry time, lift
 // with the receipt that met the lift condition, or note. The rule's words, dates
 // and original expiry are never changed; the latest amendment's new expiry is the
-// time the resolver uses. A lift is checked against the receipt the request
-// carries whole, and the Pool reads no other store for it. The amend re-renders
-// the projections of the rule's scope in its transaction and is refused with
-// pool.projection_over_budget when one would exceed its budget.
+// time the resolver uses. A rule no longer in force takes a note only. A lift is
+// checked against the receipt the request carries whole, and the Pool reads no
+// other store for it. The amend re-renders the projections of the rule's scope
+// in its transaction and is refused with pool.projection_over_budget when one
+// would exceed its budget.
 //
 // The request's expected_revisions names the rule's revision when the caller
 // supplies it, and is checked then; neither the contract's sentence nor the
@@ -41,6 +42,11 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 		}
 	}
 	now := c.Clock.Now()
+	if kind != rule.AmendmentNote {
+		if err := checkStillInForce(r, now); err != nil {
+			return nil, err
+		}
+	}
 	stamp, err := c.Stamp()
 	if err != nil {
 		return nil, internal("the time of the amendment cannot be written", err)
@@ -104,6 +110,9 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 	if err := snap.RefuseConflicts(now, write); err != nil {
 		return nil, err
 	}
+	if err := checkProductConflict(snap.Rules, now, pr); err != nil {
+		return nil, err
+	}
 	if _, err := snap.Plan(now, write); err != nil {
 		return nil, err
 	}
@@ -116,6 +125,26 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 		return nil, err
 	}
 	return b.stageRendered(snap, write, map[string]any{"rule": final})
+}
+
+// checkStillInForce refuses an extend, an end or a lift of a rule no longer in
+// force: ended, expired or lifted, or past its effective expiry by the clock. A
+// rule ended at a later time is in force until then, and a note is taken by any
+// rule.
+func checkStillInForce(r *rule.Rule, now time.Time) error {
+	if r.Status != rule.StatusInForce {
+		return invalid("the rule is "+r.Status+" and no longer in force, so it takes a note only").With("status", r.Status)
+	}
+	past, err := r.ExpiredAt(now)
+	if err != nil {
+		return envelope.Common(envelope.CodeRecordMalformed, "the rule's expiry is not a calendar instant").With("record", r.RuleID).Because(err)
+	}
+	if past {
+		expiry, _, _ := r.EffectiveExpiry()
+		at, _ := clock.Format(expiry)
+		return invalid("the rule is past its expiry time, "+at+", and no longer in force, so it takes a note only").With("status", r.Status).With("expires_at", at)
+	}
+	return nil
 }
 
 // checkDirection refuses an extend that does not move the rule's effective

@@ -76,11 +76,14 @@ func (s *Snapshot) Rerender(c *cli.Call, w Write, tx poolstore.Transaction) (poo
 // RefuseConflicts refuses, with pool.rule_conflict, a write of rules after which
 // two rules govern one subject at one scope, neither naming the other in
 // changes, as the resolver reads them, for any role, at the clock or at any later
-// instant at which a rule of the records as the write leaves them takes effect
+// instant at which a rule of the records before or after the write takes effect
 // or expires: the instants at which the live set changes. A rule that another
 // supersedes or qualifies by changes is no conflict, and a rule narrowed to a
-// task generation is resolved for that generation. Only a conflict that involves
-// a rule the write carries is refused.
+// task generation is resolved for that generation. A conflict is refused where
+// the records before the write do not have it at that instant, for that role and
+// at the scope of a rule the write carries: one that involves the rule, and one
+// between other rules that the write restores, as the end of a superseding rule
+// restores the rules it superseded.
 func (s *Snapshot) RefuseConflicts(now time.Time, w Write) error {
 	after := s.after(w)
 	instants := []time.Time{now}
@@ -89,15 +92,17 @@ func (s *Snapshot) RefuseConflicts(now time.Time, w Write) error {
 			instants = append(instants, t)
 		}
 	}
-	for _, r := range after.Rules {
-		if r.Kind != rule.KindOperating {
-			continue
-		}
-		if t, err := clock.Parse(r.EffectiveAt); err == nil {
-			add(t)
-		}
-		if t, ok, err := r.EffectiveExpiry(); err == nil && ok {
-			add(t)
+	for _, rules := range [][]*rule.Rule{s.Rules, after.Rules} {
+		for _, r := range rules {
+			if r.Kind != rule.KindOperating {
+				continue
+			}
+			if t, err := clock.Parse(r.EffectiveAt); err == nil {
+				add(t)
+			}
+			if t, ok, err := r.EffectiveExpiry(); err == nil && ok {
+				add(t)
+			}
 		}
 	}
 	slices.SortFunc(instants, func(a, b time.Time) int { return a.Compare(b) })
@@ -107,18 +112,28 @@ func (s *Snapshot) RefuseConflicts(now time.Time, w Write) error {
 		}
 		for _, at := range instants {
 			for _, role := range roles {
-				res, err := rule.Compute(rule.Request{Scope: envelopeScope(r.Scope), Role: role, At: at, TaskID: r.TaskID, Generation: r.Generation}, after.Rules)
+				req := rule.Request{Scope: envelopeScope(r.Scope), Role: role, At: at, TaskID: r.TaskID, Generation: r.Generation}
+				res, err := rule.Compute(req, after.Rules)
+				if err != nil {
+					return fmt.Errorf("a rule cannot be placed in time: %w", err)
+				}
+				if len(res.Conflicts) == 0 {
+					continue
+				}
+				was, err := rule.Compute(req, s.Rules)
 				if err != nil {
 					return fmt.Errorf("a rule cannot be placed in time: %w", err)
 				}
 				for _, c := range res.Conflicts {
-					if slices.Contains(c.Rules, r.RuleID) {
+					if !slices.ContainsFunc(was.Conflicts, func(p rule.Conflict) bool {
+						return p.Subject == c.Subject && p.ScopeLevel == c.ScopeLevel && slices.Equal(p.Rules, c.Rules)
+					}) {
 						instant, _ := clock.Format(at)
 						ids := make([]any, len(c.Rules))
 						for i, id := range c.Rules {
 							ids[i] = id
 						}
-						return refuse(CodeRuleConflict, "a rule is in force on the subject at this scope and the request does not name it in changes").
+						return refuse(CodeRuleConflict, "after the write two rules would govern the subject at this scope, neither naming the other in changes").
 							With("subject", c.Subject).With("rules", ids).With("at", instant)
 					}
 				}
