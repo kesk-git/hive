@@ -106,7 +106,9 @@ func openGeneration(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := b.receipt(generationOpened, ref, scopeOf(final), taskID, evidence); err != nil {
+	scope := scopeOf(final)
+	scope.Generation = entry["generation"].(int64)
+	if _, err := b.receipt(generationOpened, ref, scope, taskID, evidence); err != nil {
 		return nil, err
 	}
 	return b.stage(map[string]any{"item": final, "generation": generationNumbered(final, entry["generation"].(int64))})
@@ -159,7 +161,9 @@ func closeGeneration(c *cli.Call) (*cli.Result, error) {
 		return nil, err
 	}
 	evidence := []envelope.Evidence{{Role: "closed-by", Ref: refFromMap(closedBy)}}
-	if _, err := b.receipt(generationClosed, ref, scopeOf(final), taskID, evidence); err != nil {
+	scope := scopeOf(final)
+	scope.Generation = number
+	if _, err := b.receipt(generationClosed, ref, scope, taskID, evidence); err != nil {
 		return nil, err
 	}
 	return b.stage(map[string]any{"item": final, "generation": generationNumbered(final, number)})

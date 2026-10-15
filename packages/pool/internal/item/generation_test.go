@@ -209,7 +209,8 @@ func TestOpenGenerationNumbersTheFirstAndMovesAQueuedItemToInFlight(t *testing.T
 		t.Errorf("the stored item is %v", stored)
 	}
 	if len(resp.Receipts) != 1 || resp.Receipts[0].Kind != "pool.generation.opened" || resp.Receipts[0].Subject == nil ||
-		resp.Receipts[0].Subject.ID != id || resp.Receipts[0].Subject.RecordRevision != before+1 || resp.Receipts[0].TaskID != id {
+		resp.Receipts[0].Subject.ID != id || resp.Receipts[0].Subject.RecordRevision != before+1 || resp.Receipts[0].TaskID != id ||
+		resp.Receipts[0].Scope.Generation != generation["generation"] {
 		t.Errorf("the receipts are %+v", resp.Receipts)
 	}
 	if !strings.Contains(joinValues(h.files("journal")), `"pool.generation.opened"`) {
@@ -337,7 +338,7 @@ func TestCloseGenerationRecordsEachOutcomeAndChangesNoState(t *testing.T) {
 				t.Errorf("the stored item is %v", stored)
 			}
 			if len(resp.Receipts) != 1 || resp.Receipts[0].Kind != "pool.generation.closed" || resp.Receipts[0].Subject == nil ||
-				resp.Receipts[0].Subject.ID != id || resp.Receipts[0].TaskID != id {
+				resp.Receipts[0].Subject.ID != id || resp.Receipts[0].TaskID != id || resp.Receipts[0].Scope.Generation != 1 {
 				t.Errorf("the receipts are %+v", resp.Receipts)
 			}
 			if !strings.Contains(joinValues(h.files("journal")), `"pool.generation.closed"`) {
