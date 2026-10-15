@@ -13,6 +13,7 @@ import (
 	_ "github.com/kesk-git/hive/packages/pool/internal/legacy"
 	_ "github.com/kesk-git/hive/packages/pool/internal/memory"
 	_ "github.com/kesk-git/hive/packages/pool/internal/rule"
+	_ "github.com/kesk-git/hive/packages/pool/internal/rulewrite"
 	_ "github.com/kesk-git/hive/packages/pool/internal/specification"
 )
 

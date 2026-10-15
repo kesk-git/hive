@@ -1,0 +1,53 @@
+{
+  "schema": "pool.rule",
+  "schema_version": "2.0",
+  "record_revision": 9007199254740991,
+  "rule_id": "rule_01000000000000000000000000",
+  "scope_level": "hive",
+  "home_id": "home_01j9xk3m2nq4r5s6t7v8w9xyza",
+  "subject": "example.subject",
+  "words": "Example fact.",
+  "origin": {
+    "kind": "ruling"
+  },
+  "applies": [],
+  "status": "expired",
+  "effective_at": "2026-10-11T08:00:00.000Z",
+  "authority": {
+    "kind": "none"
+  },
+  "amendments": [
+    {
+      "sequence": 1,
+      "kind": "end",
+      "words": "Ended on a date.",
+      "new_expires_at": "2026-10-20T00:00:00.000Z",
+      "authority": {
+        "kind": "none"
+      },
+      "recorded_at": "2026-10-12T08:00:00.000Z",
+      "recorded_by": {
+        "kind": "test"
+      },
+      "request_id": "req_01000000000000000000000000",
+      "receipt_id": "rcpt_01000000000000000000000000"
+    }
+  ],
+  "created_at": "2026-10-11T08:00:00.000Z",
+  "updated_at": "2026-10-11T08:00:00.000Z",
+  "writer": {
+    "package": "dispatch",
+    "command": "hive-dispatch",
+    "operation": "create-home",
+    "implementation_version": "0.1.0"
+  },
+  "kind": "operating",
+  "tier": "always",
+  "filed_under": "subj_01000000000000000000000000",
+  "rule_line": "Example fact.",
+  "expiry": {
+    "receipt_id": "rcpt_02000000000000000000000000",
+    "recorded_at": "2026-10-20T01:00:00.000Z",
+    "noticed_at": "2026-10-20T01:00:00.000Z"
+  }
+}

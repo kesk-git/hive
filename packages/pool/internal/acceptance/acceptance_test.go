@@ -151,6 +151,8 @@ func request(t testing.TB, command, operation string) []byte {
 		version = "2.0"
 	case command == "hive-spec" && operation == "define":
 		version = "1.2"
+	case command == "hive-rule" && operation == "record":
+		version = "2.0"
 	}
 	out, err := canon.Encode(map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
@@ -172,15 +174,15 @@ func request(t testing.TB, command, operation string) []byte {
 // operations hold-question, revise-question, answer-question, release-question,
 // complete-question and close-question, and the dry-run import and export of
 // the legacy backlog, hive-admit approve, and the operations define, accept and
-// close of hive-spec, hive-rule resolve, and render, check, propagate and
-// budget of hive-memory. Every other operation of the declaration is declared
-// and refused.
+// close of hive-spec, record, amend, expire and resolve of hive-rule, and
+// render, check, propagate, budget and subject of hive-memory. Every other
+// operation of the declaration is declared and refused.
 var built = map[string][]string{
 	"hive-pool":   {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question", "release-question", "complete-question", "close-question", "import-legacy", "export-legacy"},
 	"hive-admit":  {"approve"},
 	"hive-spec":   {"define", "accept", "close"},
-	"hive-rule":   {"resolve"},
-	"hive-memory": {"render", "check", "propagate", "budget"},
+	"hive-rule":   {"record", "amend", "expire", "resolve"},
+	"hive-memory": {"render", "check", "propagate", "budget", "subject"},
 }
 
 // Every command name of the package answers capabilities: exit 0, one

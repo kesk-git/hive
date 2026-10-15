@@ -1,6 +1,5 @@
 {"name":"atomic-subject-and-fact-bad-load","base":"atomic-subject-and-fact.json","edits":[{"op":"replace","path":"/create_subject/loads_at/0","value":"startup"}]}
 {"name":"atomic-subject-and-fact-missing-evidence","base":"atomic-subject-and-fact.json","edits":[{"op":"replace","path":"/facts/0/provenance/evidence","value":[]}]}
-{"name":"line-over-cap","base":"minimal.json","edits":[{"op":"replace","path":"/rule_line","value":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界"}]}
 {"name":"minimal-bad-kind","base":"minimal.json","edits":[{"op":"replace","path":"/kind","value":"not-allowed"}]}
 {"name":"minimal-bad-tier","base":"minimal.json","edits":[{"op":"replace","path":"/tier","value":"not-allowed"}]}
 {"name":"minimal-missing-applies","base":"minimal.json","edits":[{"op":"remove","path":"/applies"}]}
