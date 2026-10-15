@@ -17,17 +17,13 @@ func fullHome(t *testing.T) string {
 	t.Helper()
 	home := newHome(t)
 	for _, d := range knownDirs {
-		if err := os.Mkdir(filepath.Join(home, d), dirMode); err != nil {
-			t.Fatal(err)
-		}
+		makeDir(t, filepath.Join(home, d))
 	}
 	data, err := os.ReadFile("testdata/home/home.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(home, homeFile), data, fileMode); err != nil {
-		t.Fatal(err)
-	}
+	makeFile(t, filepath.Join(home, homeFile), data)
 	return home
 }
 
@@ -126,7 +122,7 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 		}, fs.ErrNotExist},
 		{"a file", func(t *testing.T, home string) string {
 			p := filepath.Join(home, "file")
-			os.WriteFile(p, []byte("x"), fileMode)
+			makeFile(t, p, []byte("x"))
 			return p
 		}, ErrLayout},
 		{"a home open to others", func(t *testing.T, home string) string {
@@ -139,7 +135,7 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 		}, ErrLayout},
 		{"a known directory that is a file", func(t *testing.T, home string) string {
 			os.Remove(filepath.Join(home, journalDir))
-			os.WriteFile(filepath.Join(home, journalDir), []byte("x"), fileMode)
+			makeFile(t, filepath.Join(home, journalDir), []byte("x"))
 			return home
 		}, ErrLayout},
 		{"a known directory that is a symbolic link", func(t *testing.T, home string) string {
@@ -157,7 +153,7 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 		}, ErrLayout},
 		{"home.json that is a directory", func(t *testing.T, home string) string {
 			os.Remove(filepath.Join(home, homeFile))
-			os.Mkdir(filepath.Join(home, homeFile), dirMode)
+			makeDir(t, filepath.Join(home, homeFile))
 			return home
 		}, ErrLayout},
 		{"home.json open to others", func(t *testing.T, home string) string {
@@ -167,25 +163,25 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 		{"home.json without its line feed", func(t *testing.T, home string) string {
 			p := filepath.Join(home, homeFile)
 			data, _ := os.ReadFile(p)
-			os.WriteFile(p, data[:len(data)-1], fileMode)
+			makeFile(t, p, data[:len(data)-1])
 			return home
 		}, ErrRecordMalformed},
 		{"home.json torn", func(t *testing.T, home string) string {
 			p := filepath.Join(home, homeFile)
 			data, _ := os.ReadFile(p)
-			os.WriteFile(p, data[:len(data)/2], fileMode)
+			makeFile(t, p, data[:len(data)/2])
 			return home
 		}, ErrRecordMalformed},
 		{"home.json that fails its schema", func(t *testing.T, home string) string {
 			p := filepath.Join(home, homeFile)
 			data, _ := os.ReadFile(p)
-			os.WriteFile(p, []byte(strings.Replace(string(data), `"role":"hive"`, `"role":"other"`, 1)), fileMode)
+			makeFile(t, p, []byte(strings.Replace(string(data), `"role":"hive"`, `"role":"other"`, 1)))
 			return home
 		}, ErrRecordMalformed},
 		{"home.json of a fleet without its workspace", func(t *testing.T, home string) string {
 			p := filepath.Join(home, homeFile)
 			data, _ := os.ReadFile(p)
-			os.WriteFile(p, []byte(strings.Replace(string(data), `"role":"hive"`, `"role":"fleet"`, 1)), fileMode)
+			makeFile(t, p, []byte(strings.Replace(string(data), `"role":"hive"`, `"role":"fleet"`, 1)))
 			return home
 		}, ErrRecordMalformed},
 		{"home.json of a newer minor version", func(t *testing.T, home string) string {
@@ -205,23 +201,23 @@ func TestCheckHomeRefusesInvalidLayouts(t *testing.T) {
 			return home
 		}, ErrRecordMalformed},
 		{"home.json empty", func(t *testing.T, home string) string {
-			os.WriteFile(filepath.Join(home, homeFile), nil, fileMode)
+			makeFile(t, filepath.Join(home, homeFile), nil)
 			return home
 		}, ErrRecordMalformed},
 		{"a .git directory in the home", func(t *testing.T, home string) string {
-			os.Mkdir(filepath.Join(home, ".git"), dirMode)
+			makeDir(t, filepath.Join(home, ".git"))
 			return home
 		}, ErrInsideRepository},
 		{"a .git file in the home, as a linked worktree has", func(t *testing.T, home string) string {
-			os.WriteFile(filepath.Join(home, ".git"), []byte("gitdir: elsewhere\n"), fileMode)
+			makeFile(t, filepath.Join(home, ".git"), []byte("gitdir: elsewhere\n"))
 			return home
 		}, ErrInsideRepository},
 		{"a .git directory above the home", func(t *testing.T, home string) string {
-			os.Mkdir(filepath.Join(filepath.Dir(home), ".git"), dirMode)
+			makeDir(t, filepath.Join(filepath.Dir(home), ".git"))
 			return home
 		}, ErrInsideRepository},
 		{"a .git directory two levels above the home", func(t *testing.T, home string) string {
-			os.Mkdir(filepath.Join(filepath.Dir(filepath.Dir(home)), ".git"), dirMode)
+			makeDir(t, filepath.Join(filepath.Dir(filepath.Dir(home)), ".git"))
 			return home
 		}, ErrInsideRepository},
 	}, platformLayoutCases...)
@@ -249,9 +245,7 @@ func newerHome(t *testing.T, home, version string) {
 		t.Fatal(err)
 	}
 	data = []byte(strings.Replace(string(data), `"schema_version":"1.0"`, `"schema_version":"`+version+`"`, 1))
-	if err := os.WriteFile(p, data, fileMode); err != nil {
-		t.Fatal(err)
-	}
+	makeFile(t, p, data)
 }
 
 // A newer home record is refused as unsupported_version and never as a
@@ -272,9 +266,9 @@ func TestNewerHomeIsUnsupported(t *testing.T) {
 
 func TestCheckHomeNamesWhatIsWrong(t *testing.T) {
 	home := fullHome(t)
-	os.WriteFile(filepath.Join(home, journalDir, "x"), nil, fileMode)
+	makeFile(t, filepath.Join(home, journalDir, "x"), nil)
 	os.Remove(filepath.Join(home, "shadow"))
-	os.WriteFile(filepath.Join(home, "shadow"), []byte("x"), fileMode)
+	makeFile(t, filepath.Join(home, "shadow"), []byte("x"))
 	_, err := CheckHome(home)
 	if err == nil || !strings.Contains(err.Error(), "shadow") {
 		t.Fatalf("error %v does not name the entry", err)
@@ -321,7 +315,7 @@ func TestOpenRefuses(t *testing.T) {
 	if entries, _ := os.ReadDir(home); len(entries) != 0 {
 		t.Errorf("a refused Open created %v", entries)
 	}
-	os.Mkdir(filepath.Join(home, ".git"), dirMode)
+	makeDir(t, filepath.Join(home, ".git"))
 	_, err := Open(home, "pool", Options{})
 	if !errors.Is(err, ErrInsideRepository) || Code(err) != "home_inside_repository" {
 		t.Errorf("Open inside a repository: %v, code %q", err, Code(err))

@@ -17,34 +17,11 @@ import (
 	"github.com/kesk-git/hive/contract/internal/testsupport"
 )
 
-// On Windows the package access imports the store, so the store's own tests
-// cannot import it without an import cycle Go refuses. newHome, secureHome and
-// hasMode stand in for its helpers here as short wrappers over the store's own
-// SecureDir and CheckOwnerOnly, so the logic is still in one place; they are
-// not copies of it.
+// The package access imports the store, so the store's own tests cannot import
+// it without an import cycle Go refuses. hasMode stands in for its helper here
+// as a short wrapper over the store's own CheckOwnerOnly, so the logic is
+// still in one place; it is not a copy of it.
 //
-// newHome makes an empty home under a temporary directory, which the test
-// removes.
-func newHome(t testing.TB) string {
-	t.Helper()
-	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, dirMode); err != nil {
-		t.Fatal(err)
-	}
-	secureHome(t, dir)
-	return dir
-}
-
-// secureHome makes the home at dir what spec/records.md says a home is on
-// Windows: a protected access-control list of its owner alone, which what is
-// made in it inherits.
-func secureHome(t testing.TB, dir string) {
-	t.Helper()
-	if err := SecureDir(dir); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // hasMode reports whether the entry at path is open to its owner only. There
 // are no mode bits to compare on Windows, so the access-control list is what
 // is read.
@@ -126,15 +103,9 @@ func refuseReplace(t testing.TB, s *Store, rel string) (restore func(), ok bool)
 // is written after its access is closed, and opens it once that handle is
 // gone.
 func TestOpenPrivateRefusesAnOpenFile(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, dirMode); err != nil {
-		t.Fatal(err)
-	}
-	secureHome(t, dir)
+	dir := newHome(t)
 	path := filepath.Join(dir, "response.json")
-	if err := os.WriteFile(path, nil, fileMode); err != nil {
-		t.Fatal(err)
-	}
+	makeFile(t, path, nil)
 	reader, err := OpenRead(path)
 	if err != nil {
 		t.Fatal(err)

@@ -41,11 +41,7 @@ func TestSecureDirAndCheckOwnerOnly(t *testing.T) {
 // A file made in a secured directory is owner-only too, and OpenPrivate closes
 // a file that was open to others before anything is written to it.
 func TestOpenPrivate(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, dirMode); err != nil {
-		t.Fatal(err)
-	}
-	secureHome(t, dir)
+	dir := newHome(t)
 	path := filepath.Join(dir, "file")
 	f, err := OpenPrivate(path)
 	if err != nil {
@@ -155,9 +151,7 @@ func TestLinkedIntentIsRefused(t *testing.T) {
 	if err := os.WriteFile(target, []byte("{}\n"), fileMode); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(home, "pool", txDir), dirMode); err != nil {
-		t.Fatal(err)
-	}
+	makeDir(t, filepath.Join(home, "pool", txDir))
 	symlink(t, target, s.abs(IntentPath("pool", req1)))
 	if w, err := s.Lock(); !errors.Is(err, ErrRecordMalformed) {
 		if err == nil {
