@@ -40,8 +40,8 @@ func pcSchemas(t testing.TB) *schema.Registry {
 	return reg
 }
 
-// pcKind describes a kind a caller reads: the schema of its record, the member
-// that is its identity, and whether the Pool stores it as a file of its own.
+// pcKind describes a kind a caller reads: the schema of its record and the
+// member that is its identity.
 type pcKind struct {
 	schema, identity string
 }
@@ -1200,7 +1200,7 @@ type pcUIWorld struct {
 	target, prey, hunt string
 	// The questions: one open, one answered with Later, and their items.
 	open, later wpHeld
-	// Rules: in force, expired and expiring.
+	// Rules: in force and expired.
 	inForce, expired string
 }
 
