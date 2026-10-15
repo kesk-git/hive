@@ -139,10 +139,15 @@ func request(t testing.TB, command, operation string) []byte {
 		t.Fatal(err)
 	}
 	// An empty body breaks the schema of every built operation but check, whose
-	// members are all optional: an identity that is not one breaks its.
+	// members are all optional: an identity that is not one breaks its. The
+	// body of fold is empty by its contract, so a member it has none of breaks
+	// its.
 	body := map[string]any{}
 	if command == "hive-memory" && operation == "check" {
 		body["projection_id"] = "not-a-projection"
+	}
+	if command == "hive-memory" && operation == "fold" {
+		body["notes"] = []any{}
 	}
 	// Each built operation is sent the version it is declared at.
 	version := "1.0"

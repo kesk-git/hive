@@ -63,3 +63,38 @@ func RegisterMemorySubject(r *Registry, subject Handler) {
 		Handle: subject,
 	})
 }
+
+// RegisterMemoryMaintenance builds enqueue and fold of hive-memory into the
+// registry, with the handlers of the package that keeps the maintenance queue,
+// and the readers of the kinds note and maintenance-queue. Both are new memory
+// operations, so both are declared at 1.0. enqueue writes the notes it queues
+// and a receipt for each; the fold also renders again the projections of the
+// subjects it files facts under and adds the items it routes notes to, so it
+// declares the receipts of those beside its own.
+func RegisterMemoryMaintenance(r *Registry, enqueue, fold Handler) {
+	for _, op := range []struct {
+		name     string
+		handle   Handler
+		receipts []string
+	}{
+		{"enqueue", enqueue, []string{"pool.note.queued"}},
+		{"fold", fold, []string{"pool.memory.folded", "pool.projection.rendered", "pool.item.added"}},
+	} {
+		r.RegisterOperation("hive-memory", &cli.Operation{
+			OperationDecl: envelope.OperationDecl{
+				Name:           op.name,
+				State:          envelope.Supported,
+				Mode:           envelope.Unary,
+				Mutates:        true,
+				Versions:       []string{"1.0"},
+				RequestSchema:  "urn:hive:schema:ops:hive-memory." + op.name + ".request:v1",
+				ResponseSchema: "urn:hive:schema:ops:hive-memory." + op.name + ".response:v1",
+				ReceiptKinds:   op.receipts,
+				Executes:       []string{},
+				Calls:          []string{},
+			},
+			Handle: op.handle,
+		})
+	}
+	read.RegisterMaintenanceReaders(r.Reads)
+}

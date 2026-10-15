@@ -706,3 +706,15 @@ func TestHivePoolReadsNotesAndTheQueue(t *testing.T) {
 		refused(t, read(queueKind, m), envelope.Invalid, envelope.CodeSchemaViolation)
 	}
 }
+
+// enqueue and fold are new operations, declared at 1.0 with v1 schemas: a
+// request at another version is refused before its body is read.
+func TestEnqueueAndFoldAcceptOnlyVersionOne(t *testing.T) {
+	h, _ := foldSeed(t)
+	for _, operation := range []string{"enqueue", "fold"} {
+		resp := h.send("hive-memory", operation, map[string]any{}, request{version: "2.0"})
+		if resp.Status != envelope.Invalid || resp.Error == nil || resp.Error.Code != envelope.CodeUnsupportedVersion {
+			t.Errorf("%s at 2.0: status %s, error %+v; want unsupported_version", operation, resp.Status, resp.Error)
+		}
+	}
+}
