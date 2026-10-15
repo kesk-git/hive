@@ -2,7 +2,7 @@
 
 A supervisor for Claude Code and Codex agents, with local execution on the operator's machine, natively on macOS, Windows and Linux, and optional cloud sessions. Hive owns its workflow in one repository, with five core dependencies: Git, gh, Claude Code, Codex CLI and no-mistakes, the long-lived plugin point behind its gate.
 
-[Hive design](docs/design.md) defines the architecture, dispatch classes, delivery contracts and approved [tooling strategy](docs/design.md#tooling). It specifies the target; what is built so far is scaffolding, and the behaviour the design describes beyond it is prospective. [The specification](spec/README.md) holds the contracts of the plan's first two stages: for the first, the package owners, identities, schemas, test targets and the distribution and import contracts; for the second, the Pool.
+[Hive design](docs/design.md) defines the architecture, dispatch classes, delivery contracts and approved [tooling strategy](docs/design.md#tooling). It specifies the target; each executable's own `capabilities` answer declares which operations are built, and the behaviour the design describes beyond them is prospective. [The specification](spec/README.md) holds the contracts of the plan's first two stages: for the first, the package owners, identities, schemas, test targets and the distribution and import contracts; for the second, the Pool.
 
 Hive is not affiliated with Games Workshop.
 

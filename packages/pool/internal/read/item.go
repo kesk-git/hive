@@ -42,6 +42,13 @@ func RegisterItemReaders(r *Registry) {
 
 func readItems(c *Context) (*Result, error) {
 	sel := c.Selector
+	for _, state := range sel.States {
+		switch state {
+		case "queued", "in-flight", "done", "archived":
+		default:
+			return nil, envelope.Common(envelope.CodeSchemaViolation, "selector.states must name only queued, in-flight, done or archived item states")
+		}
+	}
 	g, omitted, err := LoadGraph(c.Store, c.Call.Clock.Now())
 	if err != nil {
 		return nil, err

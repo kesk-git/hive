@@ -7,10 +7,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kesk-git/hive/contract/canon"
+	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/journal"
 	"github.com/kesk-git/hive/packages/pool/internal/item"
 	"github.com/kesk-git/hive/packages/pool/internal/legacy"
 )
@@ -707,3 +710,97 @@ func TestRetainedStoreLegacyTags(t *testing.T) {
 // Reason: spec/import-plan-tasks-axi.md, Excluded: "The backend seam and the
 // TypeScript data model: Hive's records are the schemas under
 // spec/schemas/records/, and there is no second backend."
+
+// The parenthesis reason row of test/commands/state.test.ts's "rejects
+// missing or unsafe hold fields before mutating" belongs at the legacy
+// rendering boundary: Pool holds keep exact text, and export must refuse a
+// tag it cannot represent instead of substituting different text.
+func TestRetainedStoreHoldParenthesesExport(t *testing.T) {
+	h := newHome(t)
+	im := h.importText("# Backlog\n\n## Queued\n- [ ] held-a - Hold text\n", "UTC")
+	id := im.taskID("held-a")
+	ok(t, h.do("hold", map[string]any{"task_id": id, "kind": "parked", "reason": "wait (blocked)"}))
+	poolFiles := func() map[string]string {
+		t.Helper()
+		files := map[string]string{}
+		err := filepath.Walk(filepath.Join(h.dir, "pool"), func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			files[path] = string(data)
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return files
+	}
+	j, err := journal.Open(h.dir, journal.Options{Package: "pool", Clock: h.exe.Clock})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range []map[string]any{
+		{"zone": "UTC", "selector": map[string]any{"task_id": id}},
+		{"zone": "UTC", "migration_id": im.migration["migration_id"]},
+		{"zone": "UTC", "migration_id": im.migration["migration_id"], "normalize": true},
+	} {
+		// A refusal leaves records, request outcomes and receipts unchanged.
+		// Its one diagnostic event is the journal's failure evidence.
+		before := poolFiles()
+		cursor, err := j.Head()
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp := h.do("export-legacy", body)
+		refused(t, resp, envelope.Invalid, "pool.legacy_malformed")
+		if resp.Error.Detail["task_id"] != id {
+			t.Fatalf("item absent from error: %+v", resp.Error)
+		}
+		if after := poolFiles(); !reflect.DeepEqual(before, after) {
+			t.Fatal("refused export changed Pool files")
+		}
+		reader, err := j.Reader(cursor)
+		if err != nil {
+			t.Fatal(err)
+		}
+		event, err := reader.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if event == nil || event.Kind != "pool.diagnostic.recorded" {
+			t.Fatalf("diagnostic event = %+v", event)
+		}
+		diagnostic, _ := event.Event["body"].(map[string]any)
+		if diagnostic["command"] != "hive-pool" || diagnostic["status"] != "invalid" || diagnostic["code"] != "pool.legacy_malformed" || diagnostic["request_id"] != resp.RequestID {
+			t.Fatalf("diagnostic names a different failure: %v", diagnostic)
+		}
+		if extra, err := reader.Next(); err != nil || extra != nil {
+			t.Fatalf("extra journal event = %+v, %v", extra, err)
+		}
+	}
+}
+
+// A parenthesized reason is refused whichever of the item's holds the legacy
+// form would have selected.
+func TestRetainedStoreHoldParenthesesExportSecondHold(t *testing.T) {
+	h := newHome(t)
+	im := h.importText("# Backlog\n\n## Queued\n- [ ] held-a - Hold text\n", "UTC")
+	id := im.taskID("held-a")
+	ok(t, h.do("hold", map[string]any{"task_id": id, "kind": "parked", "reason": "wait"}))
+	h.exe.Clock.(*clock.Fake).Advance(time.Millisecond)
+	ok(t, h.do("hold", map[string]any{"task_id": id, "kind": "external", "reason": "wait (blocked)"}))
+	for _, body := range []map[string]any{
+		{"zone": "UTC", "selector": map[string]any{"task_id": id}},
+		{"zone": "UTC", "migration_id": im.migration["migration_id"]},
+		{"zone": "UTC", "migration_id": im.migration["migration_id"], "normalize": true},
+	} {
+		refused(t, h.do("export-legacy", body), envelope.Invalid, "pool.legacy_malformed")
+	}
+}

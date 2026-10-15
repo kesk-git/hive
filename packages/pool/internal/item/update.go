@@ -112,6 +112,9 @@ func update(c *cli.Call) (*cli.Result, error) {
 				deps = append(deps, copyValue(e))
 			}
 			if m, _ := e.(map[string]any); m["type"] == read.EdgeBlockedBy {
+				if m["task_id"] == taskID {
+					return nil, envelope.Common(envelope.CodeSchemaViolation, "patch.add_deps must not contain a blocked-by edge to the item itself")
+				}
 				if _, ok := g.Items[m["task_id"].(string)]; !ok {
 					return nil, refuse(codeDependencyMissing, "a blocked-by edge names an item that does not exist")
 				}
