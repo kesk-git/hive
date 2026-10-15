@@ -53,16 +53,15 @@ func (r *Rule) Lifted() bool {
 }
 
 // meets reports whether the subject a receipt is about is the record the lift
-// condition names: the same schema and identity, and the same home where the
-// condition names one. A revision or a digest is not compared: a receipt is
-// about the record at the revision its fact holds for.
+// condition names: the same schema and identity, and the same home, record
+// revision and digest wherever the condition names one.
 func meets(want map[string]any, got any) bool {
 	have, ok := got.(map[string]any)
 	if !ok {
 		return false
 	}
-	for _, key := range []string{"schema", "id", "home_id"} {
-		if w, given := want[key]; (given || key != "home_id") && have[key] != w {
+	for _, key := range []string{"schema", "id", "home_id", "record_revision", "digest"} {
+		if w, given := want[key]; (given || key == "schema" || key == "id") && have[key] != w {
 			return false
 		}
 	}

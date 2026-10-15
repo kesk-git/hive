@@ -129,8 +129,6 @@ func exclusion(req Request, r *Rule) (string, error) {
 		return ReasonLifted, nil
 	case r.Status == StatusEnded:
 		return ReasonEnded, nil
-	case r.Status == StatusExpired:
-		return ReasonExpired, nil
 	}
 	past, err := r.ExpiredAt(req.At)
 	if err != nil {

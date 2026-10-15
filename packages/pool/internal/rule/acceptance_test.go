@@ -215,6 +215,62 @@ func TestTheClockExcludesAndALiftNeedsItsReceipt(t *testing.T) {
 	}
 }
 
+// A lift condition that names a record revision or a digest is met only by a
+// receipt whose subject carries each one it names.
+func TestALiftNamingARevisionOrDigestNeedsThatState(t *testing.T) {
+	h := newHome(t)
+	const digest = "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+	at := func(revision int64, digest string) map[string]any {
+		r := receipt(liftKind, liftSubject)
+		subject := r["subject"].(map[string]any)
+		subject["record_revision"] = revision
+		if digest != "" {
+			subject["digest"] = digest
+		}
+		return r
+	}
+	condition := func(over map[string]any) map[string]any {
+		c := liftCondition()
+		for k, v := range over {
+			c["subject"].(map[string]any)[k] = v
+		}
+		return c
+	}
+	named := condition(map[string]any{"record_revision": int64(2), "digest": digest})
+	rules := map[string]string{
+		"state":          h.rule("a.subject", "hive", R{"lift": named, "amendments": []any{lift(1, at(2, digest))}}),
+		"other revision": h.rule("b.subject", "hive", R{"lift": named, "amendments": []any{lift(1, at(1, digest))}}),
+		"other digest":   h.rule("c.subject", "hive", R{"lift": named, "amendments": []any{lift(1, at(2, digest[:len(digest)-1]+"2"))}}),
+		"no digest":      h.rule("d.subject", "hive", R{"lift": named, "amendments": []any{lift(1, at(2, ""))}}),
+		"revision only":  h.rule("e.subject", "hive", R{"lift": condition(map[string]any{"record_revision": int64(2)}), "amendments": []any{lift(1, at(2, digest))}}),
+		"unnamed":        h.rule("f.subject", "hive", R{"lift": liftCondition(), "amendments": []any{lift(1, at(7, digest))}}),
+	}
+	got := excluded(h.resolved("class-3", "", nil))
+	want := map[string]string{rules["state"]: "lifted", rules["revision only"]: "lifted", rules["unnamed"]: "lifted"}
+	if len(got) != len(want) {
+		t.Fatalf("excluded %v, want %v", got, want)
+	}
+	for id, reason := range want {
+		if got[id] != reason {
+			t.Errorf("%s excluded as %q", id, got[id])
+		}
+	}
+}
+
+// Whether a rule has expired at the instant is read from its effective expiry
+// alone: a rule whose expiry was noticed is still in force before it.
+func TestANoticedExpiryDoesNotReachBackBeforeTheExpiryTime(t *testing.T) {
+	h := newHome(t)
+	noticed := h.rule("a.subject", "hive", R{"status": "expired", "expires_at": d20, "expiry": map[string]any{
+		"receipt_id": "rcpt_01j9xk3m2nq4r5s6t7v8w9xyzh", "recorded_at": d20, "noticed_at": d20,
+	}})
+	same(t, "before", applied(h.resolved("class-3", d15, nil)), []string{noticed})
+	body := h.resolved("class-3", d20, nil)
+	if len(applied(body)) != 0 || excluded(body)[noticed] != "expired-by-clock" {
+		t.Errorf("rules %v, excluded %v", applied(body), excluded(body))
+	}
+}
+
 // A rule that does not apply to the role is left out; one that names no role
 // applies to every role.
 func TestARuleOfAnotherRoleIsLeftOut(t *testing.T) {
