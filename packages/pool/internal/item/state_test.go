@@ -2,6 +2,7 @@ package item_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -315,8 +316,7 @@ func TestRetainedStateNoteExactText(t *testing.T) {
 // tag text, and required an ISO date. Hive's separate hold record requires a
 // reason and a zoned instant: spec/pool.md, Holds, says "with a reason; future
 // with its until" and "A hold's until is a wall-clock time with its zone".
-// The parenthesis row ("wait (blocked)") is left out pending the Pool hold
-// validation correction; it is not claimed by these two passing rows.
+// Parentheses remain exact text in the Pool; export refuses that legacy tag.
 func TestRetainedStateHoldRequiredFields(t *testing.T) {
 	t.Run("rejects missing or unsafe hold fields before mutating", func(t *testing.T) {
 		for _, name := range []string{"missing reason", "invalid until"} {
@@ -408,14 +408,72 @@ func TestRetainedStateHoldRequiredFields(t *testing.T) {
 // Reason: spec/import-plan-tasks-axi.md, Excluded: "The multi-item move is
 // left for a later stage" and "Nothing of it is translated at stage 2."
 //
-// Left out here pending the Pool correction; no failing assertion is
-// claimed or committed for these cases:
-// - "rejects non-canonical pull URLs without mutating".
-// - "rejects a malformed pr link before closing the task".
-// - "rejects a self-block before changing dependencies".
-// - "rejects missing or unsafe hold fields before mutating", only the parenthesis reason row
-//   ("wait (blocked)"); required-reason/date rows are retained above.
-// The pending evidence cases validate full harvest URLs; the dependency
-// case validates the refusal of a self blocked-by edge, and the hold row
-// validates a reason safe for the legacy form. These corrections and their
-// executable cases are kept together in the separate Pool correction lane.
+
+// Retained done cases validate harvest evidence with the same full-URL
+// recognition used by the legacy import.
+func TestRetainedStateHarvestEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		urls []string
+	}{
+		{"rejects non-canonical pull URLs without mutating", []string{
+			"https://forge.example.org/eve/widget/pull/39",
+			"https://github.com/o/r/pulls/9",
+			"https://github.com/o/r/pull/9?w=1",
+			" https://github.com/o/r/pull/9 ",
+		}},
+		{"rejects a malformed pr link before closing the task", []string{"https://github.com/o/r/issues/9"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, url := range tc.urls {
+				t.Run(url, func(t *testing.T) {
+					h := newHome(t)
+					id := h.addID(leaf("Invalid harvest evidence"))
+					retainedNoWrites(h, func() {
+						resp := h.do("transition", map[string]any{"task_id": id, "to": "done", "evidence": []any{map[string]any{"kind": "harvest", "url": url}}})
+						refused(t, resp, envelope.Invalid, envelope.CodeSchemaViolation)
+						if !strings.Contains(resp.Error.Message, "evidence") {
+							t.Fatalf("field absent from error: %+v", resp.Error)
+						}
+					})
+				})
+			}
+		})
+	}
+}
+
+func TestRetainedStateSelfBlock(t *testing.T) {
+	t.Run("rejects a self-block before changing dependencies", func(t *testing.T) {
+		h := newHome(t)
+		id := h.addID(leaf("Self dependency"))
+		retainedNoWrites(h, func() {
+			resp := h.do("update", map[string]any{"task_id": id, "patch": map[string]any{"title": "Changed", "add_deps": []any{map[string]any{"type": "blocked-by", "task_id": id}}}})
+			refused(t, resp, envelope.Invalid, envelope.CodeSchemaViolation)
+			if !strings.Contains(resp.Error.Message, "add_deps") {
+				t.Fatalf("field absent from error: %+v", resp.Error)
+			}
+		})
+	})
+}
+
+// The parenthesis row of "rejects missing or unsafe hold fields before
+// mutating" is re-expressed against the Pool's separate hold record.
+func TestRetainedStateHoldParentheses(t *testing.T) {
+	h := newHome(t)
+	id := h.addID(leaf("Hold text"))
+	hold := h.ok(h.do("hold", map[string]any{"task_id": id, "kind": "parked", "reason": "wait (blocked)"}))["hold"].(map[string]any)
+	got := h.ok(h.do("read", map[string]any{"kind": "hold", "selector": map[string]any{"id": hold["hold_id"]}}))["records"].([]any)[0].(map[string]any)
+	if got["reason"] != "wait (blocked)" {
+		t.Fatalf("hold reason = %v", got["reason"])
+	}
+}
+
+// retainedNoWrites checks every home file, including journal and replay data.
+func retainedNoWrites(h *home, f func()) {
+	h.t.Helper()
+	before := h.files("")
+	f()
+	if !same(before, h.files("")) {
+		h.t.Fatal("refusal wrote home files")
+	}
+}

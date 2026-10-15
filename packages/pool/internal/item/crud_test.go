@@ -342,8 +342,8 @@ func TestRetainedCRUDExactText(t *testing.T) {
 // whole request: spec/commands.md, Replay, says a different digest with the
 // same request_id is "a conflict with code replay_mismatch". Request-schema
 // invalidity is refused before replay. Every upstream table row is named:
-// the bad-pr row uses an empty harvest URL to exercise schema invalidity;
-// the upstream issue-URL-as-PR rule belongs to the pending evidence correction.
+// the malformed-link row uses the original issue URL. A changed add payload
+// is a replay mismatch; done validates harvest URLs at its own boundary.
 func TestRetainedCRUDChangedReplayPayload(t *testing.T) {
 	t.Run("rejects %s before duplicate add no-ops", func(t *testing.T) {
 		for _, row := range []string{"bad pr", "missing blocker", "tag-injecting repo", "tagging title"} {
@@ -382,8 +382,7 @@ func TestRetainedCRUDChangedReplayPayload(t *testing.T) {
 				status, code := envelope.Conflict, envelope.CodeReplayMismatch
 				switch row {
 				case "bad pr":
-					changed["links"] = []any{map[string]any{"kind": "harvest", "url": ""}}
-					status, code = envelope.Invalid, envelope.CodeSchemaViolation
+					changed["links"] = []any{map[string]any{"kind": "harvest", "url": "https://github.com/o/r/issues/9"}}
 				case "missing blocker":
 					changed["deps"] = []any{map[string]any{"type": "blocked-by", "task_id": mint(t, ids.Task)}}
 				case "tag-injecting repo":
@@ -641,9 +640,21 @@ func TestRetainedCRUDEmptyPatch(t *testing.T) {
 // as presentation and says "None is the Pool's behavior; Hive's command
 // contract is the interface". Native title/body rows are retained above.
 //
-// Left out here pending the Pool correction; no failing assertion is
-// claimed or committed for these cases:
-// - "rejects an invalid state filter".
-// The pending case checks the item state vocabulary of spec/pool.md,
-// State: queued, in-flight, done and archived. The correction and its
-// executable case are kept together in the separate Pool correction lane.
+
+// test/commands/crud.test.ts: "rejects an invalid state filter". Hive's
+// in-flight spelling is valid; bogus is outside the item state vocabulary.
+func TestRetainedCRUDInvalidStateFilter(t *testing.T) {
+	t.Run("rejects an invalid state filter", func(t *testing.T) {
+		for _, states := range [][]any{{"bogus"}, {"queued", "bogus"}} {
+			h := newHome(t)
+			h.addID(leaf("Queued work"))
+			retainedNoWrites(h, func() {
+				resp := h.do("read", map[string]any{"kind": "item", "selector": map[string]any{"states": states}})
+				refused(t, resp, envelope.Invalid, envelope.CodeSchemaViolation)
+				if !strings.Contains(resp.Error.Message, "states") {
+					t.Fatalf("field absent from error: %+v", resp.Error)
+				}
+			})
+		}
+	})
+}

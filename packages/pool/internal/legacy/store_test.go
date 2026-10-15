@@ -707,3 +707,29 @@ func TestRetainedStoreLegacyTags(t *testing.T) {
 // Reason: spec/import-plan-tasks-axi.md, Excluded: "The backend seam and the
 // TypeScript data model: Hive's records are the schemas under
 // spec/schemas/records/, and there is no second backend."
+
+// The parenthesis reason row of test/commands/state.test.ts's "rejects
+// missing or unsafe hold fields before mutating" belongs at the legacy
+// rendering boundary: Pool holds keep exact text, and export must refuse a
+// tag it cannot represent instead of substituting different text.
+func TestRetainedStoreHoldParenthesesExport(t *testing.T) {
+	h := newHome(t)
+	im := h.importText("# Backlog\n\n## Queued\n- [ ] held-a - Hold text\n", "UTC")
+	id := im.taskID("held-a")
+	ok(t, h.do("hold", map[string]any{"task_id": id, "kind": "parked", "reason": "wait (blocked)"}))
+	for _, body := range []map[string]any{
+		{"zone": "UTC", "selector": map[string]any{"task_id": id}},
+		{"zone": "UTC", "migration_id": im.migration["migration_id"]},
+		{"zone": "UTC", "migration_id": im.migration["migration_id"], "normalize": true},
+	} {
+		before := snapshot(t, h.dir)
+		resp := h.do("export-legacy", body)
+		refused(t, resp, envelope.Invalid, "pool.legacy_malformed")
+		if resp.Error.Detail["task_id"] != id {
+			t.Fatalf("item absent from error: %+v", resp.Error)
+		}
+		if !reflect.DeepEqual(before, snapshot(t, h.dir)) {
+			t.Fatal("refused export wrote files")
+		}
+	}
+}
