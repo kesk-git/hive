@@ -13,6 +13,7 @@ import (
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/pool/internal/entry"
 	_ "github.com/kesk-git/hive/packages/pool/internal/item"
 )
@@ -62,10 +63,27 @@ func (h *home) register(dir, id string, rec map[string]any) {
 		h.t.Fatal(err)
 	}
 	path := filepath.Join(h.dir, "dispatch", "registry", dir, id+".json")
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	h.put(path, append(data, '\n'))
+}
+
+// put puts the file at path in the home with the content given, through the
+// store's own primitives, so that the directories above it and the file are
+// owner-only and owned by the user, as Hive makes them. A file that is there
+// is emptied first.
+func (h *home) put(path string, data []byte) {
+	h.t.Helper()
+	if err := store.MakeDir(filepath.Dir(path)); err != nil {
 		h.t.Fatal(err)
 	}
-	if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
+	f, err := store.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		h.t.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		h.t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
 		h.t.Fatal(err)
 	}
 }
@@ -106,7 +124,12 @@ func mint(t testing.TB, p ids.Prefix) string {
 func newHome(t testing.TB) *home {
 	t.Helper()
 	h := &home{t: t, dir: filepath.Join(t.TempDir(), "home"), homeID: mint(t, ids.Home), clk: clock.NewFake(start)}
-	if err := os.Mkdir(h.dir, 0o700); err != nil {
+	// The root is made and secured first, as Hive makes a home, so that every
+	// entry made in it is owner-only and owned by the user.
+	if err := store.MakeDir(h.dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SecureDir(h.dir); err != nil {
 		t.Fatal(err)
 	}
 	data, err := canon.Encode(map[string]any{
@@ -117,9 +140,7 @@ func newHome(t testing.TB) *home {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(h.dir, "home.json"), append(data, '\n'), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	h.put(filepath.Join(h.dir, "home.json"), append(data, '\n'))
 	h.exe = entry.Executable()
 	h.exe.Clock = h.clk
 	return h
@@ -205,12 +226,19 @@ func (h *home) files(under string) map[string]string {
 	out := map[string]string{}
 	filepath.WalkDir(filepath.Join(h.dir, under), func(path string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
+			rel, _ := filepath.Rel(h.dir, path)
+			rel = filepath.ToSlash(rel)
+			if strings.HasPrefix(rel, "locks/") {
+				// A lock file is listed, never opened: the store may hold it,
+				// and on Windows a plain open of a held lock file is refused.
+				out[rel] = ""
+				return nil
+			}
 			data, rerr := os.ReadFile(path)
 			if rerr != nil {
 				h.t.Fatal(rerr)
 			}
-			rel, _ := filepath.Rel(h.dir, path)
-			out[filepath.ToSlash(rel)] = string(data)
+			out[rel] = string(data)
 		}
 		return nil
 	})
@@ -325,13 +353,7 @@ func (h *home) plant(kind, id string, rec map[string]any) {
 	if err != nil {
 		h.t.Fatal(err)
 	}
-	dir := filepath.Join(h.dir, "pool", "records", kind)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		h.t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, id+".json"), append(data, '\n'), 0o600); err != nil {
-		h.t.Fatal(err)
-	}
+	h.put(filepath.Join(h.dir, "pool", "records", kind, id+".json"), append(data, '\n'))
 }
 
 // stored reads the record file of the item as the store holds it.
@@ -1497,9 +1519,7 @@ func TestAReadKeepsTheOmissionsOfFactsItEvaluatedWhenTheFilterKeepsNothing(t *te
 	dependent := leaf("A dependent")
 	dependent["deps"] = []any{map[string]any{"type": "blocked-by", "task_id": blocker}}
 	dep := h.addID(dependent)
-	if err := os.WriteFile(filepath.Join(h.dir, "pool", "records", "item", blocker+".json"), []byte("{"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	h.put(filepath.Join(h.dir, "pool", "records", "item", blocker+".json"), []byte("{"))
 	body := h.ok(h.do("read", map[string]any{"kind": "item", "selector": map[string]any{"id": dep, "ready": false}}))
 	omitted, _ := body["projection"].(map[string]any)["omitted"].([]any)
 	if len(body["records"].([]any)) != 0 || len(omitted) != 1 || omitted[0].(map[string]any)["id"] != blocker {
