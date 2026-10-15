@@ -4,21 +4,22 @@ package store
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/internal/testsupport"
-	"github.com/kesk-git/hive/contract/internal/testsupport/access"
 )
 
-// The helpers the tests of the contract share for the access of a home.
-var (
-	secureHome = access.SecureHome
-	hasMode    = access.HasMode
-	newHome    = access.EmptyHome
-	grantGroup = testsupport.GrantOthers
-)
+// grantGroup gives the group and everyone else the access mode says.
+var grantGroup = testsupport.GrantOthers
+
+// hasMode reports whether the entry at path, which info describes, has the
+// access of an owner-only entry of the mode given.
+func hasMode(info fs.FileInfo, path string, want os.FileMode) bool {
+	return info.Mode().Perm() == want
+}
 
 // symlink makes link a symbolic link to target.
 func symlink(t testing.TB, target, link string) {

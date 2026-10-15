@@ -5,9 +5,9 @@
 // contract/exec.
 //
 // It imports no package of the contract that holds a test using it, so no test
-// of the contract is in an import cycle through it. The helpers that need the
-// store to set or read the access of a home on Windows are in the package
-// access, which the tests of the store cannot import.
+// of the contract is in an import cycle through it. Home-access helpers live
+// in the access subpackage; see its package comment for the store dependency
+// and import-cycle constraint.
 package testsupport
 
 import (
