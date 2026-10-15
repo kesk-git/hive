@@ -73,7 +73,7 @@ func TestStorelessFollowsTheHomePaths(t *testing.T) {
 func TestHandoffCallersAreThePackagesWithNoStore(t *testing.T) {
 	set := read(t, repo(t))
 	e := described(t, set, "pool")
-	e.Handoffs = []string{"word"}
+	e.Handoffs = []cli.HandoffCaller{{Package: "word", Command: "hive-word"}}
 	if ps := set.Agree(e); len(ps) != 0 {
 		t.Errorf("%v", ps)
 	}
@@ -82,10 +82,29 @@ func TestHandoffCallersAreThePackagesWithNoStore(t *testing.T) {
 		"nothing":  "not a declared package",
 		"contract": "not a declared package",
 	} {
-		e.Handoffs = []string{"word", name}
+		e.Handoffs = []cli.HandoffCaller{{Package: "word", Command: "hive-word"}, {Package: name, Command: "hive-word"}}
 		if ps := set.Agree(e); len(ps) != 1 || !mention(ps, want) {
 			t.Errorf("%s: %v", name, ps)
 		}
+	}
+}
+
+// Each handoff an executable lists is a package and a command that package
+// declares: a command the package does not declare is refused.
+func TestHandoffCallersAreCommandsTheirPackageDeclares(t *testing.T) {
+	set := read(t, repo(t))
+	e := described(t, set, "pool")
+	e.Handoffs = []cli.HandoffCaller{{Package: "word", Command: "hive-word"}}
+	if ps := set.Agree(e); len(ps) != 0 {
+		t.Errorf("%v", ps)
+	}
+	e.Handoffs = []cli.HandoffCaller{{Package: "word", Command: "hive-other"}}
+	if ps := set.Agree(e); len(ps) != 1 || !mention(ps, "does not declare the command hive-other") {
+		t.Errorf("%v", ps)
+	}
+	e.Handoffs = []cli.HandoffCaller{{Package: "word", Command: "hive-word"}, {Package: "word"}}
+	if ps := set.Agree(e); len(ps) != 1 || !mention(ps, "does not declare the command ") {
+		t.Errorf("a handoff naming no command: %v", ps)
 	}
 }
 

@@ -66,13 +66,14 @@ type Executable struct {
 	// Callee is how a storeless executable reaches the one package it
 	// persists through. Only a storeless executable has one.
 	Callee Callee
-	// Handoffs are the packages that declare no home path, whose requests
-	// this executable treats as handoffs when they carry their original as
-	// the causation: it keys the replay of such a request on the digest the
-	// causation names. A package the executable does not list is a caller
-	// whose request is keyed on its own digest. The declaration of the
-	// packages states who they are, and Agree holds this list to it.
-	Handoffs []string
+	// Handoffs are the callers, each a package that declares no home path
+	// and one of its commands, whose requests this executable treats as
+	// handoffs when they carry their original as the causation: it keys the
+	// replay of such a request on the digest the causation names. A caller
+	// the executable does not list is a caller whose request is keyed on its
+	// own digest. The declaration of the packages states who they are, and
+	// Agree holds this list to it.
+	Handoffs []HandoffCaller
 	// Journal opens the home journal of the home at dir for a transaction
 	// that appends events, and for the diagnostic event of a failure. Nil
 	// means the executable appends none; a transaction that names events

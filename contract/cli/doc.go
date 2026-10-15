@@ -44,10 +44,12 @@
 // handoff, Call.SendHandoff: the same request_id, correlation_id and scope,
 // the package and its command as the caller, and as the causation the
 // original request by identity and digest. The callee's harness, told by
-// Executable.Handoffs which packages keep no store, keys such a request on
-// that digest, so that retries that race past the read are answered by
-// whichever reached the callee first. A callee that gives no response the
-// contract accepts leaves the request unknown, with nothing recorded.
+// Executable.Handoffs which commands of which packages that keep no store
+// hand off, keys such a request on that digest, so that retries that race past
+// the read are answered by whichever reached the callee first. A request that
+// names the package and another command is keyed on its own digest. A callee
+// that gives no response the contract accepts leaves the request unknown, with
+// nothing recorded.
 //
 // An operation with an effect outside Hive commits its intent first, with
 // Call.CommitIntent: the records, receipts and events of the intent are

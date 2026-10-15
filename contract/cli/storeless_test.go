@@ -204,7 +204,7 @@ func TestTheHandoffCarriesTheOriginalDigest(t *testing.T) {
 // identity or checks the operation, with the callee's receipts and status.
 func TestARecordedOutcomeIsReplayedBeforeAnythingElse(t *testing.T) {
 	h := newHarness(t)
-	h.exe.Handoffs = []string{"word"}
+	h.exe.Handoffs = []HandoffCaller{{Package: "word", Command: "hive-word"}}
 	adapter := &inProcess{exe: h.exe}
 	w := newWordy(t, h, adapter)
 	home := newHome(t)
@@ -251,7 +251,7 @@ func TestARecordedOutcomeIsReplayedBeforeAnythingElse(t *testing.T) {
 // unknown with the callee's receipts.
 func TestAnOutcomeAdaptedToAHoldKeepsTheCalleesReceipts(t *testing.T) {
 	h := newHarness(t)
-	h.exe.Handoffs = []string{"word"}
+	h.exe.Handoffs = []HandoffCaller{{Package: "word", Command: "hive-word"}}
 	adapter := &inProcess{exe: h.exe}
 	w := newWordy(t, h, adapter)
 	home := newHome(t)
@@ -294,7 +294,7 @@ func TestAnOutcomeAdaptedToAHoldKeepsTheCalleesReceipts(t *testing.T) {
 // sent.
 func TestAChangedRequestIsAReplayMismatch(t *testing.T) {
 	h := newHarness(t)
-	h.exe.Handoffs = []string{"word"}
+	h.exe.Handoffs = []HandoffCaller{{Package: "word", Command: "hive-word"}}
 	adapter := &inProcess{exe: h.exe}
 	w := newWordy(t, h, adapter)
 	home := newHome(t)
@@ -314,7 +314,7 @@ func TestAChangedRequestIsAReplayMismatch(t *testing.T) {
 // callee's replay_mismatch.
 func TestRacingRequestsAreAnsweredByTheFirstToReachTheCallee(t *testing.T) {
 	h := newHarness(t)
-	h.exe.Handoffs = []string{"word"}
+	h.exe.Handoffs = []HandoffCaller{{Package: "word", Command: "hive-word"}}
 	adapter := &inProcess{exe: h.exe}
 	w := newWordy(t, h, adapter)
 	home := newHome(t)
@@ -346,7 +346,7 @@ func TestRacingRequestsAreAnsweredByTheFirstToReachTheCallee(t *testing.T) {
 // a hive.request of its own request_id with a digest.
 func TestACalleeKeysOnTheOriginalOnlyForAHandoff(t *testing.T) {
 	h := newHarness(t)
-	h.exe.Handoffs = []string{"word"}
+	h.exe.Handoffs = []HandoffCaller{{Package: "word", Command: "hive-word"}}
 	home := newHome(t)
 	const original = "sha256:00000000000000000000000000000000000000000000000000000000000000aa"
 	cases := []struct {
@@ -359,6 +359,7 @@ func TestACalleeKeysOnTheOriginalOnlyForAHandoff(t *testing.T) {
 		{"a causation without a digest", func(m map[string]any) { delete(m["causation"].(map[string]any), "digest") }, false},
 		{"a causation of another schema", func(m map[string]any) { m["causation"].(map[string]any)["schema"] = "word.question" }, false},
 		{"a caller that is not a package", func(m map[string]any) { m["caller"] = map[string]any{"kind": "test"} }, false},
+		{"another command of the package", func(m map[string]any) { m["caller"].(map[string]any)["command"] = "hive-other" }, false},
 		{"a package with a home path", func(m map[string]any) { m["caller"].(map[string]any)["package"] = "dispatch" }, false},
 	}
 	for i, tc := range cases {
