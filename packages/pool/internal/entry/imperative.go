@@ -13,24 +13,25 @@ import (
 // into the default registry from its init function, as the package that keeps
 // the specifications does.
 //
-// Each operation is declared at the version of the body it serves
-// (spec/pool.md, Contract versions): create and revise have no member that
-// version 1.1 added, so they are 1.0; render and deliver serve the additive
+// Each operation is declared at the versions of the body it serves in full
+// (spec/pool.md, Contract versions). render and deliver serve the additive
 // bodies of 1.1, the inventories and the instant of the rendering, and are
-// declared at 1.1 only. render writes nothing and returns no receipt; deliver
-// writes the delivery, and the receipts of each projection it records received
-// beside it.
+// declared at 1.1 only. create and revise have no member that 1.1 added, so
+// their body is the same at 1.0 and 1.1 and each is declared at both. render
+// writes nothing and returns no receipt; deliver writes the delivery, and the
+// receipts of each projection it records received beside it.
 func RegisterImperative(r *Registry, create, revise, render, deliver Handler) {
 	for _, op := range []struct {
-		name, version string
-		handle        Handler
-		mutates       bool
-		receipts      []string
+		name     string
+		versions []string
+		handle   Handler
+		mutates  bool
+		receipts []string
 	}{
-		{"create", "1.0", create, true, []string{"pool.imperative.revised"}},
-		{"revise", "1.0", revise, true, []string{"pool.imperative.revised"}},
-		{"render", "1.1", render, false, []string{}},
-		{"deliver", "1.1", deliver, true, []string{"pool.imperative.delivered", "pool.projection.received"}},
+		{"create", []string{"1.0", "1.1"}, create, true, []string{"pool.imperative.revised"}},
+		{"revise", []string{"1.0", "1.1"}, revise, true, []string{"pool.imperative.revised"}},
+		{"render", []string{"1.1"}, render, false, []string{}},
+		{"deliver", []string{"1.1"}, deliver, true, []string{"pool.imperative.delivered", "pool.projection.received"}},
 	} {
 		r.RegisterOperation("hive-imperative", &cli.Operation{
 			OperationDecl: envelope.OperationDecl{
@@ -38,7 +39,7 @@ func RegisterImperative(r *Registry, create, revise, render, deliver Handler) {
 				State:          envelope.Supported,
 				Mode:           envelope.Unary,
 				Mutates:        op.mutates,
-				Versions:       []string{op.version},
+				Versions:       op.versions,
 				RequestSchema:  "urn:hive:schema:ops:hive-imperative." + op.name + ".request:v1",
 				ResponseSchema: "urn:hive:schema:ops:hive-imperative." + op.name + ".response:v1",
 				ReceiptKinds:   op.receipts,
