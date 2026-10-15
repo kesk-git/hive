@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -31,10 +32,12 @@ type SubjectMisses struct {
 //   - An independent account is its own root: its incident, by home, schema and
 //     record identity. A revision or a digest does not make another incident.
 //   - A derived account has the roots of the accounts it derives from. A link
-//     names a miss of the Pool, or an incident that an independent account of the
-//     Pool reports; a link that names neither is dangling, and a link that leads
-//     back to the account is a cycle. Either gives the account no root, so it
-//     contributes no count until the provenance is reconciled.
+//     names a miss of the Pool, or an incident whose accounts the Pool holds, and
+//     has the roots of that miss, or of every account of the incident that has
+//     roots, by its current provenance. A link that names neither is dangling,
+//     and accounts that reach a root only through one another are a cycle. Either
+//     gives the account no root, so it contributes no count until the provenance
+//     is reconciled.
 //   - An account whose independence is unknown, or whose derivation reaches one
 //     that is, contributes no count: independence is never assumed.
 //
@@ -47,57 +50,59 @@ type SubjectMisses struct {
 // incident to a derived account in a narrower one.
 func countMisses(misses []*Miss, visible func(*Miss) bool) []SubjectMisses {
 	byID := map[string]*Miss{}
-	independentOf := map[string]bool{}
+	accounts := map[string][]*Miss{}
 	for _, m := range misses {
 		byID[m.ID] = m
-		if m.Independence == "independent" {
-			independentOf[m.Incident.key()] = true
-		}
+		accounts[m.Incident.key()] = append(accounts[m.Incident.key()], m)
 	}
 
 	type outcome struct {
 		roots map[string]bool
 		ok    bool
 	}
-	memo := map[string]outcome{}
-	visiting := map[string]bool{}
-	var rootsOf func(m *Miss) outcome
-	rootsOf = func(m *Miss) outcome {
-		if o, done := memo[m.ID]; done {
-			return o
+	resolved := map[string]outcome{}
+	for _, m := range misses {
+		if m.Independence == "independent" {
+			resolved[m.ID] = outcome{roots: map[string]bool{m.Incident.key(): true}, ok: true}
 		}
-		if visiting[m.ID] {
-			return outcome{}
+	}
+	linked := func(m *Miss, link recordRef) outcome {
+		targets := accounts[link.key()]
+		if link.Schema == schemaMiss {
+			targets = nil
+			if target, held := byID[link.ID]; held && link.Home == m.Scope.HomeID {
+				targets = []*Miss{target}
+			}
 		}
-		visiting[m.ID] = true
-		defer delete(visiting, m.ID)
-		var o outcome
-		switch m.Independence {
-		case "independent":
-			o = outcome{roots: map[string]bool{m.Incident.key(): true}, ok: true}
-		case "derived":
-			o.ok = len(m.DerivedFrom) > 0
-			o.roots = map[string]bool{}
+		o := outcome{roots: map[string]bool{}}
+		for _, t := range targets {
+			if r := resolved[t.ID]; r.ok {
+				o.ok = true
+				maps.Copy(o.roots, r.roots)
+			}
+		}
+		return o
+	}
+	for changed := true; changed; {
+		changed = false
+		for _, m := range misses {
+			if m.Independence != "derived" || len(m.DerivedFrom) == 0 {
+				continue
+			}
+			o := outcome{roots: map[string]bool{}, ok: true}
 			for _, link := range m.DerivedFrom {
-				var linked outcome
-				if link.Schema == schemaMiss {
-					if target, held := byID[link.ID]; held && link.Home == m.Scope.HomeID {
-						linked = rootsOf(target)
-					}
-				} else if independentOf[link.key()] {
-					linked = outcome{roots: map[string]bool{link.key(): true}, ok: true}
-				}
-				if !linked.ok {
+				l := linked(m, link)
+				if !l.ok {
 					o = outcome{}
 					break
 				}
-				for r := range linked.roots {
-					o.roots[r] = true
-				}
+				maps.Copy(o.roots, l.roots)
+			}
+			if was := resolved[m.ID]; o.ok != was.ok || len(o.roots) != len(was.roots) {
+				resolved[m.ID] = o
+				changed = true
 			}
 		}
-		memo[m.ID] = o
-		return o
 	}
 
 	type tally struct {
@@ -114,11 +119,9 @@ func countMisses(misses []*Miss, visible func(*Miss) bool) []SubjectMisses {
 			t = &tally{roots: map[string]bool{}}
 			bySubject[m.SubjectID] = t
 		}
-		if o := rootsOf(m); o.ok {
+		if o := resolved[m.ID]; o.ok {
 			t.ids = append(t.ids, m.ID)
-			for r := range o.roots {
-				t.roots[r] = true
-			}
+			maps.Copy(t.roots, o.roots)
 		}
 	}
 

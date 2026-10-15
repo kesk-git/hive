@@ -13,12 +13,10 @@ import (
 // session or task generation. It takes the refusal the writer is about to return,
 // and returns the result the writer ends with.
 //
-// The refusal is cited rules by the identities its detail names: the member rule,
-// the member rules, and the sources of the kind pool.rule that a stale projection
-// names. For each rule the Pool holds that is filed under a subject, and which the
-// actor was given at its stored revision neither in a projection nor in an
-// Imperative, the Pool writes a miss and pool.rule.missed in the transaction of
-// the refusal. The incident is the request, the observer the Pool, and the
+// The refusal cites the rules its detail names in its member rules. For each rule
+// the Pool holds that is filed under a subject, and which the actor was given at
+// its stored revision neither in a projection nor in an Imperative, the Pool
+// writes a miss and pool.rule.missed in the transaction of the refusal. The incident is the request, the observer the Pool, and the
 // independence independent: the Pool is the owner that met the refusal and
 // verifies it.
 //
@@ -109,15 +107,8 @@ func citedRuleIDs(f *envelope.Failure) []string {
 		}
 		out = append(out, id)
 	}
-	d := f.Err.Detail
-	add(str(d["rule"]))
-	for _, v := range list(d["rules"]) {
+	for _, v := range list(f.Err.Detail["rules"]) {
 		add(str(v))
-	}
-	for _, v := range list(d["stale_sources"]) {
-		if m := tree(v); str(m["schema"]) == rule.SchemaRule {
-			add(str(m["id"]))
-		}
 	}
 	return out
 }

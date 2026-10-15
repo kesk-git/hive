@@ -996,3 +996,34 @@ func TestAQuestionStaysNamedAfterACorrectionBelowTheThreshold(t *testing.T) {
 		t.Errorf("after the correction: %v, want one incident, nothing due and the earlier question still named", row)
 	}
 }
+
+func TestAnIncidentReferenceFollowsTheIncidentsAccountsThroughACorrection(t *testing.T) {
+	w := newMissWorld(t)
+	other := w.home.subject(hiveScope, "class.s")
+	otherRule := w.home.rule("subject", other, hiveScope, nil)
+	_, a := workerActor(t)
+	_, b := sessionActor(t)
+	_, c := workerActor(t)
+	_, d := workerActor(t)
+	first := w.missed(a, accountOf("incident_a", "independent"))
+	second := w.missed(b, accountOf("incident_b", "independent"))
+	file := func(actor, prov map[string]any) {
+		w.t.Helper()
+		if body := w.ok(w.file(otherRule, 1, actor, prov, seenAt)); body["recorded"] != true {
+			w.t.Fatalf("the miss was not recorded: %v", body)
+		}
+	}
+	file(c, accountOf("incident_c", "derived", recordRef("pool.item", "incident_b")))
+	file(d, accountOf("incident_d", "independent"))
+	if row := w.subjectRowOf(hiveScope, other); row["independent_misses"] != int64(2) || row["decision_due"] != true {
+		t.Fatalf("before the correction: %v", row)
+	}
+	id := second["miss_id"].(string)
+	body := w.body(w.rule, 1, b, accountOf("incident_b", "derived", recordRef("pool.miss", first["miss_id"].(string))), seenAt)
+	body["miss_id"] = id
+	w.ok(w.send("hive-memory", "miss", body, request{version: "1.0", expected: []rev{{"pool.miss", id, 1}}}))
+	row := w.subjectRowOf(hiveScope, other)
+	if row["independent_misses"] != int64(2) || row["decision_due"] != true || len(row["misses"].([]any)) != 2 {
+		t.Errorf("after incident b's account was corrected to derive from incident a: %v, want incidents a and d", row)
+	}
+}
