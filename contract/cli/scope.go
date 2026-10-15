@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
+	"strings"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/envelope"
@@ -98,6 +100,74 @@ func checkScope(home *store.Home, s envelope.Scope) error {
 		return mismatch("the clone does not belong to this home")
 	}
 	return nil
+}
+
+// RegisteredScopes are the workspace and project scopes the home's registry
+// holds that the scope check admits: each active workspace that belongs to the
+// home, and each active project of the home in one of them, in the order of
+// their file names. It reads each record through the validated reader and
+// takes no lock; a record that cannot be read is record_malformed.
+func RegisteredScopes(home *store.Home) ([]envelope.Scope, error) {
+	var out []envelope.Scope
+	workspaces, err := registryIDs(home, workspaceKind)
+	if err != nil {
+		return nil, err
+	}
+	admitted := map[string]bool{}
+	for _, id := range workspaces {
+		ws, err := readRegistry(home, workspaceKind, id)
+		if err != nil {
+			return nil, err
+		}
+		if ws["state"] != "active" || (ws["home_id"] != home.HomeID && ws["parent_home_id"] != home.HomeID) {
+			continue
+		}
+		admitted[id] = true
+		out = append(out, envelope.Scope{Level: envelope.ScopeWorkspace, HomeID: home.HomeID, WorkspaceID: id})
+	}
+	projects, err := registryIDs(home, projectKind)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range projects {
+		proj, err := readRegistry(home, projectKind, id)
+		if err != nil {
+			return nil, err
+		}
+		ws, _ := proj["workspace_id"].(string)
+		if proj["state"] != "active" || proj["home_id"] != home.HomeID || !admitted[ws] {
+			continue
+		}
+		out = append(out, envelope.Scope{Level: envelope.ScopeProject, HomeID: home.HomeID, WorkspaceID: ws, ProjectID: id})
+	}
+	return out, nil
+}
+
+// registryIDs are the identities of the records of the kind in the registry,
+// by their file names; an entry that does not end in .json is no record.
+func registryIDs(home *store.Home, kind registryKind) ([]string, error) {
+	rel := registryDir + "/" + kind.dir
+	malformed := func(why error) error {
+		return envelope.Common(envelope.CodeRecordMalformed, fmt.Sprintf("the registry of the %ss cannot be listed", kind.name)).Because(fmt.Errorf("%s: %w", rel, why))
+	}
+	path, err := home.Path(rel)
+	if err != nil {
+		return nil, malformed(err)
+	}
+	entries, err := os.ReadDir(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, malformed(err)
+	}
+	var out []string
+	for _, e := range entries {
+		if id, ok := strings.CutSuffix(e.Name(), ".json"); ok {
+			out = append(out, id)
+		}
+	}
+	return out, nil
 }
 
 // readRegistry reads one identity record of the registry through the

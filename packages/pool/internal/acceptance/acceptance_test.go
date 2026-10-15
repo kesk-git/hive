@@ -138,6 +138,12 @@ func request(t testing.TB, command, operation string) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// An empty body breaks the schema of every built operation but check, whose
+	// members are all optional: an identity that is not one breaks its.
+	body := map[string]any{}
+	if command == "hive-memory" && operation == "check" {
+		body["projection_id"] = "not-a-projection"
+	}
 	out, err := canon.Encode(map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
 		"command": command, "operation": operation, "operation_version": "1.0",
@@ -145,7 +151,7 @@ func request(t testing.TB, command, operation string) []byte {
 		"issued_at": "2026-10-11T08:00:00.000Z", "caller": map[string]any{"kind": "test"},
 		"scope_level": "hive", "home_id": homeID,
 		"authority": map[string]any{"kind": "none"},
-		"body":      map[string]any{},
+		"body":      body,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -158,13 +164,15 @@ func request(t testing.TB, command, operation string) []byte {
 // operations hold-question, revise-question, answer-question, release-question,
 // complete-question and close-question, and the dry-run import and export of
 // the legacy backlog, hive-admit approve, and the operations define, accept and
-// close of hive-spec, and hive-rule resolve. Every other operation of the
-// declaration is declared and refused.
+// close of hive-spec, hive-rule resolve, and render, check, propagate and
+// budget of hive-memory. Every other operation of the declaration is declared
+// and refused.
 var built = map[string][]string{
-	"hive-pool":  {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question", "release-question", "complete-question", "close-question", "import-legacy", "export-legacy"},
-	"hive-admit": {"approve"},
-	"hive-spec":  {"define", "accept", "close"},
-	"hive-rule":  {"resolve"},
+	"hive-pool":   {"add", "read", "update", "transition", "hold", "release", "hold-question", "revise-question", "answer-question", "release-question", "complete-question", "close-question", "import-legacy", "export-legacy"},
+	"hive-admit":  {"approve"},
+	"hive-spec":   {"define", "accept", "close"},
+	"hive-rule":   {"resolve"},
+	"hive-memory": {"render", "check", "propagate", "budget"},
 }
 
 // Every command name of the package answers capabilities: exit 0, one
