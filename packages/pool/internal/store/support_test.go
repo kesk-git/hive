@@ -316,13 +316,6 @@ func (h *home) do(r *req) *envelope.Response {
 	return resp
 }
 
-// try sends the request over the home and returns whatever it answered.
-func (h *home) try(r *req) *envelope.Response {
-	resp, err := send(h.exe, h.dir, r.command, r.op, r.bytes())
-	must(err)
-	return resp
-}
-
 // writeFile replaces a file of the home.
 func writeFile(dir, rel string, data []byte) {
 	must(os.WriteFile(filepath.Join(dir, filepath.FromSlash(rel)), data, 0o600))
@@ -689,6 +682,11 @@ type scenario struct {
 	// to another edit of the same record and returns the words that edit adds,
 	// as a second caller prepares it from the revision the first one read.
 	rival func(body map[string]any) []string
+	// repeats says the contract answers the same request from another caller
+	// with what the first one wrote, writing nothing of its own: a duplicate
+	// answer (spec/word.md), a second expire (spec/pool.md) and a rendering
+	// equal to the current one (spec/pool.md).
+	repeats bool
 }
 
 // prepared is a scenario seeded once: the home as the request finds it, the
@@ -923,11 +921,6 @@ func check(t *testing.T, what string, bad []string) {
 	for _, b := range bad {
 		t.Errorf("%s: %s", what, b)
 	}
-}
-
-// outcomeOf is the recorded outcome of a request in the home at dir.
-func outcomeOf(dir, request string) (*envelope.Response, error) {
-	return recorded(files(dir), request)
 }
 
 // The scenarios are the writers of the Pool: every mutating operation the
@@ -1283,7 +1276,7 @@ var ruleScenarios = []*scenario{
 		return ruleReq("amend", map[string]any{"rule_id": id, "kind": "lift", "words": "The round closed.", "receipt": carried},
 			&req{expected: []rev{revOf("pool.rule", id, rule)}}), []string{kindPath("rule", id), kindPath("subject", filing)}
 	}},
-	{name: "hive-rule expire", command: "hive-rule", op: "expire", build: func(h *home) (*req, []string) {
+	{name: "hive-rule expire", command: "hive-rule", op: "expire", repeats: true, build: func(h *home) (*req, []string) {
 		filing := h.seedRules()
 		body := opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms.")
 		body["expires_at"] = d15
@@ -1320,7 +1313,7 @@ func (h *home) rendered(scope map[string]any, tier, audience, subject string) ma
 }
 
 var memoryScenarios = []*scenario{
-	{name: "hive-memory render", command: "hive-memory", op: "render", build: func(h *home) (*req, []string) {
+	{name: "hive-memory render", command: "hive-memory", op: "render", repeats: true, build: func(h *home) (*req, []string) {
 		filing := h.seedRules()
 		rule := h.rule("always", filing, hiveScope, nil)
 		return mem("render", map[string]any{"tier": "always", "audience": "hive"}, &req{}),
@@ -1467,6 +1460,10 @@ var imperativeScenarios = []*scenario{
 		body["supersedes_reason"] = "The steer narrowed the scope to the retry loop."
 		tree(tree(body["task"])["object"])["text"] = "The retry loop of the nightly export, and nothing else."
 		return imp("revise", body, &req{expected: []rev{{"pool.imperative", w.hunt, 1}}}), []string{kindPath("imperative", w.hunt), itemPath(w.hunt)}
+	}, rival: func(body map[string]any) []string {
+		words := "The retry loop of the nightly export, as the second caller reads it."
+		tree(tree(body["task"])["object"])["text"] = words
+		return []string{words}
 	}},
 	{name: "hive-imperative deliver", command: "hive-imperative", op: "deliver", build: func(h *home) (*req, []string) {
 		w := newWorld(h)
@@ -1502,10 +1499,6 @@ func specReq(op string, body map[string]any, expected ...rev) *req {
 		version = "1.2"
 	}
 	return &req{command: "hive-spec", op: op, body: body, expected: expected, version: version}
-}
-
-func (h *home) targetNeedingSpec() string {
-	return h.addItem(map[string]any{"title": "T", "level": "target", "deliverable": nil})
 }
 
 // needsSpec adds a Target that needs a specification.
@@ -1788,7 +1781,7 @@ var decisionScenarios = []*scenario{
 		return handoff("revise-question", body, rev{"pool.question", q.question, 1}),
 			[]string{kindPath("question", q.question), kindPath("decision-round", q.round)}
 	}},
-	{name: "hive-pool answer-question", command: "hive-pool", op: "answer-question", build: func(h *home) (*req, []string) {
+	{name: "hive-pool answer-question", command: "hive-pool", op: "answer-question", repeats: true, build: func(h *home) (*req, []string) {
 		q := h.raiseQuestion()
 		return h.answerReq(q.question), []string{kindPath("question", q.question), kindPath("decision-round", q.round), kindPath("hold", q.hold)}
 	}},

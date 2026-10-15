@@ -234,6 +234,88 @@ func kept(first, all map[string][]byte, in *intent) []string {
 	return bad
 }
 
+// own checks that the ok of the second writer answers its own request: its
+// outcome is recorded under its request, each receipt it returns was written
+// for that request by it, and each record its body carries is on disk as it
+// carries it and is not one the first writer created. Where the contract
+// answers a repeat with what the first wrote, the second writes no record and
+// no receipt instead. first is the home as the first writer left it, in its
+// intent.
+func own(first, all map[string][]byte, in *intent, b *req, resp *envelope.Response, repeats bool) []string {
+	var bad []string
+	if resp.RequestID != b.id {
+		bad = append(bad, fmt.Sprintf("the response answers request %s, not %s", resp.RequestID, b.id))
+	}
+	if rec, err := recorded(all, b.id); err != nil {
+		bad = append(bad, "no outcome is recorded under the request: "+err.Error())
+	} else {
+		bad = append(bad, sameResponse(resp, rec)...)
+	}
+	if repeats {
+		for _, d := range differences(first, all) {
+			if strings.HasPrefix(d[1:], "pool/records/") || strings.HasPrefix(d[1:], "pool/receipts/") {
+				bad = append(bad, "a repeat answered with the first writer's result wrote "+d)
+			}
+		}
+		return bad
+	}
+	for _, r := range resp.Receipts {
+		path := cstore.ReceiptPath("pool", r.ReceiptID)
+		if r.RequestID != b.id {
+			bad = append(bad, fmt.Sprintf("receipt %s was written for request %s", r.ReceiptID, r.RequestID))
+		}
+		if _, ok := first[path]; ok {
+			bad = append(bad, "receipt "+r.ReceiptID+" was there before the second writer")
+		}
+		if _, ok := all[path]; !ok {
+			bad = append(bad, "receipt "+r.ReceiptID+" is not on disk")
+		}
+	}
+	created := map[string]bool{}
+	for _, f := range in.Records {
+		if f.Expected == 0 {
+			created[f.Path] = true
+		}
+	}
+	var walk func(v any)
+	walk = func(v any) {
+		switch v := v.(type) {
+		case map[string]any:
+			schema, _ := v["schema"].(string)
+			if kind, ok := strings.CutPrefix(schema, "pool."); ok && v["schema_version"] != nil {
+				data, err := canon.Encode(v)
+				if err != nil {
+					bad = append(bad, err.Error())
+					return
+				}
+				data = append(data, '\n')
+				var at string
+				for path, have := range all {
+					if strings.HasPrefix(path, "pool/records/"+kind+"/") && string(have) == string(data) {
+						at = path
+					}
+				}
+				switch {
+				case at == "":
+					bad = append(bad, fmt.Sprintf("the response carries a %s record that is not on disk as it carries it", schema))
+				case created[at]:
+					bad = append(bad, "the response carries "+at+", which the first writer created")
+				}
+				return
+			}
+			for _, x := range v {
+				walk(x)
+			}
+		case []any:
+			for _, x := range v {
+				walk(x)
+			}
+		}
+	}
+	walk(resp.Body)
+	return bad
+}
+
 // absent reports the words of the second writer's edit that a record of the
 // Pool holds.
 func absent(all map[string][]byte, words []string) []string {
@@ -306,6 +388,7 @@ func TestTwoWritersOfEveryWriterLoseNoUpdate(t *testing.T) {
 				switch r.run.resp.Status {
 				case envelope.Ok:
 					check(t, "the first writer's transaction", kept(first, all, in))
+					check(t, "the second writer's transaction", own(first, all, in, b, r.run.resp, p.sc.repeats))
 				case envelope.Conflict, envelope.Refused:
 					if got := shapeOf(before, all, p.beforeEv, events); !sameShape(got, p.cleanShape) {
 						t.Errorf("a second writer that was turned away changed the home: %s against %s", got, p.cleanShape)
@@ -372,6 +455,7 @@ func TestTwoWritersOfEveryWriterLoseNoUpdate(t *testing.T) {
 				}
 				switch r.run.resp.Status {
 				case envelope.Ok:
+					check(t, "the second writer's transaction", own(first, all, in, b, r.run.resp, p.sc.repeats))
 				case envelope.Conflict, envelope.Refused:
 					if got := shapeOf(before, all, p.beforeEv, events); !sameShape(got, p.cleanShape) {
 						t.Errorf("a second writer that was turned away changed the home: %s against %s", got, p.cleanShape)
