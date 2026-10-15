@@ -50,9 +50,12 @@ func TestMain(m *testing.M) {
 //	            its id once it is ready, and hold ignoring them too
 //	selfkill    end itself with a signal it does not handle
 //	ids         print the process id, group and session
-//	fds         print the descriptors open beyond the standard three
+//	fds         print "fds:" and which of the file identities in the
+//	            arguments the process holds open beyond the standard three
 //	tty         report the terminal, then wait for Control-C
 //	needstty    exit 1 unless standard input is a terminal
+//	termhandles report which standard handles are terminals, write to
+//	            standard error, and wait (Windows only)
 func runFake(args []string) {
 	out := os.Stdout
 	mode := ""
@@ -102,7 +105,7 @@ func runFake(args []string) {
 	case "ids":
 		fmt.Fprintln(out, fakeIDs())
 	case "fds":
-		fmt.Fprintln(out, strings.Join(openDescriptors(), " "))
+		fmt.Fprintln(out, strings.TrimSpace("fds: "+strings.Join(heldIdentities(args), " ")))
 	case "tty":
 		fakeTTY(out)
 	case "needstty":
@@ -115,6 +118,8 @@ func runFake(args []string) {
 		fakeStarter(args)
 	case "writehandle":
 		fakeWriteHandle(out, args)
+	case "termhandles":
+		fakeTermHandles(out, args)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown fake mode %q\n", mode)
 		os.Exit(99)

@@ -32,16 +32,29 @@ func fakeIDs() string {
 	return fmt.Sprintf("pid=%d pgid=%d sid=%d", os.Getpid(), syscall.Getpgrp(), sid)
 }
 
-// openDescriptors lists the descriptors open beyond the standard three.
-func openDescriptors() []string {
-	var open []string
-	for fd := 3; fd < 256; fd++ {
+// identity names the file a descriptor refers to, by device and inode.
+func identity(st *syscall.Stat_t) string {
+	return fmt.Sprintf("%d:%d", uint64(st.Dev), uint64(st.Ino))
+}
+
+// heldIdentities reports which of the identities the process holds open as a
+// descriptor beyond the standard three. A descriptor the process opened for
+// itself since it started refers to some other file, and does not count.
+func heldIdentities(want []string) []string {
+	var held []string
+	for fd := 3; fd < 4096; fd++ {
 		var st syscall.Stat_t
-		if syscall.Fstat(fd, &st) == nil {
-			open = append(open, fmt.Sprint(fd))
+		if syscall.Fstat(fd, &st) != nil {
+			continue
+		}
+		id := identity(&st)
+		for _, w := range want {
+			if w == id {
+				held = append(held, id)
+			}
 		}
 	}
-	return open
+	return held
 }
 
 func isTerminal(f *os.File) bool {
@@ -105,6 +118,10 @@ func getsid(pid int) (int, error) {
 	return int(r), nil
 }
 
-// fakeWriteHandle has nothing to do on macOS and Linux: the descriptors a
-// child inherits are listed by fds.
+// fakeWriteHandle has nothing to do on macOS and Linux; see
+// TestNoOtherDescriptorReachesTheChild for the descriptor-inheritance check.
 func fakeWriteHandle(out *os.File, args []string) {}
+
+// fakeTermHandles has nothing to do on macOS and Linux: the standard
+// descriptors of a terminal start are tested by tty.
+func fakeTermHandles(out *os.File, args []string) {}

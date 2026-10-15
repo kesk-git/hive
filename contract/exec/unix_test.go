@@ -6,7 +6,9 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -31,51 +33,95 @@ func kill(id ProcessID) {
 	}
 }
 
-// Nothing else Hive holds open reaches the child: a descriptor the process
-// was started with, which is not close-on-exec, is closed when the program
-// starts.
-func TestNoOtherDescriptorReachesTheChild(t *testing.T) {
-	fakeDir(t, "fakeprog")
-	fds := make([]int, 0, 3)
-	for _, name := range []string{os.DevNull, os.DevNull, os.DevNull} {
-		fd, err := syscall.Open(name, syscall.O_RDONLY, 0) // no O_CLOEXEC, as an inherited one is
+// withSentinels opens n uniquely identified files at non-standard descriptors
+// without close-on-exec, as a descriptor Hive's starter left open is, and
+// hands their identities to f; the files are closed when f returns. Each
+// start gets sentinels of its own, because a start marks every descriptor of
+// the process close-on-exec.
+func withSentinels(t testing.TB, n int, f func(ids []string)) {
+	t.Helper()
+	dir := t.TempDir()
+	var ids []string
+	for i := 0; i < n; i++ {
+		path := filepath.Join(dir, fmt.Sprintf("sentinel-%d", i))
+		if err := os.WriteFile(path, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		fd, err := syscall.Open(path, syscall.O_RDONLY, 0) // no O_CLOEXEC
 		if err != nil {
 			t.Fatal(err)
 		}
-		fds = append(fds, fd)
-	}
-	defer func() {
-		for _, fd := range fds {
-			syscall.Close(fd)
+		defer syscall.Close(fd)
+		var st syscall.Stat_t
+		if err := syscall.Fstat(fd, &st); err != nil {
+			t.Fatal(err)
 		}
-	}()
-	out, res := runOutput(t, withFake(t, Spec{Stdin: Pipe()}, "fds"))
-	if !res.Passed() {
-		t.Fatalf("%v", res)
+		ids = append(ids, identity(&st))
 	}
-	if strings.TrimSpace(out) != "" {
-		t.Errorf("the child holds descriptors %q", out)
+	f(ids)
+}
+
+// held reads what the fds fake printed: the identities it holds. A line
+// without the fake's prefix is no report.
+func held(t testing.TB, line string) []string {
+	t.Helper()
+	rest, ok := strings.CutPrefix(strings.TrimSpace(line), "fds:")
+	if !ok {
+		t.Fatalf("no report from the child: %q", line)
 	}
+	return strings.Fields(rest)
+}
+
+// Nothing else Hive holds open reaches the child: a descriptor the process
+// was started with, which is not close-on-exec, is closed when the program
+// starts. What crosses a start is measured by files the parent holds open
+// under identities of their own, and which of them the child holds; a
+// descriptor the child's own runtime opens after the start is not one.
+func TestNoOtherDescriptorReachesTheChild(t *testing.T) {
+	dir := fakeDir(t, "fakeprog")
+	// The control: with Hive's start bypassed, the detector sees every
+	// sentinel the child inherits.
+	withSentinels(t, 3, func(ids []string) {
+		cmd := osexec.Command(filepath.Join(dir, "fakeprog"), append([]string{fakeFlag, "fds"}, ids...)...)
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := held(t, string(out)); !slices.Equal(got, ids) {
+			t.Fatalf("the control child holds %q, it was started with %q", got, ids)
+		}
+	})
+	withSentinels(t, 3, func(ids []string) {
+		out, res := runOutput(t, withFake(t, Spec{Stdin: Pipe()}, "fds", ids...))
+		if !res.Passed() {
+			t.Fatalf("%v", res)
+		}
+		if got := held(t, out); len(got) != 0 {
+			t.Errorf("the child holds %q", got)
+		}
+	})
 	// The same through a terminal start.
-	term := fake(t, Spec{Start: TerminalStart}, "fds")
-	got := readUntil(t, term.Terminal(), "\n")
-	if strings.TrimSpace(got) != "" {
-		t.Errorf("the child of a terminal start holds descriptors %q", got)
-	}
-	// And through a resident start, which writes where it is told.
-	file := filepath.Join(t.TempDir(), "fds.txt")
-	resident := fake(t, Spec{Start: ResidentStart, Stdout: File(file)}, "fds")
-	_ = resident
-	for i := 0; i < 200; i++ {
-		if data, _ := os.ReadFile(file); len(data) > 0 {
-			if strings.TrimSpace(string(data)) != "" {
-				t.Errorf("the resident holds descriptors %q", data)
-			}
-			return
+	withSentinels(t, 3, func(ids []string) {
+		term := fake(t, Spec{Start: TerminalStart}, "fds", ids...)
+		if got := held(t, readUntil(t, term.Terminal(), "\n")); len(got) != 0 {
+			t.Errorf("the child of a terminal start holds %q", got)
 		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Error("the resident wrote nothing")
+	})
+	// And through a resident start, which writes where it is told.
+	withSentinels(t, 3, func(ids []string) {
+		file := filepath.Join(t.TempDir(), "fds.txt")
+		fake(t, Spec{Start: ResidentStart, Stdout: File(file)}, "fds", ids...)
+		for i := 0; i < 200; i++ {
+			if data, _ := os.ReadFile(file); strings.Contains(string(data), "\n") {
+				if got := held(t, string(data)); len(got) != 0 {
+					t.Errorf("the resident holds %q", got)
+				}
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		t.Error("the resident wrote nothing")
+	})
 }
 
 // A plain start is a process group of its own; a resident and a terminal start
