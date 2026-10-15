@@ -264,12 +264,12 @@ func checkChanges(snap *memory.Snapshot, r *rule.Rule) error {
 }
 
 // checkProductConflict refuses, with pool.rule_conflict, a write of a product
-// rule after which two product rules of its conflict key and full scope that
-// apply to a common role are in force together at the clock or at a later
-// instant at which one takes effect or expires, neither naming the other in
-// changes, where the rules before the write were not. A rule that a rule in
-// force supersedes is not in force beside it. An operating rule is never
-// compared with a product rule: the resolver weighs those.
+// rule after which two product rules of its conflict key and full scope are in
+// force together for a role, at the clock or at a later instant at which one
+// takes effect or expires, neither naming the other in changes, where the rules
+// before the write were not. A rule that a rule in force for the role
+// supersedes is not in force beside it for that role. An operating rule is
+// never compared with a product rule: the resolver weighs those.
 func checkProductConflict(rules []*rule.Rule, now time.Time, w *rule.Rule) error {
 	if w.Kind != rule.KindProduct {
 		return nil
@@ -285,7 +285,9 @@ func checkProductConflict(rules []*rule.Rule, now time.Time, w *rule.Rule) error
 		}
 	}
 	after = append(after, w)
-	instants := []time.Time{now}
+	// The role "" stands for every role no rule of the group names, to which
+	// only a rule that applies to every role applies.
+	instants, roles := []time.Time{now}, []string{""}
 	for _, s := range append(slices.Clone(before), w) {
 		if t, err := clock.Parse(s.EffectiveAt); err == nil && t.After(now) {
 			instants = append(instants, t)
@@ -293,32 +295,39 @@ func checkProductConflict(rules []*rule.Rule, now time.Time, w *rule.Rule) error
 		if t, ok, err := s.EffectiveExpiry(); err == nil && ok && t.After(now) {
 			instants = append(instants, t)
 		}
+		for _, role := range s.Applies {
+			if !slices.Contains(roles, role) {
+				roles = append(roles, role)
+			}
+		}
 	}
 	slices.SortFunc(instants, func(a, b time.Time) int { return a.Compare(b) })
 	for _, at := range instants {
-		involved := productConflict(after, at)
-		if len(involved) > 0 && !slices.Equal(involved, productConflict(before, at)) {
-			instant, _ := clock.Format(at)
-			ruleIDs := make([]any, len(involved))
-			for i, id := range involved {
-				ruleIDs[i] = id
+		for _, role := range roles {
+			involved := productConflict(after, at, role)
+			if len(involved) > 0 && !slices.Equal(involved, productConflict(before, at, role)) {
+				instant, _ := clock.Format(at)
+				ruleIDs := make([]any, len(involved))
+				for i, id := range involved {
+					ruleIDs[i] = id
+				}
+				return refuse(CodeRuleConflict, "after the write two product rules would be in force on the subject at this scope, neither naming the other in changes").
+					With("subject", w.Subject).With("rules", ruleIDs).With("at", instant)
 			}
-			return refuse(CodeRuleConflict, "after the write two product rules would be in force on the subject at this scope, neither naming the other in changes").
-				With("subject", w.Subject).With("rules", ruleIDs).With("at", instant)
 		}
 	}
 	return nil
 }
 
 // productConflict are the identities, in order, of the product rules of one
-// conflict key and full scope in force at the instant, and not superseded by
-// one in force, that have a partner applying to a common role that neither
-// names the other in changes.
-func productConflict(group []*rule.Rule, at time.Time) []string {
+// conflict key and full scope in force for the role at the instant, and not
+// superseded by one in force for it, that have a partner in force for it that
+// neither names the other in changes.
+func productConflict(group []*rule.Rule, at time.Time, role string) []string {
 	var live []*rule.Rule
 	superseded := map[string]bool{}
 	for _, s := range group {
-		if inForce(s, at) {
+		if (len(s.Applies) == 0 || slices.Contains(s.Applies, role)) && inForce(s, at) {
 			live = append(live, s)
 			if s.Changes != nil && s.Changes.Relation == rule.RelationSupersedes {
 				superseded[s.Changes.RuleID] = true
@@ -334,7 +343,7 @@ func productConflict(group []*rule.Rule, at time.Time) []string {
 			continue
 		}
 		for _, b := range live {
-			if b != a && !superseded[b.RuleID] && !related(a, b) && overlaps(a.Applies, b.Applies) {
+			if b != a && !superseded[b.RuleID] && !related(a, b) {
 				involved = append(involved, a.RuleID)
 				break
 			}
@@ -356,19 +365,6 @@ func inForce(s *rule.Rule, at time.Time) bool {
 	}
 	past, err := s.ExpiredAt(at)
 	return err == nil && !past
-}
-
-// overlaps says whether two rules apply to a common role; none is every role.
-func overlaps(a, b []string) bool {
-	if len(a) == 0 || len(b) == 0 {
-		return true
-	}
-	for _, x := range a {
-		if slices.Contains(b, x) {
-			return true
-		}
-	}
-	return false
 }
 
 // checkGoverned holds a product rule's governed work to the Pool: a governed

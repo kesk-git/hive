@@ -641,3 +641,23 @@ func TestARuleNoLongerInForceTakesANoteOnly(t *testing.T) {
 		invalidStatus(h.amend(lifted, map[string]any{"kind": "lift", "words": "Again.", "receipt": liftReceipt(t, "synapse.round.closed", "round_a")}), "lifted")
 	})
 }
+
+func TestAProductRuleSupersededForSomeRolesStillConflictsForTheOthers(t *testing.T) {
+	h, _ := seed(t)
+	product := func(applies ...any) map[string]any {
+		return map[string]any{
+			"subject": "stage.ruling", "words": "The ruling.", "origin": map[string]any{"kind": "ruling"},
+			"applies": append([]any{}, applies...), "kind": "product", "governs": map[string]any{"stage": int64(2)},
+		}
+	}
+	everyone := h.recorded(product(), request{})
+	fleet := h.recorded(supersedes(product("fleet"), everyone), request{})
+
+	// The rule for every role still applies to the Hive, beside which a rule for
+	// the Hive alone that names neither is a conflict.
+	h.unchanged(func() {
+		refused(t, h.record(product("hive"), request{}), envelope.Refused, "pool.rule_conflict")
+	})
+	// A rule for the Fleet that supersedes the Fleet's rule is no conflict.
+	h.recorded(supersedes(product("fleet"), fleet), request{})
+}
