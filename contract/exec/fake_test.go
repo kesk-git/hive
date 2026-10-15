@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 //	slowterm    print ready, and on a request to end exit 0 after a pause
 //	tree        start a grandchild that holds ignoring requests to end, print
 //	            its id once it is ready, and hold ignoring them too
-//	selfkill    end itself with a signal it does not handle
+//	selfkill    end itself (see the platform's selfKill)
 //	ids         print the process id, group and session
 //	fds         print "fds:" and which of the file identities in the
 //	            arguments the process holds open beyond the standard three
