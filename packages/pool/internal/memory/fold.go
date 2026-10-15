@@ -2,6 +2,7 @@ package memory
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/kesk-git/hive/contract/cli"
@@ -52,7 +53,7 @@ func FoldOp(c *cli.Call) (*cli.Result, error) {
 		body := foldBody(q.Revision, q.Revision, nil, nil, nil)
 		receipt.Body = body
 		receipt.Subject = queueRef(c, q.Revision, q.Digest)
-		receipt.Scope = envelopeOf(homeScope(c))
+		receipt.Scope = envelopeScope(homeScope(c))
 		b.tx.Receipts = append(b.tx.Receipts, receipt)
 		return b.stage(body)
 	}
@@ -80,8 +81,8 @@ func FoldOp(c *cli.Call) (*cli.Result, error) {
 			return nil, err
 		}
 	}
-	if changed := w.changed(); len(changed) > 0 {
-		tx, err := snap.Rerender(c, Write{Subjects: changed}, b.tx)
+	if filed := w.filedSubjects(snap, notes, placed); len(filed) > 0 {
+		tx, err := snap.Rerender(c, Write{Subjects: filed}, b.tx)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +114,7 @@ func FoldOp(c *cli.Call) (*cli.Result, error) {
 		return nil, err
 	}
 	body := foldBody(q.Revision, q.Revision+1, q.Pending, facts, items)
-	receipt.Body, receipt.Subject, receipt.Scope = body, ref, envelopeOf(homeScope(c))
+	receipt.Body, receipt.Subject, receipt.Scope = body, ref, envelopeScope(homeScope(c))
 	b.tx.Receipts = append(b.tx.Receipts, receipt)
 	return b.stage(body)
 }
@@ -194,6 +195,22 @@ func (w *working) changed() []*rule.Subject {
 	out := make([]*rule.Subject, len(w.order))
 	for i, id := range w.order {
 		out[i] = w.subjects[id]
+	}
+	return out
+}
+
+// filedSubjects are the subjects some note was filed under, whether it added a
+// fact or repeated one: the changed ones at their new revisions first, then the
+// unchanged ones as they stand, which are rendered again but not written.
+func (w *working) filedSubjects(snap *Snapshot, notes []*Note, placed []placement) []*rule.Subject {
+	out := w.changed()
+	for i, n := range notes {
+		if placed[i].reason != "" {
+			continue
+		}
+		if !slices.ContainsFunc(out, func(s *rule.Subject) bool { return s.SubjectID == n.SubjectID }) {
+			out = append(out, snap.subject(n.SubjectID))
+		}
 	}
 	return out
 }

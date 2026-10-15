@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kesk-git/hive/contract/canon"
 	"github.com/kesk-git/hive/contract/cli"
@@ -445,6 +446,37 @@ func TestFoldRepeatedIdenticalFactIsIdempotent(t *testing.T) {
 	}
 	if n := h.stored("note", ids[0]); n["state"] != "folded" {
 		t.Errorf("the note is %v", n)
+	}
+}
+
+func TestFoldOfARepeatedFactRendersTheSubjectsProjectionAgainWithoutRaisingTheSubject(t *testing.T) {
+	h, subject := foldSeed(t)
+	p, _ := h.rendered(hiveScope, "subject", "class-3", subject)
+	pid := p["projection_id"].(string)
+	line := strings.Repeat("l", 40)
+	h.rule("subject", subject, hiveScope, R{"rule_line": line, "effective_at": d15})
+	h.clk.Set(at(d15).Add(time.Hour))
+	if state := h.freshness(pid)["state"]; state == "fresh" {
+		t.Fatalf("the projection is %v before the fold", state)
+	}
+
+	h.enqueued(note(t, "The first fact.", map[string]any{"subject_id": subject, "fact_id": "fact-a"}))
+	body := h.ok(h.fold(h.queue()["record_revision"].(int64)))
+	if len(body["facts"].([]any)) != 1 || len(body["items"].([]any)) != 0 {
+		t.Fatalf("receipt %v", body)
+	}
+
+	if rev := h.stored("subject", subject)["record_revision"]; rev != int64(1) {
+		t.Errorf("the subject is at revision %v", rev)
+	}
+	if text := current(h.stored("projection", pid))["text"].(string); !strings.Contains(text, line) {
+		t.Errorf("the projection was not rendered again at the fold's clock: %q", text)
+	}
+	if state := h.freshness(pid)["state"]; state != "fresh" {
+		t.Errorf("the projection is %v", state)
+	}
+	if _, unchanged := h.rendered(hiveScope, "subject", "class-3", subject); !unchanged {
+		t.Error("the projection is not what a fresh render at the fold's clock gives")
 	}
 }
 

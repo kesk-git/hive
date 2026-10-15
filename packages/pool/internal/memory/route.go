@@ -8,7 +8,6 @@ import (
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
 	cstore "github.com/kesk-git/hive/contract/store"
-	"github.com/kesk-git/hive/packages/pool/internal/rule"
 	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
 )
 
@@ -73,7 +72,7 @@ func (b *builder) routeItem(n *Note, reason string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	scope := envelopeOf(n.Scope)
+	scope := envelopeScope(n.Scope)
 	scope.TaskID = taskID
 	return taskID, b.itemAdded(ref, scope)
 }
@@ -134,11 +133,6 @@ func (b *builder) itemAdded(subject *envelope.RecordRef, scope envelope.Scope) e
 	}
 	b.tx.Events = append(b.tx.Events, cstore.Event{ID: eventID, Content: content})
 	return nil
-}
-
-// envelopeOf is the scope of a record as the envelope carries it.
-func envelopeOf(s rule.Scope) envelope.Scope {
-	return envelope.Scope{Level: s.Level, HomeID: s.HomeID, WorkspaceID: s.WorkspaceID, ProjectID: s.ProjectID}
 }
 
 // queueRef is the reference to the maintenance queue at a revision.
