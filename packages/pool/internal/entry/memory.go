@@ -42,3 +42,24 @@ func RegisterMemory(r *Registry, render, check, propagate, budget Handler, deriv
 	}
 	read.RegisterProjectionReader(r.Reads, derive)
 }
+
+// RegisterMemorySubject builds subject of hive-memory into the registry, with the
+// handler of the package that writes the subject records. It is a new memory
+// operation, so it is declared at 1.0.
+func RegisterMemorySubject(r *Registry, subject Handler) {
+	r.RegisterOperation("hive-memory", &cli.Operation{
+		OperationDecl: envelope.OperationDecl{
+			Name:           "subject",
+			State:          envelope.Supported,
+			Mode:           envelope.Unary,
+			Mutates:        true,
+			Versions:       []string{"1.0"},
+			RequestSchema:  "urn:hive:schema:ops:hive-memory.subject.request:v1",
+			ResponseSchema: "urn:hive:schema:ops:hive-memory.subject.response:v1",
+			ReceiptKinds:   []string{"pool.subject.revised"},
+			Executes:       []string{},
+			Calls:          []string{},
+		},
+		Handle: subject,
+	})
+}

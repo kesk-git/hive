@@ -1,0 +1,337 @@
+package rulewrite
+
+import (
+	"slices"
+	"strconv"
+	"time"
+	"unicode/utf8"
+
+	"github.com/kesk-git/hive/contract/cli"
+	"github.com/kesk-git/hive/contract/clock"
+	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/packages/pool/internal/memory"
+	"github.com/kesk-git/hive/packages/pool/internal/rule"
+	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
+)
+
+// postureSubject is the conflict key of a project's Assimilation posture.
+const postureSubject = "assimilation.posture"
+
+// The step kinds a subject's loads_at may name; project is the one a subject
+// outside project scope cannot have.
+var steps = []string{"dispatch", "gate", "define", "stow", "project"}
+
+// Record is hive-rule record (spec/pool.md, Rules, What a write refuses): it
+// appends a rule and writes pool.rule.recorded, the words and dates given never
+// changed afterwards. It refuses a line over 300 code points, a second rule on a
+// subject that already has one in force at the scope unless the request names
+// that rule in changes, and a rule after which a projection would exceed its
+// budget at the clock or at any later instant at which the live set changes. A
+// subject created beside an operating rule, and the facts filed under its
+// subject, commit with the rule or not at all.
+func Record(c *cli.Call) (*cli.Result, error) {
+	body := c.Request.Body
+	if err := checkLevel(c); err != nil {
+		return nil, err
+	}
+	// The posture check runs inside the transaction, under the store's lock,
+	// before any record is read, so that the word it relies on cannot be
+	// superseded between the check and the write.
+	if str(body["subject"]) == postureSubject {
+		if err := rule.CheckPosture(c.Store, c.Request.Scope, c.Request.Authority); err != nil {
+			return nil, err
+		}
+	}
+	if err := checkExpected(c); err != nil {
+		return nil, err
+	}
+	kind := str(body["kind"])
+	if line := str(body["rule_line"]); kind == rule.KindOperating {
+		if n := utf8.RuneCountInString(line); n > MaxRuleLine {
+			return nil, refuse(CodeLineTooLong, "the rule line is "+strconv.Itoa(n)+" characters, over the cap of 300; the words are no part of it; the recorder's three moves are to shorten the line to one sentence and file its mechanics as a fact of its subject in the same request, to file the rule into a new, narrower subject created in the same request with its loads_at, or to supersede a rule in force with it").
+				With("characters", int64(n)).With("max_characters", int64(MaxRuleLine)).With("moves", slices.Clone(moves))
+		}
+	}
+	snap, err := memory.Load(c.Store, c.Home)
+	if err != nil {
+		return nil, err
+	}
+	now := c.Clock.Now()
+	stamp, err := c.Stamp()
+	if err != nil {
+		return nil, internal("the time of the rule cannot be written", err)
+	}
+	id, err := ids.Mint(c.Clock, ids.Rule)
+	if err != nil {
+		return nil, internal("a rule cannot be given an identity", err)
+	}
+	r := &rule.Rule{
+		RecordRevision: 1, RuleID: id, Scope: ruleScope(c.Request.Scope), Subject: str(body["subject"]), Words: str(body["words"]),
+		Origin: copyValue(body["origin"]).(map[string]any), Applies: texts(body["applies"]), Status: rule.StatusInForce,
+		EffectiveAt: stamp, ExpiresAt: str(body["expires_at"]), Authority: tree(c.Request.Tree()["authority"]),
+		Amendments: []rule.Amendment{}, CreatedAt: stamp, UpdatedAt: stamp, Kind: kind,
+	}
+	if at := str(body["effective_at"]); at != "" {
+		r.EffectiveAt = at
+	}
+	if l := tree(body["lift"]); l != nil {
+		r.Lift = &rule.Lift{ReceiptKind: str(l["receipt_kind"]), Subject: copyValue(l["subject"]).(map[string]any)}
+	}
+	if ch := tree(body["changes"]); ch != nil {
+		r.Changes = &rule.Changes{RuleID: str(ch["rule_id"]), RecordRevision: whole(ch["record_revision"]), Relation: str(ch["relation"])}
+	}
+	if in := tree(body["intake"]); in != nil {
+		r.Intake = copyValue(in).(map[string]any)
+	}
+	for _, l := range list(body["links"]) {
+		r.Links = append(r.Links, copyValue(l).(map[string]any))
+	}
+	if r.Changes != nil {
+		if err := checkChanges(snap, r); err != nil {
+			return nil, err
+		}
+	}
+
+	var subjects []*rule.Subject
+	switch kind {
+	case rule.KindOperating:
+		r.RuleLine, r.Tier, r.FiledUnder = str(body["rule_line"]), str(body["tier"]), str(body["filed_under"])
+		if subjects, err = fileSubject(c, snap, r, stamp); err != nil {
+			return nil, err
+		}
+		effective, err := clock.Parse(r.EffectiveAt)
+		if err != nil {
+			return nil, invalid("effective_at is not a calendar instant")
+		}
+		if err := checkConflict(snap, r, effective, now); err != nil {
+			return nil, err
+		}
+	default:
+		r.Governs = copyValue(body["governs"]).(map[string]any)
+		r.Specifications = []map[string]any{}
+		if err := checkGoverned(c, r); err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := snap.Plan(now, memory.Write{Rules: []*rule.Rule{r}, Subjects: subjects}); err != nil {
+		return nil, err
+	}
+
+	b := &builder{c: c}
+	for _, s := range subjects {
+		expected := s.RecordRevision - 1
+		if _, _, err := b.put("subject", s.SubjectID, s.Tree(), expected); err != nil {
+			return nil, err
+		}
+	}
+	final, ref, err := b.put("rule", id, r.Tree(), 0)
+	if err != nil {
+		return nil, err
+	}
+	receipt, err := b.receipt(receiptRecorded, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := b.seal(receipt, ref, r.Scope, true); err != nil {
+		return nil, err
+	}
+	return b.stage(map[string]any{"rule": final})
+}
+
+// stage checks the transaction and hands it to the harness.
+func (b *builder) stage(body map[string]any) (*cli.Result, error) {
+	// FILE STOP (CLOUD-STATUS.md): the re-rendering of the projections the write
+	// affects, in this transaction, joins here once memory exports the step
+	// that hive-memory budget takes with its unexported builder.
+	staged, err := poolstore.Stage(b.c, b.tx)
+	if err != nil {
+		return nil, err
+	}
+	return staged.Result(body), nil
+}
+
+// fileSubject finds the subject the operating rule is filed under, or makes the
+// one the request creates beside it, and files the request's facts under it. It
+// returns the subjects as they will be, to be written: the created subject, or
+// the existing one with the facts it gains.
+func fileSubject(c *cli.Call, snap *memory.Snapshot, r *rule.Rule, stamp string) ([]*rule.Subject, error) {
+	body := c.Request.Body
+	var sub, created *rule.Subject
+	if cs := tree(body["create_subject"]); cs != nil {
+		if r.FiledUnder != str(cs["subject_id"]) {
+			return nil, refuse(CodeSubjectInvalid, "filed_under is not the subject the request creates")
+		}
+		loads := texts(cs["loads_at"])
+		if err := checkLoadsAt(loads, r.Scope); err != nil {
+			return nil, err
+		}
+		for _, s := range snap.Subjects {
+			if s.SubjectID == r.FiledUnder {
+				return nil, refuse(CodeSubjectInvalid, "a subject already has the identity the request creates")
+			}
+			if s.Scope == r.Scope && s.Key == str(cs["key"]) {
+				return nil, refuse(CodeSubjectInvalid, "a subject already has the key the request creates at this scope")
+			}
+		}
+		created = &rule.Subject{
+			RecordRevision: 1, SubjectID: r.FiledUnder, Scope: r.Scope, Key: str(cs["key"]), LoadsAt: loads,
+			Facts: []rule.Fact{}, CreatedAt: stamp, UpdatedAt: stamp,
+		}
+		sub = created
+	} else {
+		for _, s := range snap.Subjects {
+			if s.SubjectID == r.FiledUnder {
+				// A copy: the snapshot is what the planner measures against.
+				cp := *s
+				cp.Facts = slices.Clone(s.Facts)
+				cp.RecordRevision++
+				sub = &cp
+			}
+		}
+		if sub == nil || sub.Scope != r.Scope {
+			return nil, refuse(CodeSubjectInvalid, "an operating rule is filed under an existing subject at exactly its own scope")
+		}
+	}
+	added := false
+	for _, v := range list(body["facts"]) {
+		f := tree(v)
+		fact := rule.Fact{FactID: str(f["fact_id"]), Text: str(f["text"]), Provenance: copyValue(f["provenance"]).(map[string]any)}
+		if i := slices.IndexFunc(sub.Facts, func(e rule.Fact) bool { return e.FactID == fact.FactID }); i >= 0 {
+			if sub.Facts[i].Text != fact.Text {
+				return nil, refuse(CodeFactConflict, "a fact of the subject has that identity and different text").With("fact_id", fact.FactID)
+			}
+			continue
+		}
+		sub.Facts = append(sub.Facts, fact)
+		added = true
+	}
+	if created == nil && !added {
+		return nil, nil
+	}
+	return []*rule.Subject{sub}, nil
+}
+
+// checkLoadsAt refuses a loads_at that repeats a step, and the step project on a
+// subject outside project scope.
+func checkLoadsAt(loads []string, scope rule.Scope) error {
+	for i, s := range loads {
+		if !slices.Contains(steps, s) || slices.Contains(loads[:i], s) {
+			return refuse(CodeSubjectInvalid, "loads_at is a duplicate-free list of the step kinds dispatch, gate, define, stow and project")
+		}
+		if s == "project" && scope.Level != envelope.ScopeProject {
+			return refuse(CodeSubjectInvalid, "the step project is refused on a subject outside project scope")
+		}
+	}
+	return nil
+}
+
+// checkChanges refuses a request whose changes names a rule the Pool does not
+// hold at the revision named.
+func checkChanges(snap *memory.Snapshot, r *rule.Rule) error {
+	for _, s := range snap.Rules {
+		if s.RuleID == r.Changes.RuleID {
+			if s.RecordRevision != r.Changes.RecordRevision {
+				return envelope.Common(envelope.CodeRevisionConflict, "the rule that changes names is not at the revision named")
+			}
+			return nil
+		}
+	}
+	return envelope.Common(envelope.CodeNotFound, "the rule that changes names is not a rule of the Pool")
+}
+
+// checkConflict refuses a rule on a subject that already has a rule in force at
+// its scope, unless the request names that rule in changes. A rule is in force at
+// the instant the new rule begins to bind, the clock where that is earlier, and
+// the roles of the two rules overlap.
+func checkConflict(snap *memory.Snapshot, r *rule.Rule, effective, now time.Time) error {
+	at := effective
+	if now.After(at) {
+		at = now
+	}
+	var standing []any
+	for _, s := range snap.Rules {
+		if s.Kind != rule.KindOperating || s.Subject != r.Subject || s.Scope != r.Scope || s.TaskID != "" {
+			continue
+		}
+		if r.Changes != nil && r.Changes.RuleID == s.RuleID {
+			continue
+		}
+		if inForce(s, at) && overlaps(s.Applies, r.Applies) {
+			standing = append(standing, s.RuleID)
+		}
+	}
+	if len(standing) > 0 {
+		return refuse(CodeRuleConflict, "a rule is in force on the subject at this scope and the request does not name it in changes").
+			With("subject", r.Subject).With("rules", standing)
+	}
+	return nil
+}
+
+// inForce says whether the rule is in force at the instant, as the resolver
+// reads it, whatever the role.
+func inForce(s *rule.Rule, at time.Time) bool {
+	if s.Status != rule.StatusInForce || s.Lifted() {
+		return false
+	}
+	effective, err := clock.Parse(s.EffectiveAt)
+	if err != nil || at.Before(effective) {
+		return false
+	}
+	past, err := s.ExpiredAt(at)
+	return err == nil && !past
+}
+
+// overlaps says whether two rules apply to a common role; none is every role.
+func overlaps(a, b []string) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return true
+	}
+	for _, x := range a {
+		if slices.Contains(b, x) {
+			return true
+		}
+	}
+	return false
+}
+
+// checkGoverned holds a product rule's governed work to the Pool: a governed
+// Target exists at the ruling's scope and has level target, and a governed stage
+// is a ruling at the Hive's scope.
+func checkGoverned(c *cli.Call, r *rule.Rule) error {
+	if target := str(r.Governs["target_id"]); target != "" {
+		l, om, err := poolstore.Load(c.Store, "item", target)
+		if err != nil || om != nil {
+			return refuse(CodeSubjectInvalid, "the governed Target is not an item of the Pool")
+		}
+		d := l.Data
+		got := rule.Scope{Level: str(d["scope_level"]), HomeID: str(d["home_id"]), WorkspaceID: str(d["workspace_id"]), ProjectID: str(d["project_id"])}
+		if str(d["level"]) != "target" || got != r.Scope {
+			return refuse(CodeSubjectInvalid, "the governed work is not a Target at the scope of the ruling")
+		}
+		return nil
+	}
+	if r.Scope.Level != envelope.ScopeHive {
+		return refuse(CodeSubjectInvalid, "a governed stage is ruled at the Hive's scope")
+	}
+	return nil
+}
+
+func texts(v any) []string {
+	out := []string{}
+	for _, e := range list(v) {
+		out = append(out, str(e))
+	}
+	return out
+}
+
+func whole(v any) int64 {
+	switch n := v.(type) {
+	case int64:
+		return n
+	case int:
+		return int64(n)
+	}
+	return 0
+}

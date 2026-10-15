@@ -188,13 +188,17 @@ func TestACreatedSubjectAndItsFactsCommitWithTheRuleAndTheProjectionsOrNoneDo(t 
 	body["create_subject"] = map[string]any{"subject_id": subjectID, "key": "dispatch.limits", "loads_at": []any{"dispatch", "gate"}}
 	body["facts"] = []any{map[string]any{"fact_id": "cap-mechanics", "text": "The cap counts Swarms in flight, not queued.", "provenance": provenance}}
 
-	// A budget the subject's projection cannot fit: nothing is written.
-	small, _ := seed(t)
-	small.plantBudget(18432, 4608, 100)
-	small.unchanged(func() {
-		refused(t, small.record(body, request{}), envelope.Refused, "pool.projection_over_budget")
+	// Facts the subject's projection cannot hold in its budget of 9,216 bytes:
+	// nothing is written.
+	big := map[string]any{}
+	for k, v := range body {
+		big[k] = v
+	}
+	big["facts"] = []any{map[string]any{"fact_id": "cap-mechanics", "text": strings.Repeat("The cap counts Swarms in flight. ", 300), "provenance": provenance}}
+	h.unchanged(func() {
+		refused(t, h.record(big, request{}), envelope.Refused, "pool.projection_over_budget")
 	})
-	if small.stored("subject", subjectID) != nil {
+	if h.stored("subject", subjectID) != nil {
 		t.Error("the subject was created though the write was refused")
 	}
 
@@ -231,7 +235,7 @@ func TestAWriteThatPutsAProjectionOverItsBudgetAtTheClockOrLaterIsRefusedAndWrit
 	line := strings.Repeat("a", 60)
 	t.Run("at the clock", func(t *testing.T) {
 		h, filing := seed(t)
-		h.plantBudget(120, 4608, 9216)
+		h.tighten(hiveScope, "always", "hive", "", 120)
 		h.unchanged(func() {
 			resp := refused(t, h.record(opRule("dispatch.cap", "always", filing, strings.Repeat("a", 100)), request{}), envelope.Refused, "pool.projection_over_budget")
 			d := detail(t, resp)
@@ -243,7 +247,7 @@ func TestAWriteThatPutsAProjectionOverItsBudgetAtTheClockOrLaterIsRefusedAndWrit
 	})
 	t.Run("at a later instant", func(t *testing.T) {
 		h, filing := seed(t)
-		h.plantBudget(150, 4608, 9216)
+		h.tighten(hiveScope, "always", "hive", "", 150)
 		h.recorded(opRule("dispatch.cap", "always", filing, line), request{})
 		later := opRule("dispatch.model", "always", filing, line)
 		later["effective_at"] = d25
@@ -257,7 +261,7 @@ func TestAWriteThatPutsAProjectionOverItsBudgetAtTheClockOrLaterIsRefusedAndWrit
 	})
 	t.Run("by an amend", func(t *testing.T) {
 		h, filing := seed(t)
-		h.plantBudget(150, 4608, 9216)
+		h.tighten(hiveScope, "always", "hive", "", 150)
 		temp := h.recorded(withExpiry(opRule("dispatch.cap", "always", filing, line), d15), request{})
 		later := opRule("dispatch.model", "always", filing, line)
 		later["effective_at"] = d20

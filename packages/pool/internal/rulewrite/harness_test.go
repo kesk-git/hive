@@ -283,14 +283,13 @@ func refused(t testing.TB, resp *envelope.Response, status envelope.Status, code
 	return resp
 }
 
-// plantBudget stands the budget configuration in the home, with no entry and the
-// defaults given, and the question that is the Hive Mind's word.
-func (h *home) plantBudget(hiveAlways, fleetAlways, subject int64) {
+// plantBudget stands the budget configuration in the home, at the provisioned
+// defaults with no entry, and the question that is the Hive Mind's word.
+func (h *home) plantBudget() {
 	h.t.Helper()
 	rec := fixture(h.t, "pool.budget", "changed")
 	rec["home_id"], rec["record_revision"] = homeID, int64(1)
 	rec["projections"] = []any{}
-	rec["defaults"] = map[string]any{"hive_always": hiveAlways, "fleet_always": fleetAlways, "subject": subject}
 	h.plant("budget", "memory", rec)
 	q := fixture(h.t, "pool.question", "answered-superseding")
 	q["scope_level"] = "hive"
@@ -320,7 +319,7 @@ func (h *home) subject(scope map[string]any, key string) string {
 // the subject the rules of the Hive are filed under.
 func seed(t testing.TB) (*home, string) {
 	h := newHome(t)
-	h.plantBudget(18432, 4608, 9216)
+	h.plantBudget()
 	return h, h.subject(hiveScope, "filing")
 }
 
@@ -390,4 +389,22 @@ func moves(t testing.TB, resp *envelope.Response) {
 	if !slices.Equal(got, want) {
 		t.Errorf("moves %v, want %v", got, want)
 	}
+}
+
+// tighten renders the projection, which stands it with its entry in the budget
+// configuration, and lowers that entry to max bytes.
+func (h *home) tighten(scope map[string]any, tier, audience, subject string, max int64) {
+	h.t.Helper()
+	body := map[string]any{"tier": tier, "audience": audience}
+	if subject != "" {
+		body["subject_id"] = subject
+	}
+	id := ok(h.t, h.send("hive-memory", "render", body, request{scope: scope}))["projection"].(map[string]any)["projection_id"]
+	rec := h.stored("budget", "memory")
+	for _, e := range rec["projections"].([]any) {
+		if m := e.(map[string]any); m["projection_id"] == id {
+			m["max_bytes"] = max
+		}
+	}
+	h.plant("budget", "memory", rec)
 }

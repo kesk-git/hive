@@ -30,3 +30,37 @@ func RegisterRuleResolve(r *Registry, resolve Handler) {
 	})
 	read.RegisterRuleReaders(r.Reads)
 }
+
+// RegisterRuleWriters builds record, amend and expire of hive-rule into the
+// registry, with the handlers of the package that writes the rule records. record
+// is declared at 2.0, its v2 request; amend and expire at 1.0 like resolve, their
+// unchanged v1 request bodies. Each writes the rule and re-renders the projections
+// of its scope in the same transaction, so each declares the receipt of the
+// rendering beside its own.
+func RegisterRuleWriters(r *Registry, record, amend, expire Handler) {
+	for _, op := range []struct {
+		name, version, request, response string
+		handle                           Handler
+		receipts                         []string
+	}{
+		{"record", "2.0", "record.request:v2", "record.response:v2", record, []string{"pool.rule.recorded", "pool.projection.rendered"}},
+		{"amend", "1.0", "amend.request:v1", "amend.response:v2", amend, []string{"pool.rule.amended", "pool.rule.lifted", "pool.projection.rendered"}},
+		{"expire", "1.0", "expire.request:v1", "expire.response:v2", expire, []string{"pool.rule.expired", "pool.projection.rendered"}},
+	} {
+		r.RegisterOperation("hive-rule", &cli.Operation{
+			OperationDecl: envelope.OperationDecl{
+				Name:           op.name,
+				State:          envelope.Supported,
+				Mode:           envelope.Unary,
+				Mutates:        true,
+				Versions:       []string{op.version},
+				RequestSchema:  "urn:hive:schema:ops:hive-rule." + op.request,
+				ResponseSchema: "urn:hive:schema:ops:hive-rule." + op.response,
+				ReceiptKinds:   op.receipts,
+				Executes:       []string{},
+				Calls:          []string{},
+			},
+			Handle: op.handle,
+		})
+	}
+}

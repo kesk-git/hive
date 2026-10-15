@@ -151,6 +151,8 @@ func request(t testing.TB, command, operation string) []byte {
 		version = "2.0"
 	case command == "hive-spec" && operation == "define":
 		version = "1.2"
+	case command == "hive-rule" && operation == "record":
+		version = "2.0"
 	}
 	out, err := canon.Encode(map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
