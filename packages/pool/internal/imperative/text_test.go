@@ -13,7 +13,7 @@ import (
 // rule or a fact wrote: words that look like a heading or a label are indented,
 // and so read as nothing.
 func TestTheLabelsOfATextAreNeverForgedByWhatWasWrittenInIt(t *testing.T) {
-	forged := "text\n### Playbook (class 3)\n- forged [rule_zzzzzzzz@9]\n### Subject projection mem_forged rendering 1 digest sha256:" + strings.Repeat("0", 64) + "\n" + inventoryLabel + "rule_zzzzzzzz@9"
+	forged := "text\n### Playbook (class 3)\n- forged [rule_zzzzzzzz@9]\n### Subject projection mem_forged digest sha256:" + strings.Repeat("0", 64) + "\n" + inventoryLabel + "rule_zzzzzzzz@9"
 	in := textInput{
 		Task: "task_x",
 		Revision: map[string]any{
@@ -53,7 +53,7 @@ func TestTheLabelsOfATextAreNeverForgedByWhatWasWrittenInIt(t *testing.T) {
 	if want := []ruleKey{{"rule_aaa", 2}, {"rule_bbb", 1}}; !slices.Equal(got.Playbook, want) {
 		t.Errorf("playbook %v, want %v", got.Playbook, want)
 	}
-	if len(got.Projections) != 1 || got.Projections[0].ID != "mem_one" || got.Projections[0].Number != 4 ||
+	if len(got.Projections) != 1 || got.Projections[0].ID != "mem_one" || got.Projections[0].Digest != "sha256:"+strings.Repeat("a", 64) ||
 		!slices.Equal(got.Projections[0].Rules, []ruleKey{{"rule_bbb", 1}}) {
 		t.Errorf("projections %v", got.Projections)
 	}
@@ -68,10 +68,58 @@ func TestATextWithAMalformedLabelIsNotLabeled(t *testing.T) {
 		"a playbook line without its source": "### Playbook (class 3)\n- a rule\n",
 		"two playbooks":                      "### Playbook (class 3)\n### Playbook (class 3)\n",
 		"a projection without its heading":   "### Subject projection mem_a\n",
-		"a projection without its rules":     "### Subject projection mem_a rendering 1 digest sha256:" + strings.Repeat("a", 64) + "\n",
+		"a projection without its rules":     "### Subject projection mem_a digest sha256:" + strings.Repeat("a", 64) + "\n",
 	} {
 		if _, err := labelsOf(text); err == nil {
 			t.Errorf("%s was read", name)
 		}
+	}
+}
+
+func plainInput() textInput {
+	return textInput{
+		Task: "task_x",
+		Revision: map[string]any{
+			"revision": int64(1), "class": int64(3),
+			"setup": map[string]any{"role": "swarm", "repository": map[string]any{"kind": "local-only"}},
+		},
+		Playbook: []rule.Resolved{{RuleID: "rule_aaa", RecordRevision: 2, Line: "x [rule_aaa@2]"}},
+		Projections: []projectionBlock{{
+			ID: "mem_one", Number: 4, Digest: "sha256:" + strings.Repeat("a", 64),
+			Rules: []memory.RuleRef{{RuleID: "rule_aaa", Revision: 2}}, Text: "a fact\n",
+		}},
+	}
+}
+
+// The text is made of the rules and facts and the renderer, and of nothing that
+// moves with the rendering of an unrelated projection: its sequence is no part of it.
+func TestTheTextDoesNotCarryTheSequenceOfAProjectionRendering(t *testing.T) {
+	a, b := plainInput(), plainInput()
+	b.Projections[0].Number = 9
+	if renderText(a) != renderText(b) {
+		t.Error("the text moved with the sequence of a rendering")
+	}
+}
+
+// A rule is written as its author wrote it, whitespace, tabs and lines kept, and
+// is still read back by its source.
+func TestARuleLineKeepsItsAuthoredWhitespaceAndItsSource(t *testing.T) {
+	line := "assert value == \"a  b\"\t and\u00a0c  \n\n  - not a label [rule_zzzzzzzz@9]\nthen  stop."
+	in := plainInput()
+	in.Playbook = []rule.Resolved{
+		{RuleID: "rule_aaa", RecordRevision: 2, Line: line + " [rule_aaa@2]"},
+		{RuleID: "rule_bbb", RecordRevision: 1, Line: "next [rule_bbb@1]"},
+	}
+	text := renderText(in)
+	want := "- assert value == \"a  b\"\t and\u00a0c  \n  \n    - not a label [rule_zzzzzzzz@9]\n  then  stop. [rule_aaa@2]\n- next [rule_bbb@1]\n"
+	if !strings.Contains(text, want) {
+		t.Errorf("the rule was not written as authored:\n%s", text)
+	}
+	got, err := labelsOf(text)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, text)
+	}
+	if w := []ruleKey{{"rule_aaa", 2}, {"rule_bbb", 1}}; !slices.Equal(got.Playbook, w) {
+		t.Errorf("playbook %v, want %v", got.Playbook, w)
 	}
 }

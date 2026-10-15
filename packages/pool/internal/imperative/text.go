@@ -15,8 +15,9 @@ import (
 // renderer, under the rule that the same inputs give the same text.
 //
 // The text keeps the sources it was made from in labels a delivery can read
-// back: the rules of the playbook, each as a line of its own with its source
-// and revision at the end, and each embedded subject projection under a heading
+// back: the rules of the playbook, each as an entry of its own, written as the
+// rule wrote it with its lines after the first indented and its source and
+// revision at the end, and each embedded subject projection under a heading
 // that names it, with the inventory of its rules on the line after. Only the
 // renderer writes at the first column. Everything an author, a rule or a fact
 // wrote is indented, so that none of it can pass for a heading or a label.
@@ -122,11 +123,6 @@ func repositoryText(r map[string]any) string {
 	return "local-only, no forge"
 }
 
-// oneLine collapses a rule line to a single line.
-func oneLine(s string) string {
-	return strings.Join(strings.Fields(strings.ReplaceAll(s, " ", " ")), " ")
-}
-
 // renderText writes the text of the rendering. It reads nothing but its input,
 // and holds no time and no identity of the rendering, so the same input gives
 // the same text.
@@ -222,10 +218,10 @@ func renderText(in textInput) string {
 		o.line(indent("No rule is in force for this class.", 2))
 	}
 	for _, r := range in.Playbook {
-		o.line("- " + oneLine(r.Line))
+		o.line("- " + strings.ReplaceAll(r.Line, "\n", "\n  "))
 	}
 	for _, p := range in.Projections {
-		o.line(fmt.Sprintf("%s%s rendering %d digest %s", headingProjection, p.ID, p.Number, p.Digest))
+		o.line(fmt.Sprintf("%s%s digest %s", headingProjection, p.ID, p.Digest))
 		o.line(inventoryLabel + inventoryText(p.Rules))
 		o.line(indent(strings.TrimRight(p.Text, "\n"), 2))
 	}
@@ -280,14 +276,13 @@ type labeled struct {
 
 type labeledProjection struct {
 	ID     string
-	Number int64
 	Digest string
 	Rules  []ruleKey
 }
 
 var (
-	playbookLine    = regexp.MustCompile(`^- .*\[(rule_[0-9a-z]+)@([0-9]+)\]$`)
-	projectionHead  = regexp.MustCompile(`^### Subject projection (mem_[0-9a-z]+) rendering ([0-9]+) digest (sha256:[0-9a-f]{64})$`)
+	playbookLine    = regexp.MustCompile(`(?s)^- .*\[(rule_[0-9a-z]+)@([0-9]+)\]$`)
+	projectionHead  = regexp.MustCompile(`^### Subject projection (mem_[0-9a-z]+) digest (sha256:[0-9a-f]{64})$`)
 	ruleReference   = regexp.MustCompile(`^(rule_[0-9a-z]+)@([0-9]+)$`)
 	errNotLabelable = fmt.Errorf("the text does not carry its sources in labels")
 )
@@ -303,7 +298,28 @@ func labelsOf(text string) (*labeled, error) {
 		inProjection
 	)
 	mode, seenPlaybook := none, false
+	var entry []string
+	flush := func() error {
+		if entry == nil {
+			return nil
+		}
+		m := playbookLine.FindStringSubmatch(strings.Join(entry, "\n"))
+		entry = nil
+		if m == nil {
+			return errNotLabelable
+		}
+		n, _ := strconv.ParseInt(m[2], 10, 64)
+		l.Playbook = append(l.Playbook, ruleKey{m[1], n})
+		return nil
+	}
 	for _, ln := range strings.Split(text, "\n") {
+		if entry != nil && strings.HasPrefix(ln, " ") {
+			entry = append(entry, ln)
+			continue
+		}
+		if err := flush(); err != nil {
+			return nil, err
+		}
 		switch {
 		case strings.HasPrefix(ln, headingPlaybook):
 			if seenPlaybook {
@@ -315,21 +331,12 @@ func labelsOf(text string) (*labeled, error) {
 			if m == nil {
 				return nil, errNotLabelable
 			}
-			n, err := strconv.ParseInt(m[2], 10, 64)
-			if err != nil {
-				return nil, errNotLabelable
-			}
-			l.Projections = append(l.Projections, labeledProjection{ID: m[1], Number: n, Digest: m[3]})
+			l.Projections = append(l.Projections, labeledProjection{ID: m[1], Digest: m[2]})
 			mode = inProjection
 		case strings.HasPrefix(ln, "# "), strings.HasPrefix(ln, "## "), strings.HasPrefix(ln, "### "):
 			mode = none
 		case mode == inPlaybook && strings.HasPrefix(ln, "- "):
-			m := playbookLine.FindStringSubmatch(ln)
-			if m == nil {
-				return nil, errNotLabelable
-			}
-			n, _ := strconv.ParseInt(m[2], 10, 64)
-			l.Playbook = append(l.Playbook, ruleKey{m[1], n})
+			entry = []string{ln}
 		case mode == inProjection && strings.HasPrefix(ln, inventoryLabel):
 			p := &l.Projections[len(l.Projections)-1]
 			if p.Rules != nil {
@@ -347,6 +354,9 @@ func labelsOf(text string) (*labeled, error) {
 				}
 			}
 		}
+	}
+	if err := flush(); err != nil {
+		return nil, err
 	}
 	for _, p := range l.Projections {
 		if p.Rules == nil {

@@ -133,7 +133,8 @@ func checkOpen(c *cli.Call, taskID string, generation int64) error {
 // agree checks that the inventories of the request are those the text is
 // labeled with: the rules are the duplicate-free union of the playbook's and of
 // the embedded projections', and the projections are those embedded, each with
-// its rendering, digest and rules.
+// its digest and rules; its rendering is the inventory's, not the text's, and
+// the digest is checked against it when the receipt is staged.
 func agree(text string, body map[string]any) error {
 	disagree := func(what string) error {
 		return refuse(codeDeliveryInventory, "the inventory delivered does not agree with the text supplied: "+what)
@@ -176,8 +177,8 @@ func agree(text string, body map[string]any) error {
 			return disagree("a projection is not in the text")
 		}
 		lp := l.Projections[i]
-		if lp.Number != intOf(p["rendering"]) || lp.Digest != strOf(p["digest"]) {
-			return disagree("a projection's rendering or digest differs")
+		if lp.Digest != strOf(p["digest"]) {
+			return disagree("a projection's digest differs")
 		}
 		mine, err := ruleKeys(listOf(p["rules"]))
 		if err != nil || len(mine) != len(lp.Rules) {

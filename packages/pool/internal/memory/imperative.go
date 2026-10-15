@@ -1,12 +1,10 @@
 package memory
 
 import (
-	"errors"
 	"time"
 
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/envelope"
-	"github.com/kesk-git/hive/contract/ids"
 	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
 )
 
@@ -74,81 +72,9 @@ type ReceivedStep struct {
 // recorded for the same consumer, rendering and digest adds nothing, and the
 // result says so.
 func StageReceived(c *cli.Call, tx poolstore.Transaction, step ReceivedStep) (poolstore.Transaction, bool, error) {
-	l, om, err := poolstore.Load(c.Store, kindProj, step.ProjectionID)
-	switch {
-	case errors.Is(err, poolstore.ErrNotFound):
-		return tx, false, envelope.Common(envelope.CodeNotFound, "no projection has that identity")
-	case err != nil:
-		return tx, false, poolstore.Failure("the projection", err)
-	case om != nil:
-		return tx, false, envelope.Common(envelope.CodeRecordMalformed, "the projection cannot be read").With("record", om.ID)
-	}
-	e, err := ParseProjection(l.Data)
-	if err != nil {
-		return tx, false, malformed("the projection cannot be read", step.ProjectionID, err)
-	}
-	if err := checkContained(c, e.Scope); err != nil {
-		return tx, false, err
-	}
-	named := e.Current
-	if named.Number != step.Rendering {
-		found := false
-		for _, h := range list(l.Data["history"]) {
-			if r, err := parseRendering(h); err == nil && r.Number == step.Rendering {
-				named, found = r, true
-			}
-		}
-		if !found {
-			return tx, false, refuse(CodeDeliveryInvent, "the projection has no such rendering")
-		}
-	}
-	if named.Digest != step.Digest {
-		return tx, false, refuse(CodeDeliveryInvent, "the digest is not the digest of the rendering named")
-	}
-
-	for _, h := range list(l.Data["receipt_history"]) {
-		h := tree(h)
-		if !sameTree(h["consumer"], step.Consumer) {
-			continue
-		}
-		if r := tree(h["received"]); num(r["rendering"]) == step.Rendering && str(r["digest"]) == step.Digest {
-			return tx, false, nil
-		}
-	}
-
-	receiptID, err := ids.Mint(c.Clock, ids.Receipt)
-	if err != nil {
-		return tx, false, internal("a receipt cannot be made", err)
-	}
-	next := map[string]any{"rendering": step.Rendering, "digest": step.Digest, "at": step.At, "receipt_id": receiptID}
-	if step.Evidence != nil {
-		next["evidence"] = copyValue(step.Evidence)
-	}
-	entry := map[string]any{"consumer": copyValue(step.Consumer), "received": next}
-
-	rec := copyValue(l.Data).(map[string]any)
-	rec["receipt_history"] = append(list(rec["receipt_history"]), entry)
-	consumers := list(rec["consumers"])
-	at := -1
-	for i, v := range consumers {
-		if sameTree(tree(v)["consumer"], step.Consumer) {
-			at = i
-		}
-	}
-	if at < 0 {
-		consumers = append(consumers, copyValue(entry))
-	} else if cur := tree(consumers[at]); step.Rendering >= num(tree(cur["received"])["rendering"]) {
-		cur["received"] = copyValue(next)
-	}
-	rec["consumers"] = consumers
-
-	b := &builder{c: c, tx: tx}
-	_, ref, err := b.put(kindProj, step.ProjectionID, rec, l.Revision)
-	if err != nil {
-		return tx, false, err
-	}
-	if err := b.receipt(receiptID, receiptReceived, ref, e.Scope); err != nil {
-		return tx, false, err
-	}
-	return b.tx, true, nil
+	tx, out, err := stageStep(c, tx, projectionStep{
+		ProjectionID: step.ProjectionID, Step: "received", Rendering: step.Rendering, Digest: step.Digest,
+		Consumer: step.Consumer, At: step.At, Evidence: step.Evidence,
+	})
+	return tx, out.Changed, err
 }

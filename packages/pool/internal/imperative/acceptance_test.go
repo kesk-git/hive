@@ -584,3 +584,60 @@ func TestTheReaderReturnsTheImperativeWhole(t *testing.T) {
 	refused(t, read(map[string]any{"id": mint(t, ids.Task)}), envelope.NotFound, "not_found")
 	refused(t, read(map[string]any{"states": []any{"queued"}}), envelope.Invalid, "schema_violation")
 }
+
+// The text a worker is given of a rule is the rule as it was written, and a
+// delivery of it is still recorded against the rule's source.
+func TestARuleReachesTheWorkerAsItWasWrittenAndIsDelivered(t *testing.T) {
+	w := newWorld(t)
+	w.created()
+	w.open(w.hunt)
+	w.reword(w.playbook[0], "Run  the command\tonce:\n  - not a source [rule_zzzzzzzz@9]\nthen  stop.")
+	ok(t, w.send("hive-memory", "render", map[string]any{"tier": "subject", "audience": "class-3", "subject_id": w.touched}, request{}))
+	r := ok(t, w.render(w.hunt))
+	want := "- Run  the command\tonce:\n    - not a source [rule_zzzzzzzz@9]\n  then  stop. [" + w.playbook[0] + "@2]\n"
+	if !strings.Contains(r["text"].(string), want) {
+		t.Errorf("the rule was not written as authored:\n%s", r["text"])
+	}
+	resp := w.send("hive-imperative", "deliver", w.delivery(r, 1, "launch-prompt"), request{})
+	rec := ok(t, resp)["imperative"].(map[string]any)
+	for _, v := range list(tree(list(rec["deliveries"])[0])["rules"]) {
+		if tree(v)["rule_id"] == "rule_zzzzzzzz" {
+			t.Error("a source written inside a rule was recorded as delivered")
+		}
+	}
+}
+
+// What a delivery stages is the step propagate records: the receipt it wrote is
+// the one an acknowledgment follows, and a step propagate recorded first is not
+// recorded again by the delivery.
+func TestADeliveryStagesTheStepPropagateRecords(t *testing.T) {
+	w := newWorld(t)
+	w.created()
+	w.open(w.hunt)
+	r := ok(t, w.render(w.hunt))
+	embedded := tree(list(r["subject_projections"])[0])
+	consumer := map[string]any{"kind": "generation", "task_id": w.hunt, "generation": int64(1)}
+	step := func(name string) *envelope.Response {
+		return w.send("hive-memory", "propagate", map[string]any{
+			"projection_id": w.projection, "consumer": consumer, "step": name,
+			"rendering": embedded["rendering"], "digest": embedded["digest"], "at": "2026-10-14T09:00:00.000Z",
+		}, request{})
+	}
+
+	if resp := step("received"); len(ok(t, resp)) == 0 || len(resp.Receipts) != 1 {
+		t.Fatalf("receipts %v", kinds(resp))
+	}
+	first := ok(t, w.send("hive-imperative", "deliver", w.delivery(r, 1, "launch-prompt"), request{}))
+	if len(list(first["imperative"].(map[string]any)["deliveries"])) != 1 {
+		t.Fatalf("delivery %v", first)
+	}
+	projection := w.stored("projection", w.projection)
+	if len(list(projection["receipt_history"])) != 1 {
+		t.Errorf("the delivery recorded the step again: %v", projection["receipt_history"])
+	}
+	ack := step("acknowledged")
+	ok(t, ack)
+	if want := []string{"pool.projection.acknowledged"}; !slices.Equal(kinds(ack), want) {
+		t.Errorf("receipts %v, want %v", kinds(ack), want)
+	}
+}
