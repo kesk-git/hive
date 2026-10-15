@@ -178,7 +178,7 @@ An authority reference of kind `word` names a question, as a record reference wi
 3. The applied answer was recorded at a record revision no greater than the reference's: the answer the caller relied on is the one still applied. An answer that superseded it since is `superseded`; an answer first applied after the revision named is `unanswered`.
 4. The question's scope contains the envelope's: the same home, and a Hive question for any scope of it, a workspace question for that workspace and its projects, a project question for that project.
 
-The check is `word`'s, defined here once. The Pool applies the same rule to its own records where its operations accept a `word` authority, in `hive-admit approve`, a change of the budget record and `hive-rule record` of a project's Assimilation posture, as [pool.md](pool.md) states, and `hive-word verify` applies it through `hive-pool read`. Assimilation, at stage 5, calls `verify` or applies the rule to what it reads. A reference is never itself authority.
+The check is `word`'s, defined here once. The Pool applies the same rule to its own records wherever [pool.md](pool.md) requires a standing `word` authority, and `hive-word verify` applies it through `hive-pool read`. Assimilation, at stage 5, calls `verify` or applies the rule to what it reads. A reference is never itself authority.
 
 ## What this does not prevent
 
