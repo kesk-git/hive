@@ -131,7 +131,7 @@ func requested(value string) map[string]any {
 }
 
 func pushed(state string) map[string]any {
-	return map[string]any{"branch": "hive/export-retry", "pushed": state, "observed_at": "2026-10-14T08:59:00.000Z"}
+	return map[string]any{"branch": "main", "revision": "9b8a7c6d5e4f30211203f4e5d6c7b8a998877665", "pushed": state, "observed_at": "2026-10-14T08:59:00.000Z"}
 }
 
 func (h *home) check(id string, body map[string]any) *envelope.Response {
@@ -684,7 +684,8 @@ func TestNothingAdmitsCodexCloud(t *testing.T) {
 
 // A held check is lifted by a later check with new evidence; the earlier check
 // is never changed, and the hold it placed is released by the receipt that
-// admitted.
+// admitted. A held check for a reason an active hold of the admission already
+// holds names that hold and places none.
 func TestALaterCheckWithNewEvidenceAdmitsWhatAnEarlierOneHeld(t *testing.T) {
 	h := newHome(t)
 	h.work(all(place("claude-cloud-session"), harness("claude")))
@@ -693,15 +694,20 @@ func TestALaterCheckWithNewEvidenceAdmitsWhatAnEarlierOneHeld(t *testing.T) {
 	first := h.check(id, map[string]any{})
 	held := wants(t, h, id, first, outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"source_branch_not_pushed"}, reason: "source_branch_not_pushed"})
 	holdID := first.Error.Hold.ID
-	// Run again with the same evidence: held again, a hold of its own.
+	// Run again: held for the same reason, the same hold named, none placed.
 	again := h.check(id, map[string]any{"source_branch": pushed("unknown")})
 	wants(t, h, id, again, outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"source_branch_not_pushed"}, reason: "source_branch_not_pushed"})
-	if again.Error.Hold.ID == holdID {
-		t.Errorf("a second held check names the first hold")
+	if again.Error.Hold.ID != holdID {
+		t.Errorf("a second held check for the same reason names %s, not the first hold %s", again.Error.Hold.ID, holdID)
+	}
+	if n := h.holdCount(); n != 1 {
+		t.Errorf("%d holds after two checks held for one reason", n)
+	}
+	if stored := h.stored("hold", holdID); stored["record_revision"] != int64(1) {
+		t.Errorf("the reused hold was rewritten: %v", stored)
 	}
 
 	evidence := map[string]any{"source_branch": pushed("true")}
-	evidence["source_branch"].(map[string]any)["revision"] = "9b8a7c6d5e4f30211203f4e5d6c7b8a998877665"
 	third := h.check(id, evidence)
 	admitted := wants(t, h, id, third, outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
 	rec := h.stored("admission", id)
@@ -712,13 +718,141 @@ func TestALaterCheckWithNewEvidenceAdmitsWhatAnEarlierOneHeld(t *testing.T) {
 	if !equalTree(tree(admitted["source_branch"]), evidence["source_branch"]) {
 		t.Errorf("the evidence is not recorded with the check: %v", admitted["source_branch"])
 	}
-	for _, hold := range []string{holdID, again.Error.Hold.ID} {
-		stored := h.stored("hold", hold)
-		by := tree(stored["released_by"])
-		if stored["state"] != "released" || stored["released_at"] == nil || by["schema"] != "hive.receipt" || by["id"] != third.Receipts[0].ReceiptID {
-			t.Errorf("hold %s: %v", hold, stored)
+	stored := h.stored("hold", holdID)
+	by := tree(stored["released_by"])
+	if stored["state"] != "released" || stored["released_at"] == nil || by["schema"] != "hive.receipt" || by["id"] != third.Receipts[0].ReceiptID {
+		t.Errorf("hold %s: %v", holdID, stored)
+	}
+	// One placement and one release, each with the check's receipt as its basis.
+	h.holdEvents(t, "pool.hold.placed", first.Receipts[0].ReceiptID, 1)
+	h.holdEvents(t, "pool.hold.released", third.Receipts[0].ReceiptID, 1)
+	if n := h.filesWith("journal", `"pool.hold.placed"`) + h.filesWith("journal", `"pool.hold.released"`); n != 2 {
+		t.Errorf("%d hold events in all", n)
+	}
+}
+
+// holdCount is the number of hold records of the Pool.
+func (h *home) holdCount() int {
+	h.t.Helper()
+	holds, _ := os.ReadDir(filepath.Join(h.dir, "pool", "records", "hold"))
+	return len(holds)
+}
+
+// holdEvents checks that the journal holds n events of the kind whose basis is
+// the receipt.
+func (h *home) holdEvents(t *testing.T, kind, receipt string, n int) {
+	t.Helper()
+	got := 0
+	filepath.WalkDir(filepath.Join(h.dir, "journal"), func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		data, rerr := os.ReadFile(path)
+		if rerr != nil {
+			t.Fatal(rerr)
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.Contains(line, `"kind":"`+kind+`"`) && strings.Contains(line, `"id":"`+receipt+`"`) && strings.Contains(line, `"task_id":"`+taskID+`"`) {
+				got++
+			}
+		}
+		return nil
+	})
+	if got != n {
+		t.Errorf("%d %s events on receipt %s; want %d", got, kind, receipt, n)
+	}
+}
+
+// A held check for a reason no active hold of the admission holds places a
+// hold of its own; a refused check places none and releases none.
+func TestHoldsFollowTheReasonOfTheCheck(t *testing.T) {
+	h := newHome(t)
+	h.work(all(place("claude-cloud-session"), harness("claude"), sensitive("spend")))
+	h.plant("question", questionID, fixture(t, "pool.question", "answered-superseding"))
+	id := h.admission(none())
+
+	first := h.check(id, map[string]any{})
+	wants(t, h, id, first, outcome{status: envelope.Held, code: "held", result: "held",
+		findings: []string{"source_branch_not_pushed", "pool.authority_required"}, reason: "source_branch_not_pushed"})
+	if n := h.holdCount(); n != 1 {
+		t.Fatalf("%d holds", n)
+	}
+	// The branch is shown pushed: held for another reason, a second hold.
+	second := h.check(id, map[string]any{"source_branch": pushed("true")})
+	wants(t, h, id, second, outcome{status: envelope.Held, code: "held", result: "held",
+		findings: []string{"pool.authority_required"}, reason: "authority_required"})
+	if second.Error.Hold.ID == first.Error.Hold.ID || h.holdCount() != 2 {
+		t.Errorf("a new reason names %s; %d holds", second.Error.Hold.ID, h.holdCount())
+	}
+	h.holdEvents(t, "pool.hold.placed", second.Receipts[0].ReceiptID, 1)
+	// A refusal places none and releases none.
+	item := h.stored("item", taskID)
+	item["placement_requested"], item["record_revision"] = "policy", int64(4)
+	h.plant("item", taskID, item)
+	refusal := h.check(id, map[string]any{"placement": requested("policy")})
+	wants(t, h, id, refusal, outcome{status: envelope.Refused, code: "pool.imperative_stale", result: "refused",
+		findings: []string{"pool.imperative_stale", "pool.authority_required"}})
+	if h.holdCount() != 2 {
+		t.Errorf("a refusal changed the holds: %d", h.holdCount())
+	}
+	for _, hold := range []string{first.Error.Hold.ID, second.Error.Hold.ID} {
+		if stored := h.stored("hold", hold); stored["state"] != "active" || stored["record_revision"] != int64(1) {
+			t.Errorf("a refusal changed hold %s: %v", hold, stored)
 		}
 	}
+	if n := h.filesWith("journal", `"pool.hold.placed"`) + h.filesWith("journal", `"pool.hold.released"`); n != 2 {
+		t.Errorf("%d hold events after a refusal", n)
+	}
+	// An admitting check releases both.
+	item["placement_requested"], item["record_revision"] = "claude-cloud-session", int64(5)
+	h.plant("item", taskID, item)
+	if resp := h.approve(request{authority: word(3)}, id); resp.Status != envelope.Ok {
+		t.Fatalf("approve: %s %+v", resp.Status, resp.Error)
+	}
+	admit := h.check(id, map[string]any{"placement": requested("claude-cloud-session"), "source_branch": pushed("true")})
+	wants(t, h, id, admit, outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
+	for _, hold := range []string{first.Error.Hold.ID, second.Error.Hold.ID} {
+		if stored := h.stored("hold", hold); stored["state"] != "released" || tree(stored["released_by"])["id"] != admit.Receipts[0].ReceiptID {
+			t.Errorf("hold %s after the admitting check: %v", hold, stored)
+		}
+	}
+	h.holdEvents(t, "pool.hold.released", admit.Receipts[0].ReceiptID, 2)
+}
+
+// The evidence shows the source branch pushed only when it is Setup's branch,
+// pushed, and at Setup's revision where Setup gives one; anything else holds,
+// and the evidence is recorded as given.
+func TestBranchEvidenceMustBeSetupsBranchAndRevision(t *testing.T) {
+	held := outcome{status: envelope.Held, code: "held", result: "held", findings: []string{"source_branch_not_pushed"}, reason: "source_branch_not_pushed"}
+	for name, tc := range map[string]struct {
+		evidence func(map[string]any)
+		want     outcome
+	}{
+		"Setup's branch and revision, pushed": {func(map[string]any) {}, outcome{status: envelope.Ok, result: "admitted", findings: []string{}}},
+		"another branch":                      {func(e map[string]any) { e["branch"] = "hive/another" }, held},
+		"another revision":                    {func(e map[string]any) { e["revision"] = "3f5a9c1e7b2d4860a1c3e5f708192a3b4c5d6e7f" }, held},
+		"no revision where Setup gives one":   {func(e map[string]any) { delete(e, "revision") }, held},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newHome(t)
+			h.work(all(place("claude-cloud-session"), harness("claude")))
+			id := h.admission(none())
+			evidence := pushed("true")
+			tc.evidence(evidence)
+			check := wants(t, h, id, h.check(id, map[string]any{"source_branch": evidence}), tc.want)
+			if !equalTree(check["source_branch"], evidence) {
+				t.Errorf("the evidence is not recorded as given: %v", check["source_branch"])
+			}
+		})
+	}
+	t.Run("Setup gives no revision", func(t *testing.T) {
+		h := newHome(t)
+		h.work(all(place("claude-cloud-session"), harness("claude"), func(_, rev map[string]any) { delete(tree(rev["setup"]), "source_revision") }))
+		id := h.admission(none())
+		evidence := pushed("true")
+		evidence["revision"] = "3f5a9c1e7b2d4860a1c3e5f708192a3b4c5d6e7f"
+		wants(t, h, id, h.check(id, map[string]any{"source_branch": evidence}), outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
+	})
 }
 
 // A sensitive boundary needs explicit authority: an approval on the record, a
@@ -762,13 +896,21 @@ func TestSensitiveBoundariesNeedAuthority(t *testing.T) {
 		wants(t, h, id, h.check(id, map[string]any{}), held)
 	})
 	for _, kind := range []string{"posture", "charter", "instruction"} {
-		t.Run("a "+kind+" reference is insufficient", func(t *testing.T) {
+		t.Run("a "+kind+" reference is held, and an approval lifts it", func(t *testing.T) {
 			h := newHome(t)
 			h.work(sensitive("spend"))
+			h.plant("question", questionID, fixture(t, "pool.question", "answered-superseding"))
 			schema := map[string]string{"posture": "pool.rule", "charter": "dispatch.charter", "instruction": "dispatch.instruction"}[kind]
 			id := h.admission(request{authority: authority(kind, schema, ruleID, 1)})
-			wants(t, h, id, h.check(id, map[string]any{}), outcome{status: envelope.Held, code: "held", result: "held",
-				findings: []string{"authority_insufficient"}, reason: "authority_required"})
+			check := wants(t, h, id, h.check(id, map[string]any{}), held)
+			message := check["findings"].([]any)[0].(map[string]any)["message"].(string)
+			if !strings.Contains(message, kind) || !strings.Contains(message, "authority_insufficient") || !strings.Contains(message, "stage 4") {
+				t.Errorf("the finding's message %q", message)
+			}
+			if resp := h.approve(request{authority: word(3)}, id); resp.Status != envelope.Ok {
+				t.Fatalf("approve: %s %+v", resp.Status, resp.Error)
+			}
+			wants(t, h, id, h.check(id, map[string]any{}), admitted)
 		})
 	}
 	t.Run("none passes every check but the sensitive ones", func(t *testing.T) {
@@ -877,15 +1019,20 @@ func TestCheckRefusesWhatItCannotRecord(t *testing.T) {
 	})
 }
 
-// A rule reference is named by the contract as verifiable at stage 2 and the
-// contract states no rule for verifying it, so it gives a sensitive boundary
-// nothing: the check holds on authority_required (s2-1m-gap).
-func TestARuleReferenceIsNotVerifiedUntilTheContractSaysHow(t *testing.T) {
+// Rule verification is not built: a request whose only authority is a rule
+// reference gives a sensitive boundary nothing and is held on authority_required,
+// and an approval on the record lets a later check admit it.
+func TestARuleReferenceAloneIsHeldUntilApproved(t *testing.T) {
 	h := newHome(t)
 	h.work(sensitive("deletion"))
+	h.plant("question", questionID, fixture(t, "pool.question", "answered-superseding"))
 	rule := fixture(t, "pool.rule_v2", "minimal")
 	h.plant("rule", rule["rule_id"].(string), rule)
 	id := h.admission(request{authority: authority("rule", "pool.rule", rule["rule_id"].(string), 1)})
 	wants(t, h, id, h.check(id, map[string]any{}), outcome{status: envelope.Held, code: "held", result: "held",
 		findings: []string{"pool.authority_required"}, reason: "authority_required"})
+	if resp := h.approve(request{authority: word(3)}, id); resp.Status != envelope.Ok {
+		t.Fatalf("approve: %s %+v", resp.Status, resp.Error)
+	}
+	wants(t, h, id, h.check(id, map[string]any{}), outcome{status: envelope.Ok, result: "admitted", findings: []string{}})
 }
