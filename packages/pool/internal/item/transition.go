@@ -1,6 +1,8 @@
 package item
 
 import (
+	"fmt"
+
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
@@ -16,6 +18,16 @@ func transition(c *cli.Call) (*cli.Result, error) {
 	to, _ := body["to"].(string)
 	if at, ok := body["at"].(string); ok && !clock.Valid(at) {
 		return nil, envelope.Common(envelope.CodeSchemaViolation, "at is not a calendar instant")
+	}
+	if to == "done" {
+		links, _ := body["evidence"].([]any)
+		for i, value := range links {
+			link, _ := value.(map[string]any)
+			url, _ := link["url"].(string)
+			if link["kind"] == "harvest" && !IsPRURL(url) {
+				return nil, envelope.Common(envelope.CodeSchemaViolation, fmt.Sprintf("evidence[%d].url must be %s", i, PRURLExpected))
+			}
+		}
 	}
 	g, err := loadGraph(c)
 	if err != nil {
