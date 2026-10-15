@@ -85,7 +85,8 @@ func Expire(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := snap.Plan(now, memory.Write{Rules: []*rule.Rule{pr}}); err != nil {
+	write := memory.Write{Rules: []*rule.Rule{pr}}
+	if _, err := snap.Plan(now, write); err != nil {
 		return nil, err
 	}
 
@@ -96,7 +97,7 @@ func Expire(c *cli.Call) (*cli.Result, error) {
 	if err := b.seal(receipt, ref, r.Scope, true); err != nil {
 		return nil, err
 	}
-	return b.stage(map[string]any{"rule": final})
+	return b.stageRendered(snap, write, map[string]any{"rule": final})
 }
 
 // again is the answer to an expiry already recorded: the rule as it stands and

@@ -272,6 +272,21 @@ func TestAWriteThatPutsAProjectionOverItsBudgetAtTheClockOrLaterIsRefusedAndWrit
 	})
 }
 
+func TestAmendChecksAnExpectedRevisionOnlyWhereTheRequestSuppliesOne(t *testing.T) {
+	h, filing := seed(t)
+	rec := h.recorded(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), request{})
+	body := func() map[string]any {
+		return map[string]any{"rule_id": rec["rule_id"], "kind": "note", "words": "Still wanted."}
+	}
+	h.unchanged(func() {
+		refused(t, h.send("hive-rule", "amend", body(), request{expected: []rev{{"pool.rule", rec["rule_id"].(string), 7}}}), envelope.Conflict, "revision_conflict")
+	})
+	got := ok(t, h.send("hive-rule", "amend", body(), request{}))["rule"].(map[string]any)
+	if got["record_revision"] != int64(2) || len(got["amendments"].([]any)) != 1 {
+		t.Errorf("amended %v", got)
+	}
+}
+
 func TestSubjectRevisesALoadsAtUnderAnExpectedRevisionAndAStandingWord(t *testing.T) {
 	h, filing := seed(t)
 	rule := h.recorded(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), request{})
@@ -283,6 +298,9 @@ func TestSubjectRevisesALoadsAtUnderAnExpectedRevisionAndAStandingWord(t *testin
 	subject := func(b map[string]any, r request) *envelope.Response { return h.send("hive-memory", "subject", b, r) }
 
 	h.unchanged(func() {
+		if resp := subject(body("dispatch", "gate"), request{authority: word(3)}); resp.Status != envelope.Invalid {
+			t.Errorf("a request that names no expected revision: status %s, error %+v", resp.Status, resp.Error)
+		}
 		refused(t, subject(body("dispatch", "gate"), request{expected: expect}), envelope.Refused, "authority_insufficient")
 		refused(t, subject(body("dispatch", "gate"), request{authority: word(3), expected: []rev{{"pool.subject", filing, 7}}}), envelope.Conflict, "revision_conflict")
 		refused(t, subject(body("dispatch", "dispatch"), request{authority: word(3), expected: expect}), envelope.Refused, "pool.subject_invalid")

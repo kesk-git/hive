@@ -17,14 +17,12 @@ import (
 // the projections of the rule's scope in its transaction and is refused with
 // pool.projection_over_budget when one would exceed its budget.
 //
-// The request's expected_revisions names the rule's revision, as the schema of
-// the request states, and a request without it is invalid.
+// The request's expected_revisions names the rule's revision when the caller
+// supplies it, and is checked then; neither the contract's sentence nor the
+// request's schema requires one.
 func Amend(c *cli.Call) (*cli.Result, error) {
 	body := c.Request.Body
 	id, kind := str(body["rule_id"]), str(body["kind"])
-	if !expects(c, "pool.rule", id) {
-		return nil, invalid("hive-rule amend names the expected revision of the rule, pool.rule " + id)
-	}
 	if err := checkExpected(c); err != nil {
 		return nil, err
 	}
@@ -92,7 +90,8 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := snap.Plan(now, memory.Write{Rules: []*rule.Rule{pr}}); err != nil {
+	write := memory.Write{Rules: []*rule.Rule{pr}}
+	if _, err := snap.Plan(now, write); err != nil {
 		return nil, err
 	}
 
@@ -103,7 +102,7 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 	if err := b.seal(receipt, ref, r.Scope, true); err != nil {
 		return nil, err
 	}
-	return b.stage(map[string]any{"rule": final})
+	return b.stageRendered(snap, write, map[string]any{"rule": final})
 }
 
 // meetsCondition says whether the receipt, as the request carries it whole, is of

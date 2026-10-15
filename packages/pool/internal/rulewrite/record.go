@@ -115,7 +115,8 @@ func Record(c *cli.Call) (*cli.Result, error) {
 		}
 	}
 
-	if _, err := snap.Plan(now, memory.Write{Rules: []*rule.Rule{r}, Subjects: subjects}); err != nil {
+	write := memory.Write{Rules: []*rule.Rule{r}, Subjects: subjects}
+	if _, err := snap.Plan(now, write); err != nil {
 		return nil, err
 	}
 
@@ -137,14 +138,22 @@ func Record(c *cli.Call) (*cli.Result, error) {
 	if err := b.seal(receipt, ref, r.Scope, true); err != nil {
 		return nil, err
 	}
-	return b.stage(map[string]any{"rule": final})
+	return b.stageRendered(snap, write, map[string]any{"rule": final})
+}
+
+// stageRendered adds to the transaction the re-rendering of the projections the
+// write affects, in the same transaction, then stages it.
+func (b *builder) stageRendered(snap *memory.Snapshot, w memory.Write, body map[string]any) (*cli.Result, error) {
+	tx, err := snap.Rerender(b.c, w, b.tx)
+	if err != nil {
+		return nil, err
+	}
+	b.tx = tx
+	return b.stage(body)
 }
 
 // stage checks the transaction and hands it to the harness.
 func (b *builder) stage(body map[string]any) (*cli.Result, error) {
-	// FILE STOP (CLOUD-STATUS.md): the re-rendering of the projections the write
-	// affects, in this transaction, joins here once memory exports the step
-	// that hive-memory budget takes with its unexported builder.
 	staged, err := poolstore.Stage(b.c, b.tx)
 	if err != nil {
 		return nil, err
