@@ -315,22 +315,29 @@ func FuzzParseNeverPanics(f *testing.F) {
 	})
 }
 
-// The six prefixes of stage 2, all minted by the Pool (spec/pool.md,
-// Identifiers). Each mints and parses, is a row of the identity table, and
-// agrees with its pattern in the shared definitions of records/pool.item.
+// The prefixes of stage 2 registered so far, all minted by the Pool
+// (spec/pool.md, Identifiers). Each mints and parses, is a row of the identity
+// table, and agrees with its pattern in the shared definitions of
+// records/pool.item, or of records/pool.note for a note.
 func TestStageTwoPrefixes(t *testing.T) {
-	data, err := spec.Schemas.ReadFile("schemas/records/pool.item.v1.schema.json")
-	if err != nil {
-		t.Fatal(err)
+	definitions := func(file string) map[string]struct {
+		Pattern string `json:"pattern"`
+	} {
+		data, err := spec.Schemas.ReadFile("schemas/records/" + file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Defs map[string]struct {
+				Pattern string `json:"pattern"`
+			} `json:"$defs"`
+		}
+		if err := json.Unmarshal(data, &doc); err != nil {
+			t.Fatal(err)
+		}
+		return doc.Defs
 	}
-	var doc struct {
-		Defs map[string]struct {
-			Pattern string `json:"pattern"`
-		} `json:"$defs"`
-	}
-	if err := json.Unmarshal(data, &doc); err != nil {
-		t.Fatal(err)
-	}
+	item, note := definitions("pool.item.v1.schema.json"), definitions("pool.note.v1.schema.json")
 	table, err := os.ReadFile("../../spec/identities.md")
 	if err != nil {
 		t.Fatal(err)
@@ -346,6 +353,7 @@ func TestStageTwoPrefixes(t *testing.T) {
 		{"hold", "hold_id"},
 		{"mem", "projection_id"},
 		{"migr", "migration_id"},
+		{"mnote", "note_id"},
 	} {
 		t.Run(string(c.prefix), func(t *testing.T) {
 			if !Registered(c.prefix) {
@@ -364,9 +372,13 @@ func TestStageTwoPrefixes(t *testing.T) {
 			if err := Check(id, Task); !errors.Is(err, ErrWrongPrefix) {
 				t.Errorf("Check(%q, task) = %v; want ErrWrongPrefix", id, err)
 			}
-			pattern := doc.Defs[c.def].Pattern
+			defs := item
+			if c.prefix == Note {
+				defs = note
+			}
+			pattern := defs[c.def].Pattern
 			if pattern == "" {
-				t.Fatalf("no %s definition in records/pool.item", c.def)
+				t.Fatalf("no %s definition in the record schema", c.def)
 			}
 			re := regexp.MustCompile(pattern)
 			if !re.MatchString(id) {
