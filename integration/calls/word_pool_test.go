@@ -3,12 +3,13 @@ package calls
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/kesk-git/hive/contract/envelope"
+	"github.com/kesk-git/hive/contract/ids"
 )
 
 // The real call from hive-word to hive-pool (spec/word.md, What test-word
@@ -174,9 +175,15 @@ func mergeMap(a, b map[string]any) map[string]any {
 // through hive-word, as the table of spec/commands.md fixes it: the Pool's
 // exit code and status, its own code, no body, the receipts only where the
 // state leaves one, and no record or receipt of the Pool written by a state
-// that changes nothing. The states a request can only reach by breaking the
-// Pool's own storage are proved by the one that can be made with a
-// purpose-written fixture.
+// that changes nothing.
+//
+// Four states are left out, each for a reason of its own. too_large and usage
+// cannot come from the Pool through word: word refuses an over-limit request
+// first and builds the Pool call itself. failed and unknown come only from a
+// storage fault or an interrupted transaction, and no fixture produces them on
+// all three platforms without writing the store's internal transaction files;
+// their crossing of the command line is already proved by the transport tests
+// against the test-only command, as states_test.go states.
 //
 // It catches a word that turns a refusal into another state or code, that
 // carries a body beside an error, that loses the hold of a held answer, and a
@@ -497,93 +504,140 @@ func TestWordPoolRetryAfterTheRoundChanged(t *testing.T) {
 	}
 }
 
-// wpRace sends the call twice, started together, to hive-word and returns the
-// two replies.
-func wpRace(t *testing.T, c wpCall, home string) [2]reply {
+// wpHandoff is the request hive-word sends hive-pool for the word request in
+// hand, as a second identical request that had read no recorded outcome would
+// send it: the same request_id, correlation and scope, the caller the package
+// word with its command hive-word, and as the causation the original request
+// and its digest. The test builds it from the request document, and the
+// operation's body is the one the caller gives, with identities of its own
+// minting where the operation has any.
+func wpHandoff(t testing.TB, word request, c wpCall) request {
 	t.Helper()
-	req := wpRequest(t, c.with("hive-word"))
-	var out [2]reply
-	gate := make(chan struct{})
-	var wg sync.WaitGroup
-	for i := range out {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-gate
-			out[i] = call{program: "hive-word", operation: c.operation, home: home, req: req}.run(t)
-		}()
+	digest, err := envelope.Digest(word.data)
+	if err != nil {
+		t.Fatal(err)
 	}
-	close(gate)
-	wg.Wait()
-	return out
+	c.command = "hive-pool"
+	c.caller = envelope.Caller{Kind: envelope.CallerPackage, Package: "word", Command: "hive-word"}
+	c.causation = &envelope.RecordRef{Schema: envelope.RequestSchema, ID: word.id, Digest: digest}
+	return wpRequest(t, c)
 }
-
-// raceRounds is how many times each race is run in a fresh home, so that the
-// two starts overlap in the Pool in some of them: a race is not controlled
-// from outside two processes, and every assertion below holds however the two
-// interleave.
-const raceRounds = 8
 
 // TestWordPoolTwoIdenticalRequestsOneOutcome proves that two identical
-// requests started together share one outcome and one set of records: both
-// are ok, with the same body and the same receipts, the Pool holds one
-// question, one round and one hold, and exactly one of the two is not a
-// replay. It runs for a hold and for an answer.
+// requests share one outcome and one set of records. Two processes cannot be
+// interleaved by control from outside, so the test fixes the two orders in
+// which the second request can meet the first (spec/test-targets.md, rule 5)
+// and runs each against the real executables:
 //
-// It catches a retry that races past the read and applies a second time, one
-// that is answered replay_mismatch for its own identities, and two outcomes
-// for one request.
+//   - The second read the Pool before the first wrote. The first request runs
+//     to its outcome; then the test sends hive-pool, as the package word, the
+//     handoff that the second request would send having read no recorded
+//     outcome: the same original request and its digest, with identities of
+//     its own minting. The Pool answers the first outcome with replayed true,
+//     and writes no second question, round, hold, answer or receipt.
+//   - The second read after the first wrote. The identical request sent to
+//     hive-word again returns the recorded outcome with replayed true.
+//
+// It runs for a hold, which mints identities, and for an answer.
+//
+// It catches a Pool that applies a handoff it has an outcome for, one that
+// answers replay_mismatch for the identities a retry minted anew, and two
+// outcomes for one request.
 func TestWordPoolTwoIdenticalRequestsOneOutcome(t *testing.T) {
-	t.Run("hold", func(t *testing.T) {
-		for round := 0; round < raceRounds; round++ {
-			f := newWpFixture(t)
+	// counts are the number of records of each kind and of receipts.
+	counts := func(f *wpFixture) map[string]int {
+		out := map[string]int{}
+		for _, dir := range []string{"question", "decision-round", "hold", "item"} {
+			out[dir] = len(wpUnder(f.t, f.home, "pool/records/"+dir))
+		}
+		out["receipts"] = len(wpUnder(f.t, f.home, "pool/receipts"))
+		return out
+	}
+	scenarios := []struct {
+		name string
+		// start makes the home ready and returns the call, the operation of
+		// hive-pool it hands off to, and the body of that handoff, with the
+		// identities of a second request's own minting.
+		start func(f *wpFixture) (wpCall, string, map[string]any)
+		// same judges the Pool's body against the first outcome's.
+		same func(t *testing.T, first, pool map[string]any)
+	}{
+		{"hold", func(f *wpFixture) (wpCall, string, map[string]any) {
 			c := wpCall{operation: "hold", n: f.ids.take(), caller: wpSupervisor, body: wpHoldBody(f.addItem(), wpWords)}
-			rs := wpRace(t, c, f.home)
-			a, b := wpOK(t, "first of the pair", rs[0]), wpOK(t, "second of the pair", rs[1])
-			wpOneOutcome(t, a, b)
-			for _, dir := range []string{"pool/records/question", "pool/records/decision-round", "pool/records/hold"} {
-				if files := wpUnder(t, f.home, dir); len(files) != 1 {
-					t.Errorf("round %d: %d records under %s, want one: %v", round, len(files), dir, files)
+			body := map[string]any{
+				"question": map[string]any{
+					"question_id": ident(ids.Question, 500), "asked_at": "2026-10-11T08:00:00.000Z",
+					"held_task_id": c.body["held_task_id"], "origin": c.body["origin"],
+					"text": c.body["text"], "consequence": c.body["consequence"],
+					"options": c.body["options"], "recommendation": c.body["recommendation"],
+				},
+				"round": map[string]any{
+					"decision_round_id": ident(ids.DecisionRound, 500), "new": true,
+					"origin": c.body["origin"], "complete": true,
+				},
+				"card_id":      ident(ids.Card, 500),
+				"requested_by": map[string]any{"kind": "supervisor", "session_id": wpSupervisor.SessionID, "session_generation": wpSupervisor.SessionGeneration},
+			}
+			return c, "hold-question", body
+		}, func(t *testing.T, first, pool map[string]any) {
+			for _, key := range []string{"question", "round", "hold", "item"} {
+				if !wpSame(t, first[key].(map[string]any), pool[key].(map[string]any)) {
+					t.Errorf("the Pool's %s is not the first outcome's", key)
 				}
 			}
-			// The one question is the one both responses name.
-			if q := f.read("question", a.Body["question_id"].(string)); q["card_id"] != a.Body["card_id"] {
-				t.Errorf("round %d: the question the Pool holds is not the one the responses name", round)
+			if q := pool["question"].(map[string]any)["question_id"]; q == ident(ids.Question, 500) {
+				t.Error("the Pool applied the identities of the second request")
 			}
-		}
-	})
-	t.Run("answer", func(t *testing.T) {
-		for round := 0; round < raceRounds; round++ {
+		}},
+		{"answer", func(f *wpFixture) (wpCall, string, map[string]any) {
+			c := f.operatorAnswer(f.hold(), f.ids.take(), mergeMap(wpKeep, map[string]any{"text": wpWords}))
+			body := mergeMap(c.body, map[string]any{"requested_by": map[string]any{"kind": "operator"}})
+			return c, "answer-question", body
+		}, func(t *testing.T, first, pool map[string]any) {
+			for _, key := range []string{"disposition", "answer_sequence", "duplicate", "question", "round", "hold"} {
+				if !wpSame(t, map[string]any{"v": first[key]}, map[string]any{"v": pool[key]}) {
+					t.Errorf("the Pool's %s is not the first outcome's", key)
+				}
+			}
+		}},
+	}
+	for _, sc := range scenarios {
+		t.Run(sc.name, func(t *testing.T) {
 			f := newWpFixture(t)
-			h := f.hold()
-			c := f.operatorAnswer(h, f.ids.take(), mergeMap(wpKeep, map[string]any{"text": wpWords}))
-			rs := wpRace(t, c, f.home)
-			a, b := wpOK(t, "first of the pair", rs[0]), wpOK(t, "second of the pair", rs[1])
-			wpOneOutcome(t, a, b)
-			q := f.read("question", h.question)
-			if answers, _ := q["answers"].([]any); len(answers) != 1 {
-				t.Errorf("round %d: %d answers recorded, want one", round, len(answers))
-			}
-			if got := len(wpUnder(t, f.home, "pool/receipts")); got != 4 {
-				// add, hold (placed, held) and the one acceptance.
-				t.Errorf("round %d: %d receipts in the home, want 4", round, got)
-			}
-		}
-	})
-}
+			c, poolOperation, body := sc.start(f)
 
-// wpOneOutcome fails the test unless the two responses are one outcome: the
-// same body and receipts, and one of them the recorded replay of the other.
-func wpOneOutcome(t *testing.T, a, b *envelope.Response) {
-	t.Helper()
-	if !wpSame(t, a.Body, b.Body) {
-		t.Errorf("the two responses have different bodies")
-	}
-	if !slices.Equal(wpReceiptIDs(a), wpReceiptIDs(b)) {
-		t.Errorf("the two responses have receipts %v and %v", wpReceiptIDs(a), wpReceiptIDs(b))
-	}
-	if a.Replayed == b.Replayed {
-		t.Errorf("replayed is %v and %v: exactly one of the two is the first outcome", a.Replayed, b.Replayed)
+			// The first request runs to its outcome.
+			word := c.with("hive-word")
+			first := wpOK(t, "the first request", c.word(t, f.home))
+			if first.Replayed {
+				t.Fatal("the first request is not a replay")
+			}
+			written, held := snapshot(t, f.home), counts(f)
+
+			// The second request read the Pool before the first wrote.
+			handoff := wpHandoff(t, wpRequest(t, word), wpCall{operation: poolOperation, n: c.n, body: body, expected: c.expected})
+			r := call{program: "hive-pool", operation: poolOperation, home: f.home, req: handoff}.run(t)
+			pool := wpOK(t, "the second request's handoff", r)
+			if !pool.Replayed {
+				t.Error("the Pool applied the second request's handoff: replayed is false")
+			}
+			if !slices.Equal(wpReceiptIDs(pool), wpReceiptIDs(first)) {
+				t.Errorf("the handoff's receipts %v, want the first outcome's %v", wpReceiptIDs(pool), wpReceiptIDs(first))
+			}
+			sc.same(t, first.Body, pool.Body)
+			sameSnapshot(t, "the second request's handoff", written, snapshot(t, f.home))
+			if got := counts(f); !maps.Equal(got, held) {
+				t.Errorf("records and receipts after the handoff %v, want %v: a second set was written", got, held)
+			}
+
+			// The second request read after the first wrote.
+			again := wpOK(t, "the second request", c.word(t, f.home))
+			if !again.Replayed || !wpSame(t, first.Body, again.Body) || !slices.Equal(wpReceiptIDs(again), wpReceiptIDs(first)) {
+				t.Errorf("the identical request again: replayed %v, same body %v, receipts %v; want the recorded outcome %v",
+					again.Replayed, wpSame(t, first.Body, again.Body), wpReceiptIDs(again), wpReceiptIDs(first))
+			}
+			sameSnapshot(t, "the identical request again", written, snapshot(t, f.home))
+		})
 	}
 }
 

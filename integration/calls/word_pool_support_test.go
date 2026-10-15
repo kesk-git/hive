@@ -44,6 +44,8 @@ type wpCall struct {
 	caller             envelope.Caller
 	body               map[string]any
 	expected           []envelope.ExpectedRevision
+	// causation is the request a handoff stands on, or nil.
+	causation *envelope.RecordRef
 }
 
 // wpRequest builds the request of the call, in the hive scope of the test
@@ -62,6 +64,7 @@ func wpRequest(t testing.TB, c wpCall) request {
 		Scope:             envelope.Scope{Level: envelope.ScopeHive, HomeID: testHome},
 		Authority:         envelope.Authority{Kind: envelope.AuthorityNone},
 		ExpectedRevisions: c.expected,
+		Causation:         c.causation,
 		Body:              c.body,
 	}
 	data, err := r.Encode()
