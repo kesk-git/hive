@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -1064,18 +1065,30 @@ func (w *pcWorld) check(from asPackage) map[string]any {
 	return resp.Body
 }
 
-// delayedRule records a rule that takes effect a few seconds from now, after
-// the projections of its scope were rendered without it, and returns it and
-// the instant it takes effect.
-func (w *pcWorld) delayedRule() (rule string, effective time.Time) {
+// lateRule records a rule that came into force before now and then renders
+// every projection again as of an instant before it did, so that each
+// projection stands rendered without a rule the clock has since put in force,
+// as the clock leaves one that was rendered before the rule took effect. It
+// returns the rule.
+func (w *pcWorld) lateRule() string {
 	w.t.Helper()
-	effective = time.Now().Add(4 * time.Second)
-	rule = fmt.Sprint(w.rule("widget.delayed", "Takes effect after the projections were rendered.", map[string]any{"effective_at": pcStamp(effective)})["rule_id"])
-	return rule, effective
+	effective := time.Now().Add(-time.Hour)
+	rule := fmt.Sprint(w.rule("widget.late-in-force", "Came into force after the projections were rendered.", map[string]any{"effective_at": pcStamp(effective)})["rule_id"])
+	entries, err := os.ReadDir(filepath.Join(w.home, "pool", "records", "projection"))
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	before := pcStamp(effective.Add(-time.Minute))
+	for _, e := range entries {
+		p := w.stored("projection", strings.TrimSuffix(e.Name(), ".json"))
+		body := map[string]any{"tier": p["tier"], "audience": p["audience"], "at": before}
+		if id, ok := p["subject_id"]; ok {
+			body["subject_id"] = id
+		}
+		w.send("hive-memory", "render", body)
+	}
+	return rule
 }
-
-// pcWaitUntil returns once the clock has passed the instant.
-func pcWaitUntil(at time.Time) { time.Sleep(time.Until(at) + 300*time.Millisecond) }
 
 // pcStaleReport lists the projections of the report that are stale, by
 // identity, with the sources they are stale by.
@@ -1104,8 +1117,8 @@ func pcStaleReport(report map[string]any) map[string][]string {
 // and its freshness, and every subject with the misses counted against it; the
 // sizes are the ones the Pool stores, the budgets are the home's, the
 // projections are fresh, and the check changes nothing. It then runs the check
-// after a rule recorded to take effect later has taken effect, and receives
-// the projections that rule makes stale, naming it.
+// after a rule has come into force that the projections were rendered without,
+// and receives the projections that rule makes stale, naming it.
 //
 // It catches a size that is not the stored rendering's, a budget that is not
 // one of the home's, a projection called fresh after the clock changed the
@@ -1156,14 +1169,9 @@ func TestShadowCallerReadsTheHealthOfTheProjectionsOnItsBackstop(t *testing.T) {
 	}
 	sameSnapshot(t, "the check", before, s.state())
 
-	// A rule takes effect by the clock after the projections were rendered.
-	rule, effective := s.delayedRule()
+	// A rule is in force by the clock that the projections were rendered without.
+	rule := s.lateRule()
 	stale := pcStaleReport(c.check())
-	if time.Now().Before(effective) && len(stale) != 0 {
-		t.Errorf("before the rule takes effect the check reports stale projections %v", stale)
-	}
-	pcWaitUntil(effective)
-	stale = pcStaleReport(c.check())
 	if len(stale) == 0 {
 		t.Fatalf("the rule %s took effect and the check reports no projection stale", rule)
 	}
@@ -1442,8 +1450,8 @@ func TestUICallerReadsHoldsQuestionsAndDecisionRounds(t *testing.T) {
 // projections the rules rendered. The caller reads the rules by state and
 // receives each under its own state; it reads the projections and receives each
 // whole with its freshness beside it, fresh while the rules in force are the
-// ones it was rendered from and stale, naming the rule, once a rule recorded to
-// take effect later has taken effect.
+// ones it was rendered from and stale, naming the rule, once a rule has come
+// into force that it was rendered without.
 //
 // It catches a rule in the wrong state, an expired rule that is still called in
 // force, a projection that is called fresh after the clock changed the rules in
@@ -1483,8 +1491,7 @@ func TestUICallerReadsRulesInForceAndExpiredAndProjections(t *testing.T) {
 	sameSnapshot(t, "the ui caller's reads", before, u.state())
 
 	// A rule takes effect by the clock after the projections were rendered.
-	rule, effective := u.delayedRule()
-	pcWaitUntil(effective)
+	rule := u.lateRule()
 	stale := 0
 	read := c.read("projection", map[string]any{})
 	for _, p := range read.records {
@@ -1629,8 +1636,7 @@ func TestShadowAndUICallersAgreeOnWhichProjectionsAreStale(t *testing.T) {
 	w := newPcWorld(t)
 	w.plantBudget()
 	w.rule("widget.exports", "Exports retry three times.", mergeMap(pcCreateSubject(), nil))
-	rule, effective := w.delayedRule()
-	pcWaitUntil(effective)
+	rule := w.lateRule()
 
 	ui := w.caller("ui", "hive-pool read projection")
 	shadow := w.caller("shadow", "hive-memory check")
