@@ -76,7 +76,7 @@ func Subject(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := b.seal(receipt, ref, s.Scope, false); err != nil {
+	if err := b.seal(receipt, ref, envScope(s.Scope), false); err != nil {
 		return nil, err
 	}
 	return b.stage(map[string]any{"subject": final})

@@ -1,3 +1,4 @@
+{"name":"expired-missing-expiry","base":"expired-by-end-amendment.json","edits":[{"op":"remove","path":"/expiry"}]}
 {"name":"line-over-cap","base":"minimal.json","edits":[{"op":"replace","path":"/rule_line","value":"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界"}]}
 {"name":"minimal-bad-kind","base":"minimal.json","edits":[{"op":"replace","path":"/kind","value":"not-allowed"}]}
 {"name":"minimal-bad-schema-version","base":"minimal.json","edits":[{"op":"replace","path":"/schema_version","value":"not-allowed"}]}

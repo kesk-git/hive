@@ -2,9 +2,12 @@ package memory
 
 import (
 	"cmp"
+	"fmt"
 	"slices"
+	"time"
 
 	"github.com/kesk-git/hive/contract/cli"
+	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/packages/pool/internal/rule"
 	poolstore "github.com/kesk-git/hive/packages/pool/internal/store"
 )
@@ -68,6 +71,61 @@ func (s *Snapshot) Rerender(c *cli.Call, w Write, tx poolstore.Transaction) (poo
 		}
 	}
 	return b.tx, nil
+}
+
+// RefuseConflicts refuses, with pool.rule_conflict, a write of rules after which
+// two rules govern one subject at one scope, neither naming the other in
+// changes, as the resolver reads them, for any role, at the clock or at any later
+// instant at which a rule of the records as the write leaves them takes effect
+// or expires: the instants at which the live set changes. A rule that another
+// supersedes or qualifies by changes is no conflict, and a rule narrowed to a
+// task generation is resolved for that generation. Only a conflict that involves
+// a rule the write carries is refused.
+func (s *Snapshot) RefuseConflicts(now time.Time, w Write) error {
+	after := s.after(w)
+	instants := []time.Time{now}
+	add := func(t time.Time) {
+		if t.After(now) && !slices.ContainsFunc(instants, t.Equal) {
+			instants = append(instants, t)
+		}
+	}
+	for _, r := range after.Rules {
+		if r.Kind != rule.KindOperating {
+			continue
+		}
+		if t, err := clock.Parse(r.EffectiveAt); err == nil {
+			add(t)
+		}
+		if t, ok, err := r.EffectiveExpiry(); err == nil && ok {
+			add(t)
+		}
+	}
+	slices.SortFunc(instants, func(a, b time.Time) int { return a.Compare(b) })
+	for _, r := range w.Rules {
+		if r.Kind != rule.KindOperating {
+			continue
+		}
+		for _, at := range instants {
+			for _, role := range roles {
+				res, err := rule.Compute(rule.Request{Scope: envelopeScope(r.Scope), Role: role, At: at, TaskID: r.TaskID, Generation: r.Generation}, after.Rules)
+				if err != nil {
+					return fmt.Errorf("a rule cannot be placed in time: %w", err)
+				}
+				for _, c := range res.Conflicts {
+					if slices.Contains(c.Rules, r.RuleID) {
+						instant, _ := clock.Format(at)
+						ids := make([]any, len(c.Rules))
+						for i, id := range c.Rules {
+							ids[i] = id
+						}
+						return refuse(CodeRuleConflict, "a rule is in force on the subject at this scope and the request does not name it in changes").
+							With("subject", c.Subject).With("rules", ids).With("at", instant)
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // bringing are the keys of the projections the write brings: those a rendering

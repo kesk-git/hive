@@ -285,7 +285,6 @@
       },
       "then": {
         "required": [
-          "expires_at",
           "expiry"
         ]
       },

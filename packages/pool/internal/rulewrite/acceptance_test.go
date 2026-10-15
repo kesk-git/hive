@@ -333,3 +333,220 @@ func TestAPostureRuleIsRecordedOnlyFromAStandingWord(t *testing.T) {
 		t.Errorf("recorded %v", rec)
 	}
 }
+
+// ruleIDs are the identities of the rules a resolve for the role applies.
+func (h *home) resolvedIDs(scope map[string]any, extra map[string]any) []string {
+	h.t.Helper()
+	body := map[string]any{"role": "class-0"}
+	for k, v := range extra {
+		body[k] = v
+	}
+	var out []string
+	for _, r := range ok(h.t, h.send("hive-rule", "resolve", body, request{scope: scope}))["rules"].([]any) {
+		out = append(out, r.(map[string]any)["rule_id"].(string))
+	}
+	return out
+}
+
+func supersedes(body map[string]any, standing map[string]any) map[string]any {
+	body["changes"] = map[string]any{"rule_id": standing["rule_id"], "record_revision": standing["record_revision"], "relation": "supersedes"}
+	return body
+}
+
+func TestARuleRecordedForATaskGenerationStaysNarrowedToIt(t *testing.T) {
+	h, _ := seed(t)
+	filing := h.subject(projectScope, "narrow")
+	task := mint(t, ids.Task)
+	scopeOf := func(task string, generation int64) map[string]any {
+		s := map[string]any{}
+		for k, v := range projectScope {
+			s[k] = v
+		}
+		if task != "" {
+			s["task_id"] = task
+		}
+		if generation != 0 {
+			s["generation"] = generation
+		}
+		return s
+	}
+	h.unchanged(func() {
+		if resp := h.record(opRule("dispatch.model", "subject", filing, "Use the small model."), request{scope: scopeOf("", 1)}); resp.Status != envelope.Invalid {
+			t.Errorf("a generation without its task: status %s, error %+v", resp.Status, resp.Error)
+		}
+	})
+	resp := h.record(opRule("dispatch.model", "subject", filing, "Use the small model."), request{scope: scopeOf(task, 1)})
+	rec := ok(t, resp)["rule"].(map[string]any)
+	if rec["task_id"] != task || rec["generation"] != int64(1) {
+		t.Fatalf("recorded %v", rec)
+	}
+	for _, r := range resp.Receipts {
+		if r.Kind == "pool.rule.recorded" && (r.Scope.TaskID != task || r.Scope.Generation != 1) {
+			t.Errorf("the receipt is of scope %+v, not the task generation", r.Scope)
+		}
+	}
+	id := rec["rule_id"].(string)
+	if got := h.resolvedIDs(projectScope, nil); slices.Contains(got, id) {
+		t.Error("the rule of a task generation binds the whole project")
+	}
+	if got := h.resolvedIDs(projectScope, map[string]any{"task_id": task, "generation": int64(2)}); slices.Contains(got, id) {
+		t.Error("the rule of generation 1 binds generation 2")
+	}
+	if got := h.resolvedIDs(projectScope, map[string]any{"task_id": task, "generation": int64(1)}); !slices.Equal(got, []string{id}) {
+		t.Errorf("generation 1 resolves %v", got)
+	}
+
+	// The same conflict key at the project scope is another full scope: it does
+	// not conflict, and a request of another generation does not reach the rule.
+	h.recorded(opRule("dispatch.model", "subject", filing, "Use the large model."), request{scope: projectScope})
+	h.unchanged(func() {
+		refused(t, h.send("hive-rule", "amend", map[string]any{"rule_id": id, "kind": "note", "words": "Noted."}, request{scope: scopeOf(task, 2)}), envelope.Refused, "scope_mismatch")
+	})
+}
+
+func TestARuleThatSupersedesASupersedingRuleIsNoConflict(t *testing.T) {
+	h, filing := seed(t)
+	a := h.recorded(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), request{})
+	b := h.recorded(supersedes(opRule("dispatch.cap", "always", filing, "Dispatch at most five Swarms."), a), request{})
+	c := h.recorded(supersedes(opRule("dispatch.cap", "always", filing, "Dispatch at most six Swarms."), b), request{})
+	if got := h.resolvedIDs(hiveScope, nil); !slices.Equal(got, []string{c["rule_id"].(string)}) {
+		t.Errorf("resolves %v, want the last rule alone", got)
+	}
+}
+
+func TestAConflictReachableAtALaterInstantIsRefusedAtTheWriteThatMakesItReachable(t *testing.T) {
+	t.Run("a rule that begins while another stands", func(t *testing.T) {
+		h, filing := seed(t)
+		later := opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms.")
+		later["effective_at"] = d25
+		h.recorded(later, request{})
+		h.unchanged(func() {
+			refused(t, h.record(opRule("dispatch.cap", "always", filing, "Dispatch at most six Swarms."), request{}), envelope.Refused, "pool.rule_conflict")
+		})
+	})
+	t.Run("an extend past the start of another rule", func(t *testing.T) {
+		h, filing := seed(t)
+		temp := h.recorded(withExpiry(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), d15), request{})
+		next := opRule("dispatch.cap", "always", filing, "Dispatch at most six Swarms.")
+		next["effective_at"] = d20
+		h.recorded(next, request{})
+		h.unchanged(func() {
+			refused(t, h.amend(temp, map[string]any{"kind": "extend", "words": "Longer.", "new_expires_at": d25}), envelope.Refused, "pool.rule_conflict")
+		})
+	})
+}
+
+func TestAnExpiryAnEndAmendmentSetOnARuleWithNoneIsNoticedAndHonoured(t *testing.T) {
+	h, filing := seed(t)
+	rec := h.recorded(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), request{})
+	ended := ok(t, h.amend(rec, map[string]any{"kind": "end", "words": "Until the twentieth.", "new_expires_at": d20}))["rule"].(map[string]any)
+	h.unchanged(func() {
+		refused(t, h.expire(ended, "2026-10-14T09:00:00.000Z"), envelope.Refused, "pool.rule_not_expired")
+	})
+	h.clk.Set(time.Date(2026, 10, 20, 1, 0, 0, 0, time.UTC))
+	resp := h.expire(ended, "2026-10-20T01:00:00.000Z")
+	expired := ok(t, resp)["rule"].(map[string]any)
+	if !slices.Contains(kinds(resp), "pool.rule.expired") || expired["status"] != "expired" {
+		t.Fatalf("expired %v, receipts %v", expired, kinds(resp))
+	}
+	if _, has := expired["expires_at"]; has {
+		t.Errorf("an original date was written: %v", expired["expires_at"])
+	}
+}
+
+func TestChangesNamesARuleOfTheSameConflictKeyAndFullScopeOnly(t *testing.T) {
+	h, filing := seed(t)
+	other := h.recorded(opRule("dispatch.model", "always", filing, "Use the small model."), request{})
+	projectFiling := h.subject(projectScope, "project-filing")
+	narrow := h.recorded(opRule("dispatch.cap", "subject", projectFiling, "Dispatch at most two Swarms."), request{scope: projectScope})
+	hive := h.recorded(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), request{})
+	h.unchanged(func() {
+		for name, c := range map[string]struct {
+			body  map[string]any
+			named map[string]any
+		}{
+			"another conflict key": {opRule("dispatch.cap", "always", filing, "Dispatch at most six Swarms."), other},
+			"another scope":        {opRule("dispatch.cap", "always", filing, "Dispatch at most six Swarms."), narrow},
+		} {
+			resp := h.record(supersedes(c.body, c.named), request{})
+			if resp.Status != envelope.Invalid || resp.Error.Code != "schema_violation" || detail(t, resp)["rule"] != c.named["rule_id"] {
+				t.Errorf("%s: status %s, error %+v", name, resp.Status, resp.Error)
+			}
+		}
+	})
+	h.recorded(supersedes(opRule("dispatch.cap", "always", filing, "Dispatch at most six Swarms."), hive), request{})
+}
+
+func TestAnAmendmentOfAPostureRuleNeedsTheStandingWordThatRecordingItNeeds(t *testing.T) {
+	h, hiveFiling := seed(t)
+	filing := h.subject(projectScope, "posture")
+	posture := h.recorded(opRule("assimilation.posture", "subject", filing, "Land by pull request, never directly."), request{scope: projectScope, authority: word(3)})
+	note := func(r request) *envelope.Response {
+		r.scope = projectScope
+		return h.send("hive-rule", "amend", map[string]any{"rule_id": posture["rule_id"], "kind": "note", "words": "Still wanted."}, r)
+	}
+	h.unchanged(func() {
+		refused(t, note(request{}), envelope.Refused, "authority_insufficient")
+	})
+	ok(t, note(request{authority: word(3)}))
+
+	// Another subject's amendment is as it was.
+	cap := h.recorded(opRule("dispatch.cap", "always", hiveFiling, "Dispatch at most four Swarms."), request{})
+	ok(t, h.amend(cap, map[string]any{"kind": "note", "words": "Still wanted."}))
+}
+
+func TestARuleIsRecordedOnlyWithItsDatesCalendarInstants(t *testing.T) {
+	h, filing := seed(t)
+	const impossible = "2026-02-30T00:00:00.000Z"
+	product := func() map[string]any {
+		return map[string]any{
+			"subject": "stage.ruling", "words": "The ruling.", "origin": map[string]any{"kind": "ruling"},
+			"applies": []any{}, "kind": "product", "governs": map[string]any{"stage": int64(2)},
+		}
+	}
+	h.unchanged(func() {
+		for name, body := range map[string]map[string]any{
+			"a product rule's expiry":    withExpiry(product(), impossible),
+			"a product rule's start":     func() map[string]any { b := product(); b["effective_at"] = impossible; return b }(),
+			"an operating rule's expiry": withExpiry(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), impossible),
+			"an operating rule's start": func() map[string]any {
+				b := opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms.")
+				b["effective_at"] = impossible
+				return b
+			}(),
+		} {
+			if resp := h.record(body, request{}); resp.Status != envelope.Invalid || resp.Error.Code != "schema_violation" {
+				t.Errorf("%s: status %s, error %+v", name, resp.Status, resp.Error)
+			}
+		}
+	})
+	ok(t, h.record(withExpiry(product(), d25), request{}))
+}
+
+func TestAnExtendMovesTheEffectiveExpiryLaterAndAnEndEarlier(t *testing.T) {
+	h, filing := seed(t)
+	temp := h.recorded(withExpiry(opRule("dispatch.cap", "always", filing, "Dispatch at most four Swarms."), d20), request{})
+	h.unchanged(func() {
+		for name, c := range map[string]map[string]any{
+			"an extend earlier":  {"kind": "extend", "words": "Shorter.", "new_expires_at": d15},
+			"an extend as it is": {"kind": "extend", "words": "Same.", "new_expires_at": d20},
+			"an end later":       {"kind": "end", "words": "Longer.", "new_expires_at": d25},
+			"an end as it is":    {"kind": "end", "words": "Same.", "new_expires_at": d20},
+		} {
+			resp := h.amend(temp, c)
+			if resp.Status != envelope.Invalid || resp.Error.Code != "schema_violation" || detail(t, resp)["expires_at"] != d20 {
+				t.Errorf("%s: status %s, error %+v", name, resp.Status, resp.Error)
+			}
+		}
+	})
+	ok(t, h.amend(temp, map[string]any{"kind": "end", "words": "Sooner.", "new_expires_at": d15}))
+
+	// A rule with no expiry never expires: it cannot be extended, and any end is sooner.
+	open := h.recorded(opRule("dispatch.model", "always", filing, "Use the small model."), request{})
+	h.unchanged(func() {
+		if resp := h.amend(open, map[string]any{"kind": "extend", "words": "Longer.", "new_expires_at": d25}); resp.Status != envelope.Invalid {
+			t.Errorf("an extend of a rule with no expiry: status %s, error %+v", resp.Status, resp.Error)
+		}
+	})
+	ok(t, h.amend(open, map[string]any{"kind": "end", "words": "Until the twenty-fifth.", "new_expires_at": d25}))
+}

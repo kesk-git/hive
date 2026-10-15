@@ -78,6 +78,18 @@ func ruleScope(s envelope.Scope) rule.Scope {
 	return rule.Scope{Level: s.Level, HomeID: s.HomeID, WorkspaceID: s.WorkspaceID, ProjectID: s.ProjectID}
 }
 
+// scopeOfRule is the full scope of the rule: its scope and its task generation.
+func scopeOfRule(r *rule.Rule) envelope.Scope {
+	s := envScope(r.Scope)
+	s.TaskID, s.Generation = r.TaskID, r.Generation
+	return s
+}
+
+// envScope is the scope of a rule or a subject as the envelope carries it.
+func envScope(s rule.Scope) envelope.Scope {
+	return envelope.Scope{Level: s.Level, HomeID: s.HomeID, WorkspaceID: s.WorkspaceID, ProjectID: s.ProjectID}
+}
+
 // contains says whether the scope outer is the scope inner or contains it.
 func contains(outer, inner rule.Scope) bool {
 	if outer.HomeID != inner.HomeID {
@@ -98,6 +110,18 @@ func contains(outer, inner rule.Scope) bool {
 func checkContained(c *cli.Call, scope rule.Scope) error {
 	if !contains(ruleScope(c.Request.Scope), scope) {
 		return envelope.Common(envelope.CodeScopeMismatch, "the record is outside the scope of the request")
+	}
+	return nil
+}
+
+// checkRuleContained refuses a rule outside the scope of the request: a request
+// narrowed to a task generation reaches the rules of that generation only.
+func checkRuleContained(c *cli.Call, r *rule.Rule) error {
+	if err := checkContained(c, r.Scope); err != nil {
+		return err
+	}
+	if s := c.Request.Scope; s.TaskID != "" && (r.TaskID != s.TaskID || r.Generation != s.Generation) {
+		return envelope.Common(envelope.CodeScopeMismatch, "the rule is outside the task generation of the request")
 	}
 	return nil
 }
@@ -210,12 +234,12 @@ func (b *builder) receipt(kind string, evidence []envelope.Evidence) (envelope.R
 	return r, nil
 }
 
-// seal adds the receipt, about the record, in the scope of the rule; for a
+// seal adds the receipt, about the record, in the scope given; for a
 // receipt that has an event it appends the event beside it, as the Pool
 // registers them.
-func (b *builder) seal(r envelope.Receipt, subject *envelope.RecordRef, scope rule.Scope, event bool) error {
+func (b *builder) seal(r envelope.Receipt, subject *envelope.RecordRef, scope envelope.Scope, event bool) error {
 	r.Subject = subject
-	r.Scope = envelope.Scope{Level: scope.Level, HomeID: scope.HomeID, WorkspaceID: scope.WorkspaceID, ProjectID: scope.ProjectID}
+	r.Scope = scope
 	b.tx.Receipts = append(b.tx.Receipts, r)
 	if !event {
 		return nil
@@ -244,6 +268,12 @@ func (b *builder) seal(r envelope.Receipt, subject *envelope.RecordRef, scope ru
 	}
 	if scope.ProjectID != "" {
 		e["project_id"] = scope.ProjectID
+	}
+	if scope.TaskID != "" {
+		e["task_id"] = scope.TaskID
+	}
+	if scope.Generation != 0 {
+		e["generation"] = scope.Generation
 	}
 	content, err := canon.Encode(e)
 	if err != nil {

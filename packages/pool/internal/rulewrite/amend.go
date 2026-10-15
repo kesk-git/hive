@@ -1,6 +1,8 @@
 package rulewrite
 
 import (
+	"time"
+
 	"github.com/kesk-git/hive/contract/cli"
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
@@ -30,8 +32,13 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkContained(c, r.Scope); err != nil {
+	if err := checkRuleContained(c, r); err != nil {
 		return nil, err
+	}
+	if r.Subject == postureSubject {
+		if err := rule.CheckPosture(c.Store, c.Request.Scope, c.Request.Authority); err != nil {
+			return nil, err
+		}
 	}
 	now := c.Clock.Now()
 	stamp, err := c.Stamp()
@@ -60,6 +67,9 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 		t, err := clock.Parse(at)
 		if err != nil {
 			return nil, invalid("new_expires_at is not a calendar instant")
+		}
+		if err := checkDirection(r, kind, t); err != nil {
+			return nil, err
 		}
 		amendment["new_expires_at"] = at
 		// An end whose time has come is the rule's status; one that lies ahead
@@ -91,6 +101,9 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 		return nil, err
 	}
 	write := memory.Write{Rules: []*rule.Rule{pr}}
+	if err := snap.RefuseConflicts(now, write); err != nil {
+		return nil, err
+	}
 	if _, err := snap.Plan(now, write); err != nil {
 		return nil, err
 	}
@@ -99,10 +112,32 @@ func Amend(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := b.seal(receipt, ref, r.Scope, true); err != nil {
+	if err := b.seal(receipt, ref, scopeOfRule(r), true); err != nil {
 		return nil, err
 	}
 	return b.stageRendered(snap, write, map[string]any{"rule": final})
+}
+
+// checkDirection refuses an extend that does not move the rule's effective
+// expiry later and an end that does not move it earlier; a rule with no expiry
+// never expires, so it cannot be extended and any end is earlier.
+func checkDirection(r *rule.Rule, kind string, t time.Time) error {
+	current, has, err := r.EffectiveExpiry()
+	if err != nil {
+		return envelope.Common(envelope.CodeRecordMalformed, "the rule's expiry is not a calendar instant").With("record", r.RuleID).Because(err)
+	}
+	if kind == rule.AmendmentExtend && has && t.After(current) || kind == rule.AmendmentEnd && (!has || t.Before(current)) {
+		return nil
+	}
+	if !has {
+		return invalid("an extend moves the expiry later than the rule's current effective expiry, and the rule has none")
+	}
+	at, _ := clock.Format(current)
+	direction := "later"
+	if kind == rule.AmendmentEnd {
+		direction = "earlier"
+	}
+	return invalid("an "+kind+" moves the expiry "+direction+" than the rule's current effective expiry, "+at).With("expires_at", at)
 }
 
 // meetsCondition says whether the receipt, as the request carries it whole, is of

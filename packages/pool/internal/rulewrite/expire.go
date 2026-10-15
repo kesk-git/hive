@@ -32,7 +32,7 @@ func Expire(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := checkContained(c, r.Scope); err != nil {
+	if err := checkRuleContained(c, r); err != nil {
 		return nil, err
 	}
 	if r.Expiry != nil {
@@ -43,7 +43,7 @@ func Expire(c *cli.Call) (*cli.Result, error) {
 	switch {
 	case err != nil:
 		return nil, envelope.Common(envelope.CodeRecordMalformed, "the rule's expiry is not a calendar instant").With("record", id).Because(err)
-	case !ok || r.ExpiresAt == "":
+	case !ok:
 		return nil, refuse(CodeNotExpired, "the rule has no expiry time to honour")
 	case now.Before(expiry):
 		at, _ := clock.Format(expiry)
@@ -94,7 +94,7 @@ func Expire(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := b.seal(receipt, ref, r.Scope, true); err != nil {
+	if err := b.seal(receipt, ref, scopeOfRule(r), true); err != nil {
 		return nil, err
 	}
 	return b.stageRendered(snap, write, map[string]any{"rule": final})

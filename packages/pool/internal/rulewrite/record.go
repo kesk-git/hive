@@ -3,7 +3,6 @@ package rulewrite
 import (
 	"slices"
 	"strconv"
-	"time"
 	"unicode/utf8"
 
 	"github.com/kesk-git/hive/contract/cli"
@@ -25,8 +24,8 @@ var steps = []string{"dispatch", "gate", "define", "stow", "project"}
 // Record is hive-rule record (spec/pool.md, Rules, What a write refuses): it
 // appends a rule and writes pool.rule.recorded, the words and dates given never
 // changed afterwards. It refuses a line over 300 code points, a second rule on a
-// subject that already has one in force at the scope unless the request names
-// that rule in changes, and a rule after which a projection would exceed its
+// subject that already has one in force at the scope, whole of its task
+// generation, unless the request names that rule in changes, and a rule after which a projection would exceed its
 // budget at the clock or at any later instant at which the live set changes. A
 // subject created beside an operating rule, and the facts filed under its
 // subject, commit with the rule or not at all.
@@ -45,6 +44,16 @@ func Record(c *cli.Call) (*cli.Result, error) {
 	}
 	if err := checkExpected(c); err != nil {
 		return nil, err
+	}
+	if sc := c.Request.Scope; (sc.TaskID == "") != (sc.Generation == 0) {
+		return nil, invalid("a rule is narrowed to a task generation by the request scope's task_id and generation, given together")
+	}
+	for _, f := range []string{"effective_at", "expires_at"} {
+		if at := str(body[f]); at != "" {
+			if _, err := clock.Parse(at); err != nil {
+				return nil, invalid(f + " is not a calendar instant")
+			}
+		}
 	}
 	kind := str(body["kind"])
 	if line := str(body["rule_line"]); kind == rule.KindOperating {
@@ -67,7 +76,7 @@ func Record(c *cli.Call) (*cli.Result, error) {
 		return nil, internal("a rule cannot be given an identity", err)
 	}
 	r := &rule.Rule{
-		RecordRevision: 1, RuleID: id, Scope: ruleScope(c.Request.Scope), Subject: str(body["subject"]), Words: str(body["words"]),
+		RecordRevision: 1, RuleID: id, Scope: ruleScope(c.Request.Scope), TaskID: c.Request.Scope.TaskID, Generation: c.Request.Scope.Generation, Subject: str(body["subject"]), Words: str(body["words"]),
 		Origin: copyValue(body["origin"]).(map[string]any), Applies: texts(body["applies"]), Status: rule.StatusInForce,
 		EffectiveAt: stamp, ExpiresAt: str(body["expires_at"]), Authority: tree(c.Request.Tree()["authority"]),
 		Amendments: []rule.Amendment{}, CreatedAt: stamp, UpdatedAt: stamp, Kind: kind,
@@ -100,13 +109,6 @@ func Record(c *cli.Call) (*cli.Result, error) {
 		if subjects, err = fileSubject(c, snap, r, stamp); err != nil {
 			return nil, err
 		}
-		effective, err := clock.Parse(r.EffectiveAt)
-		if err != nil {
-			return nil, invalid("effective_at is not a calendar instant")
-		}
-		if err := checkConflict(snap, r, effective, now); err != nil {
-			return nil, err
-		}
 	default:
 		r.Governs = copyValue(body["governs"]).(map[string]any)
 		r.Specifications = []map[string]any{}
@@ -116,6 +118,9 @@ func Record(c *cli.Call) (*cli.Result, error) {
 	}
 
 	write := memory.Write{Rules: []*rule.Rule{r}, Subjects: subjects}
+	if err := snap.RefuseConflicts(now, write); err != nil {
+		return nil, err
+	}
 	if _, err := snap.Plan(now, write); err != nil {
 		return nil, err
 	}
@@ -135,7 +140,7 @@ func Record(c *cli.Call) (*cli.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := b.seal(receipt, ref, r.Scope, true); err != nil {
+	if err := b.seal(receipt, ref, scopeOfRule(r), true); err != nil {
 		return nil, err
 	}
 	return b.stageRendered(snap, write, map[string]any{"rule": final})
@@ -237,72 +242,20 @@ func checkLoadsAt(loads []string, scope rule.Scope) error {
 }
 
 // checkChanges refuses a request whose changes names a rule the Pool does not
-// hold at the revision named.
+// hold at the revision named, or one of another conflict key or full scope.
 func checkChanges(snap *memory.Snapshot, r *rule.Rule) error {
 	for _, s := range snap.Rules {
 		if s.RuleID == r.Changes.RuleID {
 			if s.RecordRevision != r.Changes.RecordRevision {
 				return envelope.Common(envelope.CodeRevisionConflict, "the rule that changes names is not at the revision named")
 			}
+			if s.Subject != r.Subject || s.Scope != r.Scope || s.TaskID != r.TaskID || s.Generation != r.Generation {
+				return invalid("the rule that changes names is of another conflict key or full scope").With("rule", s.RuleID)
+			}
 			return nil
 		}
 	}
 	return envelope.Common(envelope.CodeNotFound, "the rule that changes names is not a rule of the Pool")
-}
-
-// checkConflict refuses a rule on a subject that already has a rule in force at
-// its scope, unless the request names that rule in changes. A rule is in force at
-// the instant the new rule begins to bind, the clock where that is earlier, and
-// the roles of the two rules overlap.
-func checkConflict(snap *memory.Snapshot, r *rule.Rule, effective, now time.Time) error {
-	at := effective
-	if now.After(at) {
-		at = now
-	}
-	var standing []any
-	for _, s := range snap.Rules {
-		if s.Kind != rule.KindOperating || s.Subject != r.Subject || s.Scope != r.Scope || s.TaskID != "" {
-			continue
-		}
-		if r.Changes != nil && r.Changes.RuleID == s.RuleID {
-			continue
-		}
-		if inForce(s, at) && overlaps(s.Applies, r.Applies) {
-			standing = append(standing, s.RuleID)
-		}
-	}
-	if len(standing) > 0 {
-		return refuse(CodeRuleConflict, "a rule is in force on the subject at this scope and the request does not name it in changes").
-			With("subject", r.Subject).With("rules", standing)
-	}
-	return nil
-}
-
-// inForce says whether the rule is in force at the instant, as the resolver
-// reads it, whatever the role.
-func inForce(s *rule.Rule, at time.Time) bool {
-	if s.Status != rule.StatusInForce || s.Lifted() {
-		return false
-	}
-	effective, err := clock.Parse(s.EffectiveAt)
-	if err != nil || at.Before(effective) {
-		return false
-	}
-	past, err := s.ExpiredAt(at)
-	return err == nil && !past
-}
-
-// overlaps says whether two rules apply to a common role; none is every role.
-func overlaps(a, b []string) bool {
-	if len(a) == 0 || len(b) == 0 {
-		return true
-	}
-	for _, x := range a {
-		if slices.Contains(b, x) {
-			return true
-		}
-	}
-	return false
 }
 
 // checkGoverned holds a product rule's governed work to the Pool: a governed
