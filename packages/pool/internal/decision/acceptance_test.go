@@ -736,6 +736,28 @@ func TestAHandoffSentAgainIsReplayed(t *testing.T) {
 	refused(t, h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id, digest: canon.FileDigest([]byte("another request"))}), envelope.Conflict, envelope.CodeReplayMismatch)
 }
 
+// A resend of a recorded handoff's exact request_id and causation under
+// another command of the package is not that handoff: it is not answered from
+// the outcome hive-word's request recorded, and nothing is written. The
+// genuine handoff sent again is still answered from its recorded outcome.
+func TestAResendUnderAnotherCommandIsNotTheHandoff(t *testing.T) {
+	h := newHome(t)
+	item := h.item()
+	id := mint(t, ids.Request)
+	first := h.ok(h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id}))
+	h.unchanged(func() {
+		other := map[string]any{"kind": "package", "package": "word", "command": "hive-other"}
+		resp := h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id, caller: other})
+		if resp.Status == envelope.Ok || resp.Replayed || resp.Error == nil || resp.Body != nil {
+			t.Fatalf("status %s, replayed %v, error %+v, with a body: %v", resp.Status, resp.Replayed, resp.Error, resp.Body != nil)
+		}
+		again := h.send("hold-question", holdBody(t, ask(t, item), newRound(t)), sent{requestID: id})
+		if again.Status != envelope.Ok || !again.Replayed || rec(again.Body, "question")["question_id"] != rec(first, "question")["question_id"] {
+			t.Fatalf("the handoff itself: status %s, replayed %v, error %+v", again.Status, again.Replayed, again.Error)
+		}
+	})
+}
+
 // revision is the body of a revise-question.
 func revision(question string) map[string]any {
 	return map[string]any{

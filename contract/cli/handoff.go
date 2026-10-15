@@ -15,6 +15,14 @@ import (
 // handoff on the original request's digest, which the handoff carries as its
 // causation.
 
+// HandoffCaller is a caller whose requests an executable treats as handoffs:
+// a package that declares no home path, and the command of that package that
+// hands them off.
+type HandoffCaller struct {
+	Package string
+	Command string
+}
+
 // Callee is a storeless executable's way to the one package it persists
 // through. It is the transport only: the harness decides what the callee's
 // answers mean, and every answer is held to the contract before it is used.
@@ -129,7 +137,7 @@ func (c *Call) SendHandoff(h Handoff) (*envelope.Response, error) {
 // a digest.
 func (e *Executable) handoffKey(req *envelope.Request, own string) string {
 	c := req.Causation
-	if req.Caller.Kind == envelope.CallerPackage && slices.Contains(e.Handoffs, req.Caller.Package) &&
+	if req.Caller.Kind == envelope.CallerPackage && slices.ContainsFunc(e.Handoffs, func(h HandoffCaller) bool { return h.Package == req.Caller.Package }) &&
 		c != nil && c.Schema == envelope.RequestSchema && c.ID == req.RequestID && c.Digest != "" {
 		return c.Digest
 	}

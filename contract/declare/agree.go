@@ -38,7 +38,8 @@ func (s *Set) Agree(e *cli.Executable) Problems {
 			add(e.Name, "%s declares the home paths %v, so its executable keeps a store, and this one is storeless", p.Name, p.HomePaths)
 		}
 	}
-	for _, name := range e.Handoffs {
+	for _, h := range e.Handoffs {
+		name := h.Package
 		q := s.Lookup(name)
 		switch {
 		case q == nil || q.Kind != KindPackage:

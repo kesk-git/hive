@@ -76,7 +76,7 @@ func (r *Registry) Executable() *cli.Executable {
 		Name:      "hive-pool",
 		Version:   Version,
 		Storeless: false,
-		Handoffs:  []string{"word"},
+		Handoffs:  []cli.HandoffCaller{{Package: "word", Command: "hive-word"}},
 		Journal:   journal.Opener("pool"),
 	}
 	r.mu.Lock()
