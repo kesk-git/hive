@@ -361,9 +361,7 @@ func TestAMalformedOutcomeIsUnavailable(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := os.WriteFile(filepath.Join(p.dir, filepath.FromSlash(outcomeFile(written.RequestID))), append(data, '\n'), 0o600); err != nil {
-				t.Fatal(err)
-			}
+			p.put(filepath.Join(p.dir, filepath.FromSlash(outcomeFile(written.RequestID))), append(data, '\n'))
 			resp := p.read("request-outcome", map[string]any{"id": written.RequestID})
 			if resp.Status != envelope.Unavailable || resp.Error == nil || resp.Error.Code != envelope.CodeRecordMalformed || resp.Body != nil {
 				t.Errorf("%s %+v", resp.Status, resp.Error)
@@ -371,9 +369,7 @@ func TestAMalformedOutcomeIsUnavailable(t *testing.T) {
 		})
 	}
 	t.Run("a file that is not a document", func(t *testing.T) {
-		if err := os.WriteFile(filepath.Join(p.dir, filepath.FromSlash(outcomeFile(written.RequestID))), []byte("not json\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
+		p.put(filepath.Join(p.dir, filepath.FromSlash(outcomeFile(written.RequestID))), []byte("not json\n"))
 		resp := p.read("request-outcome", map[string]any{"id": written.RequestID})
 		if resp.Status != envelope.Unavailable || resp.Error == nil || resp.Error.Code != envelope.CodeRecordMalformed {
 			t.Errorf("%s %+v", resp.Status, resp.Error)

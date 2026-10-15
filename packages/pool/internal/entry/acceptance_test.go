@@ -45,12 +45,39 @@ func mint(t testing.TB, p ids.Prefix) string {
 	return id
 }
 
+// put puts the file at path in the home with the content given, through the
+// store's own primitives, so that the directories above it and the file are
+// owner-only and owned by the user, as Hive makes them. A file that is there
+// is emptied first.
+func (p *pool) put(path string, data []byte) {
+	p.t.Helper()
+	if err := store.MakeDir(filepath.Dir(path)); err != nil {
+		p.t.Fatal(err)
+	}
+	f, err := store.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		p.t.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		p.t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		p.t.Fatal(err)
+	}
+}
+
 // newPool makes a home and the executable: the test writer replaces the
 // declared-only update, and the hold reader is registered.
 func newPool(t testing.TB) *pool {
 	t.Helper()
 	p := &pool{t: t, dir: filepath.Join(t.TempDir(), "home"), homeID: mint(t, ids.Home), reg: NewRegistry()}
-	if err := os.Mkdir(p.dir, 0o700); err != nil {
+	// The root is made and secured first, as Hive makes a home, so that every
+	// entry made in it is owner-only and owned by the user.
+	if err := store.MakeDir(p.dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SecureDir(p.dir); err != nil {
 		t.Fatal(err)
 	}
 	writer := map[string]any{"package": "dispatch", "command": "hive-fleet", "operation": "provision", "implementation_version": "test"}
@@ -62,9 +89,7 @@ func newPool(t testing.TB) *pool {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(p.dir, "home.json"), append(home, '\n'), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	p.put(filepath.Join(p.dir, "home.json"), append(home, '\n'))
 	p.reg.RegisterOperation("hive-pool", &cli.Operation{
 		OperationDecl: envelope.OperationDecl{
 			Name: "update", State: envelope.Supported, Mode: envelope.Unary, Mutates: true, Versions: []string{"1.0"},
@@ -165,12 +190,19 @@ func (p *pool) files(under string) map[string]string {
 	root := filepath.Join(p.dir, under)
 	filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
+			rel, _ := filepath.Rel(p.dir, path)
+			rel = filepath.ToSlash(rel)
+			if strings.HasPrefix(rel, "locks/") {
+				// A lock file is listed, never opened: the store may hold it,
+				// and on Windows a plain open of a held lock file is refused.
+				out[rel] = ""
+				return nil
+			}
 			data, rerr := os.ReadFile(path)
 			if rerr != nil {
 				p.t.Fatal(rerr)
 			}
-			rel, _ := filepath.Rel(p.dir, path)
-			out[filepath.ToSlash(rel)] = string(data)
+			out[rel] = string(data)
 		}
 		return nil
 	})
