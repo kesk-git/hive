@@ -279,17 +279,8 @@ func envBlock(env []string) ([]uint16, error) {
 	return append(block, 0), nil
 }
 
-// startPlatform starts the run with one CreateProcessW call through syscall,
-// with CREATE_UNICODE_ENVIRONMENT; CREATE_NO_WINDOW for a plain start; never
-// CREATE_NEW_PROCESS_GROUP, which turns Control-C off for the new process;
-// and an extended startup block whose attribute list carries the job the
-// process is created in (PROC_THREAD_ATTRIBUTE_JOB_LIST), the handle list
-// and, for a terminal start, a pseudoconsole. A resident start there is
-// DETACHED_PROCESS, CREATE_BREAKAWAY_FROM_JOB and CREATE_SUSPENDED, in no job
-// of its own; before it is resumed it is checked with IsProcessInJob, naming
-// no job, to be in no job at all, and if it is in one, or the check fails, it
-// is ended unresumed and the start is refused. A resident is reported as
-// started only after it was resumed outside every job.
+// startPlatform applies the Windows start rules of spec/distribution.md
+// (Starting a process, A resident start and A terminal start).
 //
 // For a terminal start the process inherits no handle at all: the
 // pseudoconsole is its terminal, and the start passes no handle list. It sets

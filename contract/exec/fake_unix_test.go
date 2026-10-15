@@ -118,8 +118,8 @@ func getsid(pid int) (int, error) {
 	return int(r), nil
 }
 
-// fakeWriteHandle has nothing to do on macOS and Linux: the descriptors a
-// child inherits are listed by fds.
+// fakeWriteHandle has nothing to do on macOS and Linux; see
+// TestNoOtherDescriptorReachesTheChild for the descriptor-inheritance check.
 func fakeWriteHandle(out *os.File, args []string) {}
 
 // fakeTermHandles has nothing to do on macOS and Linux: the standard

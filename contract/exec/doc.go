@@ -11,10 +11,8 @@
 // nothing; its standard streams are pipes, named files or the null device,
 // and nothing else Hive holds open reaches it. A run is a plain start, a
 // terminal start on a pseudo-terminal or a resident start for a process that
-// outlives the command that starts it. On macOS and Linux a start goes
-// through os.StartProcess; on Windows it is one CreateProcessW call through
-// syscall, with a job object, a handle list and, for a terminal, a
-// pseudoconsole.
+// outlives the command that starts it. The platform-specific creation and
+// inheritance rules are defined in spec/distribution.md.
 //
 // A run ends in exactly one result: not started, exited with its code, ended
 // by the platform, stopped by Hive, or lost. The operation that made the run
