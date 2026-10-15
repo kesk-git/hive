@@ -23,4 +23,64 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - run: make test
+      - if: runner.os != 'Windows'
+        run: make test
+      - name: Test outside the Windows runner job
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $runDirectory = Join-Path $env:RUNNER_TEMP ("hive-test-" + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $runDirectory | Out-Null
+          $launcher = Join-Path $runDirectory 'test.ps1'
+          $output = Join-Path $runDirectory 'output.log'
+          $status = Join-Path $runDirectory 'exit-code'
+          # WMI does not inherit setup-go's PATH or the step's environment.
+          $environment = @(
+            'PATH', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP',
+            'CGO_ENABLED', 'GOCACHE', 'GOENV', 'GOEXPERIMENT', 'GOFLAGS',
+            'GOINSECURE', 'GOMODCACHE', 'GONOPROXY', 'GONOSUMDB', 'GOPATH',
+            'GOPRIVATE', 'GOPROXY', 'GOROOT', 'GOSUMDB', 'GOTMPDIR', 'GOTOOLCHAIN'
+          )
+          $lines = @('$ErrorActionPreference = ''Stop''', '$PSNativeCommandUseErrorActionPreference = $false')
+          foreach ($name in $environment) {
+            $value = [Environment]::GetEnvironmentVariable($name)
+            if ($null -ne $value) {
+              $lines += '$env:' + $name + " = '" + $value.Replace("'", "''") + "'"
+            }
+          }
+          # Include individual test outcomes in the relayed log.
+          $lines += '$env:GOFLAGS = ($env:GOFLAGS + '' -test.v=true'').Trim()'
+          $lines += "Set-Location -LiteralPath '" + $env:GITHUB_WORKSPACE.Replace("'", "''") + "'"
+          $lines += @'
+          & make test *> (Join-Path $PSScriptRoot 'output.log')
+          $code = $LASTEXITCODE
+          if ($null -eq $code) { throw 'make test did not report an exit status' }
+          [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'exit-code.tmp'), [string]$code)
+          [IO.File]::Move((Join-Path $PSScriptRoot 'exit-code.tmp'), (Join-Path $PSScriptRoot 'exit-code'))
+          exit $code
+          '@
+          Set-Content -LiteralPath $launcher -Value $lines -Encoding utf8
+          try {
+            $pwsh = (Get-Command pwsh.exe).Source
+            $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+              CommandLine = "`"$pwsh`" -NoProfile -NonInteractive -File `"$launcher`""
+              CurrentDirectory = $env:GITHUB_WORKSPACE
+            }
+            Write-Output "WMI ReturnValue=$($created.ReturnValue) ProcessId=$($created.ProcessId)"
+            if ($created.ReturnValue -ne 0) { throw "WMI Create returned $($created.ReturnValue)" }
+            $deadline = [DateTime]::UtcNow.AddMinutes(9)
+            while (!(Test-Path -LiteralPath $status)) {
+              if ([DateTime]::UtcNow -ge $deadline) { throw 'make test did not report an exit status within 9 minutes' }
+              Start-Sleep -Seconds 1
+            }
+            $code = 0
+            if (![int]::TryParse((Get-Content -Raw -LiteralPath $status).Trim(), [ref]$code)) {
+              throw 'make test reported an unreadable exit status'
+            }
+          } finally {
+            if (Test-Path -LiteralPath $output) { Get-Content -LiteralPath $output }
+          }
+          Write-Output "make test exit status: $code"
+          exit $code
