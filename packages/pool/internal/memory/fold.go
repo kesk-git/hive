@@ -14,8 +14,9 @@ import (
 // FoldOp is hive-memory fold (spec/pool.md, Generated knowledge, The
 // maintenance queue and the fold). In one transaction, under the Pool's lock,
 // it drains exactly the whole pending list it reads, in queue order: each note
-// becomes a fact of its subject, and the projections of each subject it changed
-// are rendered again under their budgets; a note with no subject, one whose
+// becomes a fact of its subject, and the projections of each subject a note was
+// filed under, a repeated fact included, are rendered again under their
+// budgets; a note with no subject, one whose
 // fact identity stands with other text and one that would take its subject over
 // its budget becomes a queued Prey of the supervisor that owns the home, and
 // never a line of an always projection. Each note is marked folded or routed
