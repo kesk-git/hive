@@ -135,3 +135,33 @@ func TestThePlannerChecksTheRoleAudiencesAWriteReaches(t *testing.T) {
 }
 
 func errOf(_ []memory.Rendered, err error) error { return err }
+
+// A subject's facts render in every role audience whether or not a rule applies
+// to it, so a new subject whose fact exceeds the subject default is refused
+// though it has no rule and no projection yet.
+func TestThePlannerChecksTheFactsOfANewSubjectInEveryAudience(t *testing.T) {
+	p := newPlan(t)
+	_, rec := subjectRecord(t, hiveScope, "class.5", strings.Repeat("x", 100))
+	small, err := rule.ParseSubject(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.snap.Plan(start, memory.Write{Subjects: []*rule.Subject{small}}); err != nil {
+		t.Fatalf("a fact that fits: %v", err)
+	}
+	_, rec = subjectRecord(t, hiveScope, "class.6", strings.Repeat("x", 400))
+	big, err := rule.ParseSubject(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := overBudget(t, errOf(p.snap.Plan(start, memory.Write{Subjects: []*rule.Subject{big}})))
+	if f.Err.Detail["max_bytes"] != int64(300) {
+		t.Errorf("detail %v", f.Err.Detail)
+	}
+	// A rule for one role does not leave the other roles' renderings unchecked.
+	r := parseRule(t, func() map[string]any {
+		_, r := ruleRecord(t, "subject", big.SubjectID, hiveScope, R{"rule_line": "x", "applies": []any{"class-5"}})
+		return r
+	}())
+	overBudget(t, errOf(p.snap.Plan(start, memory.Write{Subjects: []*rule.Subject{big}, Rules: []*rule.Rule{r}})))
+}

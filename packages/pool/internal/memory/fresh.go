@@ -93,7 +93,7 @@ func staleTrees(homeID string, stale []Source) []any {
 // Derive is the freshness of the projections hive-pool read returns, computed
 // at the clock from the rules in force.
 func Derive(c *read.Context, projections []map[string]any) ([]map[string]any, error) {
-	snap, err := Load(c.Store, c.Call.Home.HomeID)
+	snap, err := loadSources(c.Store, c.Call.Home.HomeID)
 	if err != nil {
 		return nil, err
 	}

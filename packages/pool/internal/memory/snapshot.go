@@ -81,6 +81,30 @@ type resKey struct {
 // under the lock the caller holds. A record that cannot be read ends the read:
 // what is in force cannot be known over a hole in the records.
 func Load(st *cstore.Store, homeID string) (*Snapshot, error) {
+	s, err := loadSources(st, homeID)
+	if err != nil {
+		return nil, err
+	}
+	projections, omitted, err := poolstore.LoadAll(st, "projection")
+	if err != nil {
+		return nil, poolstore.Failure("the projections", err)
+	}
+	if len(omitted) > 0 {
+		return nil, malformed("a projection cannot be read", omitted[0].ID, nil)
+	}
+	for _, l := range projections {
+		e, err := ParseProjection(l.Data)
+		if err != nil {
+			return nil, malformed("a projection cannot be read", l.ID, err)
+		}
+		s.Projections = append(s.Projections, e)
+	}
+	return s, nil
+}
+
+// loadSources reads what a projection's freshness is computed from: the rules,
+// the subjects and the budget configuration, and no projection.
+func loadSources(st *cstore.Store, homeID string) (*Snapshot, error) {
 	s := &Snapshot{}
 	rules, omitted, err := poolstore.LoadAll(st, "rule")
 	if err != nil {
@@ -109,20 +133,6 @@ func Load(st *cstore.Store, homeID string) (*Snapshot, error) {
 			return nil, malformed("a subject cannot be read, so a projection cannot be made", l.ID, err)
 		}
 		s.Subjects = append(s.Subjects, sub)
-	}
-	projections, omitted, err := poolstore.LoadAll(st, "projection")
-	if err != nil {
-		return nil, poolstore.Failure("the projections", err)
-	}
-	if len(omitted) > 0 {
-		return nil, malformed("a projection cannot be read", omitted[0].ID, nil)
-	}
-	for _, l := range projections {
-		e, err := ParseProjection(l.Data)
-		if err != nil {
-			return nil, malformed("a projection cannot be read", l.ID, err)
-		}
-		s.Projections = append(s.Projections, e)
 	}
 	rec, err := budget.Read(st, homeID)
 	if err != nil {

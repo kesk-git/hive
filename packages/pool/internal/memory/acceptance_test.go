@@ -1,6 +1,8 @@
 package memory_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -447,5 +449,28 @@ func TestBudgetChangesAreFitCheckedAndReRenderedAtomically(t *testing.T) {
 		if m := h.freshness(id); m["state"] != "fresh" {
 			t.Errorf("%s: %v", id, m)
 		}
+	}
+}
+
+// A projection's freshness is derived from the rules, subjects and budget it
+// reads, so a projection that cannot be read beside it neither fails its read
+// nor hides the omission of the one that cannot: it is named, and the valid one
+// is returned with its freshness.
+func TestAReadOfAProjectionSurvivesAMalformedOneBesideIt(t *testing.T) {
+	h, _ := seed(t)
+	p, _ := h.rendered(hiveScope, "always", "hive", "")
+	id := p["projection_id"].(string)
+	bad := mint(t, ids.Projection)
+	if err := os.WriteFile(filepath.Join(h.dir, "pool", "records", "projection", bad+".json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if m := h.freshness(id); m["state"] != "fresh" {
+		t.Errorf("by identity: %v", m)
+	}
+	body := h.ok(h.send("hive-pool", "read", map[string]any{"kind": "projection", "selector": map[string]any{}}, request{}))
+	derived := body["derived"].([]any)
+	omitted, _ := body["projection"].(map[string]any)["omitted"].([]any)
+	if len(derived) != 1 || derived[0].(map[string]any)["projection_id"] != id || len(omitted) != 1 || omitted[0].(map[string]any)["id"] != bad {
+		t.Errorf("a query: derived %v, omitted %v (body %v)", derived, omitted, body)
 	}
 }

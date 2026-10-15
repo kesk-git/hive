@@ -144,7 +144,8 @@ func (s *Snapshot) instants(now time.Time) []time.Time {
 // reachable are the keys of every projection that can be rendered from the
 // records: those that stand, the always projections of the Hive and of each
 // workspace, and, for each subject, a projection in every scope the subject's
-// own contains and every audience its rules apply to.
+// own contains and in every role audience: the subject's facts render for each
+// of them whether or not a rule applies to it.
 func (s *Snapshot) reachable() []Key {
 	home := s.home()
 	scopes := []rule.Scope{{Level: envelope.ScopeHive, HomeID: home}}
@@ -162,28 +163,17 @@ func (s *Snapshot) reachable() []Key {
 			scopes = append(scopes, sc)
 		}
 	}
-	audiences := map[string][]string{}
 	for _, r := range s.Rules {
 		if r.Kind != rule.KindOperating || r.TaskID != "" {
 			continue
 		}
 		addScope(r.Scope)
-		if r.Tier == TierSubject {
-			if len(r.Applies) == 0 {
-				audiences[r.FiledUnder] = append(audiences[r.FiledUnder], roles...)
-			} else {
-				audiences[r.FiledUnder] = append(audiences[r.FiledUnder], r.Applies...)
-			}
-		}
 	}
 	for _, sub := range s.Subjects {
 		addScope(sub.Scope)
 	}
 	for _, e := range s.Projections {
 		addScope(e.Scope)
-		if e.Tier == TierSubject {
-			audiences[e.SubjectID] = append(audiences[e.SubjectID], e.Audience)
-		}
 	}
 	seen := map[Key]bool{}
 	var keys []Key
@@ -209,7 +199,7 @@ func (s *Snapshot) reachable() []Key {
 			if !within(sub.Scope, sc) {
 				continue
 			}
-			for _, a := range audiences[sub.SubjectID] {
+			for _, a := range roles {
 				add(Key{Scope: sc, Tier: TierSubject, Audience: a, SubjectID: sub.SubjectID})
 			}
 		}
