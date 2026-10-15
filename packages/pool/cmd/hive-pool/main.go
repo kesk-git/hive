@@ -11,6 +11,7 @@ import (
 	"github.com/kesk-git/hive/packages/pool/internal/entry"
 	_ "github.com/kesk-git/hive/packages/pool/internal/item"
 	_ "github.com/kesk-git/hive/packages/pool/internal/legacy"
+	_ "github.com/kesk-git/hive/packages/pool/internal/rule"
 	_ "github.com/kesk-git/hive/packages/pool/internal/specification"
 )
 
