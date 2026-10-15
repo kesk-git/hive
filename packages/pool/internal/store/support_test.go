@@ -1835,10 +1835,14 @@ var legacyScenarios = []*scenario{
 		must(err)
 		path := filepath.Join(newDir(), "backlog.md")
 		must(os.WriteFile(path, data, 0o600))
+		// The request carries the schema's form of the path: absolute, with
+		// forward slashes, the same string on every platform.
+		abs, err := filepath.Abs(path)
+		must(err)
 		earlier := fixture("pool.migration", "empty-file-hive")
 		earlier["home_id"] = homeID
 		h.plant("migration", earlier["migration_id"].(string), earlier)
-		return poolReq("import-legacy", map[string]any{"path": path, "zone": "UTC", "dry_run": false, "expected_digest": canon.FileDigest(data)}),
+		return poolReq("import-legacy", map[string]any{"path": filepath.ToSlash(abs), "zone": "UTC", "dry_run": false, "expected_digest": canon.FileDigest(data)}),
 			[]string{kindPath("migration", earlier["migration_id"].(string))}
 	}},
 }
