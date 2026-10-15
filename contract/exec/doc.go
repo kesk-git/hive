@@ -8,11 +8,10 @@
 // A run names its program by kind and bare name, and passes its arguments as
 // a list. The program is found on the search path Hive's own process was
 // started with, as an absolute path; the child's environment is built from
-// nothing; its standard streams are pipes, named files or the null device,
-// and nothing else Hive holds open reaches it. A run is a plain start, a
-// terminal start on a pseudo-terminal or a resident start for a process that
-// outlives the command that starts it. The platform-specific creation and
-// inheritance rules are defined in spec/distribution.md.
+// nothing. A run is a plain start, a terminal start on a pseudo-terminal or a
+// resident start for a process that outlives the command that starts it. The
+// platform-specific creation, stream and inheritance rules are defined in
+// spec/distribution.md.
 //
 // A run ends in exactly one result: not started, exited with its code, ended
 // by the platform, stopped by Hive, or lost. The operation that made the run
