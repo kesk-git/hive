@@ -47,8 +47,9 @@
 // Executable.Handoffs which commands of which packages that keep no store
 // hand off, keys such a request on that digest, so that retries that race past
 // the read are answered by whichever reached the callee first. A request that
-// names the package and another command is keyed on its own digest. A callee that gives no response the
-// contract accepts leaves the request unknown, with nothing recorded.
+// names the package and another command is keyed on its own digest. A callee
+// that gives no response the contract accepts leaves the request unknown, with
+// nothing recorded.
 //
 // An operation with an effect outside Hive commits its intent first, with
 // Call.CommitIntent: the records, receipts and events of the intent are
