@@ -7,8 +7,10 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kesk-git/hive/contract/canon"
+	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
 	"github.com/kesk-git/hive/contract/journal"
@@ -792,6 +794,7 @@ func TestRetainedStoreHoldParenthesesExportSecondHold(t *testing.T) {
 	im := h.importText("# Backlog\n\n## Queued\n- [ ] held-a - Hold text\n", "UTC")
 	id := im.taskID("held-a")
 	ok(t, h.do("hold", map[string]any{"task_id": id, "kind": "parked", "reason": "wait"}))
+	h.exe.Clock.(*clock.Fake).Advance(time.Millisecond)
 	ok(t, h.do("hold", map[string]any{"task_id": id, "kind": "external", "reason": "wait (blocked)"}))
 	for _, body := range []map[string]any{
 		{"zone": "UTC", "selector": map[string]any{"task_id": id}},
