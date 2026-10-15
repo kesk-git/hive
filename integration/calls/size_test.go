@@ -64,7 +64,7 @@ func TestSizeRecordCrossesWhole(t *testing.T) {
 		{"standard input, response file", true, true},
 	} {
 		t.Run("echo, "+c.name, func(t *testing.T) {
-			req := newRequest(fromDispatch, calleeExe, "echo", 40, body)
+			req := newRequest(t, fromDispatch, calleeExe, "echo", 40, body)
 			if len(req.data) <= recordBytes {
 				t.Fatalf("the request is %d bytes, not above the record", len(req.data))
 			}
@@ -77,7 +77,7 @@ func TestSizeRecordCrossesWhole(t *testing.T) {
 	}
 
 	t.Run("a response from a small request", func(t *testing.T) {
-		req := newRequest(fromDispatch, calleeExe, "expand", 41, map[string]any{"bytes": int64(recordBytes)})
+		req := newRequest(t, fromDispatch, calleeExe, "expand", 41, map[string]any{"bytes": int64(recordBytes)})
 		if len(req.data) > 4096 {
 			t.Fatalf("the request is %d bytes, not small", len(req.data))
 		}
@@ -89,7 +89,7 @@ func TestSizeRecordCrossesWhole(t *testing.T) {
 	})
 
 	t.Run("a mutating call and its replay", func(t *testing.T) {
-		req := newRequest(fromDispatch, calleeExe, "put", 42, map[string]any{"name": "big", "record": pattern(recordBytes)})
+		req := newRequest(t, fromDispatch, calleeExe, "put", 42, map[string]any{"name": "big", "record": pattern(recordBytes)})
 		r1 := call{program: calleeExe, operation: "put", home: home, req: req}.run(t)
 		resp1 := r1.must(t)
 		if r1.result.Code != 0 || resp1.Replayed || !sameRecord(resp1.Body["record"], recordBytes) {
@@ -122,7 +122,7 @@ func TestSizeRecordFailsWithTooLarge(t *testing.T) {
 
 	t.Run("request by file", func(t *testing.T) {
 		before := snapshot(t, home)
-		req := newRequest(fromDispatch, calleeSmallName, "echo", 50, body)
+		req := newRequest(t, fromDispatch, calleeSmallName, "echo", 50, body)
 		r := call{program: calleeSmallName, operation: "echo", home: home, req: req}.run(t)
 		if got := wantTooLarge(t, r, "request", smallLimit); got != int64(len(req.data)) {
 			t.Errorf("actual_bytes = %d, want the request's %d", got, len(req.data))
@@ -135,7 +135,7 @@ func TestSizeRecordFailsWithTooLarge(t *testing.T) {
 
 	t.Run("request by standard input, mutating", func(t *testing.T) {
 		before := snapshot(t, home)
-		req := newRequest(fromDispatch, calleeSmallName, "put", 51, map[string]any{"name": "toolarge", "record": pattern(recordBytes)})
+		req := newRequest(t, fromDispatch, calleeSmallName, "put", 51, map[string]any{"name": "toolarge", "record": pattern(recordBytes)})
 		r := call{program: calleeSmallName, operation: "put", home: home, req: req, stdin: true, responseFile: true}.run(t)
 		if got := wantTooLarge(t, r, "request", smallLimit); got != int64(len(req.data)) {
 			t.Errorf("actual_bytes = %d, want the request's %d", got, len(req.data))
@@ -145,7 +145,7 @@ func TestSizeRecordFailsWithTooLarge(t *testing.T) {
 
 	t.Run("response, read-only", func(t *testing.T) {
 		before := snapshot(t, home)
-		req := newRequest(fromDispatch, calleeSmallName, "expand", 52, map[string]any{"bytes": int64(recordBytes)})
+		req := newRequest(t, fromDispatch, calleeSmallName, "expand", 52, map[string]any{"bytes": int64(recordBytes)})
 		r := call{program: calleeSmallName, operation: "expand", home: home, req: req}.run(t)
 		if got := wantTooLarge(t, r, "response", smallLimit); got < recordBytes {
 			t.Errorf("actual_bytes = %d, below the record the response would have carried", got)
@@ -158,14 +158,14 @@ func TestSizeRecordFailsWithTooLarge(t *testing.T) {
 
 	t.Run("response, mutating, leaves nothing behind", func(t *testing.T) {
 		before := snapshot(t, home)
-		req := newRequest(fromDispatch, calleeSmallName, "grow", 53, map[string]any{"name": "grown", "bytes": int64(recordBytes)})
+		req := newRequest(t, fromDispatch, calleeSmallName, "grow", 53, map[string]any{"name": "grown", "bytes": int64(recordBytes)})
 		r := call{program: calleeSmallName, operation: "grow", home: home, req: req}.run(t)
 		wantTooLarge(t, r, "response", smallLimit)
 		sameSnapshot(t, "a mutating call whose response was too large", before, snapshot(t, home))
 
 		// Nothing was written and no outcome was recorded, so the name is free
 		// and a smaller answer to the same name succeeds.
-		again := newRequest(fromDispatch, calleeSmallName, "grow", 54, map[string]any{"name": "grown", "bytes": int64(16)})
+		again := newRequest(t, fromDispatch, calleeSmallName, "grow", 54, map[string]any{"name": "grown", "bytes": int64(16)})
 		r2 := call{program: calleeSmallName, operation: "grow", home: home, req: again}.run(t)
 		if resp := r2.must(t); r2.result.Code != 0 || !sameRecord(resp.Body["record"], 16) {
 			t.Fatalf("a smaller answer for the same name: exit %d, status %q; want 0, ok", r2.result.Code, resp.Status)
@@ -182,12 +182,12 @@ func TestSizeRecordFailsWithTooLarge(t *testing.T) {
 func TestSizeLimitIsExact(t *testing.T) {
 	home := newHome(t)
 	padded := func(n int, id int) request {
-		req := newRequest(fromDispatch, calleeSmallName, "state", id, map[string]any{"status": "ok", "pad": strings.Repeat("p", 0)})
+		req := newRequest(t, fromDispatch, calleeSmallName, "state", id, map[string]any{"status": "ok", "pad": strings.Repeat("p", 0)})
 		extra := n - len(req.data)
 		if extra < 0 {
 			t.Fatalf("the base request is already %d bytes", len(req.data))
 		}
-		req = newRequest(fromDispatch, calleeSmallName, "state", id, map[string]any{"status": "ok", "pad": strings.Repeat("p", extra)})
+		req = newRequest(t, fromDispatch, calleeSmallName, "state", id, map[string]any{"status": "ok", "pad": strings.Repeat("p", extra)})
 		if len(req.data) != n {
 			t.Fatalf("the request is %d bytes, want %d", len(req.data), n)
 		}

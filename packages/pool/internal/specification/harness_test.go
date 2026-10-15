@@ -78,12 +78,27 @@ type rev struct {
 // written. A request_id of "" is minted.
 func (h *home) send(requestID, command, operation string, body map[string]any, expected ...rev) *envelope.Response {
 	h.t.Helper()
+	return h.sendAt(operationVersion(command, operation), requestID, command, operation, body, expected...)
+}
+
+// operationVersion is the operation version a request to the operation
+// carries: define is declared at the contract's 1.2, accept and close at 1.0.
+func operationVersion(command, operation string) string {
+	if command == "hive-spec" && operation == "define" {
+		return "1.2"
+	}
+	return "1.0"
+}
+
+// sendAt is send at the operation version given.
+func (h *home) sendAt(version, requestID, command, operation string, body map[string]any, expected ...rev) *envelope.Response {
+	h.t.Helper()
 	if requestID == "" {
 		requestID = mint(h.t, ids.Request)
 	}
 	req := map[string]any{
 		"schema": "hive.request", "schema_version": "1.0",
-		"command": command, "operation": operation, "operation_version": "1.0",
+		"command": command, "operation": operation, "operation_version": version,
 		"request_id": requestID, "correlation_id": h.correlation,
 		"issued_at": "2026-10-14T09:00:00.000Z", "caller": map[string]any{"kind": "test"},
 		"scope_level": "hive", "home_id": h.homeID,

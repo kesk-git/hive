@@ -26,7 +26,7 @@ import (
 func TestAcceptanceDeclaredCallCrossesTheCommandLine(t *testing.T) {
 	home := newHome(t)
 	before := snapshot(t, home)
-	req := newRequest(asPackage{"word", "hive-word"}, "hive-pool", "open-generation", 1, map[string]any{})
+	req := newRequest(t, asPackage{"word", "hive-word"}, "hive-pool", "open-generation", 1, map[string]any{})
 
 	r := call{program: "hive-pool", operation: "open-generation", home: home, req: req}.run(t)
 	resp := r.must(t)
@@ -74,7 +74,7 @@ func TestAcceptanceRecordCrossesWhole(t *testing.T) {
 	body := map[string]any{"record": pattern(recordBytes)}
 
 	t.Run("whole", func(t *testing.T) {
-		req := newRequest(caller, calleeExe, "echo", 1, body)
+		req := newRequest(t, caller, calleeExe, "echo", 1, body)
 		r := call{program: calleeExe, operation: "echo", home: home, req: req}.run(t)
 		resp := r.must(t)
 		if r.result.Code != 0 || string(resp.Status) != "ok" {
@@ -86,7 +86,7 @@ func TestAcceptanceRecordCrossesWhole(t *testing.T) {
 	})
 
 	t.Run("too_large", func(t *testing.T) {
-		req := newRequest(caller, calleeSmallName, "echo", 2, body)
+		req := newRequest(t, caller, calleeSmallName, "echo", 2, body)
 		r := call{program: calleeSmallName, operation: "echo", home: home, req: req}.run(t)
 		resp := r.must(t)
 		if r.result.Code != 7 || string(resp.Status) != "too_large" {
