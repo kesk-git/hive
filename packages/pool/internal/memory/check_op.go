@@ -95,13 +95,7 @@ func missRows(c *cli.Call, st *cstore.Store) ([]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var scoped []*Miss
-	for _, m := range misses {
-		if checkContained(c, m.Scope) == nil {
-			scoped = append(scoped, m)
-		}
-	}
-	counts := countMisses(scoped)
+	counts := countMisses(misses, func(m *Miss) bool { return checkContained(c, m.Scope) == nil })
 	if err := decisionsDue(st, counts); err != nil {
 		return nil, err
 	}

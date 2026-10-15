@@ -351,6 +351,17 @@ func TestStageTwoPrefixes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	owners := map[Prefix]string{}
+	for _, line := range strings.Split(string(table), "\n") {
+		cells := strings.Split(strings.Trim(strings.TrimSpace(line), "|"), "|")
+		if len(cells) != 3 {
+			continue
+		}
+		prefix, owner := strings.Trim(strings.TrimSpace(cells[0]), "`"), strings.Trim(strings.TrimSpace(cells[2]), "`")
+		if name, ok := strings.CutSuffix(prefix, "_"); ok {
+			owners[Prefix(name)] = owner
+		}
+	}
 	clk := clock.NewFake(time.UnixMilli(1729886278806))
 	for _, c := range []struct {
 		prefix Prefix
@@ -400,18 +411,12 @@ func TestStageTwoPrefixes(t *testing.T) {
 			if re.MatchString(strings.ToUpper(id)) {
 				t.Error("pattern accepts upper case")
 			}
-			row := "| `" + string(c.prefix) + "_` |"
-			line := ""
-			for _, l := range strings.Split(string(table), "\n") {
-				if strings.HasPrefix(l, row) {
-					line = l
-				}
-			}
-			if line == "" {
+			owner, found := owners[c.prefix]
+			if !found {
 				t.Fatalf("no row for %q in the identity table", c.prefix)
 			}
-			if !strings.HasSuffix(line, "| `pool` |") {
-				t.Errorf("row %q is not minted by pool", line)
+			if owner != "pool" {
+				t.Errorf("%q is minted by %q; want pool", c.prefix, owner)
 			}
 		})
 	}

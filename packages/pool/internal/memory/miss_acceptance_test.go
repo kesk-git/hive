@@ -932,3 +932,67 @@ func TestRecordAndAmendDeclareTheReceiptOfAMiss(t *testing.T) {
 		}
 	}
 }
+
+// subjectRowOf is the report of a check, in the scope given, about the subject.
+func (w *missWorld) subjectRowOf(scope map[string]any, subject string) map[string]any {
+	w.t.Helper()
+	body := w.ok(w.send("hive-memory", "check", map[string]any{}, request{scope: scope}))
+	for _, v := range body["subjects"].([]any) {
+		if m := v.(map[string]any); m["subject_id"] == subject {
+			return m
+		}
+	}
+	return nil
+}
+
+func TestACheckInANarrowerScopeCountsAnIncidentWhoseRootLiesInAWiderScopedMiss(t *testing.T) {
+	w := newMissWorld(t)
+	projectSubject := w.home.subject(projectScope, "class.p")
+	projectRule := w.home.rule("subject", projectSubject, projectScope, nil)
+	_, a := workerActor(t)
+	_, b := workerActor(t)
+	_, c := workerActor(t)
+	root := w.missed(a, accountOf("incident_a", "independent"))
+	file := func(actor, prov map[string]any) {
+		w.t.Helper()
+		body := w.ok(w.send("hive-memory", "miss", w.body(projectRule, 1, actor, prov, seenAt), request{version: "1.0", scope: projectScope}))
+		if body["recorded"] != true {
+			w.t.Fatalf("the miss was not recorded: %v", body)
+		}
+	}
+	file(b, accountOf("incident_a", "derived", recordRef("pool.miss", root["miss_id"].(string))))
+	if row := w.subjectRowOf(projectScope, projectSubject); row == nil || row["independent_misses"] != int64(1) {
+		t.Fatalf("the derived miss does not carry the wider-scoped root: %v", row)
+	}
+	file(c, accountOf("incident_c", "independent"))
+	row := w.subjectRowOf(projectScope, projectSubject)
+	if row == nil || row["independent_misses"] != int64(2) || row["decision_due"] != true {
+		t.Errorf("project-scoped check: %v, want two incidents and a decision due", row)
+	}
+	if row := w.subjectRowOf(projectScope, w.subject); row != nil {
+		t.Errorf("the project-scoped check reports the Hive-scoped subject: %v", row)
+	}
+}
+
+func TestAQuestionStaysNamedAfterACorrectionBelowTheThreshold(t *testing.T) {
+	w := newMissWorld(t)
+	_, a := workerActor(t)
+	_, b := sessionActor(t)
+	first := w.missed(a, accountOf("incident_a", "independent"))
+	second := w.missed(b, accountOf("incident_b", "independent"))
+	q := fixture(t, "pool.question", "answered-superseding")
+	q["scope_level"] = "hive"
+	delete(q, "workspace_id")
+	delete(q, "project_id")
+	q["question_id"] = "q_" + strings.TrimPrefix(mint(t, ids.Task), "task_")
+	q["origin"] = map[string]any{"kind": "rule", "ref": map[string]any{"schema": "pool.subject", "id": w.subject, "home_id": homeID}}
+	w.plant("question", q["question_id"].(string), q)
+	id := second["miss_id"].(string)
+	body := w.body(w.rule, 1, b, accountOf("incident_b", "derived", recordRef("pool.miss", first["miss_id"].(string))), seenAt)
+	body["miss_id"] = id
+	w.ok(w.send("hive-memory", "miss", body, request{version: "1.0", expected: []rev{{"pool.miss", id, 1}}}))
+	row := w.counted()
+	if row["independent_misses"] != int64(1) || row["decision_due"] != false || row["question_id"] != q["question_id"] {
+		t.Errorf("after the correction: %v, want one incident, nothing due and the earlier question still named", row)
+	}
+}

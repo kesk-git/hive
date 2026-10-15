@@ -41,7 +41,11 @@ type SubjectMisses struct {
 // Two misses of one incident, whether of two rules or of the same account echoed
 // by a supervisor or a synchronized report, are one root and count once. Every
 // miss stays readable: a subject with misses is reported even at a count of zero.
-func countMisses(misses []*Miss) []SubjectMisses {
+//
+// Roots resolve over every miss given, and the subjects reported are those of the
+// misses that visible admits, so a miss in a wider scope still carries its
+// incident to a derived account in a narrower one.
+func countMisses(misses []*Miss, visible func(*Miss) bool) []SubjectMisses {
 	byID := map[string]*Miss{}
 	independentOf := map[string]bool{}
 	for _, m := range misses {
@@ -52,7 +56,7 @@ func countMisses(misses []*Miss) []SubjectMisses {
 	}
 
 	type outcome struct {
-		roots []string
+		roots map[string]bool
 		ok    bool
 	}
 	memo := map[string]outcome{}
@@ -70,9 +74,10 @@ func countMisses(misses []*Miss) []SubjectMisses {
 		var o outcome
 		switch m.Independence {
 		case "independent":
-			o = outcome{roots: []string{m.Incident.key()}, ok: true}
+			o = outcome{roots: map[string]bool{m.Incident.key(): true}, ok: true}
 		case "derived":
 			o.ok = len(m.DerivedFrom) > 0
+			o.roots = map[string]bool{}
 			for _, link := range m.DerivedFrom {
 				var linked outcome
 				if link.Schema == schemaMiss {
@@ -80,13 +85,15 @@ func countMisses(misses []*Miss) []SubjectMisses {
 						linked = rootsOf(target)
 					}
 				} else if independentOf[link.key()] {
-					linked = outcome{roots: []string{link.key()}, ok: true}
+					linked = outcome{roots: map[string]bool{link.key(): true}, ok: true}
 				}
 				if !linked.ok {
 					o = outcome{}
 					break
 				}
-				o.roots = append(o.roots, linked.roots...)
+				for r := range linked.roots {
+					o.roots[r] = true
+				}
 			}
 		}
 		memo[m.ID] = o
@@ -99,6 +106,9 @@ func countMisses(misses []*Miss) []SubjectMisses {
 	}
 	bySubject := map[string]*tally{}
 	for _, m := range misses {
+		if !visible(m) {
+			continue
+		}
 		t := bySubject[m.SubjectID]
 		if t == nil {
 			t = &tally{roots: map[string]bool{}}
@@ -106,7 +116,7 @@ func countMisses(misses []*Miss) []SubjectMisses {
 		}
 		if o := rootsOf(m); o.ok {
 			t.ids = append(t.ids, m.ID)
-			for _, r := range o.roots {
+			for r := range o.roots {
 				t.roots[r] = true
 			}
 		}
@@ -132,11 +142,7 @@ func countMisses(misses []*Miss) []SubjectMisses {
 // schema pool.subject naming the subject, and that subject is its durable
 // deduplication key. A subject with such a question is not due another.
 func decisionsDue(st *cstore.Store, subjects []SubjectMisses) error {
-	reached := false
-	for _, s := range subjects {
-		reached = reached || s.Independent >= SecondMiss
-	}
-	if !reached {
+	if len(subjects) == 0 {
 		return nil
 	}
 	questions, omitted, err := poolstore.LoadAll(st, "question")
