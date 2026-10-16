@@ -139,6 +139,6 @@ The design names five event kinds and says a free-standing instruction is "its o
 
 ## Interaction and resident continuity
 
-**Review interaction mode.** Deliberate annotation is distinct from interacting with an artifact or answering a decision card. The reviewer’s explicit mode wins over the artifact’s declared default; absent a recognized default, annotation is on. Preserve that explicit mode across artifact reloads. Initialization and restoring a draft are not user actions and cannot emit an empty draft that clears restored text or a selected answer. Acceptance: open an interaction-default artifact, use its controls without creating annotation targets, explicitly switch mode and reload; the explicit choice survives. Restore a typed unsent card answer through initialization and reload and verify no empty event replaces it. Sources: [upstream lavish-axi/pull/413](https://github.com/kunchenguid/lavish-axi/pull/413), [upstream lavish-axi/issues/412](https://github.com/kunchenguid/lavish-axi/issues/412).
+**Review interaction mode.** The design’s [Review section](../docs/design.md#review) owns interaction modes, draft restoration, native modifier gestures and their acceptance cases.
 
 Resident reuse and replacement preserve every active review under [the distribution contract](distribution.md#identity-and-resident-compatibility). Browser attachments retain the task/page generation and actual measured viewport required by [optional browser proof](dispatch.md#optional-browser-proof); a mismatched capture is not a valid attachment.
