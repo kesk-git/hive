@@ -18,6 +18,7 @@ import (
 	"github.com/kesk-git/hive/contract/declare"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/word/internal/poolfake"
 )
 
@@ -343,7 +344,10 @@ func pool(t testing.TB) string {
 func homeWith(t testing.TB) (home, homeID string) {
 	t.Helper()
 	home = filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(home, 0o700); err != nil {
+	if err := store.MakeDir(home); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SecureDir(home); err != nil {
 		t.Fatal(err)
 	}
 	homeID, err := ids.Mint(clock.System{}, ids.Home)
@@ -360,10 +364,24 @@ func homeWith(t testing.TB) (home, homeID string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(home, "home.json"), append(record, '\n'), 0o600); err != nil {
+	writeFile(t, filepath.Join(home, "home.json"), append(record, '\n'))
+	return home, homeID
+}
+
+// writeFile creates a home entry with the store's owner-only access.
+func writeFile(t testing.TB, path string, data []byte) {
+	t.Helper()
+	f, err := store.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
 		t.Fatal(err)
 	}
-	return home, homeID
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // listing is every path under the home with its size.

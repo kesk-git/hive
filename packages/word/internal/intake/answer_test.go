@@ -388,13 +388,13 @@ func TestALaterTheRoundFileDoesNotCarryIsRefused(t *testing.T) {
 func TestARoundFileThatIsNotTheSourcesIsRefused(t *testing.T) {
 	asked := map[string]any{"option_id": "yes", "option_label": "Yes", "text": words}
 	for name, damage := range map[string]func(s *scene, path string){
-		"not a record": func(s *scene, path string) { os.WriteFile(path, []byte("{not json"), 0o600) },
+		"not a record": func(s *scene, path string) { writeFile(s.r.t, path, []byte("{not json")) },
 		"another review": func(s *scene, path string) {
 			s.round.ReviewID = mint(t, ids.Review)
 			tree := s.round.Tree()
 			tree["events"] = []any{poolfake.Event(s.event, 1, "submit", poolfake.Submission(mint(t, ids.Request), s.entry(asked)))}
-			out, _ := canon.Encode(tree)
-			os.WriteFile(path, append(out, '\n'), 0o600)
+			out := mustEncode(s.r.t, tree)
+			writeFile(s.r.t, path, append(out, '\n'))
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

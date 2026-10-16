@@ -14,6 +14,7 @@ import (
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/dispatch/internal/entry"
 )
 
@@ -105,14 +106,39 @@ func sendWith(t testing.TB, e *cli.Executable, home string, p provisioning) *env
 	return resp
 }
 
-// newHome makes the empty directory a home is provisioned in.
+// newHome makes the owner-only empty directory a home is provisioned in.
 func newHome(t testing.TB) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, 0o700); err != nil {
+	emptyHome(t, dir)
+	return dir
+}
+
+// emptyHome creates and secures the root before provisioning writes in it.
+func emptyHome(t testing.TB, dir string) {
+	t.Helper()
+	if err := store.MakeDir(dir); err != nil {
 		t.Fatal(err)
 	}
-	return dir
+	if err := store.SecureDir(dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writeFile creates or overwrites a home entry with the store's owner-only access.
+func writeFile(t testing.TB, path string, data []byte) {
+	t.Helper()
+	f, err := store.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // tryGit runs Git in dir for a test, away from the machine's configuration.

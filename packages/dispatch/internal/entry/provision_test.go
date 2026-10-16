@@ -10,6 +10,7 @@ import (
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/store"
 )
 
 // hive-fleet provision is the one operation built: its capabilities say so,
@@ -78,7 +79,10 @@ func TestProvisionIsSupportedAndRouted(t *testing.T) {
 		t.Fatal(err)
 	}
 	home := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(home, 0o700); err != nil {
+	if err := store.MakeDir(home); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SecureDir(home); err != nil {
 		t.Fatal(err)
 	}
 	code, out = invoke(t, "hive-fleet", append(req, '\n'), "provision", "--home", home)
