@@ -2,7 +2,6 @@ package legacy_test
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,17 +18,11 @@ import (
 // build it write it.
 func (h *home) plant(kind, id string, rec map[string]any) {
 	h.t.Helper()
-	dir := filepath.Join(h.dir, "pool", "records", kind)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		h.t.Fatal(err)
-	}
 	data, err := canon.Encode(rec)
 	if err != nil {
 		h.t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, id+".json"), append(data, '\n'), 0o600); err != nil {
-		h.t.Fatal(err)
-	}
+	putFile(h.t, filepath.Join(h.dir, "pool", "records", kind, id+".json"), append(data, '\n'))
 }
 
 // leaf plants an imported item with no level in the state, under the legacy

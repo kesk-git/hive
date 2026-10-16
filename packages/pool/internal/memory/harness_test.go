@@ -13,6 +13,7 @@ import (
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/pool/internal/entry"
 	_ "github.com/kesk-git/hive/packages/pool/internal/memory"
 	_ "github.com/kesk-git/hive/packages/pool/internal/rule"
@@ -69,7 +70,12 @@ func writer(operation string) map[string]any {
 func newHome(t testing.TB) *home {
 	t.Helper()
 	h := &home{t: t, dir: filepath.Join(t.TempDir(), "home"), clk: clock.NewFake(start)}
-	if err := os.Mkdir(h.dir, 0o700); err != nil {
+	// The root is made and secured first, as Hive makes a home, so that every
+	// entry made in it is owner-only and owned by the user.
+	if err := store.MakeDir(h.dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SecureDir(h.dir); err != nil {
 		t.Fatal(err)
 	}
 	h.write("home.json", map[string]any{
@@ -102,10 +108,27 @@ func (h *home) write(rel string, rec map[string]any) {
 		h.t.Fatal(err)
 	}
 	path := filepath.Join(h.dir, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	h.put(path, append(data, '\n'))
+}
+
+// put puts the file at path in the home with the content given, through the
+// store's own primitives, so that the directories above it and the file are
+// owner-only and owned by the user, as Hive makes them. A file that is there
+// is emptied first.
+func (h *home) put(path string, data []byte) {
+	h.t.Helper()
+	if err := store.MakeDir(filepath.Dir(path)); err != nil {
 		h.t.Fatal(err)
 	}
-	if err := os.WriteFile(path, append(data, '\n'), 0o600); err != nil {
+	f, err := store.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		h.t.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		h.t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
 		h.t.Fatal(err)
 	}
 }

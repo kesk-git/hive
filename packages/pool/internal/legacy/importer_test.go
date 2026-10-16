@@ -17,6 +17,7 @@ import (
 	"github.com/kesk-git/hive/contract/clock"
 	"github.com/kesk-git/hive/contract/envelope"
 	"github.com/kesk-git/hive/contract/ids"
+	"github.com/kesk-git/hive/contract/store"
 	"github.com/kesk-git/hive/packages/pool/internal/entry"
 	_ "github.com/kesk-git/hive/packages/pool/internal/item"
 	_ "github.com/kesk-git/hive/packages/pool/internal/legacy"
@@ -52,10 +53,36 @@ func writer(operation string) map[string]any {
 	return map[string]any{"package": "pool", "command": "hive-pool", "operation": operation, "implementation_version": "test"}
 }
 
-// writeHome writes the home record of the home at dir.
+// putFile puts the file at path in a home with the content given, through the
+// store's own primitives, so that the directories above it and the file are
+// owner-only and owned by the user, as Hive makes them. A file that is there is
+// emptied first.
+func putFile(t testing.TB, path string, data []byte) {
+	t.Helper()
+	if err := store.MakeDir(filepath.Dir(path)); err != nil {
+		t.Fatal(err)
+	}
+	f, err := store.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writeHome makes the home at dir as Hive makes one, the root secured first, and
+// writes its home record.
 func writeHome(t testing.TB, dir, homeID string) {
 	t.Helper()
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := store.MakeDir(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SecureDir(dir); err != nil {
 		t.Fatal(err)
 	}
 	data, err := canon.Encode(map[string]any{
@@ -66,9 +93,7 @@ func writeHome(t testing.TB, dir, homeID string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "home.json"), append(data, '\n'), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	putFile(t, filepath.Join(dir, "home.json"), append(data, '\n'))
 }
 
 func newHome(t testing.TB) *home {
