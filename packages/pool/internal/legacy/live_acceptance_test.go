@@ -66,7 +66,8 @@ func (h *home) records(kind string) map[string]map[string]any {
 	return out
 }
 
-// liveImport imports the file for real.
+// liveImport imports the file for real. The path is sent as it is, so a caller
+// passes it in the form of requestPath.
 func (h *home) liveImport(path, zone string, extra map[string]any) *envelope.Response {
 	h.t.Helper()
 	body := map[string]any{"path": path, "zone": zone, "dry_run": false}
@@ -168,6 +169,7 @@ func (im *imported) checkWritten(wantItems, wantHolds int) {
 		t.Errorf("the home holds %d migrations", n)
 	}
 	src, _ := im.migration["source"].(map[string]any)
+	// Compare with the path sent by liveImport, preserving its requestPath form.
 	if src["text"] != string(im.data) || src["digest"] != canon.FileDigest(im.data) || src["bytes"] != int64(len(im.data)) || src["path"] != im.path {
 		t.Errorf("the migration's source is %v", src)
 	}
@@ -594,7 +596,7 @@ func TestLiveImportOfTheSameDigestTwiceIsAlreadyExists(t *testing.T) {
 		t.Errorf("a refused import wrote in the home: before %v, after %v", before, after)
 	}
 	// The same bytes under another path are the same source.
-	other := filepath.Join(t.TempDir(), "copy.md")
+	other := requestPath(t, filepath.Join(t.TempDir(), "copy.md"))
 	if err := os.WriteFile(other, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
