@@ -290,12 +290,13 @@ func wpUnder(t testing.TB, home, dir string) []string {
 	return out
 }
 
-// wpWrite replaces the file of the home at the slash path.
+// wpWrite replaces the content of the file of the home at the slash path. The
+// file is opened through the store's own primitive and emptied, so that it
+// keeps the owner and the access it was made with and only its content is
+// the fault the caller plants.
 func wpWrite(t testing.TB, home, rel string, data []byte) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(home, filepath.FromSlash(rel)), data, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	makeFile(t, filepath.Join(home, filepath.FromSlash(rel)), data)
 }
 
 // The pass-through hive-pool of the race tests is this test executable
