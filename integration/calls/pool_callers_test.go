@@ -92,13 +92,13 @@ func pcStamp(at time.Time) string { return at.UTC().Format("2006-01-02T15:04:05.
 
 // plantBudget stands the budget configuration in the Pool, as the provisioning
 // of a home leaves it (spec/pool.md, the budget record); the rule store and
-// the projections read it, and no built operation writes the first one.
+// the projections read it, and no built operation writes the first one. The
+// directory and the record are made through the store's own primitives, as
+// Hive makes them.
 func (w *pcWorld) plantBudget() {
 	w.t.Helper()
 	dir := filepath.Join(w.home, "pool", "records", "budget")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		w.t.Fatal(err)
-	}
+	makeDir(w.t, dir)
 	const at = "2026-10-11T08:00:00.000Z"
 	rec := map[string]any{
 		"schema": "pool.budget", "schema_version": "1.0", "record_revision": int64(1), "budget_id": "memory",
@@ -108,9 +108,7 @@ func (w *pcWorld) plantBudget() {
 		"created_at": at, "updated_at": at,
 		"writer": map[string]any{"package": "dispatch", "command": "hive-dispatch", "operation": "create-home", "implementation_version": "test"},
 	}
-	if err := os.WriteFile(filepath.Join(dir, "memory.json"), encodeObject(w.t, rec), 0o600); err != nil {
-		w.t.Fatal(err)
-	}
+	makeFile(w.t, filepath.Join(dir, "memory.json"), encodeObject(w.t, rec))
 }
 
 // pcDelivery is a delivery that agrees with the Output of pcImperative.
