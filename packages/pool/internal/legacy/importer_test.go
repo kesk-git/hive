@@ -199,11 +199,9 @@ func snapshot(t testing.TB, dir string) map[string]string {
 	return out
 }
 
-// requestPath is the form of a file's path that a hive-pool.import-legacy
-// request carries: the absolute path with forward slashes, which the request
-// schema requires and which is the same string on macOS, Windows and Linux
-// (C:/dir/file on Windows, /dir/file elsewhere). The operating system opens a
-// file by it as it does by the native form.
+// requestPath puts fixture paths in the request schema's absolute_path form
+// (spec/schemas/common.v1.schema.json). Native Windows separators would fail
+// schema validation before the importer runs.
 func requestPath(t testing.TB, path string) string {
 	t.Helper()
 	abs, err := filepath.Abs(path)

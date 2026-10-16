@@ -1835,8 +1835,8 @@ var legacyScenarios = []*scenario{
 		must(err)
 		path := filepath.Join(newDir(), "backlog.md")
 		must(os.WriteFile(path, data, 0o600))
-		// The request carries the schema's form of the path: absolute, with
-		// forward slashes, the same string on every platform.
+		// Use the request schema's absolute_path form so native Windows
+		// separators do not stop this scenario at schema validation.
 		abs, err := filepath.Abs(path)
 		must(err)
 		earlier := fixture("pool.migration", "empty-file-hive")

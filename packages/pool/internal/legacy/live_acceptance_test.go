@@ -169,8 +169,7 @@ func (im *imported) checkWritten(wantItems, wantHolds int) {
 		t.Errorf("the home holds %d migrations", n)
 	}
 	src, _ := im.migration["source"].(map[string]any)
-	// The migration records the path the request sent: the absolute path with
-	// forward slashes, the same string on every platform.
+	// Compare with the path sent by liveImport, preserving its requestPath form.
 	if src["text"] != string(im.data) || src["digest"] != canon.FileDigest(im.data) || src["bytes"] != int64(len(im.data)) || src["path"] != im.path {
 		t.Errorf("the migration's source is %v", src)
 	}
