@@ -199,9 +199,22 @@ func snapshot(t testing.TB, dir string) map[string]string {
 	return out
 }
 
+// requestPath puts fixture paths in the request schema's absolute_path form
+// (spec/schemas/common.v1.schema.json). Native Windows separators would fail
+// schema validation before the importer runs.
+func requestPath(t testing.TB, path string) string {
+	t.Helper()
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return filepath.ToSlash(abs)
+}
+
 // source copies the fixture into a directory of its own, sets its
-// modification time to a fixed past one, and returns its path, its bytes and
-// that time: a write of the file by the import would change one of them.
+// modification time to a fixed past one, and returns its path in the form of
+// requestPath, its bytes and that time: a write of the file by the import
+// would change one of them.
 func source(t testing.TB, fixture string) (string, []byte, time.Time) {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("..", "..", "testdata", "legacy", fixture))
@@ -211,9 +224,12 @@ func source(t testing.TB, fixture string) (string, []byte, time.Time) {
 	return sourceBytes(t, data)
 }
 
+// sourceBytes is source for bytes the test holds; its path has the form of
+// requestPath, so a request sends it as it is and the migration's recorded
+// source path is expected to equal it on every platform.
 func sourceBytes(t testing.TB, data []byte) (string, []byte, time.Time) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "backlog.md")
+	path := requestPath(t, filepath.Join(t.TempDir(), "backlog.md"))
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -524,7 +540,7 @@ func TestExpectedDigest(t *testing.T) {
 // A file that cannot be read, and a zone that is not one, end the request.
 func TestImportRefusesWhatItCannotRead(t *testing.T) {
 	h := newHome(t)
-	resp := h.do("import-legacy", map[string]any{"path": filepath.Join(t.TempDir(), "absent.md"), "zone": "UTC", "dry_run": true})
+	resp := h.do("import-legacy", map[string]any{"path": requestPath(t, filepath.Join(t.TempDir(), "absent.md")), "zone": "UTC", "dry_run": true})
 	refused(t, resp, envelope.Unavailable, "source_unreadable")
 	path, _, _ := source(t, "backlog.md")
 	resp = h.do("import-legacy", map[string]any{"path": path, "zone": "Not/AZone", "dry_run": true})
