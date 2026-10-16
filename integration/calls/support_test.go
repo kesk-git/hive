@@ -455,16 +455,15 @@ func newMisaddressed(t testing.TB, from asPackage, declaredIn, command, operatio
 }
 
 // newHome makes a private home with an identity record in a temporary
-// directory, and removes it when the test ends.
+// directory, and removes it when the test ends. It is built as Hive builds
+// one: the root is made and secured first, so that everything made in it is
+// owned by the user and open to its owner only, then the identity record is
+// created through the store's own primitive (spec/records.md, The home).
 func newHome(t testing.TB) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "home")
-	if err := os.Mkdir(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SecureDir(dir); err != nil {
-		t.Fatal(err)
-	}
+	makeDir(t, dir)
+	secureHome(t, dir)
 	const at = "2026-10-11T08:00:00.000Z"
 	rec, err := canon.Encode(map[string]any{
 		"schema": "hive.home", "schema_version": "1.0", "record_revision": int64(1),
@@ -475,10 +474,48 @@ func newHome(t testing.TB) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "home.json"), append(rec, '\n'), 0o600); err != nil {
+	makeFile(t, filepath.Join(dir, "home.json"), append(rec, '\n'))
+	return dir
+}
+
+// secureHome makes the home at dir what spec/records.md says a home is: open
+// to its owner only, on Windows by a protected access-control list of the
+// owner alone, which what is made in it inherits.
+func secureHome(t testing.TB, dir string) {
+	t.Helper()
+	if err := store.SecureDir(dir); err != nil {
 		t.Fatal(err)
 	}
-	return dir
+}
+
+// makeDir makes the directory at path in a home, and the directories above it
+// that are not there, through the store's own primitive, so that each is owned
+// by the user and open to its owner only, as Hive makes it.
+func makeDir(t testing.TB, path string) {
+	t.Helper()
+	if err := store.MakeDir(path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// makeFile puts the file at path in a home, with the content given, through
+// the store's own primitive, so that it is owned by the user and open to its
+// owner only, as Hive makes it. A file that is there is emptied first and
+// keeps the owner and access it has; the directory the file is in must be
+// there.
+func makeFile(t testing.TB, path string, data []byte) {
+	t.Helper()
+	f, err := store.CreateFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // snapshot lists every file under dir with a digest of its content, so that
